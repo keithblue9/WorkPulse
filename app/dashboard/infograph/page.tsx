@@ -100,7 +100,7 @@ export default function InfographPage() {
                 <BarChart data={ganttData} barGap={4} barCategoryGap="30%">
                   <XAxis dataKey="name" tick={{ fill: '#9da3b8', fontSize: 12 }} axisLine={{ stroke: '#2e3550' }} tickLine={false} />
                   <YAxis tick={{ fill: '#9da3b8', fontSize: 11 }} axisLine={{ stroke: '#2e3550' }} tickLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} />
-                  <Tooltip contentStyle={{ background: '#1e2335', border: '1px solid #2e3550', borderRadius: 8, fontSize: 12 }} formatter={(v: number) => `${v}%`} />
+                  <Tooltip contentStyle={{ background: '#1e2335', border: '1px solid #2e3550', borderRadius: 8, fontSize: 12 }} formatter={(v) => `${v}%`} />
                   <Bar dataKey="Plan" fill="#1e3a6e" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="Actual" fill="#4f8ef7" radius={[4, 4, 0, 0]} />
                   <Legend wrapperStyle={{ fontSize: 12, color: '#9da3b8' }} />
