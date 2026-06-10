@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { InitiativeModel } from '@/models/Initiative'
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     await connectDB()
-    const initiative = await InitiativeModel.findById(params.id).lean()
+    const initiative = await InitiativeModel.findById(id).lean()
     if (!initiative) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json({ data: initiative })
   } catch (e) {
@@ -13,21 +14,23 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     await connectDB()
     const body = await req.json()
-    const updated = await InitiativeModel.findByIdAndUpdate(params.id, body, { new: true }).lean()
+    const updated = await InitiativeModel.findByIdAndUpdate(id, body, { new: true }).lean()
     return NextResponse.json({ data: updated })
   } catch (e) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     await connectDB()
-    await InitiativeModel.findByIdAndDelete(params.id)
+    await InitiativeModel.findByIdAndDelete(id)
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
