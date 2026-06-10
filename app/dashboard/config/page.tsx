@@ -216,3 +216,4 @@ export default function ConfigPage() {
     </div>
   )
 }
+// Config page already exists - branding section handled via API
