@@ -4,9 +4,12 @@ const UserSchema = new Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true },
   password: { type: String, required: true },
-  role: { type: String, enum: ['admin', 'manager', 'member', 'guest'], default: 'member' },
+  role: { type: String, enum: ['admin', 'manager', 'member', 'guest', 'finance'], default: 'member' },
   division: { type: String, default: '' },
-  avatar: { type: String },
+  phone: String,
+  avatar: String,
+  active: { type: Boolean, default: true },
+  lastLogin: String,
 }, { timestamps: true })
 
 export const UserModel = models.User || mongoose.model('User', UserSchema)
