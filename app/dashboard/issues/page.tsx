@@ -1,144 +1,191 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Issue, Initiative } from '@/types'
 import toast from 'react-hot-toast'
 import { useSession } from 'next-auth/react'
 
-const STATUS_LABELS: Record<string, string> = { on_track: 'On Track', at_risk: 'At Risk', delayed: 'Delayed', completed: 'Completed' }
-const STATUS_COLORS: Record<string, string> = { on_track: 'var(--green)', at_risk: 'var(--amber)', delayed: 'var(--red)', completed: 'var(--blue)' }
+type ViewMode = 'table' | 'kanban' | 'timeline'
 
-function IssueModal({ issue, onClose, onSave }: { issue: Issue; onClose: () => void; onSave: () => void }) {
-  const { data: session } = useSession()
-  const user = session?.user as any
-  const [progress, setProgress] = useState(issue.progress)
-  const [status, setStatus] = useState(issue.status)
-  const [nextPlan, setNextPlan] = useState(issue.nextPlan)
-  const [dueDate, setDueDate] = useState(issue.dueDate)
-  const [progressNote, setProgressNote] = useState('')
-  const [comment, setComment] = useState('')
-  const [saving, setSaving] = useState(false)
+const STATUS_LABELS: Record<string,string> = { on_track:'On Track', at_risk:'At Risk', delayed:'Delayed', completed:'Completed' }
+const STATUS_COLS = ['on_track','at_risk','delayed','completed']
+const STATUS_COLORS: Record<string,string> = { on_track:'var(--green)', at_risk:'var(--amber)', delayed:'var(--red)', completed:'var(--blue)' }
 
+function IssueModal({ issue, onClose, onSave }: { issue: Issue; onClose: ()=>void; onSave: ()=>void }) {
+  const { data: session } = useSession(); const user = session?.user as any
+  const [form, setForm] = useState({ progress: issue.progress, status: issue.status, nextPlan: issue.nextPlan, dueDate: issue.dueDate, note: '' })
+  const [comment, setComment] = useState(''); const [saving, setSaving] = useState(false); const [activeTab, setActiveTab] = useState<'edit'|'history'|'comments'>('edit')
+  const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
   async function save() {
     setSaving(true)
     try {
-      await fetch(`/api/issues/${issue._id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ progress, status, nextPlan, dueDate, progressNote, updatedBy: user?.name || 'User' }),
-      })
-      toast.success('Issue updated!')
-      onSave()
-      onClose()
-    } catch { toast.error('Gagal menyimpan') }
-    finally { setSaving(false) }
+      await fetch(`/api/issues/${issue._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ ...form, progressNote: form.note, updatedBy: user?.name || 'User' }) })
+      toast.success('Issue diperbarui!'); onSave(); onClose()
+    } catch { toast.error('Gagal') } finally { setSaving(false) }
   }
-
   async function addComment() {
     if (!comment.trim()) return
-    await fetch(`/api/issues/${issue._id}/comments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: comment, authorId: user?.id, authorName: user?.name }),
-    })
-    setComment('')
-    toast.success('Komentar ditambahkan')
-    onSave()
+    await fetch(`/api/issues/${issue._id}/comments`, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text: comment, authorId: user?.id, authorName: user?.name }) })
+    setComment(''); toast.success('Komentar ditambahkan'); onSave()
   }
-
+  const progressColor = form.progress >= 80 ? 'var(--green)' : form.progress >= 40 ? 'var(--blue)' : 'var(--amber)'
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, width: 580, maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ width: 620 }}>
+        <div style={{ padding:'18px 22px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{issue.title}</div>
-            <div style={{ fontSize: 11, color: 'var(--text3)' }}>PIC: {issue.picName} · Due: {issue.dueDate}</div>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
-        </div>
-
-        {/* Body */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
-          {/* Progress */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Progress (%)</label>
-            <input type="range" min={0} max={100} value={progress} onChange={e => setProgress(Number(e.target.value))}
-              style={{ width: '100%', marginBottom: 4 }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text3)' }}>
-              <span>0%</span><span style={{ fontWeight: 700, color: 'var(--amber)', fontSize: 14 }}>{progress}%</span><span>100%</span>
+            <div style={{ fontSize:15, fontWeight:600, color:'var(--text)', marginBottom:4 }}>{issue.title}</div>
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <span className={`badge badge-${issue.status}`}>{STATUS_LABELS[issue.status]}</span>
+              <span style={{ fontSize:11, color:'var(--text3)' }}>PIC: {issue.picName} · Due: {issue.dueDate}</span>
             </div>
           </div>
-
-          {/* Status */}
-          <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>Status</label>
-            <select value={status} onChange={e => setStatus(e.target.value as any)} style={inputStyle}>
-              {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-          </div>
-
-          {/* Next plan */}
-          <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>Next Plan</label>
-            <textarea value={nextPlan} onChange={e => setNextPlan(e.target.value)} rows={2}
-              style={{ ...inputStyle, resize: 'vertical' as const }} />
-          </div>
-
-          {/* Due date */}
-          <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle}>Due Date</label>
-            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} style={inputStyle} />
-          </div>
-
-          {/* Progress note */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Catatan update progress</label>
-            <input value={progressNote} onChange={e => setProgressNote(e.target.value)} placeholder="Apa yang sudah dikerjakan?"
-              style={inputStyle} />
-          </div>
-
-          {/* History */}
-          {issue.progressHistory?.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>History Progress</div>
-              {[...issue.progressHistory].reverse().slice(0, 5).map((h, i) => (
-                <div key={i} style={{ display: 'flex', gap: 10, padding: '6px 10px', background: 'var(--bg3)', borderRadius: 6, marginBottom: 6, fontSize: 12 }}>
-                  <span style={{ color: 'var(--text3)', flexShrink: 0 }}>{h.date}</span>
-                  <span style={{ color: 'var(--amber)', fontWeight: 600, flexShrink: 0 }}>{h.progress}%</span>
-                  <span style={{ color: 'var(--text2)' }}>{h.note}</span>
-                  <span style={{ color: 'var(--text3)', marginLeft: 'auto', flexShrink: 0 }}>{h.updatedBy}</span>
+          <button onClick={onClose} className="btn btn-icon" style={{ fontSize:18 }}>×</button>
+        </div>
+        {/* Tabs */}
+        <div style={{ display:'flex', borderBottom:'1px solid var(--border)', padding:'0 22px' }}>
+          {(['edit','history','comments'] as const).map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding:'10px 14px', background:'none', border:'none', cursor:'pointer', fontSize:12, fontWeight:500, color: activeTab === tab ? 'var(--blue)' : 'var(--text3)', borderBottom: activeTab === tab ? '2px solid var(--blue)' : '2px solid transparent', marginBottom:-1, textTransform:'capitalize' }}>{tab === 'edit' ? 'Edit' : tab === 'history' ? 'Riwayat' : 'Komentar'}</button>
+          ))}
+        </div>
+        <div style={{ flex:1, overflow:'auto', padding:'18px 22px' }}>
+          {activeTab === 'edit' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:500, color:'var(--text2)', marginBottom:6 }}>Progress — <span style={{ color: progressColor, fontWeight:700 }}>{form.progress}%</span></label>
+                <input type="range" min={0} max={100} value={form.progress} onChange={e => set('progress', Number(e.target.value))} style={{ width:'100%', accentColor: progressColor }} />
+                <div className="prog-bar" style={{ marginTop:6 }}><div className="prog-fill" style={{ width:`${form.progress}%`, background: progressColor }} /></div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div><label style={{ display:'block', fontSize:12, fontWeight:500, color:'var(--text2)', marginBottom:5 }}>Status</label>
+                  <select className="input" value={form.status} onChange={e => set('status', e.target.value)}>
+                    {Object.entries(STATUS_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+                  </select></div>
+                <div><label style={{ display:'block', fontSize:12, fontWeight:500, color:'var(--text2)', marginBottom:5 }}>Due Date</label>
+                  <input type="date" className="input" value={form.dueDate} onChange={e => set('dueDate', e.target.value)} /></div>
+              </div>
+              <div><label style={{ display:'block', fontSize:12, fontWeight:500, color:'var(--text2)', marginBottom:5 }}>Next Plan</label>
+                <textarea className="input" value={form.nextPlan} onChange={e => set('nextPlan', e.target.value)} rows={2} style={{ resize:'vertical' }} /></div>
+              <div><label style={{ display:'block', fontSize:12, fontWeight:500, color:'var(--text2)', marginBottom:5 }}>Catatan update</label>
+                <input className="input" value={form.note} onChange={e => set('note', e.target.value)} placeholder="Apa yang sudah dikerjakan?" /></div>
+            </div>
+          )}
+          {activeTab === 'history' && (
+            <div>
+              {(!issue.progressHistory?.length) && <div style={{ textAlign:'center', padding:'24px 0', color:'var(--text3)' }}>Belum ada riwayat</div>}
+              {[...( issue.progressHistory || [])].reverse().map((h,i) => (
+                <div key={i} style={{ display:'flex', gap:12, padding:'10px 0', borderBottom:'1px solid var(--border)' }}>
+                  <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--blue)', marginTop:5, flexShrink:0 }} />
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                      <span style={{ fontSize:12, fontWeight:600, color:'var(--blue)' }}>{h.progress}%</span>
+                      <span style={{ fontSize:11, color:'var(--text3)' }}>{h.date} · {h.updatedBy}</span>
+                    </div>
+                    <div style={{ fontSize:12, color:'var(--text2)' }}>{h.note || '—'}</div>
+                  </div>
                 </div>
               ))}
             </div>
           )}
+          {activeTab === 'comments' && (
+            <div>
+              {(issue.comments || []).map((c,i) => (
+                <div key={i} style={{ display:'flex', gap:10, marginBottom:14 }}>
+                  <div style={{ width:28, height:28, borderRadius:'50%', background:'var(--blue2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff', flexShrink:0 }}>{c.authorName?.[0] || 'U'}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:11, fontWeight:600, color:'var(--text2)', marginBottom:3 }}>{c.authorName}</div>
+                    <div style={{ background:'var(--bg3)', borderRadius:8, padding:'8px 12px', fontSize:12, color:'var(--text)' }}>{c.text}</div>
+                  </div>
+                </div>
+              ))}
+              <div style={{ display:'flex', gap:8, marginTop:8 }}>
+                <input className="input" value={comment} onChange={e => setComment(e.target.value)} placeholder="Tulis komentar..." onKeyDown={e => e.key === 'Enter' && addComment()} style={{ flex:1 }} />
+                <button className="btn btn-primary btn-sm" onClick={addComment}>Kirim</button>
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{ padding:'12px 22px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
+          <button onClick={onClose} className="btn">Batal</button>
+          <button onClick={save} disabled={saving} className="btn btn-primary">{saving ? 'Menyimpan...' : 'Simpan Perubahan'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-          {/* Comments */}
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Komentar</div>
-            {issue.comments?.slice(-5).map((c) => (
-              <div key={c._id} style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--blue2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-                  {c.authorName?.[0] || 'U'}
+function KanbanView({ issues, initiatives, onSelect }: { issues: Issue[]; initiatives: Initiative[]; onSelect: (i: Issue) => void }) {
+  const [dragging, setDragging] = useState<string|null>(null)
+  function getInitCode(id: string) { return initiatives.find(i => i._id === id)?.code || '' }
+  async function drop(status: string) {
+    if (!dragging) return
+    await fetch(`/api/issues/${dragging}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status }) })
+    setDragging(null); toast.success('Status diperbarui')
+  }
+  return (
+    <div style={{ display:'flex', gap:12, overflowX:'auto', padding:'16px 20px', flex:1 }}>
+      {STATUS_COLS.map(col => {
+        const colIssues = issues.filter(i => i.status === col)
+        return (
+          <div key={col} className="kanban-col" onDragOver={e => e.preventDefault()} onDrop={() => drop(col)} style={{ flexShrink:0 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <span className={`badge badge-${col}`}>{STATUS_LABELS[col]}</span>
+              <span style={{ fontSize:11, color:'var(--text3)', background:'var(--bg4)', padding:'1px 7px', borderRadius:20 }}>{colIssues.length}</span>
+            </div>
+            {colIssues.map(issue => (
+              <div key={issue._id} className="kanban-card" draggable onDragStart={() => setDragging(issue._id)} onDragEnd={() => setDragging(null)} onClick={() => onSelect(issue)} style={{ opacity: dragging === issue._id ? 0.4 : 1 }}>
+                <div style={{ fontSize:10, color:'var(--text3)', marginBottom:4 }}>{getInitCode(issue.initiativeId)}</div>
+                <div style={{ fontSize:12, fontWeight:500, color:'var(--text)', marginBottom:8, lineHeight:1.4 }}>{issue.title}</div>
+                <div className="prog-bar" style={{ marginBottom:6 }}><div className="prog-fill" style={{ width:`${issue.progress}%`, background: issue.progress >= 80 ? 'var(--green)' : issue.progress >= 40 ? 'var(--blue)' : 'var(--amber)' }} /></div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span style={{ fontSize:10, color:'var(--text3)' }}>{issue.dueDate}</span>
+                  <span style={{ fontSize:10, fontWeight:600, color: issue.progress >= 80 ? 'var(--green)' : 'var(--amber)' }}>{issue.progress}%</span>
                 </div>
-                <div style={{ flex: 1, background: 'var(--bg3)', borderRadius: 6, padding: '6px 10px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', marginBottom: 2 }}>{c.authorName}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text)' }}>{c.text}</div>
-                </div>
+                {issue.picName && <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:5 }}><div style={{ width:18, height:18, borderRadius:'50%', background:'var(--blue2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'#fff' }}>{issue.picName[0]}</div><span style={{ fontSize:10, color:'var(--text3)' }}>{issue.picName}</span></div>}
               </div>
             ))}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input value={comment} onChange={e => setComment(e.target.value)} placeholder="Tulis komentar..." onKeyDown={e => e.key === 'Enter' && addComment()}
-                style={{ ...inputStyle, flex: 1 }} />
-              <button onClick={addComment} style={{ ...saveBtnStyle, padding: '8px 14px', flexShrink: 0 }}>Kirim</button>
-            </div>
+            {colIssues.length === 0 && <div style={{ textAlign:'center', padding:'20px 0', color:'var(--text3)', fontSize:11, border:'1px dashed var(--border)', borderRadius:6 }}>Drop issue di sini</div>}
           </div>
-        </div>
+        )
+      })}
+    </div>
+  )
+}
 
-        {/* Footer */}
-        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onClose} style={cancelBtnStyle}>Batal</button>
-          <button onClick={save} disabled={saving} style={saveBtnStyle}>{saving ? 'Menyimpan...' : 'Simpan'}</button>
-        </div>
+function TimelineView({ issues, onSelect }: { issues: Issue[]; onSelect: (i: Issue) => void }) {
+  const sorted = [...issues].sort((a,b) => a.dueDate?.localeCompare(b.dueDate || '') || 0)
+  const today = new Date().toISOString().split('T')[0]
+  return (
+    <div style={{ overflowY:'auto', padding:'16px 20px', flex:1 }}>
+      <div style={{ position:'relative', paddingLeft:28 }}>
+        <div style={{ position:'absolute', left:11, top:0, bottom:0, width:2, background:'var(--border)' }} />
+        {sorted.map((issue, i) => {
+          const isOverdue = issue.dueDate < today && issue.status !== 'completed'
+          const dotColor = issue.status === 'completed' ? 'var(--green)' : isOverdue ? 'var(--red)' : STATUS_COLORS[issue.status]
+          return (
+            <div key={issue._id} style={{ position:'relative', marginBottom:20 }} className="fade-in" style={{ animationDelay:`${i*0.04}s` }}>
+              <div style={{ position:'absolute', left:-22, top:8, width:12, height:12, borderRadius:'50%', background: dotColor, border:'2px solid var(--bg2)', boxShadow:`0 0 0 3px ${dotColor}33` }} />
+              <div className="card" style={{ padding:'12px 16px', cursor:'pointer', transition:'all 0.15s' }} onClick={() => onSelect(issue)}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor='var(--blue)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor='var(--border)'}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
+                  <div style={{ fontSize:13, fontWeight:500, color:'var(--text)', flex:1, marginRight:10 }}>{issue.title}</div>
+                  <span className={`badge badge-${issue.status}`}>{STATUS_LABELS[issue.status]}</span>
+                </div>
+                <div style={{ display:'flex', gap:12, alignItems:'center', marginBottom:8 }}>
+                  <span style={{ fontSize:11, color: isOverdue ? 'var(--red)' : 'var(--text3)' }}>📅 {issue.dueDate}{isOverdue ? ' ⚠ Overdue' : ''}</span>
+                  <span style={{ fontSize:11, color:'var(--text3)' }}>👤 {issue.picName}</span>
+                </div>
+                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                  <div className="prog-bar" style={{ flex:1 }}><div className="prog-fill" style={{ width:`${issue.progress}%`, background: dotColor }} /></div>
+                  <span style={{ fontSize:11, fontWeight:600, color: dotColor, minWidth:32 }}>{issue.progress}%</span>
+                </div>
+                {issue.nextPlan && <div style={{ fontSize:11, color:'var(--text3)', marginTop:6, borderTop:'1px solid var(--border)', paddingTop:6 }}>→ {issue.nextPlan}</div>}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -148,131 +195,98 @@ export default function IssuesPage() {
   const [issues, setIssues] = useState<Issue[]>([])
   const [initiatives, setInitiatives] = useState<Initiative[]>([])
   const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState<Issue | null>(null)
+  const [selected, setSelected] = useState<Issue|null>(null)
+  const [view, setView] = useState<ViewMode>('table')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterPIC, setFilterPIC] = useState('')
+  const [search, setSearch] = useState('')
 
   async function load() {
     const params = new URLSearchParams()
     if (filterStatus) params.set('status', filterStatus)
     if (filterPIC) params.set('pic', filterPIC)
-    const [i, ini] = await Promise.all([
+    const [ii, ini] = await Promise.all([
       fetch(`/api/issues?${params}`).then(r => r.json()),
       fetch('/api/initiatives').then(r => r.json()),
     ])
-    setIssues(i.data || [])
-    setInitiatives(ini.data || [])
-    setLoading(false)
+    setIssues(ii.data || []); setInitiatives(ini.data || []); setLoading(false)
   }
-
   useEffect(() => { load() }, [filterStatus, filterPIC])
 
-  function getInitiativeTitle(id: string) {
-    const ini = initiatives.find(i => i._id === id)
-    return ini ? `[${ini.code}]` : ''
-  }
+  const filtered = issues.filter(i => !search || i.title.toLowerCase().includes(search.toLowerCase()) || i.picName?.toLowerCase().includes(search.toLowerCase()))
+  const getCode = (id: string) => initiatives.find(i => i._id === id)?.code || ''
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       {selected && <IssueModal issue={selected} onClose={() => setSelected(null)} onSave={load} />}
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 24px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)', flexShrink: 0 }}>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>Issue Summary</div>
-          <div style={{ fontSize: 11, color: 'var(--text3)' }}>Summary Strategic Initiatives — All Issues</div>
-        </div>
-        {/* Legend */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 11, color: 'var(--text3)' }}>
-          {Object.entries(STATUS_LABELS).map(([k, v]) => (
-            <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS[k], display: 'inline-block' }} />{v}
-            </span>
+      {/* Header */}
+      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+        <input className="input" style={{ width:220 }} value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Cari issue..." />
+        <select className="input" style={{ width:140 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option value="">Semua Status</option>
+          {Object.entries(STATUS_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <input className="input" style={{ width:140 }} value={filterPIC} onChange={e => setFilterPIC(e.target.value)} placeholder="Filter PIC..." />
+        <div style={{ flex:1 }} />
+        {/* View switcher */}
+        <div style={{ display:'flex', gap:4, background:'var(--bg3)', borderRadius:8, padding:3 }}>
+          {([['table','⊟ Table'],['kanban','⊞ Kanban'],['timeline','⟳ Timeline']] as const).map(([v,l]) => (
+            <button key={v} onClick={() => setView(v)} style={{ padding:'4px 12px', borderRadius:6, fontSize:12, fontWeight:500, cursor:'pointer', border:'none', background: view === v ? 'var(--bg2)' : 'transparent', color: view === v ? 'var(--text)' : 'var(--text3)', boxShadow: view === v ? 'var(--shadow-sm)' : 'none', transition:'all 0.15s' }}>{l}</button>
           ))}
         </div>
+        <div style={{ fontSize:12, color:'var(--text3)' }}>{filtered.length} issue</div>
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, padding: '10px 24px', background: 'var(--bg2)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ ...inputStyle, width: 160 }}>
-          <option value="">Semua Status</option>
-          {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <input value={filterPIC} onChange={e => setFilterPIC(e.target.value)} placeholder="Filter PIC..." style={{ ...inputStyle, width: 160 }} />
-        <button onClick={load} style={btnStyle}>↻ Refresh</button>
-      </div>
-
-      <div style={{ flex: 1, overflow: 'auto', padding: '16px 24px' }}>
-        {loading ? <div style={{ textAlign: 'center', padding: 60, color: 'var(--text3)' }}>Memuat...</div> : (
-          <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-            {/* Table header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '40px 200px 1fr 200px 120px 100px 160px', background: 'var(--bg3)', borderBottom: '1px solid var(--border)' }}>
-              {['No', 'Critical Issue', 'Progress', 'Next Plan', 'Due Date', 'Status', 'PIC'].map((h, i) => (
-                <div key={h} style={{ padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', borderRight: i < 6 ? '1px solid var(--border)' : 'none' }}>{h}</div>
-              ))}
-            </div>
-
-            {issues.length === 0 && (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text3)', fontSize: 13 }}>Tidak ada issue ditemukan</div>
-            )}
-
-            {issues.map((issue, idx) => (
-              <div key={issue._id}
-                style={{ display: 'grid', gridTemplateColumns: '40px 200px 1fr 200px 120px 100px 160px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: 'var(--bg2)', transition: 'background 0.1s' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg3)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg2)')}
-                onClick={() => setSelected(issue)}>
-                <div style={{ padding: '10px', fontSize: 12, color: 'var(--text3)', fontWeight: 600, borderRight: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start' }}>{idx + 1}</div>
-                <div style={{ padding: '10px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 2 }}>{getInitiativeTitle(issue.initiativeId)}</div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3 }}>{issue.title}</div>
-                </div>
-                <div style={{ padding: '10px', borderRight: '1px solid var(--border)', display: 'flex', alignItems: 'center' }}>
-                  <div style={{ flex: 1 }}>
-                    {issue.progressHistory?.slice(-3).map((h, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 6, fontSize: 11, color: 'var(--text3)', marginBottom: 3, alignItems: 'flex-start' }}>
-                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: i === issue.progressHistory.length - 1 ? 'var(--blue)' : 'var(--text3)', marginTop: 4, flexShrink: 0 }} />
-                        <span style={{ color: i === issue.progressHistory.length - 1 ? 'var(--text2)' : 'var(--text3)', fontWeight: i === issue.progressHistory.length - 1 ? 600 : 400 }}>
-                          {h.date}: {h.note} ({h.progress}%)
-                        </span>
-                      </div>
+      {loading ? <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text3)' }}>Memuat...</div> : (
+        <>
+          {view === 'table' && (
+            <div style={{ flex:1, overflowY:'auto', padding:'0 20px 16px' }}>
+              <div className="card" style={{ marginTop:16, overflow:'hidden' }}>
+                <table className="wp-table" style={{ width:'100%' }}>
+                  <thead><tr>
+                    <th style={{ width:36 }}>#</th>
+                    <th>Issue</th>
+                    <th style={{ width:180 }}>Progress</th>
+                    <th style={{ width:200 }}>Next Plan</th>
+                    <th style={{ width:110 }}>Due Date</th>
+                    <th style={{ width:110 }}>Status</th>
+                    <th style={{ width:120 }}>PIC</th>
+                  </tr></thead>
+                  <tbody>
+                    {filtered.map((issue, i) => (
+                      <tr key={issue._id} style={{ cursor:'pointer' }} onClick={() => setSelected(issue)}>
+                        <td style={{ color:'var(--text3)', fontSize:11 }}>{i+1}</td>
+                        <td>
+                          <div style={{ fontSize:10, color:'var(--text3)', marginBottom:2 }}>[{getCode(issue.initiativeId)}]</div>
+                          <div style={{ fontSize:12, fontWeight:500, color:'var(--text)' }}>{issue.title}</div>
+                          {issue.progressHistory?.slice(-1)[0] && <div style={{ fontSize:10, color:'var(--text3)', marginTop:2 }}>↻ {issue.progressHistory.slice(-1)[0].date}</div>}
+                        </td>
+                        <td>
+                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <div className="prog-bar" style={{ flex:1 }}><div className="prog-fill" style={{ width:`${issue.progress}%`, background: issue.progress>=80?'var(--green)':issue.progress>=40?'var(--blue)':'var(--amber)' }} /></div>
+                            <span style={{ fontSize:11, fontWeight:600, color:'var(--text2)', minWidth:28 }}>{issue.progress}%</span>
+                          </div>
+                        </td>
+                        <td style={{ fontSize:11 }}>{issue.nextPlan}</td>
+                        <td style={{ fontSize:11, fontWeight:500, color: issue.dueDate < new Date().toISOString().split('T')[0] && issue.status !== 'completed' ? 'var(--red)' : 'var(--text2)' }}>{issue.dueDate}</td>
+                        <td><span className={`badge badge-${issue.status}`}>{STATUS_LABELS[issue.status]}</span></td>
+                        <td>
+                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                            <div style={{ width:22, height:22, borderRadius:'50%', background:'var(--blue2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color:'#fff' }}>{issue.picName?.[0]}</div>
+                            <span style={{ fontSize:11 }}>{issue.picName}</span>
+                          </div>
+                        </td>
+                      </tr>
                     ))}
-                    {(!issue.progressHistory || issue.progressHistory.length === 0) && (
-                      <span style={{ fontSize: 11, color: 'var(--text3)' }}>Belum ada update</span>
-                    )}
-                    <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ flex: 1, height: 4, background: 'var(--bg4)', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${issue.progress}%`, background: issue.progress >= 80 ? 'var(--green)' : issue.progress >= 40 ? 'var(--amber)' : 'var(--text3)', borderRadius: 2 }} />
-                      </div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', minWidth: 30 }}>{issue.progress}%</span>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ padding: '10px', borderRight: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start' }}>
-                  <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>{issue.nextPlan}</div>
-                </div>
-                <div style={{ padding: '10px', borderRight: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>{issue.dueDate}</span>
-                </div>
-                <div style={{ padding: '10px', borderRight: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start' }}>
-                  <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 }} className={`badge-${issue.status}`}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block', marginRight: 4 }} />
-                    {STATUS_LABELS[issue.status]}
-                  </span>
-                </div>
-                <div style={{ padding: '10px', display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap', gap: 4 }}>
-                  <span style={{ background: 'var(--bg4)', border: '1px solid var(--border2)', borderRadius: 20, padding: '2px 8px', fontSize: 11, color: 'var(--text2)' }}>{issue.picName || issue.pic}</span>
-                </div>
+                  </tbody>
+                </table>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+          {view === 'kanban' && <KanbanView issues={filtered} initiatives={initiatives} onSelect={setSelected} />}
+          {view === 'timeline' && <TimelineView issues={filtered} onSelect={setSelected} />}
+        </>
+      )}
     </div>
   )
 }
-
-const labelStyle: React.CSSProperties = { display: 'block', fontSize: 12, color: 'var(--text2)', marginBottom: 5, fontWeight: 500 }
-const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 7, padding: '8px 10px', color: 'var(--text)', fontSize: 13, outline: 'none' }
-const btnStyle: React.CSSProperties = { padding: '7px 14px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: '1px solid var(--border2)', background: 'var(--bg3)', color: 'var(--text2)' }
-const cancelBtnStyle: React.CSSProperties = { ...btnStyle }
-const saveBtnStyle: React.CSSProperties = { ...btnStyle, background: 'var(--blue)', borderColor: 'var(--blue)', color: '#fff' }
