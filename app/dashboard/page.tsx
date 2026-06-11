@@ -1,11 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import {
   PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, AreaChart, Area, Legend,
+  AreaChart, Area, Legend,
 } from 'recharts'
 import { format, addDays } from 'date-fns'
 
@@ -26,11 +26,11 @@ function formatRpShort(n:number) {
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background:'var(--bg2)', border:'1px solid var(--border2)', borderRadius:8, padding:'8px 12px', boxShadow:'var(--shadow)', fontSize:11 }}>
+    <div className="glass-strong" style={{ borderRadius:10, padding:'8px 12px', fontSize:11 }}>
       {label && <div style={{ fontWeight:600, color:'var(--text)', marginBottom:5 }}>{label}</div>}
       {payload.map((p:any,i:number)=>(
         <div key={i} style={{ display:'flex', alignItems:'center', gap:7, marginTop:i?3:0 }}>
-          <span style={{ width:9, height:9, borderRadius:2, background:p.color||p.fill, display:'inline-block' }} />
+          <span style={{ width:9, height:9, borderRadius:2, background:p.color||p.fill }} />
           <span style={{ color:'var(--text3)' }}>{p.name}:</span>
           <span style={{ color:'var(--text)', fontWeight:600 }}>{typeof p.value==='number' ? p.value.toLocaleString('id') : p.value}</span>
         </div>
@@ -39,37 +39,68 @@ function ChartTooltip({ active, payload, label }: any) {
   )
 }
 
-// ─── Clickable Stat Card ────────────────────────────────────
-function StatCard({ label, value, sub, color, icon, onClick }: { label:string; value:string|number; sub?:string; color:string; icon:string; onClick?:()=>void }) {
+// ─── Animated count-up ──────────────────────────────────────
+function AnimatedNumber({ value, prefix='', suffix='', duration=900 }: { value:number; prefix?:string; suffix?:string; duration?:number }) {
+  const [display, setDisplay] = useState(0)
+  const ref = useRef<number>()
+  useEffect(() => {
+    const start = display
+    const startTime = performance.now()
+    function tick(now: number) {
+      const t = Math.min(1, (now - startTime) / duration)
+      const eased = 1 - Math.pow(1 - t, 3)
+      setDisplay(Math.round(start + (value - start) * eased))
+      if (t < 1) ref.current = requestAnimationFrame(tick)
+    }
+    ref.current = requestAnimationFrame(tick)
+    return () => ref.current && cancelAnimationFrame(ref.current)
+  }, [value, duration])
+  return <>{prefix}{display.toLocaleString('id-ID')}{suffix}</>
+}
+
+// ─── Glass Stat Card with tilt ──────────────────────────────
+function GlassStatCard({ label, value, sub, color, icon, onClick, trend }: { label:string; value:number; sub?:string; color:string; icon:string; onClick?:()=>void; trend?:string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  function handleMove(e: React.MouseEvent) {
+    if (!ref.current) return
+    const rect = ref.current.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 6
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -6
+    ref.current.style.transform = `perspective(800px) rotateY(${x}deg) rotateX(${y}deg) translateY(-3px)`
+  }
+  function handleLeave() { if (ref.current) ref.current.style.transform = '' }
+
   return (
-    <div className="card" onClick={onClick} style={{ padding:'14px 16px', position:'relative', overflow:'hidden', cursor: onClick?'pointer':'default', transition:'all 0.15s' }}
-      onMouseEnter={e=>onClick&&((e.currentTarget as HTMLElement).style.transform='translateY(-2px)')}
-      onMouseLeave={e=>onClick&&((e.currentTarget as HTMLElement).style.transform='translateY(0)')}>
-      <div style={{ position:'absolute', top:-12, right:-12, width:60, height:60, borderRadius:'50%', background:color, opacity:0.08 }} />
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
-        <div style={{ fontSize:10, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em', fontWeight:600 }}>{label}</div>
-        <div style={{ width:28, height:28, borderRadius:7, background:`${color}22`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14 }}>{icon}</div>
+    <div ref={ref} className="glass glass-hover count-up" onClick={onClick} onMouseMove={handleMove} onMouseLeave={handleLeave}
+      style={{ padding:'18px 20px', borderRadius:18, position:'relative', overflow:'hidden', cursor: onClick?'pointer':'default' }}>
+      <div style={{ position:'absolute', top:-30, right:-30, width:120, height:120, borderRadius:'50%', background:`radial-gradient(circle, ${color}55 0%, transparent 70%)`, filter:'blur(20px)' }} />
+      <div style={{ position:'relative', zIndex:1 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
+          <div style={{ fontSize:10, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.07em', fontWeight:600 }}>{label}</div>
+          <div className="glass" style={{ width:34, height:34, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>{icon}</div>
+        </div>
+        <div className="stat-display" style={{ color, marginBottom:6 }}><AnimatedNumber value={value} /></div>
+        {sub && <div style={{ fontSize:11, color:'var(--text3)' }}>{sub}</div>}
+        {trend && <div style={{ fontSize:10, color, marginTop:6, fontWeight:600, opacity:0.8 }}>{trend}</div>}
+        {onClick && <div style={{ fontSize:9, color:color, marginTop:8, fontWeight:600, opacity:0.7 }}>Klik untuk detail →</div>}
       </div>
-      <div style={{ fontSize:24, fontWeight:700, color, lineHeight:1 }}>{value}</div>
-      {sub && <div style={{ fontSize:10, color:'var(--text3)', marginTop:5 }}>{sub}</div>}
-      {onClick && <div style={{ fontSize:9, color:color, marginTop:6, fontWeight:600 }}>Klik untuk detail →</div>}
     </div>
   )
 }
 
-// ─── Drill-down Detail Modal ────────────────────────────────
+// ─── Detail Modal ───────────────────────────────────────────
 function DetailModal({ title, items, columns, onClose, emptyText }: { title:string; items:any[]; columns:{key:string;label:string;render?:(v:any,row:any)=>any}[]; onClose:()=>void; emptyText?:string }) {
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:720, maxWidth:'90vw' }}>
-        <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
+      <div className="glass-strong scale-in" style={{ borderRadius:18, width:760, maxWidth:'92vw', maxHeight:'88vh', overflow:'hidden', display:'flex', flexDirection:'column' }}>
+        <div style={{ padding:'16px 22px', borderBottom:'1px solid var(--glass-border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div>
-            <div style={{ fontSize:14, fontWeight:600 }}>{title}</div>
+            <div style={{ fontSize:15, fontWeight:600 }}>{title}</div>
             <div style={{ fontSize:10, color:'var(--text3)' }}>{items.length} item</div>
           </div>
           <button onClick={onClose} className="btn btn-icon">×</button>
         </div>
-        <div style={{ overflowY:'auto', maxHeight:'70vh' }}>
+        <div style={{ overflowY:'auto', flex:1 }}>
           {items.length === 0 ? (
             <div style={{ padding:'40px 20px', textAlign:'center', color:'var(--text3)', fontSize:12 }}>{emptyText||'Belum ada data'}</div>
           ) : (
@@ -86,7 +117,7 @@ function DetailModal({ title, items, columns, onClose, emptyText }: { title:stri
   )
 }
 
-// ─── AI Insight ─────────────────────────────────────────────
+// ─── AI Insight in glass ────────────────────────────────────
 function AIInsight({ type, userName }: { type:'team'|'personal'; userName?:string }) {
   const [insight, setInsight] = useState('')
   const [loading, setLoading] = useState(false)
@@ -102,29 +133,27 @@ function AIInsight({ type, userName }: { type:'team'|'personal'; userName?:strin
   }
 
   return (
-    <div className="card" style={{ padding:'14px 16px', height:'100%', display:'flex', flexDirection:'column' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <div style={{ width:24, height:24, borderRadius:6, background:type==='team'?'var(--bluebg)':'var(--purplebg)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13 }}>🤖</div>
+    <div className="glass" style={{ padding:'16px 18px', borderRadius:16, height:'100%', display:'flex', flexDirection:'column' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:34, height:34, borderRadius:11, background:`linear-gradient(135deg, ${type==='team'?'#4f8ef7':'#a78bfa'}, ${type==='team'?'#2563d4':'#7c3aed'})`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, color:'#fff', boxShadow:'0 6px 16px rgba(79,142,247,0.3)' }}>🤖</div>
           <div>
-            <div style={{ fontSize:12, fontWeight:600, color:'var(--text)' }}>{type==='team'?'AI Insight — Tim':`AI Insight — ${userName||'Personal'}`}</div>
+            <div style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>{type==='team'?'AI Insight — Tim':`AI — ${userName||'Personal'}`}</div>
             <div style={{ fontSize:9, color:'var(--text3)' }}>Powered by Claude</div>
           </div>
         </div>
         <button onClick={generate} disabled={loading} className="btn btn-sm">
-          {loading ? '⟳ ...' : generated ? '↻ Refresh' : '✨ Generate'}
+          {loading ? '⟳ ...' : generated ? '↻' : '✨ Generate'}
         </button>
       </div>
       <div style={{ flex:1, overflowY:'auto', minHeight:120 }}>
         {insight ? (
           <div style={{ fontSize:12, color:'var(--text2)', lineHeight:1.7, whiteSpace:'pre-wrap' }}>{insight}</div>
         ) : (
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', minHeight:120, textAlign:'center', padding:10 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', minHeight:120, textAlign:'center' }}>
             <div>
-              <div style={{ fontSize:24, marginBottom:6, opacity:0.5 }}>{type==='team'?'📊':'🎯'}</div>
-              <div style={{ fontSize:11, color:'var(--text3)', lineHeight:1.5 }}>
-                {loading ? 'AI menganalisis...' : 'Klik Generate untuk analisis terkini'}
-              </div>
+              <div style={{ fontSize:32, marginBottom:6, opacity:0.4 }}>{type==='team'?'📊':'🎯'}</div>
+              <div style={{ fontSize:11, color:'var(--text3)' }}>{loading ? 'AI menganalisis...' : 'Klik Generate untuk analisis'}</div>
             </div>
           </div>
         )}
@@ -133,21 +162,27 @@ function AIInsight({ type, userName }: { type:'team'|'personal'; userName?:strin
   )
 }
 
-// ─── Mini Donut ─────────────────────────────────────────────
-function MiniDonut({ pct, color, size=72, label }: { pct:number; color:string; size?:number; label?:string }) {
+// ─── Donut with glass ───────────────────────────────────────
+function GlassDonut({ pct, color, size=80, label, sublabel }: { pct:number; color:string; size?:number; label?:string; sublabel?:string }) {
   const data = [{ name:'done', value:pct }, { name:'left', value:Math.max(0,100-pct) }]
   return (
     <div style={{ position:'relative', width:size, height:size }}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
-          <Pie data={data} dataKey="value" innerRadius={size*0.32} outerRadius={size*0.46} startAngle={90} endAngle={-270} stroke="none">
-            <Cell fill={color} /><Cell fill="var(--bg4)" />
+          <defs>
+            <linearGradient id={`grad-${label?.replace(/\W/g,'')}-${color.replace('#','')}`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={1} />
+              <stop offset="100%" stopColor={color} stopOpacity={0.6} />
+            </linearGradient>
+          </defs>
+          <Pie data={data} dataKey="value" innerRadius={size*0.34} outerRadius={size*0.48} startAngle={90} endAngle={-270} stroke="none">
+            <Cell fill={`url(#grad-${label?.replace(/\W/g,'')}-${color.replace('#','')})`} /><Cell fill="var(--bg4)" />
           </Pie>
         </PieChart>
       </ResponsiveContainer>
       <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', textAlign:'center' }}>
-        <div style={{ fontSize:Math.round(size*0.21), fontWeight:700, color, lineHeight:1 }}>{Math.round(pct)}<span style={{ fontSize:Math.round(size*0.14) }}>%</span></div>
-        {label && <div style={{ fontSize:8, color:'var(--text3)', marginTop:2 }}>{label}</div>}
+        <div style={{ fontSize:Math.round(size*0.22), fontWeight:800, color, lineHeight:1, letterSpacing:'-0.03em' }}>{Math.round(pct)}<span style={{ fontSize:Math.round(size*0.14) }}>%</span></div>
+        {sublabel && <div style={{ fontSize:8, color:'var(--text3)', marginTop:2 }}>{sublabel}</div>}
       </div>
     </div>
   )
@@ -181,9 +216,12 @@ export default function DashboardPage() {
   }, [])
 
   if (loading) return (
-    <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <div style={{ textAlign:'center' }}>
-        <div style={{ width:36, height:36, border:'3px solid var(--border2)', borderTopColor:'var(--blue)', borderRadius:'50%', margin:'0 auto 12px' }} className="spin" />
+    <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+      <div className="ambient-bg">
+        <div className="orb" style={{ width:300, height:300, background:'#4f8ef7', top:'30%', left:'40%' }} />
+      </div>
+      <div style={{ position:'relative', textAlign:'center' }}>
+        <div style={{ width:40, height:40, border:'3px solid var(--border2)', borderTopColor:'var(--blue)', borderRadius:'50%', margin:'0 auto 14px' }} className="spin" />
         <div style={{ color:'var(--text3)', fontSize:12 }}>Memuat dashboard...</div>
       </div>
     </div>
@@ -198,35 +236,31 @@ export default function DashboardPage() {
     { key:'others', label:'Others', color:'#9da3b8' },
   ]
 
-  // ─── Derived data ─────────────────────────────────────────
   const totalIssues = issues.length
   const highIssues = issues.filter((i:any)=>i.priority==='high')
   const completedIssues = issues.filter((i:any)=>i.status==='completed')
   const riskIssues = issues.filter((i:any)=>i.status==='at_risk'||i.status==='delayed')
   const avgProgress = initiatives.length ? Math.round(initiatives.reduce((s:number,i:any)=>s+(i.actualProgress||0),0)/initiatives.length) : 0
+  const avgPlan = initiatives.length ? Math.round(initiatives.reduce((s:number,i:any)=>s+(i.planProgress||0),0)/initiatives.length) : 0
 
-  // Filter projects/kpis per segment
   function projectsBySegment(seg:string) {
     if (seg === 'anggaran') return []
     return projects.filter((p:any) => {
-      const t = (p.subType||'').toLowerCase()
-      const cat = (p.category||'').toLowerCase()
-      if (seg === 'kpi') return t.includes('kpi-si') || cat.includes('kpi - si') || (!t && !cat) // empty falls here as default
-      if (seg === 'non-si') return t.includes('non-si') || cat.includes('non si')
-      if (seg === 'golive') return t.includes('go-live') || cat.includes('golive') || cat.includes('go live')
+      const t = (p.subType||'').toLowerCase(); const cat = (p.category||'').toLowerCase()
+      if (seg === 'kpi') return t.includes('kpi-si')
+      if (seg === 'non-si') return t.includes('non-si') || t.includes('non si')
+      if (seg === 'golive') return t.includes('go-live') || cat.includes('golive')
       if (seg === 'others') return t.includes('others') || cat.includes('others')
       return false
     })
   }
 
-  // Status distribution for issues
   const statusDist = ['on_track','at_risk','delayed','completed'].map(k => ({
     name: k.replace('_',' '),
     value: issues.filter((i:any)=>i.status===k).length,
     color: { on_track:'#22c55e', at_risk:'#f59e0b', delayed:'#ef4444', completed:'#4f8ef7' }[k as any],
   }))
 
-  // Budget summary
   const budgetByCategory = (config?.budgetCategories || []).map((cat:any) => {
     const catEntries = budgets.filter((b:any) => b.categoryKey === cat.key)
     const totalActual = catEntries.reduce((s:number,e:any)=>s+(e.actualAmount||0), 0)
@@ -247,7 +281,6 @@ export default function DashboardPage() {
     }
   })
 
-  // Upcoming agenda
   const today = format(new Date(),'yyyy-MM-dd')
   const upcomingAgenda: any[] = []
   agenda.forEach((day:any) => {
@@ -255,143 +288,136 @@ export default function DashboardPage() {
   })
   upcomingAgenda.sort((a,b) => a.date.localeCompare(b.date) || (a.time||'').localeCompare(b.time||''))
 
-  // Detail items for modals
   const detailMap: Record<string, any> = {
-    initiatives: {
-      title: 'Strategic Initiatives Detail',
-      items: initiatives,
-      columns: [
-        { key:'code', label:'Code' }, { key:'title', label:'Title' },
-        { key:'planProgress', label:'Plan %', render:(v:number)=>`${v}%` },
-        { key:'actualProgress', label:'Actual %', render:(v:number,r:any)=>(
-          <span style={{ color: r.actualProgress>=r.planProgress?'var(--green)':'var(--amber)', fontWeight:600 }}>{v}%</span>
-        )},
-        { key:'status', label:'Status', render:(v:string)=><span className={`badge badge-${v}`}>{v?.replace('_',' ')}</span> },
-      ],
-    },
-    issues_all: {
-      title: 'Semua Issues',
-      items: issues,
-      columns: [
-        { key:'title', label:'Issue' }, { key:'picName', label:'PIC' },
-        { key:'progress', label:'Progress', render:(v:number)=>`${v}%` },
-        { key:'priority', label:'Priority', render:(v:string)=>{const cfg=PRIORITY_CFG[v||'medium'];return <span style={{ color:cfg.color, fontSize:11, fontWeight:600 }}>{cfg.label}</span>} },
-        { key:'status', label:'Status', render:(v:string)=><span className={`badge badge-${v}`}>{v?.replace('_',' ')}</span> },
-        { key:'dueDate', label:'Due' },
-      ],
-    },
-    issues_high: {
-      title: 'High Priority Issues',
-      items: highIssues,
-      columns: [
-        { key:'title', label:'Issue' }, { key:'picName', label:'PIC' },
-        { key:'progress', label:'Progress', render:(v:number)=>`${v}%` },
-        { key:'dueDate', label:'Due' },
-        { key:'status', label:'Status', render:(v:string)=><span className={`badge badge-${v}`}>{v?.replace('_',' ')}</span> },
-      ],
-    },
-    projects_active: {
-      title: 'Active Projects',
-      items: projects.filter((p:any)=>p.status==='active'),
-      columns: [
-        { key:'title', label:'Title' }, { key:'category', label:'Category' },
-        { key:'progress', label:'Progress', render:(v:number)=>`${v}%` },
-        { key:'members', label:'PIC', render:(v:any)=>v?.join(', ')||'—' },
-      ],
-    },
-    agenda: {
-      title: 'Upcoming Agenda',
-      items: upcomingAgenda,
-      columns: [
-        { key:'date', label:'Tanggal' }, { key:'time', label:'Jam' },
-        { key:'title', label:'Activity', render:(v:string,r:any)=><span>{ITEM_TYPE_ICONS[r.type]||'📌'} {v}</span> },
-        { key:'location', label:'Lokasi' },
-      ],
-    },
+    initiatives: { title: 'Strategic Initiatives', items: initiatives, columns: [
+      { key:'code', label:'Code' }, { key:'title', label:'Title' },
+      { key:'planProgress', label:'Plan', render:(v:number)=>`${v}%` },
+      { key:'actualProgress', label:'Actual', render:(v:number,r:any)=>(<span style={{ color: r.actualProgress>=r.planProgress?'var(--green)':'var(--amber)', fontWeight:600 }}>{v}%</span>)},
+      { key:'status', label:'Status', render:(v:string)=><span className={`badge badge-${v}`}>{v?.replace('_',' ')}</span> },
+    ]},
+    issues_all: { title: 'Semua Issues', items: issues, columns: [
+      { key:'title', label:'Issue' }, { key:'picName', label:'PIC' },
+      { key:'progress', label:'Progress', render:(v:number)=>`${v}%` },
+      { key:'priority', label:'Priority', render:(v:string)=>{const cfg=PRIORITY_CFG[v||'medium'];return <span style={{ color:cfg.color, fontSize:11, fontWeight:600 }}>{cfg.label}</span>} },
+      { key:'status', label:'Status', render:(v:string)=><span className={`badge badge-${v}`}>{v?.replace('_',' ')}</span> },
+      { key:'dueDate', label:'Due' },
+    ]},
+    issues_high: { title: 'High Priority Issues', items: highIssues, columns: [
+      { key:'title', label:'Issue' }, { key:'picName', label:'PIC' },
+      { key:'progress', label:'Progress', render:(v:number)=>`${v}%` },
+      { key:'dueDate', label:'Due' },
+      { key:'status', label:'Status', render:(v:string)=><span className={`badge badge-${v}`}>{v?.replace('_',' ')}</span> },
+    ]},
+    projects_active: { title: 'Active Projects', items: projects.filter((p:any)=>p.status==='active'), columns: [
+      { key:'title', label:'Title' }, { key:'category', label:'Category' }, { key:'subType', label:'Sub-type' },
+      { key:'progress', label:'Progress', render:(v:number)=>`${v}%` },
+      { key:'members', label:'PIC', render:(v:any)=>v?.join(', ')||'—' },
+    ]},
+    agenda: { title: 'Upcoming Agenda', items: upcomingAgenda, columns: [
+      { key:'date', label:'Tanggal' }, { key:'time', label:'Jam' },
+      { key:'title', label:'Activity', render:(v:string,r:any)=><span>{ITEM_TYPE_ICONS[r.type]||'📌'} {v}</span> },
+      { key:'location', label:'Lokasi' },
+    ]},
   }
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', position:'relative' }}>
       {detail && <DetailModal {...detailMap[detail]} onClose={()=>setDetail(null)} />}
 
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+      {/* Ambient gradient orbs background */}
+      <div className="ambient-bg" style={{ position:'fixed' }}>
+        <div className="orb" style={{ width:420, height:420, background:'#4f8ef7', top:'5%', left:'-10%' }} />
+        <div className="orb" style={{ width:380, height:380, background:'#a78bfa', top:'40%', right:'-8%', animationDelay:'-6s' }} />
+        <div className="orb" style={{ width:340, height:340, background:'#22c55e', bottom:'5%', left:'30%', animationDelay:'-12s' }} />
+      </div>
+
+      <div style={{ padding:'14px 24px', borderBottom:'1px solid var(--glass-border)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, position:'relative', zIndex:1 }} className="glass">
         <div>
-          <div style={{ fontSize:15, fontWeight:600 }}>Dashboard</div>
-          <div style={{ fontSize:11, color:'var(--text3)' }}>{config?.appTagline||'BPD & SS Procurement'} · {format(new Date(),'d MMM yyyy')}</div>
+          <div style={{ fontSize:18, fontWeight:700, letterSpacing:'-0.02em' }} className="gradient-text">Dashboard</div>
+          <div style={{ fontSize:11, color:'var(--text3)' }}>{config?.appTagline||'BPD & SS Procurement'} · {format(new Date(),'EEEE, d MMM yyyy')}</div>
         </div>
-        <span style={{ padding:'4px 10px', borderRadius:20, fontSize:10, fontWeight:600, background:'var(--bluebg)', color:'var(--blue)' }}>👤 {user?.name}</span>
+        <div className="glass" style={{ padding:'5px 12px', borderRadius:20, fontSize:11, fontWeight:600 }}>👤 {user?.name}</div>
       </div>
 
       {/* Segment tabs */}
-      <div style={{ display:'flex', gap:5, padding:'8px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', overflowX:'auto', flexShrink:0 }}>
-        <button onClick={()=>setActiveSegment('overview')} style={{ padding:'5px 14px', borderRadius:8, fontSize:12, fontWeight:500, cursor:'pointer', whiteSpace:'nowrap', border:`1px solid ${activeSegment==='overview'?'var(--blue)':'var(--border)'}`, background:activeSegment==='overview'?'var(--bluebg)':'var(--bg3)', color:activeSegment==='overview'?'var(--blue)':'var(--text2)' }}>📊 Overview</button>
+      <div style={{ display:'flex', gap:5, padding:'10px 24px', overflowX:'auto', flexShrink:0, position:'relative', zIndex:1 }}>
+        <button onClick={()=>setActiveSegment('overview')} className={activeSegment==='overview'?'glass-strong':'glass'} style={{ padding:'6px 16px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', color:activeSegment==='overview'?'var(--blue)':'var(--text2)', border: activeSegment==='overview'?'1px solid var(--blue)':'1px solid var(--glass-border)' }}>📊 Overview</button>
         {segments.map((seg:any) => (
-          <button key={seg.key} onClick={()=>setActiveSegment(seg.key)} style={{ padding:'5px 14px', borderRadius:8, fontSize:12, fontWeight:500, cursor:'pointer', whiteSpace:'nowrap', border:`1px solid ${activeSegment===seg.key?seg.color:'var(--border)'}`, background:activeSegment===seg.key?seg.color+'22':'var(--bg3)', color:activeSegment===seg.key?seg.color:'var(--text2)' }}>{seg.label}</button>
+          <button key={seg.key} onClick={()=>setActiveSegment(seg.key)} className={activeSegment===seg.key?'glass-strong':'glass'} style={{ padding:'6px 16px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', color:activeSegment===seg.key?seg.color:'var(--text2)', border: activeSegment===seg.key?`1px solid ${seg.color}`:'1px solid var(--glass-border)' }}>{seg.label}</button>
         ))}
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom">
-        {/* ─── OVERVIEW segment ──────────────────────────── */}
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 24px 24px', position:'relative', zIndex:1 }} className="safe-bottom">
         {activeSegment === 'overview' && (<>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:12 }}>
-            <StatCard label="Strategic Initiatives" value={initiatives.length} sub={`Avg progress: ${avgProgress}%`} color="#4f8ef7" icon="🎯" onClick={()=>setDetail('initiatives')} />
-            <StatCard label="Total Issues" value={totalIssues} sub={`${completedIssues.length} selesai · ${riskIssues.length} berisiko`} color="#a78bfa" icon="◫" onClick={()=>setDetail('issues_all')} />
-            <StatCard label="High Priority" value={highIssues.length} sub={`${Math.round(highIssues.length/Math.max(totalIssues,1)*100)}% dari total`} color="#ef4444" icon="🔴" onClick={()=>setDetail('issues_high')} />
-            <StatCard label="Active Projects" value={projects.filter((p:any)=>p.status==='active').length} sub={`${projects.length} total project`} color="#22c55e" icon="🗂" onClick={()=>setDetail('projects_active')} />
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:14, marginBottom:14 }}>
+            <GlassStatCard label="Strategic Initiatives" value={initiatives.length} sub={`Avg progress: ${avgProgress}%`} color="#4f8ef7" icon="🎯" onClick={()=>setDetail('initiatives')} trend={avgProgress>avgPlan?`▲ ${avgProgress-avgPlan}% ahead`:avgPlan>avgProgress?`▼ ${avgPlan-avgProgress}% behind`:''} />
+            <GlassStatCard label="Total Issues" value={totalIssues} sub={`${completedIssues.length} selesai · ${riskIssues.length} berisiko`} color="#a78bfa" icon="◫" onClick={()=>setDetail('issues_all')} />
+            <GlassStatCard label="High Priority" value={highIssues.length} sub={`${Math.round(highIssues.length/Math.max(totalIssues,1)*100)}% dari total`} color="#ef4444" icon="🔴" onClick={()=>setDetail('issues_high')} />
+            <GlassStatCard label="Active Projects" value={projects.filter((p:any)=>p.status==='active').length} sub={`${projects.length} total project`} color="#22c55e" icon="🗂" onClick={()=>setDetail('projects_active')} />
           </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'1.4fr 1fr', gap:10, marginBottom:12 }}>
-            <div className="card" style={{ padding:'14px 16px' }}>
-              <div style={{ fontSize:13, fontWeight:600, marginBottom:8 }}>Strategic Initiatives</div>
-              <div style={{ display:'grid', gridTemplateColumns:`repeat(${Math.max(initiatives.length,1)},1fr)`, gap:10 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1.4fr 1fr', gap:14, marginBottom:14 }}>
+            <div className="glass count-up" style={{ padding:'18px 20px', borderRadius:18 }}>
+              <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Strategic Initiatives</div>
+              <div style={{ display:'grid', gridTemplateColumns:`repeat(${Math.max(initiatives.length,1)},1fr)`, gap:12 }}>
                 {initiatives.length === 0 ? (
                   <div style={{ textAlign:'center', padding:'20px', color:'var(--text3)', fontSize:12 }}>Belum ada initiative</div>
                 ) : initiatives.map((ini:any) => (
-                  <div key={ini._id} onClick={()=>router.push('/dashboard/progress')} style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'8px', background:'var(--bg3)', borderRadius:8, cursor:'pointer' }}>
-                    <div style={{ fontSize:10, color:'var(--text3)', marginBottom:6 }}>{ini.code}</div>
-                    <MiniDonut pct={ini.actualProgress} color={ini.actualProgress>=ini.planProgress?'#22c55e':'#f59e0b'} label={`Plan ${ini.planProgress}%`} />
-                    <div style={{ fontSize:9, color:'var(--text3)', marginTop:6, textAlign:'center', height:24, overflow:'hidden' }}>{ini.title.length>30?ini.title.slice(0,30)+'…':ini.title}</div>
+                  <div key={ini._id} onClick={()=>router.push('/dashboard/progress')} className="glass glass-hover" style={{ padding:'12px', borderRadius:12, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center' }}>
+                    <div style={{ fontSize:10, color:'var(--text3)', marginBottom:8 }}>{ini.code}</div>
+                    <GlassDonut pct={ini.actualProgress} color={ini.actualProgress>=ini.planProgress?'#22c55e':'#f59e0b'} sublabel={`Plan ${ini.planProgress}%`} />
+                    <div style={{ fontSize:10, color:'var(--text2)', marginTop:8, textAlign:'center', height:28, overflow:'hidden', lineHeight:1.3 }}>{ini.title.length>34?ini.title.slice(0,34)+'…':ini.title}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="card" style={{ padding:'14px 16px' }}>
-              <div style={{ fontSize:13, fontWeight:600, marginBottom:8 }}>Issue Status Distribution</div>
+            <div className="glass count-up" style={{ padding:'18px 20px', borderRadius:18 }}>
+              <div style={{ fontSize:14, fontWeight:600, marginBottom:8 }}>Issue Distribution</div>
               <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
-                  <Pie data={statusDist.filter(s=>s.value>0)} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} innerRadius={32}>
-                    {statusDist.map((s,i)=><Cell key={i} fill={s.color} />)}
+                  <defs>
+                    {statusDist.map((s,i) => (
+                      <linearGradient key={i} id={`pie-${s.name.replace(/\s/g,'')}`} x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stopColor={s.color} stopOpacity={1} /><stop offset="100%" stopColor={s.color} stopOpacity={0.6} />
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <Pie data={statusDist.filter(s=>s.value>0)} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={66} innerRadius={36} paddingAngle={3} stroke="none">
+                    {statusDist.map((s,i)=><Cell key={i} fill={`url(#pie-${s.name.replace(/\s/g,'')})`} />)}
                   </Pie>
                   <Tooltip content={<ChartTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:6, justifyContent:'center' }}>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:8, justifyContent:'center', marginTop:4 }}>
                 {statusDist.filter(s=>s.value>0).map(s=>(
-                  <div key={s.name} style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, color:'var(--text2)' }}>
-                    <span style={{ width:8, height:8, borderRadius:2, background:s.color }} /><span>{s.name} ({s.value})</span>
+                  <div key={s.name} style={{ display:'flex', alignItems:'center', gap:5, fontSize:10, color:'var(--text2)' }}>
+                    <span style={{ width:8, height:8, borderRadius:2, background:s.color }} /><span style={{ fontWeight:500 }}>{s.name}</span><span style={{ color:'var(--text3)' }}>({s.value})</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
             <AIInsight type="team" />
             <AIInsight type="personal" userName={user?.name} />
           </div>
 
-          <div className="card" style={{ padding:'14px 16px', marginBottom:12 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-              <div style={{ fontSize:13, fontWeight:600 }}>📅 Agenda Mendatang</div>
-              <button onClick={()=>setDetail('agenda')} style={{ fontSize:10, color:'var(--blue)', cursor:'pointer', background:'none', border:'none' }}>Lihat semua →</button>
+          <div className="glass count-up" style={{ padding:'18px 20px', borderRadius:18 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <div>
+                <div style={{ fontSize:14, fontWeight:600 }}>📅 Agenda Mendatang</div>
+                <div style={{ fontSize:10, color:'var(--text3)' }}>{upcomingAgenda.length} aktivitas dalam 2 minggu ke depan</div>
+              </div>
+              <button onClick={()=>setDetail('agenda')} className="btn btn-sm">Lihat semua →</button>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:7 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:8 }}>
               {upcomingAgenda.slice(0,6).map((item:any,i:number)=>{
                 const isToday = item.date === today
                 return (
-                  <div key={i} style={{ display:'flex', gap:8, padding:'8px 10px', background:'var(--bg3)', borderRadius:7, borderLeft:`3px solid ${isToday?'var(--blue)':'var(--border2)'}` }}>
-                    <div style={{ fontSize:13 }}>{ITEM_TYPE_ICONS[item.type]||'📌'}</div>
+                  <div key={i} className="glass glass-hover" style={{ display:'flex', gap:9, padding:'10px 12px', borderRadius:10, borderLeft:`3px solid ${isToday?'var(--blue)':'var(--border2)'}` }}>
+                    <div style={{ fontSize:14 }}>{ITEM_TYPE_ICONS[item.type]||'📌'}</div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:11, fontWeight:500, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.title}</div>
                       <div style={{ fontSize:9, color:'var(--text3)' }}>{isToday?'🔵 Hari ini':format(new Date(item.date),'d MMM')}{item.time && ` · ${item.time}`}</div>
@@ -399,49 +425,42 @@ export default function DashboardPage() {
                   </div>
                 )
               })}
-              {upcomingAgenda.length === 0 && <div style={{ padding:20, textAlign:'center', color:'var(--text3)', fontSize:11 }}>Belum ada agenda</div>}
+              {upcomingAgenda.length === 0 && <div style={{ padding:20, textAlign:'center', color:'var(--text3)', fontSize:11, gridColumn:'1/-1' }}>Belum ada agenda</div>}
             </div>
           </div>
         </>)}
 
-        {/* ─── Segment: KPI / Non SI / GoLive / Others ──── */}
         {['kpi','non-si','golive','others'].includes(activeSegment) && (() => {
           const seg = segments.find((s:any)=>s.key===activeSegment)
           const segProjects = projectsBySegment(activeSegment)
-          const segIssues = issues.filter((i:any) => {
-            const ini = initiatives.find((x:any)=>x._id===i.initiativeId)
-            if (!ini) return false
-            // Simple match — could be improved with explicit categorization on Issue model
-            return true
-          })
-
           return (
             <>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:12 }}>
-                <StatCard label={`Activities ${seg?.label}`} value={segProjects.length} sub="Total activity" color={seg?.color||'#4f8ef7'} icon="🗂" onClick={()=>router.push('/dashboard/activities')} />
-                <StatCard label="Avg Progress" value={`${segProjects.length?Math.round(segProjects.reduce((s:number,p:any)=>s+(p.progress||0),0)/segProjects.length):0}%`} sub="Rata-rata" color="#a78bfa" icon="📊" />
-                <StatCard label="Completed" value={segProjects.filter((p:any)=>p.status==='completed').length} sub="Selesai" color="#22c55e" icon="✓" />
-                <StatCard label="Active" value={segProjects.filter((p:any)=>p.status==='active').length} sub="Sedang berjalan" color="#f59e0b" icon="⚡" />
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:14, marginBottom:14 }}>
+                <GlassStatCard label={`Activities ${seg?.label}`} value={segProjects.length} sub="Total activity" color={seg?.color||'#4f8ef7'} icon="🗂" onClick={()=>router.push('/dashboard/activities')} />
+                <GlassStatCard label="Avg Progress" value={segProjects.length?Math.round(segProjects.reduce((s:number,p:any)=>s+(p.progress||0),0)/segProjects.length):0} sub="Rata-rata %" color="#a78bfa" icon="📊" />
+                <GlassStatCard label="Completed" value={segProjects.filter((p:any)=>p.status==='completed').length} sub="Selesai" color="#22c55e" icon="✓" />
+                <GlassStatCard label="Active" value={segProjects.filter((p:any)=>p.status==='active').length} sub="Sedang berjalan" color="#f59e0b" icon="⚡" />
               </div>
 
-              {/* Gantt-style mini for this segment */}
-              <div className="card" style={{ padding:'14px 16px', marginBottom:12 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+              <div className="glass count-up" style={{ padding:'18px 20px', borderRadius:18, marginBottom:14 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
                   <div>
-                    <div style={{ fontSize:13, fontWeight:600 }}>Progress Chart — {seg?.label}</div>
+                    <div style={{ fontSize:14, fontWeight:600 }}>Progress Chart — {seg?.label}</div>
                     <div style={{ fontSize:10, color:'var(--text3)' }}>Plan vs Actual per activity</div>
                   </div>
-                  <button onClick={()=>router.push('/dashboard/progress')} className="btn btn-sm">Lihat Detail →</button>
+                  <button onClick={()=>router.push('/dashboard/progress')} className="btn btn-sm">Detail Gantt →</button>
                 </div>
                 {segProjects.length === 0 ? (
                   <div style={{ textAlign:'center', padding:30, color:'var(--text3)', fontSize:12 }}>Belum ada activity di segmen ini</div>
                 ) : (
-                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                     {segProjects.slice(0,8).map((p:any) => (
-                      <div key={p._id} style={{ display:'grid', gridTemplateColumns:'1fr 60px 1fr', gap:10, alignItems:'center', padding:'6px 0' }}>
-                        <div style={{ fontSize:11, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.title}</div>
-                        <div style={{ fontSize:11, fontWeight:600, color:seg?.color }}>{p.progress||0}%</div>
-                        <div className="prog-bar"><div className="prog-fill" style={{ width:`${p.progress||0}%`, background:seg?.color }} /></div>
+                      <div key={p._id} style={{ display:'grid', gridTemplateColumns:'1fr 70px 1.4fr', gap:14, alignItems:'center', padding:'6px 0' }}>
+                        <div style={{ fontSize:12, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.title}</div>
+                        <div style={{ fontSize:13, fontWeight:700, color:seg?.color }}>{p.progress||0}%</div>
+                        <div style={{ height:8, background:'var(--bg4)', borderRadius:4, overflow:'hidden' }}>
+                          <div style={{ width:`${p.progress||0}%`, height:'100%', background:`linear-gradient(90deg, ${seg?.color}, ${seg?.color}aa)`, borderRadius:4, transition:'width 0.6s ease' }} />
+                        </div>
                       </div>
                     ))}
                     {segProjects.length > 8 && <div style={{ fontSize:10, color:'var(--text3)', textAlign:'center', padding:6 }}>+ {segProjects.length-8} activity lainnya</div>}
@@ -449,7 +468,7 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
                 <AIInsight type="team" />
                 <AIInsight type="personal" userName={user?.name} />
               </div>
@@ -457,52 +476,35 @@ export default function DashboardPage() {
           )
         })()}
 
-        {/* ─── Segment: Anggaran ─────────────────────────── */}
         {activeSegment === 'anggaran' && (<>
           {budgetByCategory.length === 0 ? (
-            <div style={{ textAlign:'center', padding:60, color:'var(--text3)' }}>
-              <div style={{ fontSize:32, marginBottom:8 }}>💰</div>
-              <div>Belum ada anggaran. Set di Konfigurasi → Anggaran.</div>
+            <div className="glass" style={{ textAlign:'center', padding:60, color:'var(--text3)', borderRadius:18 }}>
+              <div style={{ fontSize:36, marginBottom:8 }}>💰</div>
+              <div style={{ fontSize:12 }}>Belum ada anggaran. Set di Konfigurasi → Anggaran.</div>
             </div>
           ) : (<>
-            <div style={{ display:'grid', gridTemplateColumns:`repeat(${Math.min(budgetByCategory.length,4)},1fr)`, gap:10, marginBottom:12 }}>
+            <div style={{ display:'grid', gridTemplateColumns:`repeat(${Math.min(budgetByCategory.length,4)},1fr)`, gap:14, marginBottom:14 }}>
               {budgetByCategory.map((cat:any) => (
-                <StatCard key={cat.key} label={cat.label} value={`${cat.pct}%`} sub={`${formatRpShort(cat.totalActual)} / ${formatRpShort(cat.annualBudget)}`} color={cat.isOver?'#ef4444':'#f59e0b'} icon="💰" onClick={()=>router.push('/dashboard/budget')} />
+                <GlassStatCard key={cat.key} label={cat.label} value={cat.pct} sub={`${formatRpShort(cat.totalActual)} / ${formatRpShort(cat.annualBudget)}`} color={cat.isOver?'#ef4444':'#f59e0b'} icon="💰" onClick={()=>router.push('/dashboard/budget')} />
               ))}
             </div>
-            <div className="card" style={{ padding:'14px 16px', marginBottom:12 }}>
-              <div style={{ fontSize:13, fontWeight:600, marginBottom:8 }}>📈 Anggaran 2026 — Plan vs Realisasi</div>
+            <div className="glass count-up" style={{ padding:'18px 20px', borderRadius:18, marginBottom:14 }}>
+              <div style={{ fontSize:14, fontWeight:600, marginBottom:8 }}>📈 Anggaran 2026 — Plan vs Realisasi</div>
               <ResponsiveContainer width="100%" height={220}>
                 <AreaChart data={monthlyBudget}>
+                  <defs>
+                    <linearGradient id="grad-plan" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#9da3b8" stopOpacity={0.5}/><stop offset="100%" stopColor="#9da3b8" stopOpacity={0.05}/></linearGradient>
+                    <linearGradient id="grad-real" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f59e0b" stopOpacity={0.6}/><stop offset="100%" stopColor="#f59e0b" stopOpacity={0.05}/></linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="name" tick={{ fill:'var(--text2)', fontSize:10 }} />
                   <YAxis tick={{ fill:'var(--text3)', fontSize:9 }} tickFormatter={formatRpShort} />
                   <Tooltip content={<ChartTooltip />} />
                   <Legend wrapperStyle={{ fontSize:11 }} />
-                  <Area type="monotone" dataKey="Plan" stroke="#9da3b8" fill="#9da3b8" fillOpacity={0.3} />
-                  <Area type="monotone" dataKey="Realisasi" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.4} />
+                  <Area type="monotone" dataKey="Plan" stroke="#9da3b8" strokeWidth={2} fill="url(#grad-plan)" />
+                  <Area type="monotone" dataKey="Realisasi" stroke="#f59e0b" strokeWidth={2} fill="url(#grad-real)" />
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
-            <div className="card" style={{ padding:'14px 16px' }}>
-              <div style={{ fontSize:13, fontWeight:600, marginBottom:8 }}>Status Per Kategori</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {budgetByCategory.map((cat:any)=>(
-                  <div key={cat.key} style={{ padding:'10px 12px', background:'var(--bg3)', borderRadius:8, borderLeft:`3px solid ${cat.isOver?'var(--red)':'var(--green)'}` }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
-                      <span style={{ fontSize:12, fontWeight:600 }}>{cat.label}</span>
-                      <span style={{ fontSize:12, fontWeight:700, color: cat.isOver?'var(--red)':'var(--text2)' }}>{cat.pct}%</span>
-                    </div>
-                    <div className="prog-bar" style={{ marginBottom:5 }}>
-                      <div className="prog-fill" style={{ width:`${Math.min(100,cat.pct)}%`, background: cat.isOver?'var(--red)':'var(--amber)' }} />
-                    </div>
-                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'var(--text3)' }}>
-                      <span>Realisasi: {formatRpShort(cat.totalActual)}</span>
-                      <span>Estimasi: {formatRpShort(cat.estYearEnd)} {cat.estYearEnd>cat.annualBudget?'⚠':''}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           </>)}
         </>)}
