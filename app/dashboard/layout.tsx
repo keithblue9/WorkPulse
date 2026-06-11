@@ -6,40 +6,65 @@ import Link from 'next/link'
 import { useTheme, THEMES, Theme } from '@/lib/theme'
 import toast from 'react-hot-toast'
 
+// Drill-down structure: top-level groups expand to show sub-items
 const NAV_GROUPS = [
-  { label:'Overview', items:[
-    { href:'/dashboard',               label:'Dashboard',    icon:'⊞', roles:['admin','manager','member','guest'] },
-    { href:'/dashboard/gantt',         label:'Gantt Chart',  icon:'≡', roles:['admin','manager','member'] },
-    { href:'/dashboard/kpi',           label:'KPI Tracker',  icon:'🎯', roles:['admin','manager','member'] },
-    { href:'/dashboard/issues',        label:'Issues',       icon:'◫', roles:['admin','manager','member'] },
-    { href:'/dashboard/infograph',     label:'Infografis',   icon:'◕', roles:['admin','manager','member','guest'] },
-  ]},
-  { label:'Kerja', items:[
-    { href:'/dashboard/agenda',        label:'Daily Agenda', icon:'📅', roles:['admin','manager','member'] },
-    { href:'/dashboard/projects',      label:'Projects',     icon:'🗂', roles:['admin','manager','member'] },
-  ]},
-  { label:'Tim', items:[
-    { href:'/dashboard/attendance',    label:'Absensi',      icon:'▦', roles:['admin','manager','member'] },
-    { href:'/dashboard/announcements', label:'Pengumuman',   icon:'📢', roles:['admin','manager','member','guest'] },
-    { href:'/dashboard/reimbursements',label:'Reimburse',    icon:'💰', roles:['admin','manager','member','finance'] },
-    { href:'/dashboard/budget',        label:'Anggaran',     icon:'📊', roles:['admin','manager','finance'] },
-    { href:'/dashboard/links',         label:'Link Hub',     icon:'🔗', roles:['admin','manager','member','guest'] },
-  ]},
-  { label:'Admin', items:[
-    { href:'/dashboard/members',       label:'Member',       icon:'👥', roles:['admin'] },
-    { href:'/dashboard/config',        label:'Konfigurasi',  icon:'⚙', roles:['admin'] },
-  ]},
-  { label:'Akun', items:[
-    { href:'/dashboard/profile',       label:'Profil Saya',  icon:'👤', roles:['admin','manager','member','finance','guest'] },
-  ]},
+  {
+    key:'overview', label:'Overview', icon:'⊞',
+    items:[
+      { href:'/dashboard',          label:'Dashboard',           icon:'📊', roles:['admin','manager','member','guest','finance'] },
+      { href:'/dashboard/progress', label:'Progress of Projects',icon:'📈', roles:['admin','manager','member'] },
+      { href:'/dashboard/kpi',      label:'KPI Tracker',         icon:'🎯', roles:['admin','manager','member'] },
+      { href:'/dashboard/issues',   label:'Issues',              icon:'◫',  roles:['admin','manager','member'] },
+      { href:'/dashboard/infograph',label:'Infografis',          icon:'◕',  roles:['admin','manager','member','guest'] },
+    ],
+  },
+  {
+    key:'activities', label:'Activities', icon:'⚡',
+    items:[
+      { href:'/dashboard/activities', label:'Activities',     icon:'🗂', roles:['admin','manager','member'] },
+      { href:'/dashboard/agenda',     label:'Daily Agenda',   icon:'📅', roles:['admin','manager','member'] },
+      { href:'/dashboard/meetings',   label:'Meeting Reports',icon:'📝', roles:['admin','manager','member'] },
+    ],
+  },
+  {
+    key:'tim', label:'Tim', icon:'👥',
+    items:[
+      { href:'/dashboard/attendance',    label:'Absensi',      icon:'▦',  roles:['admin','manager','member'] },
+      { href:'/dashboard/announcements', label:'Pengumuman',   icon:'📢', roles:['admin','manager','member','guest','finance'] },
+      { href:'/dashboard/reimbursements',label:'Reimbursement',icon:'💰', roles:['admin','manager','member','finance'] },
+      { href:'/dashboard/budget',       label:'Anggaran',     icon:'📊', roles:['admin','manager','finance'] },
+      { href:'/dashboard/links',        label:'Link Hub',     icon:'🔗', roles:['admin','manager','member','guest','finance'] },
+    ],
+  },
+  {
+    key:'admin', label:'Admin', icon:'⚙️',
+    items:[
+      { href:'/dashboard/members', label:'Member',      icon:'👥', roles:['admin'] },
+      { href:'/dashboard/config',  label:'Konfigurasi', icon:'⚙',  roles:['admin'] },
+    ],
+  },
+  {
+    key:'akun', label:'Akun', icon:'👤',
+    items:[
+      { href:'/dashboard/profile',         label:'Profil Saya',  icon:'👤', roles:['admin','manager','member','finance','guest'] },
+      { href:'/dashboard/change-password', label:'Ganti Password',icon:'🔐', roles:['admin','manager','member','finance','guest'] },
+    ],
+  },
 ]
 
 function AddIssueModal({ onClose, onSave }: { onClose:()=>void; onSave:()=>void }) {
   const [initiatives, setInitiatives] = useState<any[]>([])
+  const [statuses, setStatuses] = useState<any[]>([])
   const [form, setForm] = useState({ initiativeId:'', title:'', description:'', progress:0, status:'on_track', priority:'medium', nextPlan:'', dueDate:'', pic:'', picName:'' })
   const [saving, setSaving] = useState(false)
   const set = (k:string,v:any) => setForm(f=>({...f,[k]:v}))
-  useEffect(()=>{ fetch('/api/initiatives').then(r=>r.json()).then(d=>setInitiatives(d.data||[])) },[])
+  useEffect(()=>{
+    fetch('/api/initiatives').then(r=>r.json()).then(d=>setInitiatives(d.data||[]))
+    fetch('/api/config').then(r=>r.json()).then(d=>{
+      const s = d.data?.issueStatuses?.filter((x:any)=>x.active) || []
+      setStatuses(s.length ? s : [{key:'on_track',label:'On Track'},{key:'at_risk',label:'At Risk'},{key:'delayed',label:'Delayed'}])
+    })
+  },[])
 
   async function save() {
     if (!form.initiativeId||!form.title||!form.dueDate) { toast.error('Initiative, judul, dan due date wajib'); return }
@@ -67,7 +92,7 @@ function AddIssueModal({ onClose, onSave }: { onClose:()=>void; onSave:()=>void 
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
             <div><label style={lbl}>Status</label>
               <select className="input" value={form.status} onChange={e=>set('status',e.target.value)}>
-                <option value="on_track">On Track</option><option value="at_risk">At Risk</option><option value="delayed">Delayed</option>
+                {statuses.map((s:any)=><option key={s.key} value={s.key}>{s.label}</option>)}
               </select></div>
             <div><label style={lbl}>Priority</label>
               <select className="input" value={form.priority} onChange={e=>set('priority',e.target.value)}>
@@ -100,6 +125,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [showAddIssue, setShowAddIssue] = useState(false)
   const [appConfig, setAppConfig] = useState<any>(null)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(['overview']))
   const themeRef = useRef<HTMLDivElement>(null)
 
   useEffect(()=>{ if(status==='unauthenticated') router.push('/login') },[status,router])
@@ -115,6 +141,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(()=>{
     fetch('/api/config').then(r=>r.json()).then(d=>setAppConfig(d.data)).catch(()=>{})
   },[])
+  // Auto-expand the group containing current page
+  useEffect(()=>{
+    NAV_GROUPS.forEach(g => {
+      if (g.items.some(i => pathname===i.href||(i.href!=='/dashboard'&&pathname.startsWith(i.href)))) {
+        setExpanded(prev => new Set([...prev, g.key]))
+      }
+    })
+  },[pathname])
+
+  function toggleGroup(key:string) {
+    setExpanded(prev => {
+      const s = new Set(prev)
+      s.has(key) ? s.delete(key) : s.add(key)
+      return s
+    })
+  }
 
   if(status==='loading') return (
     <div style={{ display:'flex', height:'100vh', alignItems:'center', justifyContent:'center', background:'var(--bg)' }}>
@@ -137,37 +179,72 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:'var(--bg)' }}>
       {showAddIssue && <AddIssueModal onClose={()=>setShowAddIssue(false)} onSave={()=>router.refresh()} />}
 
-      <aside style={{ width:collapsed?56:220, background:'var(--bg2)', borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', flexShrink:0, transition:'width 0.2s ease', overflow:'hidden' }}>
+      <aside style={{ width:collapsed?56:230, background:'var(--bg2)', borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', flexShrink:0, transition:'width 0.2s ease', overflow:'hidden' }}>
         <div style={{ padding:collapsed?'14px 12px':'14px 16px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:10, justifyContent:collapsed?'center':'flex-start', minHeight:52 }}>
           {appConfig?.appIcon ? (
             <img src={appConfig.appIcon} style={{ width:28, height:28, borderRadius:7, objectFit:'cover', flexShrink:0 }} alt="logo" />
           ) : (
             <div style={{ width:28, height:28, background:appColor, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:'#fff', flexShrink:0 }}>{appName[0]}</div>
           )}
-          {!collapsed && <div><div style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>{appName}</div><div style={{ fontSize:10, color:'var(--text3)' }}>{appTagline}</div></div>}
+          {!collapsed && <div style={{ minWidth:0 }}>
+            <div style={{ fontSize:14, fontWeight:700, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{appName}</div>
+            <div style={{ fontSize:10, color:'var(--text3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{appTagline}</div>
+          </div>}
         </div>
-        <nav style={{ padding:'8px', flex:1, overflowY:'auto' }}>
+
+        <nav style={{ padding:'10px 8px', flex:1, overflowY:'auto' }}>
           {NAV_GROUPS.map(group=>{
             const visibleItems = group.items.filter(n=>n.roles.includes(userRole))
             if(visibleItems.length===0) return null
+            const isExpanded = expanded.has(group.key)
+            const hasActive = visibleItems.some(i => pathname===i.href||(i.href!=='/dashboard'&&pathname.startsWith(i.href)))
+
+            if (collapsed) {
+              // Show just icons when collapsed
+              return (
+                <div key={group.key} style={{ marginBottom:6 }}>
+                  {visibleItems.map(item=>{
+                    const active = pathname===item.href||(item.href!=='/dashboard'&&pathname.startsWith(item.href))
+                    return (
+                      <Link key={item.href} href={item.href} style={{ textDecoration:'none' }}>
+                        <div className={`sidebar-link${active?' active':''}`} style={{ justifyContent:'center', padding:'10px' }} title={item.label}>
+                          <span style={{ fontSize:14 }}>{item.icon}</span>
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              )
+            }
+
             return (
-              <div key={group.label}>
-                {!collapsed && <div style={{ fontSize:9, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.08em', padding:'8px 8px 3px' }}>{group.label}</div>}
-                {visibleItems.map(item=>{
-                  const active = pathname===item.href||(item.href!=='/dashboard'&&pathname.startsWith(item.href))
-                  return (
-                    <Link key={item.href} href={item.href} style={{ textDecoration:'none' }}>
-                      <div className={`sidebar-link${active?' active':''}`} style={{ justifyContent:collapsed?'center':'flex-start', padding:collapsed?'10px':'6px 10px' }} title={item.label}>
-                        <span style={{ fontSize:13, flexShrink:0 }}>{item.icon}</span>
-                        {!collapsed && <span style={{ fontSize:12 }}>{item.label}</span>}
-                      </div>
-                    </Link>
-                  )
-                })}
+              <div key={group.key} style={{ marginBottom:4 }}>
+                <div className={`sidebar-group-header${isExpanded?' expanded':''}`} onClick={()=>toggleGroup(group.key)}
+                  style={{ color: hasActive?'var(--blue)':'var(--text)' }}>
+                  <span style={{ fontSize:14 }}>{group.icon}</span>
+                  <span>{group.label}</span>
+                  <span className="chevron">▶</span>
+                </div>
+                {isExpanded && (
+                  <div className="sidebar-sub fade-in">
+                    {visibleItems.map(item=>{
+                      const active = pathname===item.href||(item.href!=='/dashboard'&&pathname.startsWith(item.href))
+                      return (
+                        <Link key={item.href} href={item.href} style={{ textDecoration:'none' }}>
+                          <div className={`sidebar-link${active?' active':''}`}>
+                            <span style={{ fontSize:12 }}>{item.icon}</span>
+                            <span>{item.label}</span>
+                          </div>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )
           })}
         </nav>
+
         <div style={{ padding:collapsed?'10px 8px':'12px 14px', borderTop:'1px solid var(--border)' }}>
           {collapsed ? (
             <div style={{ display:'flex', flexDirection:'column', gap:6, alignItems:'center' }}>

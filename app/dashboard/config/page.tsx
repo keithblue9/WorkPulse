@@ -1,219 +1,305 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { AppConfig, AttendanceType } from '@/types'
+import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 
-const ROLE_PERMS = [
-  { key:'canViewDashboard',   label:'Lihat Dashboard',    desc:'Akses halaman overview & KPI' },
-  { key:'canViewGantt',       label:'Lihat Gantt Chart',  desc:'Akses timeline plan vs actual' },
-  { key:'canViewIssues',      label:'Lihat Issues',       desc:'Akses daftar issue' },
-  { key:'canEditIssues',      label:'Edit Issues',        desc:'Update progress & status issue' },
-  { key:'canViewAttendance',  label:'Lihat Absensi',      desc:'Akses kalender kehadiran' },
-  { key:'canEditAttendance',  label:'Edit Absensi',       desc:'Set kehadiran diri sendiri' },
-  { key:'canEditAllAttendance',label:'Edit Absensi Tim',  desc:'Set kehadiran semua anggota' },
-  { key:'canViewInfograph',   label:'Lihat Infografis',   desc:'Akses visual charts & summary' },
-  { key:'canViewConfig',      label:'Lihat Konfigurasi',  desc:'Akses halaman config (admin only)' },
-  { key:'canEditConfig',      label:'Edit Konfigurasi',   desc:'Ubah pengaturan sistem' },
-]
+type Tab = 'branding'|'taxonomies'|'attendance'|'budget'|'reset'|'system'
 
-const DEFAULT_ROLE_CONFIG = {
-  admin:   { canViewDashboard:true, canViewGantt:true, canViewIssues:true, canEditIssues:true, canViewAttendance:true, canEditAttendance:true, canEditAllAttendance:true, canViewInfograph:true, canViewConfig:true, canEditConfig:true },
-  manager: { canViewDashboard:true, canViewGantt:true, canViewIssues:true, canEditIssues:true, canViewAttendance:true, canEditAttendance:true, canEditAllAttendance:true, canViewInfograph:true, canViewConfig:false, canEditConfig:false },
-  member:  { canViewDashboard:true, canViewGantt:true, canViewIssues:true, canEditIssues:true, canViewAttendance:true, canEditAttendance:true, canEditAllAttendance:false, canViewInfograph:true, canViewConfig:false, canEditConfig:false },
-  guest:   { canViewDashboard:true, canViewGantt:false, canViewIssues:false, canEditIssues:false, canViewAttendance:false, canEditAttendance:false, canEditAllAttendance:false, canViewInfograph:true, canViewConfig:false, canEditConfig:false },
-}
-
-function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  return <div className={`toggle-wrap${on?' on':''}`} onClick={onToggle} />
-}
-
-function Section({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(true)
+function Section({ title, sub, children, action }: { title:string; sub?:string; children:React.ReactNode; action?:React.ReactNode }) {
   return (
-    <div className="card" style={{ marginBottom:14, overflow:'hidden' }}>
-      <div style={{ padding:'13px 16px', borderBottom: open ? '1px solid var(--border)' : 'none', display:'flex', alignItems:'center', gap:10, cursor:'pointer', background:'var(--bg3)' }} onClick={() => setOpen(!open)}>
-        <span style={{ fontSize:16 }}>{icon}</span>
-        <span style={{ fontSize:13, fontWeight:600, color:'var(--text)', flex:1 }}>{title}</span>
-        <span style={{ color:'var(--text3)', fontSize:12, transform: open?'rotate(180deg)':'rotate(0)', transition:'transform 0.2s' }}>▼</span>
+    <div className="card" style={{ padding:'16px 18px', marginBottom:14 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+        <div>
+          <div style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>{title}</div>
+          {sub && <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{sub}</div>}
+        </div>
+        {action}
       </div>
-      {open && <div style={{ padding:'14px 16px' }}>{children}</div>}
+      {children}
     </div>
   )
 }
 
-function Row({ label, desc, children }: { label: string; desc?: string; children: React.ReactNode }) {
+function TaxonomyEditor({ items, onChange, label }: { items:any[]; onChange:(items:any[])=>void; label:string }) {
+  const [editing, setEditing] = useState<number|null>(null)
+  const [newItem, setNewItem] = useState({ key:'', label:'', color:'#4f8ef7' })
+  const [showAdd, setShowAdd] = useState(false)
+
+  function update(i:number, patch:any) { onChange(items.map((it,idx) => idx===i ? {...it, ...patch} : it)) }
+  function remove(i:number) {
+    if (!confirm(`Hapus "${items[i].label}"?`)) return
+    onChange(items.filter((_,idx) => idx!==i))
+  }
+  function add() {
+    if (!newItem.key || !newItem.label) { toast.error('Key dan label wajib'); return }
+    if (items.some(i => i.key === newItem.key)) { toast.error('Key sudah ada'); return }
+    onChange([...items, { ...newItem, active:true }])
+    setNewItem({ key:'', label:'', color:'#4f8ef7' })
+    setShowAdd(false)
+  }
+
   return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'9px 0', borderBottom:'1px solid var(--border)' }}>
-      <div><div style={{ fontSize:13, color:'var(--text)', fontWeight:500 }}>{label}</div>{desc && <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{desc}</div>}</div>
-      <div style={{ flexShrink:0, marginLeft:12 }}>{children}</div>
+    <div>
+      <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:10 }}>
+        {items.map((item:any, i:number) => (
+          <div key={i} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 10px', background:'var(--bg3)', borderRadius:7, border:`1px solid ${item.color}33`, opacity:item.active?1:0.5 }}>
+            <input type="color" value={item.color} onChange={e=>update(i,{color:e.target.value})} style={{ width:24, height:24, borderRadius:4, border:'1px solid var(--border)', cursor:'pointer', flexShrink:0 }} />
+            <input value={item.label} onChange={e=>update(i,{label:e.target.value})} style={{ flex:1, background:'transparent', border:'none', outline:'none', color:'var(--text)', fontSize:12, fontWeight:500 }} />
+            <span style={{ fontSize:10, color:'var(--text3)' }}>{item.key}</span>
+            <div className={`toggle-wrap${item.active?' on':''}`} onClick={()=>update(i,{active:!item.active})} />
+            <button onClick={()=>remove(i)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text3)', fontSize:14, lineHeight:1 }}>🗑</button>
+          </div>
+        ))}
+      </div>
+      {showAdd ? (
+        <div style={{ background:'var(--bg3)', borderRadius:7, padding:10, display:'flex', gap:6, alignItems:'center' }}>
+          <input type="color" value={newItem.color} onChange={e=>setNewItem({...newItem,color:e.target.value})} style={{ width:24, height:24, borderRadius:4, border:'1px solid var(--border)', cursor:'pointer', flexShrink:0 }} />
+          <input value={newItem.key} onChange={e=>setNewItem({...newItem,key:e.target.value.toLowerCase().replace(/\s/g,'_')})} placeholder="key" style={{ width:80, padding:'4px 8px', fontSize:11 }} className="input" />
+          <input value={newItem.label} onChange={e=>setNewItem({...newItem,label:e.target.value})} placeholder="Label tampilan" style={{ flex:1, padding:'4px 8px', fontSize:12 }} className="input" />
+          <button className="btn btn-sm btn-primary" onClick={add}>Tambah</button>
+          <button className="btn btn-sm" onClick={()=>setShowAdd(false)}>×</button>
+        </div>
+      ) : (
+        <button className="btn btn-sm" onClick={()=>setShowAdd(true)}>+ Tambah {label}</button>
+      )}
     </div>
+  )
+}
+
+function ResetSection() {
+  const [scope, setScope] = useState<string[]>([])
+  const [confirmText, setConfirmText] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const options = [
+    { key:'initiatives', label:'Strategic Initiatives & Phases' },
+    { key:'issues', label:'Issues' },
+    { key:'kpi', label:'KPI Items' },
+    { key:'activities', label:'Activities (Projects)' },
+    { key:'agenda', label:'Daily Agenda' },
+    { key:'budget', label:'Budget entries' },
+    { key:'announcements', label:'Announcements' },
+    { key:'reimbursements', label:'Reimbursements' },
+    { key:'links', label:'Link Hub' },
+    { key:'attendance', label:'Attendance records' },
+  ]
+
+  function toggle(key:string) {
+    setScope(prev => prev.includes(key) ? prev.filter(k=>k!==key) : [...prev, key])
+  }
+
+  async function reset(all:boolean=false) {
+    if (confirmText !== 'RESET') { toast.error('Ketik RESET untuk konfirmasi'); return }
+    const targets = all ? options.map(o=>o.key) : scope
+    if (targets.length === 0) { toast.error('Pilih minimal satu kategori'); return }
+    setLoading(true)
+    try {
+      const r = await fetch('/api/admin/reset', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ confirm:'RESET', scope: all ? 'all' : targets }) })
+      const d = await r.json()
+      if (!r.ok) { toast.error(d.error); return }
+      const total = Object.values(d.results||{}).reduce((s:any,v:any)=>s+(v as number),0)
+      toast.success(`✅ ${total} item terhapus`)
+      setConfirmText(''); setScope([])
+    } catch (e:any) { toast.error('Gagal: '+e.message) } finally { setLoading(false) }
+  }
+
+  return (
+    <Section title="🗑️ Reset Data" sub="Hapus data berdasarkan kategori. Tidak bisa dibatalkan.">
+      <div style={{ background:'var(--redbg)', border:'1px solid var(--red)', borderRadius:8, padding:'10px 12px', marginBottom:14 }}>
+        <div style={{ fontSize:11, color:'var(--red)', fontWeight:600, marginBottom:4 }}>⚠ Peringatan</div>
+        <div style={{ fontSize:11, color:'var(--text2)', lineHeight:1.5 }}>
+          Reset akan menghapus data secara permanen. User accounts tidak akan terhapus. Untuk konfirmasi, ketik <b>RESET</b> di bawah.
+        </div>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:14 }}>
+        {options.map(o => (
+          <label key={o.key} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 10px', background:'var(--bg3)', borderRadius:6, cursor:'pointer' }}>
+            <input type="checkbox" checked={scope.includes(o.key)} onChange={()=>toggle(o.key)} />
+            <span style={{ fontSize:12, color:'var(--text2)' }}>{o.label}</span>
+          </label>
+        ))}
+      </div>
+      <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+        <input value={confirmText} onChange={e=>setConfirmText(e.target.value)} placeholder="Ketik RESET untuk konfirmasi" className="input" style={{ flex:1 }} />
+        <button className="btn btn-danger btn-sm" onClick={()=>reset(false)} disabled={loading||confirmText!=='RESET'}>Hapus Terpilih</button>
+        <button className="btn btn-danger btn-sm" onClick={()=>reset(true)} disabled={loading||confirmText!=='RESET'} style={{ opacity:0.7 }}>🚨 Reset SEMUA</button>
+      </div>
+    </Section>
   )
 }
 
 export default function ConfigPage() {
-  const [config, setConfig] = useState<AppConfig|null>(null)
-  const [roleConfig, setRoleConfig] = useState(DEFAULT_ROLE_CONFIG)
-  const [activeRole, setActiveRole] = useState<'admin'|'manager'|'member'|'guest'>('manager')
+  const { data:session } = useSession(); const user = session?.user as any
+  const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [newType, setNewType] = useState({ key:'', label:'', color:'#1a2a2a', textColor:'#4f8ef7' })
-  const [showAddType, setShowAddType] = useState(false)
+  const [tab, setTab] = useState<Tab>('branding')
 
-  useEffect(() => { fetch('/api/config').then(r => r.json()).then(d => { setConfig(d.data); setLoading(false) }) }, [])
+  useEffect(()=>{ fetch('/api/config').then(r=>r.json()).then(d=>{ setConfig(d.data); setLoading(false) }) }, [])
 
-  async function save(patch: any) {
+  async function save(patch:any) {
     setSaving(true)
-    try { const r = await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) }); const d = await r.json(); setConfig(d.data); toast.success('Tersimpan!') }
-    catch { toast.error('Gagal menyimpan') } finally { setSaving(false) }
+    try {
+      const r = await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) })
+      const d = await r.json()
+      setConfig(d.data); toast.success('Tersimpan!')
+    } catch { toast.error('Gagal') } finally { setSaving(false) }
   }
 
-  function toggleNotif(key: string) {
-    if (!config) return
-    const notif = { ...config.notifications, [key]: !(config.notifications as any)[key] }
-    setConfig({...config, notifications: notif}); save({ notifications: notif })
+  function handleIconUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 300000) { toast.error('Max 300KB'); return }
+    const reader = new FileReader()
+    reader.onload = () => save({ appIcon: reader.result as string })
+    reader.readAsDataURL(file)
   }
 
-  function toggleAttType(idx: number) {
-    if (!config) return
-    const types = config.attendanceTypes.map((t,i) => i===idx ? {...t, active: !t.active} : t)
-    setConfig({...config, attendanceTypes: types}); save({ attendanceTypes: types })
-  }
+  if (user?.role !== 'admin') return (
+    <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:8, color:'var(--text3)' }}>
+      <div style={{ fontSize:32 }}>🔒</div>
+      <div>Hanya admin yang bisa akses Konfigurasi</div>
+    </div>
+  )
 
-  function removeAttType(idx: number) {
-    if (!config) return
-    const types = config.attendanceTypes.filter((_,i) => i!==idx)
-    setConfig({...config, attendanceTypes: types}); save({ attendanceTypes: types })
-  }
+  if (loading || !config) return <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text3)' }}>Memuat...</div>
 
-  function addAttType() {
-    if (!newType.key || !newType.label) { toast.error('Key dan label wajib diisi'); return }
-    if (!config) return
-    const types = [...config.attendanceTypes, { ...newType, active: true }]
-    setConfig({...config, attendanceTypes: types}); save({ attendanceTypes: types })
-    setNewType({ key:'', label:'', color:'#1a2a2a', textColor:'#4f8ef7' }); setShowAddType(false)
-    toast.success('Tipe ditambahkan')
-  }
-
-  function toggleRolePerm(role: string, perm: string) {
-    const updated = { ...roleConfig, [role]: { ...(roleConfig as any)[role], [perm]: !(roleConfig as any)[role][perm] } }
-    setRoleConfig(updated as typeof DEFAULT_ROLE_CONFIG)
-    toast.success(`Hak akses ${role} diperbarui`)
-  }
-
-  if (loading) return <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text3)' }}>Memuat...</div>
+  const tabs: { key:Tab; label:string; icon:string }[] = [
+    { key:'branding',   label:'Branding App',  icon:'🎨' },
+    { key:'taxonomies', label:'Kategori & Status', icon:'🏷️' },
+    { key:'attendance', label:'Tipe Absensi',  icon:'📅' },
+    { key:'budget',     label:'Kategori Anggaran', icon:'💰' },
+    { key:'reset',      label:'Reset Data',    icon:'🗑️' },
+    { key:'system',     label:'Sistem Info',   icon:'ℹ️' },
+  ]
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-        <div><div style={{ fontSize:14, fontWeight:600 }}>Konfigurasi Admin</div><div style={{ fontSize:11, color:'var(--text3)' }}>Semua pengaturan sistem WorkPulse</div></div>
-        {saving && <span style={{ fontSize:12, color:'var(--amber)' }}>⟳ Menyimpan...</span>}
+      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+        <div><div style={{ fontSize:14, fontWeight:600 }}>Konfigurasi Admin</div><div style={{ fontSize:11, color:'var(--text3)' }}>Semua pengaturan dan data taxonomy</div></div>
+        {saving && <span style={{ fontSize:11, color:'var(--amber)' }}>⟳ Menyimpan...</span>}
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, alignItems:'start' }}>
-          {/* Left col */}
-          <div>
-            {/* Role & permissions */}
-            <Section title="Role & Hak Akses" icon="👥">
-              <div style={{ marginBottom:12, fontSize:12, color:'var(--text3)' }}>Atur hak akses per role. Admin selalu punya akses penuh.</div>
-              <div style={{ display:'flex', gap:6, marginBottom:14 }}>
-                {(['admin','manager','member','guest'] as const).map(r => (
-                  <button key={r} onClick={() => setActiveRole(r)} style={{ padding:'5px 14px', borderRadius:6, fontSize:12, fontWeight:500, cursor:'pointer', border:'1px solid', borderColor: activeRole===r ? 'var(--blue)' : 'var(--border2)', background: activeRole===r ? 'var(--bluebg)' : 'var(--bg3)', color: activeRole===r ? 'var(--blue)' : 'var(--text2)', textTransform:'capitalize' }}>{r}</button>
-                ))}
-              </div>
-              {ROLE_PERMS.map(p => (
-                <Row key={p.key} label={p.label} desc={p.desc}>
-                  <Toggle on={(roleConfig as any)[activeRole][p.key]} onToggle={() => activeRole !== 'admin' ? toggleRolePerm(activeRole, p.key) : toast('Admin selalu punya akses penuh')} />
-                </Row>
-              ))}
-            </Section>
+      <div style={{ display:'flex', gap:4, padding:'8px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, overflowX:'auto' }}>
+        {tabs.map(t => (
+          <button key={t.key} onClick={()=>setTab(t.key)} style={{ padding:'6px 14px', borderRadius:8, fontSize:12, fontWeight:500, cursor:'pointer', whiteSpace:'nowrap', border:`1px solid ${tab===t.key?'var(--blue)':'var(--border)'}`, background:tab===t.key?'var(--bluebg)':'var(--bg3)', color:tab===t.key?'var(--blue)':'var(--text2)' }}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
 
-            {/* Notifikasi */}
-            <Section title="Notifikasi" icon="🔔">
-              {[
-                { key:'waEnabled', label:'WA Notifikasi (Fonnte)', desc:'Kirim reminder ke tim via WhatsApp' },
-                { key:'waDueDateReminder', label:'Reminder Due Date', desc:'Notif H-3 dan H-1 sebelum deadline' },
-                { key:'waWeeklyDigest', label:'Weekly Digest ke Manager', desc:'Summary mingguan setiap Jumat 17.00' },
-              ].map(item => (
-                <Row key={item.key} label={item.label} desc={item.desc}>
-                  <Toggle on={!!(config?.notifications as any)[item.key]} onToggle={() => toggleNotif(item.key)} />
-                </Row>
-              ))}
-            </Section>
-          </div>
-
-          {/* Right col */}
-          <div>
-            {/* Attendance types */}
-            <Section title="Tipe Kehadiran" icon="📅">
-              <div style={{ fontSize:12, color:'var(--text3)', marginBottom:12 }}>Klik toggle untuk aktif/nonaktif. Tambah tipe custom sesuai kebutuhan.</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:12 }}>
-                {config?.attendanceTypes.map((t,i) => (
-                  <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background: t.color, border:`1px solid ${t.textColor}33`, borderRadius:8, opacity: t.active ? 1 : 0.5 }}>
-                    <div style={{ width:10, height:10, borderRadius:3, background: t.textColor, flexShrink:0 }} />
-                    <span style={{ fontSize:12, fontWeight:600, color: t.textColor, flex:1 }}>{t.label}</span>
-                    <span style={{ fontSize:10, color: t.textColor, opacity:0.7 }}>({t.key})</span>
-                    <Toggle on={t.active} onToggle={() => toggleAttType(i)} />
-                    <button onClick={() => removeAttType(i)} style={{ background:'none', border:'none', cursor:'pointer', color: t.textColor, opacity:0.6, fontSize:16, lineHeight:1, padding:'0 2px' }}>×</button>
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }}>
+        {tab === 'branding' && (
+          <>
+            <Section title="🎨 Branding Aplikasi" sub="Atur nama, tagline, icon, dan warna utama">
+              <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:14, alignItems:'flex-start' }}>
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
+                  <div style={{ width:84, height:84, borderRadius:18, background:config.appIcon?'transparent':config.appColor, display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', border:'1px solid var(--border)' }}>
+                    {config.appIcon ? <img src={config.appIcon} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="logo" /> :
+                      <span style={{ fontSize:36, fontWeight:700, color:'#fff' }}>{config.appName?.[0]||'W'}</span>}
                   </div>
-                ))}
-              </div>
-              {!showAddType ? (
-                <button className="btn btn-sm" onClick={() => setShowAddType(true)}>+ Tambah tipe</button>
-              ) : (
-                <div style={{ background:'var(--bg3)', borderRadius:8, padding:12, display:'flex', flexDirection:'column', gap:8 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <input className="input" placeholder="key (cth: remote)" value={newType.key} onChange={e => setNewType({...newType, key: e.target.value})} />
-                    <input className="input" placeholder="Label (cth: Remote)" value={newType.label} onChange={e => setNewType({...newType, label: e.target.value})} />
-                  </div>
-                  <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                    <span style={{ fontSize:11, color:'var(--text3)' }}>Background:</span>
-                    <input type="color" value={newType.color} onChange={e => setNewType({...newType, color: e.target.value})} style={{ width:32, height:28, borderRadius:4, border:'1px solid var(--border)', cursor:'pointer' }} />
-                    <span style={{ fontSize:11, color:'var(--text3)' }}>Text:</span>
-                    <input type="color" value={newType.textColor} onChange={e => setNewType({...newType, textColor: e.target.value})} style={{ width:32, height:28, borderRadius:4, border:'1px solid var(--border)', cursor:'pointer' }} />
-                    <div style={{ flex:1 }} />
-                    <button className="btn btn-sm btn-primary" onClick={addAttType}>Tambah</button>
-                    <button className="btn btn-sm" onClick={() => setShowAddType(false)}>Batal</button>
-                  </div>
-                  {newType.label && <div style={{ padding:'6px 10px', background: newType.color, borderRadius:6, border:`1px solid ${newType.textColor}44`, fontSize:11, fontWeight:600, color: newType.textColor }}>Preview: {newType.label}</div>}
+                  <label style={{ fontSize:11, color:'var(--blue)', cursor:'pointer', fontWeight:500 }}>
+                    📷 Upload icon
+                    <input type="file" accept="image/*" style={{ display:'none' }} onChange={handleIconUpload} />
+                  </label>
+                  {config.appIcon && <button className="btn btn-sm" onClick={()=>save({ appIcon:'' })} style={{ fontSize:10 }}>Hapus icon</button>}
+                  <div style={{ fontSize:9, color:'var(--text3)' }}>Max 300KB</div>
                 </div>
-              )}
-            </Section>
-
-            {/* Periode & target */}
-            <Section title="Periode & Target" icon="📆">
-              {[
-                { label:'Tahun aktif', value: config?.activeYear, color:'var(--text)' },
-                { label:'Target Mid Year (M6)', value:`${config?.midYearTarget}%`, color:'var(--amber)' },
-                { label:'Target Year End (M12)', value:`${config?.yearEndTarget}%`, color:'var(--green)' },
-                { label:'Mid Year Bulan ke-', value:`M${config?.midYearMonth}`, color:'var(--blue)' },
-              ].map(item => (
-                <Row key={item.label} label={item.label}>
-                  <span style={{ fontSize:14, fontWeight:700, color: item.color }}>{item.value}</span>
-                </Row>
-              ))}
-              <div style={{ marginTop:10, padding:10, background:'var(--bg3)', borderRadius:7, fontSize:11, color:'var(--text3)' }}>
-                Edit target periode dapat dilakukan langsung di database atau via update API.
+                <div style={{ display:'flex', flexDirection:'column', gap:11 }}>
+                  <div><label style={lbl}>Nama Aplikasi</label>
+                    <input className="input" defaultValue={config.appName} onBlur={e=>e.target.value!==config.appName && save({ appName: e.target.value })} placeholder="WorkPulse" /></div>
+                  <div><label style={lbl}>Tagline / Subtitle</label>
+                    <input className="input" defaultValue={config.appTagline} onBlur={e=>e.target.value!==config.appTagline && save({ appTagline: e.target.value })} placeholder="BPD & SS Procurement" /></div>
+                  <div style={{ display:'flex', gap:10, alignItems:'flex-end' }}>
+                    <div style={{ flex:1 }}><label style={lbl}>Warna Brand Utama</label>
+                      <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                        <input type="color" defaultValue={config.appColor} onChange={e=>save({ appColor: e.target.value })} style={{ width:40, height:36, borderRadius:6, border:'1px solid var(--border)', cursor:'pointer' }} />
+                        <input className="input" defaultValue={config.appColor} onBlur={e=>e.target.value!==config.appColor && save({ appColor: e.target.value })} placeholder="#4f8ef7" style={{ width:120 }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </Section>
 
-            {/* System info */}
-            <Section title="Informasi Sistem" icon="ℹ️">
-              {[
-                ['Versi App', 'WorkPulse v2.0'],
-                ['Framework', 'Next.js 16 (App Router)'],
-                ['Database', 'MongoDB Atlas'],
-                ['Auth', 'NextAuth.js'],
-                ['Deploy', 'Vercel'],
-                ['Charts', 'Recharts'],
-              ].map(([k,v]) => (
-                <Row key={k} label={k}><span style={{ fontSize:12, color:'var(--text2)', fontWeight:500 }}>{v}</span></Row>
-              ))}
+            <Section title="📅 Period & Target" sub="Tahun aktif dan target kumulatif">
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
+                <div><label style={lbl}>Tahun Aktif</label><input type="number" className="input" defaultValue={config.activeYear} onBlur={e=>save({ activeYear: parseInt(e.target.value) })} /></div>
+                <div><label style={lbl}>Bulan Mid Year</label><input type="number" min={1} max={12} className="input" defaultValue={config.midYearMonth} onBlur={e=>save({ midYearMonth: parseInt(e.target.value) })} /></div>
+                <div><label style={lbl}>Target M{config.midYearMonth} (%)</label><input type="number" className="input" defaultValue={config.midYearTarget} onBlur={e=>save({ midYearTarget: parseInt(e.target.value) })} /></div>
+                <div><label style={lbl}>Target Year End (%)</label><input type="number" className="input" defaultValue={config.yearEndTarget} onBlur={e=>save({ yearEndTarget: parseInt(e.target.value) })} /></div>
+              </div>
             </Section>
-          </div>
-        </div>
+          </>
+        )}
+
+        {tab === 'taxonomies' && (
+          <>
+            <Section title="🏷️ Kategori Activities" sub="SI / Non-SI / Others / GoLive — bisa edit, tambah, hapus" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ activityCategories: config.activityCategories })}>💾 Simpan</button>}>
+              <TaxonomyEditor items={config.activityCategories} onChange={items=>setConfig((c:any)=>({...c, activityCategories:items}))} label="kategori" />
+            </Section>
+
+            <Section title="📈 Sub-tabs Progress of Projects" sub="KPI / Non-KPI / Others — wording bisa diganti" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ progressSubTabs: config.progressSubTabs })}>💾 Simpan</button>}>
+              <TaxonomyEditor items={config.progressSubTabs} onChange={items=>setConfig((c:any)=>({...c, progressSubTabs:items}))} label="sub-tab" />
+            </Section>
+
+            <Section title="◫ Status Issue" sub="On Track / At Risk / Delayed / Completed — editable" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ issueStatuses: config.issueStatuses })}>💾 Simpan</button>}>
+              <TaxonomyEditor items={config.issueStatuses} onChange={items=>setConfig((c:any)=>({...c, issueStatuses:items}))} label="status" />
+            </Section>
+
+            <Section title="📝 Kategori Meeting Reports" sub="Weekly / Project / 1-on-1 / Workshop / etc" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ meetingCategories: config.meetingCategories })}>💾 Simpan</button>}>
+              <TaxonomyEditor items={config.meetingCategories} onChange={items=>setConfig((c:any)=>({...c, meetingCategories:items}))} label="kategori meeting" />
+            </Section>
+          </>
+        )}
+
+        {tab === 'attendance' && (
+          <Section title="📅 Tipe Kehadiran" sub="WFO / WFH / Dinas / Cuti — bisa tambah/edit/hapus" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ attendanceTypes: config.attendanceTypes })}>💾 Simpan</button>}>
+            <TaxonomyEditor items={config.attendanceTypes.map((t:any)=>({...t,color:t.textColor||t.color}))} onChange={items=>setConfig((c:any)=>({...c, attendanceTypes:items.map(i=>({...i,textColor:i.color,color:i.color+'22'}))}))} label="tipe kehadiran" />
+          </Section>
+        )}
+
+        {tab === 'budget' && (
+          <Section title="💰 Kategori Anggaran" sub="Dinas Travel / External Accommodation — set anggaran tahunan & threshold">
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              {config.budgetCategories.map((cat:any, i:number) => (
+                <div key={i} style={{ padding:'10px 12px', background:'var(--bg3)', borderRadius:7 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1.5fr 1fr 1fr 1.5fr auto', gap:8, alignItems:'center' }}>
+                    <input className="input" defaultValue={cat.label} placeholder="Label" onBlur={e=>save({ budgetCategories: config.budgetCategories.map((c:any,idx:number)=>idx===i?{...c,label:e.target.value}:c) })} />
+                    <input type="number" className="input" defaultValue={cat.annualBudget} placeholder="Anggaran (Rp)" onBlur={e=>save({ budgetCategories: config.budgetCategories.map((c:any,idx:number)=>idx===i?{...c,annualBudget:parseInt(e.target.value)||0}:c) })} />
+                    <input type="number" min={50} max={100} className="input" defaultValue={cat.threshold} placeholder="Threshold %" onBlur={e=>save({ budgetCategories: config.budgetCategories.map((c:any,idx:number)=>idx===i?{...c,threshold:parseInt(e.target.value)||80}:c) })} />
+                    <input className="input" defaultValue={cat.pic||''} placeholder="PIC pengisi" onBlur={e=>save({ budgetCategories: config.budgetCategories.map((c:any,idx:number)=>idx===i?{...c,pic:e.target.value}:c) })} />
+                    <button className="btn btn-icon btn-sm" onClick={()=>{if(confirm('Hapus kategori?'))save({budgetCategories: config.budgetCategories.filter((_:any,idx:number)=>idx!==i)})}} style={{ fontSize:14 }}>🗑</button>
+                  </div>
+                </div>
+              ))}
+              <button className="btn btn-sm" onClick={()=>save({ budgetCategories: [...config.budgetCategories, { key:`cat_${Date.now()}`, label:'Kategori Baru', annualBudget:0, threshold:80, pic:'' }] })}>+ Tambah Kategori</button>
+            </div>
+          </Section>
+        )}
+
+        {tab === 'reset' && <ResetSection />}
+
+        {tab === 'system' && (
+          <Section title="ℹ️ Informasi Sistem">
+            {[
+              ['Versi App','WorkPulse v5.0'],
+              ['Framework','Next.js 16 (App Router)'],
+              ['Database','MongoDB Atlas'],
+              ['Auth','NextAuth.js'],
+              ['Deploy','Vercel'],
+              ['AI','Anthropic Claude'],
+            ].map(([k,v]) => (
+              <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid var(--border)' }}>
+                <span style={{ fontSize:12, color:'var(--text2)' }}>{k}</span>
+                <span style={{ fontSize:12, color:'var(--text)', fontWeight:500 }}>{v}</span>
+              </div>
+            ))}
+          </Section>
+        )}
       </div>
     </div>
   )
 }
-// Config page already exists - branding section handled via API
+const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }
