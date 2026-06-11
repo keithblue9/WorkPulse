@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 
-type Tab = 'branding'|'taxonomies'|'attendance'|'budget'|'reset'|'system'
+type Tab = 'branding'|'login'|'taxonomies'|'attendance'|'budget'|'reset'|'system'
 
 function Section({ title, sub, children, action }: { title:string; sub?:string; children:React.ReactNode; action?:React.ReactNode }) {
   return (
@@ -167,6 +167,7 @@ export default function ConfigPage() {
 
   const tabs: { key:Tab; label:string; icon:string }[] = [
     { key:'branding',   label:'Branding App',  icon:'🎨' },
+    { key:'login',      label:'Login & PWA',   icon:'🔐' },
     { key:'taxonomies', label:'Kategori & Status', icon:'🏷️' },
     { key:'attendance', label:'Tipe Absensi',  icon:'📅' },
     { key:'budget',     label:'Kategori Anggaran', icon:'💰' },
@@ -234,6 +235,75 @@ export default function ConfigPage() {
           </>
         )}
 
+        
+        {tab === 'login' && (
+          <>
+            <Section title="🔐 Login Page" sub="Tulisan dan slideshow background di halaman login">
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <div>
+                  <label style={lbl}>Tagline Login Page</label>
+                  <input className="input" defaultValue={config.loginTagline||''} onBlur={e=>e.target.value!==config.loginTagline && save({ loginTagline: e.target.value })} placeholder="BPD & SS Procurement — Pertamina" />
+                  <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Tulisan ini muncul di bawah nama aplikasi di halaman login.</div>
+                </div>
+
+                <div>
+                  <label style={lbl}>Background Slideshow ({(config.loginBackgrounds||[]).length} gambar)</label>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:8, marginBottom:8 }}>
+                    {(config.loginBackgrounds||[]).map((bg:string, i:number) => (
+                      <div key={i} style={{ position:'relative', aspectRatio:'16/10', borderRadius:7, overflow:'hidden', border:'1px solid var(--border)' }}>
+                        <img src={bg} alt={`bg-${i}`} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                        <button onClick={()=>{if(confirm('Hapus gambar ini?'))save({ loginBackgrounds: config.loginBackgrounds.filter((_:any,idx:number)=>idx!==i) })}} className="btn btn-icon btn-sm" style={{ position:'absolute', top:4, right:4, fontSize:11, background:'rgba(0,0,0,0.6)', color:'#fff', border:'none' }}>×</button>
+                      </div>
+                    ))}
+                    <label style={{ aspectRatio:'16/10', borderRadius:7, border:'2px dashed var(--border2)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--text3)' }}>
+                      <div style={{ fontSize:22 }}>+</div>
+                      <div style={{ fontSize:10 }}>Tambah</div>
+                      <input type="file" accept="image/*" style={{ display:'none' }} onChange={e=>{
+                        const f = e.target.files?.[0]; if (!f) return
+                        if (f.size > 1000000) { toast.error('Max 1MB'); return }
+                        const reader = new FileReader()
+                        reader.onload = () => save({ loginBackgrounds: [...(config.loginBackgrounds||[]), reader.result as string] })
+                        reader.readAsDataURL(f)
+                      }} />
+                    </label>
+                  </div>
+                  <div style={{ fontSize:10, color:'var(--text3)' }}>Max 1MB per gambar. Disarankan rasio 16:9 atau 16:10.</div>
+                </div>
+
+                <div>
+                  <label style={lbl}>Durasi Slide (ms)</label>
+                  <input type="number" min={1000} step={1000} className="input" defaultValue={config.loginSlideInterval||5000} onBlur={e=>save({ loginSlideInterval: parseInt(e.target.value)||5000 })} style={{ width:160 }} />
+                  <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Default 5000ms (5 detik). Berapa lama tiap gambar tampil.</div>
+                </div>
+              </div>
+            </Section>
+
+            <Section title="📱 PWA Install Prompt" sub="Notifikasi instal aplikasi ke home screen">
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <div className={`toggle-wrap${config.pwaInstallEnabled?' on':''}`} onClick={()=>save({ pwaInstallEnabled: !config.pwaInstallEnabled })} />
+                  <div>
+                    <div style={{ fontSize:12, fontWeight:500 }}>Aktifkan PWA Install Prompt</div>
+                    <div style={{ fontSize:10, color:'var(--text3)' }}>Tampilkan banner instalasi aplikasi pada device yang support</div>
+                  </div>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                  <div>
+                    <label style={lbl}>Delay sebelum prompt muncul (ms)</label>
+                    <input type="number" min={0} step={1000} className="input" defaultValue={config.pwaPromptDelay||8000} onBlur={e=>save({ pwaPromptDelay: parseInt(e.target.value)||8000 })} />
+                    <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Default 8000ms. Setelah user buka app berapa lama prompt muncul.</div>
+                  </div>
+                  <div>
+                    <label style={lbl}>Cooldown setelah dismiss (hari)</label>
+                    <input type="number" min={1} max={90} className="input" defaultValue={config.pwaPromptCooldown||7} onBlur={e=>save({ pwaPromptCooldown: parseInt(e.target.value)||7 })} />
+                    <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Default 7 hari. Berapa lama tidak muncul setelah user klik "Nanti".</div>
+                  </div>
+                </div>
+              </div>
+            </Section>
+          </>
+        )}
+
         {tab === 'taxonomies' && (
           <>
             <Section title="🏷️ Kategori Activities" sub="SI / Non-SI / Others / GoLive — bisa edit, tambah, hapus" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ activityCategories: config.activityCategories })}>💾 Simpan</button>}>
@@ -242,6 +312,14 @@ export default function ConfigPage() {
 
             <Section title="📈 Sub-tabs Progress of Projects" sub="KPI / Non-KPI / Others — wording bisa diganti" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ progressSubTabs: config.progressSubTabs })}>💾 Simpan</button>}>
               <TaxonomyEditor items={config.progressSubTabs} onChange={items=>setConfig((c:any)=>({...c, progressSubTabs:items}))} label="sub-tab" />
+            </Section>
+
+            <Section title="🔖 Sub-tipe Activities" sub="KPI-SI / KPI-Non SI / Go-Live / Others — turunan tiap activity" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ activitySubTypes: config.activitySubTypes })}>💾 Simpan</button>}>
+              <TaxonomyEditor items={config.activitySubTypes||[]} onChange={items=>setConfig((c:any)=>({...c, activitySubTypes:items}))} label="sub-tipe" />
+            </Section>
+
+            <Section title="📊 Segmen Dashboard" sub="5 segmen dashboard utama — bisa edit dan tambah" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ dashboardSegments: config.dashboardSegments })}>💾 Simpan</button>}>
+              <TaxonomyEditor items={config.dashboardSegments||[]} onChange={items=>setConfig((c:any)=>({...c, dashboardSegments:items}))} label="segmen" />
             </Section>
 
             <Section title="◫ Status Issue" sub="On Track / At Risk / Delayed / Completed — editable" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ issueStatuses: config.issueStatuses })}>💾 Simpan</button>}>

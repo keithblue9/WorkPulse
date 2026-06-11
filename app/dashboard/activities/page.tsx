@@ -77,7 +77,7 @@ function PicTagInput({ value, onChange, members }: { value:string[]; onChange:(v
   )
 }
 
-function ActivityForm({ editing, onClose, onSave, categories, members }: { editing?:any; onClose:()=>void; onSave:()=>void; categories:any[]; members:any[] }) {
+function ActivityForm({ editing, onClose, onSave, categories, subTypes, members }: { editing?:any; onClose:()=>void; onSave:()=>void; categories:any[]; subTypes:any[]; members:any[] }) {
   const { data:session } = useSession(); const user = session?.user as any
   const [form, setForm] = useState({
     title:editing?.title||'', description:editing?.description||'',
@@ -88,7 +88,8 @@ function ActivityForm({ editing, onClose, onSave, categories, members }: { editi
     startDate:editing?.startDate||'',
     endDate:editing?.endDate||'',
     progress:editing?.progress||0,
-    category:editing?.category||categories[0]?.key||'SI',
+    category:editing?.category||categories[0]?.key||'iVendor',
+    subType:editing?.subType||subTypes[0]?.key||'KPI-SI',
     tags:editing?.tags?.join(', ')||'',
     color:editing?.color||'#4f8ef7',
   })
@@ -119,11 +120,17 @@ function ActivityForm({ editing, onClose, onSave, categories, members }: { editi
           <div><label style={lbl}>PIC (member atau ketik luar member)</label>
             <PicTagInput value={form.members} onChange={v=>set('members',v)} members={members} />
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
             <div><label style={lbl}>Kategori</label>
               <select className="input" value={form.category} onChange={e=>set('category',e.target.value)}>
                 {categories.map((c:any)=><option key={c.key} value={c.key}>{c.label}</option>)}
               </select></div>
+            <div><label style={lbl}>Sub-tipe</label>
+              <select className="input" value={form.subType} onChange={e=>set('subType',e.target.value)}>
+                {subTypes.map((s:any)=><option key={s.key} value={s.key}>{s.label}</option>)}
+              </select></div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
             <div><label style={lbl}>Status</label>
               <select className="input" value={form.status} onChange={e=>set('status',e.target.value)}>
                 {Object.entries(STATUS_CFG).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
@@ -156,6 +163,7 @@ export default function ActivitiesPage() {
   const { data:session } = useSession(); const user = session?.user as any
   const [activities, setActivities] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
+  const [subTypes, setSubTypes] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -171,6 +179,7 @@ export default function ActivitiesPage() {
     ])
     setActivities(proj.data||[])
     setCategories(cfg.data?.activityCategories?.filter((c:any)=>c.active) || [])
+    setSubTypes(cfg.data?.activitySubTypes?.filter((c:any)=>c.active) || [])
     setMembers((usr.data||[]).filter((u:any)=>u.active!==false))
     setLoading(false)
   }
@@ -188,7 +197,7 @@ export default function ActivitiesPage() {
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      {(showForm||editing) && <ActivityForm editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={loadAll} categories={categories} members={members} />}
+      {(showForm||editing) && <ActivityForm editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={loadAll} categories={categories} subTypes={subTypes} members={members} />}
 
       <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
         <div><div style={{ fontSize:14, fontWeight:600 }}>Activities</div><div style={{ fontSize:11, color:'var(--text3)' }}>Semua activity per PIC · {categories.length} kategori</div></div>

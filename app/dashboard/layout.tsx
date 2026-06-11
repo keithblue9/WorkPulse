@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useTheme, THEMES, Theme } from '@/lib/theme'
 import toast from 'react-hot-toast'
+import AppPopups from '@/components/AppPopups'
 
 // Drill-down structure: top-level groups expand to show sub-items
 const NAV_GROUPS = [
@@ -29,7 +30,7 @@ const NAV_GROUPS = [
   {
     key:'tim', label:'Tim', icon:'👥',
     items:[
-      { href:'/dashboard/attendance',    label:'Absensi',      icon:'▦',  roles:['admin','manager','member'] },
+      { href:'/dashboard/attendance',    label:'Presensi',      icon:'▦',  roles:['admin','manager','member'] },
       { href:'/dashboard/announcements', label:'Pengumuman',   icon:'📢', roles:['admin','manager','member','guest','finance'] },
       { href:'/dashboard/reimbursements',label:'Reimbursement',icon:'💰', roles:['admin','manager','member','finance'] },
       { href:'/dashboard/budget',       label:'Anggaran',     icon:'📊', roles:['admin','manager','finance'] },
@@ -52,69 +53,6 @@ const NAV_GROUPS = [
   },
 ]
 
-function AddIssueModal({ onClose, onSave }: { onClose:()=>void; onSave:()=>void }) {
-  const [initiatives, setInitiatives] = useState<any[]>([])
-  const [statuses, setStatuses] = useState<any[]>([])
-  const [form, setForm] = useState({ initiativeId:'', title:'', description:'', progress:0, status:'on_track', priority:'medium', nextPlan:'', dueDate:'', pic:'', picName:'' })
-  const [saving, setSaving] = useState(false)
-  const set = (k:string,v:any) => setForm(f=>({...f,[k]:v}))
-  useEffect(()=>{
-    fetch('/api/initiatives').then(r=>r.json()).then(d=>setInitiatives(d.data||[]))
-    fetch('/api/config').then(r=>r.json()).then(d=>{
-      const s = d.data?.issueStatuses?.filter((x:any)=>x.active) || []
-      setStatuses(s.length ? s : [{key:'on_track',label:'On Track'},{key:'at_risk',label:'At Risk'},{key:'delayed',label:'Delayed'}])
-    })
-  },[])
-
-  async function save() {
-    if (!form.initiativeId||!form.title||!form.dueDate) { toast.error('Initiative, judul, dan due date wajib'); return }
-    setSaving(true)
-    try {
-      await fetch('/api/issues', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(form) })
-      toast.success('Issue ditambahkan!'); onSave(); onClose()
-    } catch { toast.error('Gagal') } finally { setSaving(false) }
-  }
-
-  return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:540 }}>
-        <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:600 }}>+ Tambah Issue Baru</span>
-          <button onClick={onClose} className="btn btn-icon">×</button>
-        </div>
-        <div style={{ padding:'16px 20px', display:'flex', flexDirection:'column', gap:12 }}>
-          <div><label style={lbl}>Initiative *</label>
-            <select className="input" value={form.initiativeId} onChange={e=>set('initiativeId',e.target.value)}>
-              <option value="">Pilih initiative...</option>
-              {initiatives.map(i=><option key={i._id} value={i._id}>[{i.code}] {i.title}</option>)}
-            </select></div>
-          <div><label style={lbl}>Judul *</label><input className="input" value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Deskripsi singkat issue..." /></div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Status</label>
-              <select className="input" value={form.status} onChange={e=>set('status',e.target.value)}>
-                {statuses.map((s:any)=><option key={s.key} value={s.key}>{s.label}</option>)}
-              </select></div>
-            <div><label style={lbl}>Priority</label>
-              <select className="input" value={form.priority} onChange={e=>set('priority',e.target.value)}>
-                <option value="high">🔴 High</option><option value="medium">🟡 Medium</option><option value="low">🟢 Low</option>
-              </select></div>
-            <div><label style={lbl}>Due Date *</label><input type="date" className="input" value={form.dueDate} onChange={e=>set('dueDate',e.target.value)} /></div>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>PIC</label><input className="input" value={form.picName} onChange={e=>{set('picName',e.target.value);set('pic',e.target.value)}} placeholder="Nama PIC..." /></div>
-            <div><label style={lbl}>Progress (%)</label><input type="number" min={0} max={100} className="input" value={form.progress} onChange={e=>set('progress',Number(e.target.value))} /></div>
-          </div>
-          <div><label style={lbl}>Next Plan</label><input className="input" value={form.nextPlan} onChange={e=>set('nextPlan',e.target.value)} placeholder="Rencana berikutnya..." /></div>
-        </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
-          <button onClick={onClose} className="btn">Batal</button>
-          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'Menyimpan...':'Tambah Issue'}</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { data:session, status } = useSession()
   const router = useRouter()
@@ -123,7 +61,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [collapsed, setCollapsed] = useState(false)
   const [showThemePicker, setShowThemePicker] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(false)
-  const [showAddIssue, setShowAddIssue] = useState(false)
   const [appConfig, setAppConfig] = useState<any>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['overview']))
   const themeRef = useRef<HTMLDivElement>(null)
@@ -177,7 +114,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:'var(--bg)' }}>
-      {showAddIssue && <AddIssueModal onClose={()=>setShowAddIssue(false)} onSave={()=>router.refresh()} />}
+      
 
       <aside style={{ width:collapsed?56:230, background:'var(--bg2)', borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', flexShrink:0, transition:'width 0.2s ease', overflow:'hidden' }}>
         <div style={{ padding:collapsed?'14px 12px':'14px 16px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:10, justifyContent:collapsed?'center':'flex-start', minHeight:52 }}>
@@ -292,11 +229,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             )}
           </div>
-          <button className="btn btn-sm btn-primary" onClick={()=>setShowAddIssue(true)}>+ Issue</button>
-        </header>
+</header>
         <main style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }} className="fade-in">
           {children}
         </main>
+        <AppPopups />
       </div>
     </div>
   )
