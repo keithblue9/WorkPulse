@@ -35,11 +35,30 @@ const NAV_GROUPS = [
   ]},
 ]
 
-function getAllowedMenus(roleDefs:any[], userRoles:string[]):Set<string> {
+const FALLBACK_MENUS: Record<string,string[]> = {
+  admin:   ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members','config'],
+  manager: ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members'],
+  member:  ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','reimbursement'],
+  finance: ['dashboard','attendance','biodata','links','budget','reimbursement','cashcard','cashier'],
+  cashier: ['dashboard','reimbursement','cashier','cashcard','biodata'],
+  guest:   ['dashboard','links'],
+}
+function getAllowedMenus(roleDefs:any[], userRoles:string[], configLoaded:boolean):Set<string> {
   const allowed = new Set<string>()
+  // Try from roleDefs first
   for (const role of userRoles) {
     const def = roleDefs?.find((r:any)=>r.key===role)
     if (def?.allowedMenus) def.allowedMenus.forEach((m:string)=>allowed.add(m))
+  }
+  // Fallback to defaults if empty (config still loading OR no roleDefs in DB yet)
+  if (allowed.size === 0) {
+    for (const role of userRoles) {
+      (FALLBACK_MENUS[role] || []).forEach(m => allowed.add(m))
+    }
+    // Ultra last-resort: if STILL empty and config hasn't loaded yet, show admin defaults
+    if (allowed.size === 0 && !configLoaded) {
+      FALLBACK_MENUS.admin.forEach(m => allowed.add(m))
+    }
   }
   return allowed
 }
@@ -85,7 +104,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const user = session?.user as any
   const userRoles: string[] = user?.roles && user.roles.length ? user.roles : (user?.role ? [user.role] : ['guest'])
   const roleDefs = appConfig?.roleDefs || []
-  const allowedMenus = getAllowedMenus(roleDefs, userRoles)
+  const allowedMenus = getAllowedMenus(roleDefs, userRoles, !!appConfig)
   const initials = user?.name?.split(' ').map((n:string)=>n[0]).join('').slice(0,2)||'U'
   const allItems = NAV_GROUPS.flatMap(g=>g.items)
   const currentPage = allItems.find(n=>pathname===n.href||(n.href!=='/dashboard'&&pathname.startsWith(n.href)))?.label || (pathname==='/dashboard/profile'?'My Profile':'Dashboard')
