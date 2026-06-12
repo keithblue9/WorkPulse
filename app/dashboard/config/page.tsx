@@ -247,12 +247,12 @@ export default function ConfigPage() {
                 </div>
 
                 <div>
-                  <label style={lbl}>Background Slideshow ({(config.loginBackgrounds||[]).length} gambar)</label>
+                  <label style={lbl}>Background Slideshow ({((config.loginBackgrounds || [])||[]).length} gambar)</label>
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:8, marginBottom:8 }}>
-                    {(config.loginBackgrounds||[]).map((bg:string, i:number) => (
+                    {((config.loginBackgrounds || [])||[]).map((bg:string, i:number) => (
                       <div key={i} style={{ position:'relative', aspectRatio:'16/10', borderRadius:7, overflow:'hidden', border:'1px solid var(--border)' }}>
                         <img src={bg} alt={`bg-${i}`} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                        <button onClick={()=>{if(confirm('Hapus gambar ini?'))save({ loginBackgrounds: config.loginBackgrounds.filter((_:any,idx:number)=>idx!==i) })}} className="btn btn-icon btn-sm" style={{ position:'absolute', top:4, right:4, fontSize:11, background:'rgba(0,0,0,0.6)', color:'#fff', border:'none' }}>×</button>
+                        <button onClick={()=>{if(confirm('Hapus gambar ini?'))save({ loginBackgrounds: (config.loginBackgrounds || []).filter((_:any,idx:number)=>idx!==i) })}} className="btn btn-icon btn-sm" style={{ position:'absolute', top:4, right:4, fontSize:11, background:'rgba(0,0,0,0.6)', color:'#fff', border:'none' }}>×</button>
                       </div>
                     ))}
                     <label style={{ aspectRatio:'16/10', borderRadius:7, border:'2px dashed var(--border2)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--text3)' }}>
@@ -262,7 +262,7 @@ export default function ConfigPage() {
                         const f = e.target.files?.[0]; if (!f) return
                         if (f.size > 5*1024*1024) { toast.error('Max 5MB'); return }
                         const reader = new FileReader()
-                        reader.onload = () => save({ loginBackgrounds: [...(config.loginBackgrounds||[]), reader.result as string] })
+                        reader.onload = () => save({ loginBackgrounds: [...((config.loginBackgrounds || [])||[]), reader.result as string] })
                         reader.readAsDataURL(f)
                       }} />
                     </label>
@@ -306,53 +306,53 @@ export default function ConfigPage() {
 
         {tab === 'taxonomies' && (
           <>
-            <Section title="🏷️ Kategori Activities" sub="SI / Non-SI / Others / GoLive — bisa edit, tambah, hapus" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ activityCategories: config.activityCategories })}>💾 Simpan</button>}>
-              <TaxonomyEditor items={config.activityCategories} onChange={items=>setConfig((c:any)=>({...c, activityCategories:items}))} label="kategori" />
+            <Section title="🏷️ Kategori Activities" sub="SI / Non-SI / Others / GoLive — bisa edit, tambah, hapus" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ activityCategories: (config.activityCategories || []) })}>💾 Simpan</button>}>
+              <TaxonomyEditor items={(config.activityCategories || [])} onChange={items=>setConfig((c:any)=>({...c, activityCategories:items}))} label="kategori" />
             </Section>
 
-            <Section title="📈 Sub-tabs Progress of Projects" sub="KPI / Non-KPI / Others — wording bisa diganti" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ progressSubTabs: config.progressSubTabs })}>💾 Simpan</button>}>
-              <TaxonomyEditor items={config.progressSubTabs} onChange={items=>setConfig((c:any)=>({...c, progressSubTabs:items}))} label="sub-tab" />
+            <Section title="📈 Sub-tabs Progress of Projects" sub="KPI / Non-KPI / Others — wording bisa diganti" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ progressSubTabs: (config.progressSubTabs || []) })}>💾 Simpan</button>}>
+              <TaxonomyEditor items={(config.progressSubTabs || [])} onChange={items=>setConfig((c:any)=>({...c, progressSubTabs:items}))} label="sub-tab" />
             </Section>
 
-            <Section title="🔖 Sub-tipe Activities" sub="KPI-SI / KPI-Non SI / Go-Live / Others — turunan tiap activity" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ activitySubTypes: config.activitySubTypes })}>💾 Simpan</button>}>
-              <TaxonomyEditor items={config.activitySubTypes||[]} onChange={items=>setConfig((c:any)=>({...c, activitySubTypes:items}))} label="sub-tipe" />
+            <Section title="🔖 Sub-tipe Activities" sub="KPI-SI / KPI-Non SI / Go-Live / Others — turunan tiap activity" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ activitySubTypes: (config.activitySubTypes || []) })}>💾 Simpan</button>}>
+              <TaxonomyEditor items={(config.activitySubTypes || [])||[]} onChange={items=>setConfig((c:any)=>({...c, activitySubTypes:items}))} label="sub-tipe" />
             </Section>
 
             <Section title="📊 Segmen Dashboard" sub="5 segmen dashboard utama — bisa edit dan tambah" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ dashboardSegments: config.dashboardSegments })}>💾 Simpan</button>}>
               <TaxonomyEditor items={config.dashboardSegments||[]} onChange={items=>setConfig((c:any)=>({...c, dashboardSegments:items}))} label="segmen" />
             </Section>
 
-            <Section title="◫ Status Issue" sub="On Track / At Risk / Delayed / Completed — editable" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ issueStatuses: config.issueStatuses })}>💾 Simpan</button>}>
-              <TaxonomyEditor items={config.issueStatuses} onChange={items=>setConfig((c:any)=>({...c, issueStatuses:items}))} label="status" />
+            <Section title="◫ Status Issue" sub="On Track / At Risk / Delayed / Completed — editable" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ issueStatuses: (config.issueStatuses || []) })}>💾 Simpan</button>}>
+              <TaxonomyEditor items={(config.issueStatuses || [])} onChange={items=>setConfig((c:any)=>({...c, issueStatuses:items}))} label="status" />
             </Section>
 
-            <Section title="📝 Kategori Meeting Reports" sub="Weekly / Project / 1-on-1 / Workshop / etc" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ meetingCategories: config.meetingCategories })}>💾 Simpan</button>}>
-              <TaxonomyEditor items={config.meetingCategories} onChange={items=>setConfig((c:any)=>({...c, meetingCategories:items}))} label="kategori meeting" />
+            <Section title="📝 Kategori Meeting Reports" sub="Weekly / Project / 1-on-1 / Workshop / etc" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ meetingCategories: (config.meetingCategories || []) })}>💾 Simpan</button>}>
+              <TaxonomyEditor items={(config.meetingCategories || [])} onChange={items=>setConfig((c:any)=>({...c, meetingCategories:items}))} label="kategori meeting" />
             </Section>
           </>
         )}
 
         {tab === 'attendance' && (
-          <Section title="📅 Tipe Kehadiran" sub="WFO / WFH / Dinas / Cuti — bisa tambah/edit/hapus" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ attendanceTypes: config.attendanceTypes })}>💾 Simpan</button>}>
-            <TaxonomyEditor items={config.attendanceTypes.map((t:any)=>({...t,color:t.textColor||t.color}))} onChange={items=>setConfig((c:any)=>({...c, attendanceTypes:items.map(i=>({...i,textColor:i.color,color:i.color+'22'}))}))} label="tipe kehadiran" />
+          <Section title="📅 Tipe Kehadiran" sub="WFO / WFH / Dinas / Cuti — bisa tambah/edit/hapus" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ attendanceTypes: (config.attendanceTypes || []) })}>💾 Simpan</button>}>
+            <TaxonomyEditor items={(config.attendanceTypes || []).map((t:any)=>({...t,color:t.textColor||t.color}))} onChange={items=>setConfig((c:any)=>({...c, attendanceTypes:items.map(i=>({...i,textColor:i.color,color:i.color+'22'}))}))} label="tipe kehadiran" />
           </Section>
         )}
 
         {tab === 'budget' && (
           <Section title="💰 Kategori Anggaran" sub="Dinas Travel / External Accommodation — set anggaran tahunan & threshold">
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {config.budgetCategories.map((cat:any, i:number) => (
+              {(config.budgetCategories || []).map((cat:any, i:number) => (
                 <div key={i} style={{ padding:'10px 12px', background:'var(--bg3)', borderRadius:7 }}>
                   <div style={{ display:'grid', gridTemplateColumns:'1.5fr 1fr 1fr 1.5fr auto', gap:8, alignItems:'center' }}>
-                    <input className="input" defaultValue={cat.label} placeholder="Label" onBlur={e=>save({ budgetCategories: config.budgetCategories.map((c:any,idx:number)=>idx===i?{...c,label:e.target.value}:c) })} />
-                    <input type="number" className="input" defaultValue={cat.annualBudget} placeholder="Anggaran (Rp)" onBlur={e=>save({ budgetCategories: config.budgetCategories.map((c:any,idx:number)=>idx===i?{...c,annualBudget:parseInt(e.target.value)||0}:c) })} />
-                    <input type="number" min={50} max={100} className="input" defaultValue={cat.threshold} placeholder="Threshold %" onBlur={e=>save({ budgetCategories: config.budgetCategories.map((c:any,idx:number)=>idx===i?{...c,threshold:parseInt(e.target.value)||80}:c) })} />
-                    <input className="input" defaultValue={cat.pic||''} placeholder="PIC pengisi" onBlur={e=>save({ budgetCategories: config.budgetCategories.map((c:any,idx:number)=>idx===i?{...c,pic:e.target.value}:c) })} />
-                    <button className="btn btn-icon btn-sm" onClick={()=>{if(confirm('Hapus kategori?'))save({budgetCategories: config.budgetCategories.filter((_:any,idx:number)=>idx!==i)})}} style={{ fontSize:14 }}>🗑</button>
+                    <input className="input" defaultValue={cat.label} placeholder="Label" onBlur={e=>save({ budgetCategories: (config.budgetCategories || []).map((c:any,idx:number)=>idx===i?{...c,label:e.target.value}:c) })} />
+                    <input type="number" className="input" defaultValue={cat.annualBudget} placeholder="Anggaran (Rp)" onBlur={e=>save({ budgetCategories: (config.budgetCategories || []).map((c:any,idx:number)=>idx===i?{...c,annualBudget:parseInt(e.target.value)||0}:c) })} />
+                    <input type="number" min={50} max={100} className="input" defaultValue={cat.threshold} placeholder="Threshold %" onBlur={e=>save({ budgetCategories: (config.budgetCategories || []).map((c:any,idx:number)=>idx===i?{...c,threshold:parseInt(e.target.value)||80}:c) })} />
+                    <input className="input" defaultValue={cat.pic||''} placeholder="PIC pengisi" onBlur={e=>save({ budgetCategories: (config.budgetCategories || []).map((c:any,idx:number)=>idx===i?{...c,pic:e.target.value}:c) })} />
+                    <button className="btn btn-icon btn-sm" onClick={()=>{if(confirm('Hapus kategori?'))save({budgetCategories: (config.budgetCategories || []).filter((_:any,idx:number)=>idx!==i)})}} style={{ fontSize:14 }}>🗑</button>
                   </div>
                 </div>
               ))}
-              <button className="btn btn-sm" onClick={()=>save({ budgetCategories: [...config.budgetCategories, { key:`cat_${Date.now()}`, label:'Kategori Baru', annualBudget:0, threshold:80, pic:'' }] })}>+ Tambah Kategori</button>
+              <button className="btn btn-sm" onClick={()=>save({ budgetCategories: [...(config.budgetCategories || []), { key:`cat_${Date.now()}`, label:'Kategori Baru', annualBudget:0, threshold:80, pic:'' }] })}>+ Tambah Kategori</button>
             </div>
           </Section>
         )}

@@ -13,8 +13,7 @@ const STATUS_COLS = ['on_track','at_risk','delayed','completed']
 const STATUS_COLORS: Record<string,string> = { on_track:'var(--green)', at_risk:'var(--amber)', delayed:'var(--red)', completed:'var(--blue)' }
 
 function IssueModal({ issue, onClose, onSave }: { issue: Issue; onClose: ()=>void; onSave: ()=>void }) {
-  const { data: session } = useSession()
-  const [filterCat, setFilterCat] = useState('All'); const user = session?.user as any
+  const { data: session } = useSession(); const user = session?.user as any
   const [form, setForm] = useState({ progress: issue.progress, status: issue.status, nextPlan: issue.nextPlan, dueDate: issue.dueDate, note: '' })
   const [comment, setComment] = useState(''); const [saving, setSaving] = useState(false); const [activeTab, setActiveTab] = useState<'edit'|'history'|'comments'>('edit')
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
@@ -167,7 +166,7 @@ function TimelineView({ issues, onSelect }: { issues: Issue[]; onSelect: (i: Iss
           const isOverdue = issue.dueDate < today && issue.status !== 'completed'
           const dotColor = issue.status === 'completed' ? 'var(--green)' : isOverdue ? 'var(--red)' : STATUS_COLORS[issue.status]
           return (
-            <div key={issue._id} style={{ position:'relative', marginBottom:20 }} className="fade-in" style={{ animationDelay:`${i*0.04}s` }}>
+            <div key={issue._id} style={{ position:'relative', marginBottom:20, animationDelay:`${i*0.04}s` }} className="fade-in">
               <div style={{ position:'absolute', left:-22, top:8, width:12, height:12, borderRadius:'50%', background: dotColor, border:'2px solid var(--bg2)', boxShadow:`0 0 0 3px ${dotColor}33` }} />
               <div className="card" style={{ padding:'12px 16px', cursor:'pointer', transition:'all 0.15s' }} onClick={() => onSelect(issue)}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor='var(--blue)'}
@@ -203,6 +202,7 @@ export default function IssuesPage() {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterPIC, setFilterPIC] = useState('')
   const [search, setSearch] = useState('')
+  const [filterCat, setFilterCat] = useState('All')
 
   async function load() {
     const params = new URLSearchParams()
@@ -216,10 +216,9 @@ export default function IssuesPage() {
   }
   useEffect(() => { load() }, [filterStatus, filterPIC])
 
+  const filteredIssues = filterCat === 'All' ? issues : issues.filter((i:any) => (i.category||'Others') === filterCat || (i.subType||'') === filterCat)
   const filtered = filteredIssues.filter(i => !search || i.title.toLowerCase().includes(search.toLowerCase()) || i.picName?.toLowerCase().includes(search.toLowerCase()))
   const getCode = (id: string) => initiatives.find(i => i._id === id)?.code || ''
-
-  const filteredIssues = filterCat === 'All' ? issues : issues.filter((i:any) => (i.category||'Others') === filterCat || (i.subType||'') === filterCat)
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>

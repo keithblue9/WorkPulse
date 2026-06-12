@@ -11,7 +11,7 @@ const ITEM_TYPE_ICONS: Record<string,string> = { meeting:'👥', task:'✅', din
 
 function AnimatedNumber({ value, duration=900 }: { value:number; duration?:number }) {
   const [d, setD] = useState(0)
-  const ref = useRef<number>()
+  const ref = useRef<number | undefined>(undefined)
   useEffect(() => {
     const start = d, st = performance.now()
     function tick(now: number) {
@@ -20,7 +20,7 @@ function AnimatedNumber({ value, duration=900 }: { value:number; duration?:numbe
       if (t < 1) ref.current = requestAnimationFrame(tick)
     }
     ref.current = requestAnimationFrame(tick)
-    return () => ref.current && cancelAnimationFrame(ref.current)
+    return () => { if (ref.current) cancelAnimationFrame(ref.current) }
   }, [value, duration])
   return <>{d.toLocaleString('id-ID')}</>
 }
