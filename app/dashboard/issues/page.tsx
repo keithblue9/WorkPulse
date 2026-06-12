@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { format, startOfWeek, subDays } from 'date-fns'
 
 const PRIORITY_CFG: Record<string,{label:string;color:string;bg:string}> = {
@@ -10,7 +9,6 @@ const PRIORITY_CFG: Record<string,{label:string;color:string;bg:string}> = {
 }
 
 export default function IssuesPage() {
-  const sp = useSearchParams()
   const [activities, setActivities] = useState<any[]>([])
   const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)

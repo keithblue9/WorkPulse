@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params; await connectDB()
-    await UserModel.findByIdAndUpdate(id, { active: false })
+    await UserModel.findByIdAndDelete(id)
     return NextResponse.json({ success: true })
   } catch { return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
 }

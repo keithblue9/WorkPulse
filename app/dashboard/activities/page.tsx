@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 
 function PicTagInput({ value, onChange, members }: { value:string[]; onChange:(v:string[])=>void; members:any[] }) {
@@ -174,15 +173,15 @@ const PRIORITY_CFG: Record<string,{label:string;color:string;bg:string}> = {
 
 export default function ActivitiesPage() {
   const { data:session } = useSession()
-  const sp = useSearchParams()
   const [activities, setActivities] = useState<any[]>([])
   const [config, setConfig] = useState<any>(null)
   const [members, setMembers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
-  const [filterCat, setFilterCat] = useState(sp?.get('cat') || 'All')
-  const [filterSub, setFilterSub] = useState(sp?.get('sub') || '')
+  const [filterCat, setFilterCat] = useState('All')
+  const [filterSub, setFilterSub] = useState('')
+  useEffect(() => { if (typeof window !== 'undefined') { const sp = new URLSearchParams(window.location.search); const cat = sp.get('cat'); const sub = sp.get('sub'); if (cat) setFilterCat(cat); if (sub) setFilterSub(sub) } }, [])
   const [search, setSearch] = useState('')
 
   async function load() {
