@@ -13,12 +13,45 @@ const handler = NextAuth({
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null
+        if (!credentials?.email || !credentials?.password) {
+          console.log('[AUTH] Missing credentials:', { hasEmail: !!credentials?.email, hasPassword: !!credentials?.password })
+          return null
+        }
         await connectDB()
-        const user = await UserModel.findOne({ email: credentials.email }).lean() as any
-        if (!user) return null
-        const valid = await bcrypt.compare(credentials.password as string, user.password)
-        if (!valid) return null
+        const email = String(credentials.email).toLowerCase().trim()
+        const pin = String(credentials.password).trim()
+        console.log('[AUTH] Login attempt:', { email, pinLength: pin.length })
+
+        const user = await UserModel.findOne({ email }).lean() as any
+        if (!user) {
+          console.log('[AUTH] User not found:', email)
+          return null
+        }
+        if (!user.password) {
+          console.log('[AUTH] User has no password field:', email)
+          return null
+        }
+
+        let valid = false
+        try {
+          valid = await bcrypt.compare(pin, user.password)
+        } catch (e:any) {
+          console.log('[AUTH] bcrypt error:', e.message)
+        }
+
+        // Fallback: if bcrypt fails AND password equals the PIN as raw string, allow (then rehash)
+        if (!valid && user.password === pin) {
+          console.log('[AUTH] Raw match — migrating to bcrypt')
+          const newHash = await bcrypt.hash(pin, 10)
+          await UserModel.updateOne({ _id: user._id }, { $set: { password: newHash } })
+          valid = true
+        }
+
+        if (!valid) {
+          console.log('[AUTH] PIN mismatch for:', email, '— password hash length:', user.password.length)
+          return null
+        }
+        console.log('[AUTH] Success:', email)
         return {
           id: user._id.toString(),
           name: user.name,
@@ -31,25 +64,16 @@ const handler = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }: any) {
-      if (user) {
-        token.role = user.role
-        token.division = user.division
-        token.id = user.id
-      }
+      if (user) { token.role = user.role; token.division = user.division; token.id = user.id }
       return token
     },
     async session({ session, token }: any) {
-      if (session.user) {
-        session.user.role = token.role
-        session.user.division = token.division
-        session.user.id = token.id
-      }
+      if (session.user) { session.user.role = token.role; session.user.division = token.division; session.user.id = token.id }
       return session
     },
   },
   pages: { signIn: '/login' },
-  session: { strategy: 'jwt' },
-  secret: process.env.NEXTAUTH_SECRET || 'workpulse-secret-2026',
+  secret: process.env.NEXTAUTH_SECRET,
 })
 
 export { handler as GET, handler as POST }
