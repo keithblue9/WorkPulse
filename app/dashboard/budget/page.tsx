@@ -1,190 +1,176 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
-function formatRp(n:number) { return new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',minimumFractionDigits:0}).format(n) }
+const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
 
 export default function BudgetPage() {
-  const { data:session } = useSession(); const user = session?.user as any
   const [config, setConfig] = useState<any>(null)
-  const [entries, setEntries] = useState<any[]>([])
+  const [budgets, setBudgets] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [editCell, setEditCell] = useState<{key:string;month:number;field:'plan'|'actual'}|null>(null)
-  const [editVal, setEditVal] = useState('')
-  const [activeCat, setActiveCat] = useState('')
-  const [year] = useState(2026)
+  const [activeCat, setActiveCat] = useState<string>('')
+  const [year, setYear] = useState(new Date().getFullYear())
+  const [saving, setSaving] = useState(false)
 
   async function load() {
-    const [cfg, bud] = await Promise.all([
-      fetch('/api/config').then(r=>r.json()),
-      fetch(`/api/budget?year=${year}`).then(r=>r.json()),
-    ])
-    setConfig(cfg.data)
-    setEntries(bud.data||[])
-    if (cfg.data?.budgetCategories?.length > 0) setActiveCat(cfg.data.budgetCategories[0].key)
+    setLoading(true)
+    const [c, b] = await Promise.all([fetch('/api/config').then(r=>r.json()), fetch(`/api/budget?year=${year}`).then(r=>r.json())])
+    setConfig(c.data); setBudgets(b.data||[])
+    const cats = c.data?.budgetCategories?.filter((x:any)=>x.key!=='cash_card' && x.key!=='petty_cash') || []
+    if (cats.length > 0 && !activeCat) setActiveCat(cats[0].key)
     setLoading(false)
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [year])
 
-  const categories = config?.budgetCategories || []
-  const activeCatDef = categories.find((c:any) => c.key === activeCat)
-
-  function getEntry(catKey:string, month:number) {
-    return entries.find(e => e.categoryKey===catKey && e.month===month)
+  const visibleCats = (config?.budgetCategories || []).filter((c:any) => c.key !== 'cash_card' && c.key !== 'petty_cash')
+  const currentBudget = budgets.find(b => b.category === activeCat) || {
+    year, category: activeCat,
+    annualBudgetIDR: visibleCats.find((c:any)=>c.key===activeCat)?.annualBudget || 0,
+    annualBudgetUSD: visibleCats.find((c:any)=>c.key===activeCat)?.annualBudgetUSD || 0,
+    monthly: [],
   }
 
-  async function saveCell(catKey:string, month:number, field:'plan'|'actual') {
-    const val = parseInt(editVal.replace(/\D/g,'')) || 0
-    await fetch('/api/budget', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ categoryKey:catKey, year, month, [field==='plan'?'planAmount':'actualAmount']:val }) })
-    await load(); setEditCell(null); setEditVal('')
-    toast.success('Anggaran diperbarui')
+  function getMonth(m:number) { return currentBudget.monthly?.find((x:any)=>x.month===m) || { month:m, realisasiIDR:0, realisasiUSD:0, notes:'' } }
+  function setMonth(m:number, field:string, value:any) {
+    const monthly = [...(currentBudget.monthly || [])]
+    const idx = monthly.findIndex((x:any)=>x.month===m)
+    if (idx >= 0) monthly[idx] = { ...monthly[idx], [field]: value }
+    else monthly.push({ month:m, realisasiIDR:0, realisasiUSD:0, notes:'', [field]: value })
+    setBudgets(prev => {
+      const newB = [...prev]
+      const bIdx = newB.findIndex(b => b.category === activeCat && b.year === year)
+      if (bIdx >= 0) newB[bIdx] = { ...newB[bIdx], monthly }
+      else newB.push({ ...currentBudget, monthly })
+      return newB
+    })
   }
 
-  async function updateCatBudget(key:string, annualBudget:number, threshold:number) {
-    const updated = categories.map((c:any) => c.key===key ? {...c, annualBudget, threshold} : c)
-    await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ budgetCategories: updated }) })
-    load(); toast.success('Anggaran tahunan diperbarui')
+  function setAnnual(field:string, value:number) {
+    setBudgets(prev => {
+      const newB = [...prev]
+      const bIdx = newB.findIndex(b => b.category === activeCat && b.year === year)
+      if (bIdx >= 0) newB[bIdx] = { ...newB[bIdx], [field]: value }
+      else newB.push({ ...currentBudget, [field]: value })
+      return newB
+    })
   }
 
-  const canManage = ['admin','manager','finance'].includes(user?.role||'')
+  async function save() {
+    setSaving(true)
+    try {
+      const r = await fetch('/api/budget', { method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ year, category: activeCat, budget: currentBudget }) })
+      if (!r.ok) { toast.error('Gagal'); return }
+      toast.success('Anggaran tersimpan'); load()
+    } finally { setSaving(false) }
+  }
 
-  if (loading) return <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text3)' }}>Memuat...</div>
+  // Cumulative percentage calculation
+  function cumulativeIDR(uptoMonth:number) {
+    let total = 0
+    for (let m=1; m<=uptoMonth; m++) total += getMonth(m).realisasiIDR || 0
+    return total
+  }
+  function cumulativeUSD(uptoMonth:number) {
+    let total = 0
+    for (let m=1; m<=uptoMonth; m++) total += getMonth(m).realisasiUSD || 0
+    return total
+  }
+  function progressPct(uptoMonth:number) {
+    const cumIDR = cumulativeIDR(uptoMonth)
+    const cumUSD = cumulativeUSD(uptoMonth)
+    const annualIDR = currentBudget.annualBudgetIDR || 0
+    const annualUSD = currentBudget.annualBudgetUSD || 0
+    // Compute weighted % across both currencies (or just IDR if no USD plan)
+    if (annualIDR > 0 && annualUSD > 0) {
+      // Use IDR-equivalent total assuming 1 USD ≈ Rp 15500 (just for progress calc)
+      const totalCum = cumIDR + cumUSD * 15500
+      const totalAnnual = annualIDR + annualUSD * 15500
+      return totalAnnual > 0 ? (totalCum / totalAnnual) * 100 : 0
+    }
+    if (annualIDR > 0) return (cumIDR / annualIDR) * 100
+    if (annualUSD > 0) return (cumUSD / annualUSD) * 100
+    return 0
+  }
+
+  const activeCfg = visibleCats.find((c:any) => c.key === activeCat)
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-        <div><div style={{ fontSize:14, fontWeight:600 }}>Manajemen Anggaran {year}</div><div style={{ fontSize:11, color:'var(--text3)' }}>Dinas & Akomodasi — Plan vs Realisasi</div></div>
+      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', flexShrink:0 }}>
+        <div>
+          <div style={{ fontSize:14, fontWeight:600 }}>Anggaran</div>
+          <div style={{ fontSize:11, color:'var(--text3)' }}>Budget tracking (IDR & USD) · cumulative progress · Tahun {year}</div>
+        </div>
+        <div style={{ display:'flex', gap:8 }}>
+          <select className="input" style={{ width:100 }} value={year} onChange={e=>setYear(Number(e.target.value))}>
+            {[year-2, year-1, year, year+1].map(y=><option key={y} value={y}>{y}</option>)}
+          </select>
+          <button onClick={save} disabled={saving} className="btn btn-primary btn-sm">{saving?'...':'💾 Simpan'}</button>
+        </div>
       </div>
 
-      {/* Category tabs */}
-      <div style={{ display:'flex', gap:6, padding:'8px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
-        {categories.map((cat:any) => {
-          const totalPlan = entries.filter(e=>e.categoryKey===cat.key).reduce((s:number,e:any)=>s+e.planAmount,0)
-          const totalActual = entries.filter(e=>e.categoryKey===cat.key).reduce((s:number,e:any)=>s+e.actualAmount,0)
-          const pct = cat.annualBudget > 0 ? Math.round(totalActual/cat.annualBudget*100) : 0
-          const isOver = pct >= cat.threshold
-          return (
-            <button key={cat.key} onClick={()=>setActiveCat(cat.key)} style={{ padding:'6px 14px', borderRadius:8, fontSize:12, fontWeight:500, cursor:'pointer', border:`1px solid ${activeCat===cat.key?'var(--blue)':'var(--border)'}`, background:activeCat===cat.key?'var(--bluebg)':'var(--bg3)', color:activeCat===cat.key?'var(--blue)':'var(--text2)' }}>
-              {cat.label}
-              {cat.annualBudget > 0 && <span style={{ marginLeft:6, fontSize:10, color:isOver?'var(--red)':'var(--text3)', fontWeight:600 }}>{pct}%</span>}
-            </button>
-          )
-        })}
+      <div style={{ display:'flex', gap:5, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, flexWrap:'wrap' }}>
+        {visibleCats.map((c:any) => (
+          <button key={c.key} onClick={()=>setActiveCat(c.key)} style={chip(activeCat===c.key)}>{c.label}</button>
+        ))}
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }}>
-        {activeCatDef && (
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom">
+        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> : (
           <>
-            {/* Summary cards */}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:16 }}>
-              {(() => {
-                const catEntries = entries.filter(e=>e.categoryKey===activeCat)
-                const totalPlan = catEntries.reduce((s:number,e:any)=>s+e.planAmount,0)
-                const totalActual = catEntries.reduce((s:number,e:any)=>s+e.actualAmount,0)
-                const remaining = activeCatDef.annualBudget - totalActual
-                const currentMonth = new Date().getMonth()+1
-                const monthsLeft = 12 - currentMonth
-                const burnRate = currentMonth > 0 ? totalActual/currentMonth : 0
-                const estYearEnd = burnRate * 12
-                const pct = activeCatDef.annualBudget > 0 ? Math.round(totalActual/activeCatDef.annualBudget*100) : 0
-                const isOver = pct >= activeCatDef.threshold
-                return (<>
-                  <div className="card" style={{ padding:'12px 14px' }}>
-                    <div style={{ fontSize:10, color:'var(--text3)', marginBottom:3 }}>Anggaran Tahunan</div>
-                    <div style={{ fontSize:16, fontWeight:700, color:'var(--text)' }}>{formatRp(activeCatDef.annualBudget)}</div>
-                    <div style={{ fontSize:10, color:'var(--text3)', marginTop:2 }}>Threshold alert: {activeCatDef.threshold}%</div>
-                  </div>
-                  <div className="card" style={{ padding:'12px 14px' }}>
-                    <div style={{ fontSize:10, color:'var(--text3)', marginBottom:3 }}>Realisasi s.d. Sekarang</div>
-                    <div style={{ fontSize:16, fontWeight:700, color: isOver?'var(--red)':'var(--blue)' }}>{formatRp(totalActual)}</div>
-                    <div style={{ fontSize:10, color: isOver?'var(--red)':'var(--text3)', fontWeight: isOver?600:400, marginTop:2 }}>{pct}% dari anggaran {isOver?'⚠ MELEBIHI THRESHOLD':''}</div>
-                  </div>
-                  <div className="card" style={{ padding:'12px 14px' }}>
-                    <div style={{ fontSize:10, color:'var(--text3)', marginBottom:3 }}>Sisa Anggaran</div>
-                    <div style={{ fontSize:16, fontWeight:700, color: remaining<0?'var(--red)':'var(--green)' }}>{formatRp(remaining)}</div>
-                    <div style={{ fontSize:10, color:'var(--text3)', marginTop:2 }}>untuk {monthsLeft} bulan lagi</div>
-                  </div>
-                  <div className="card" style={{ padding:'12px 14px', borderLeft:`3px solid ${estYearEnd>activeCatDef.annualBudget?'var(--red)':'var(--amber)'}` }}>
-                    <div style={{ fontSize:10, color:'var(--text3)', marginBottom:3 }}>Estimasi Akhir Tahun</div>
-                    <div style={{ fontSize:16, fontWeight:700, color: estYearEnd>activeCatDef.annualBudget?'var(--red)':'var(--amber)' }}>{formatRp(estYearEnd)}</div>
-                    <div style={{ fontSize:10, color:'var(--text3)', marginTop:2 }}>Burn rate: {formatRp(burnRate)}/bln</div>
-                  </div>
-                </>)
-              })()}
-            </div>
-
-            {/* Config annual budget */}
-            {canManage && (
-              <div className="card" style={{ padding:'12px 16px', marginBottom:16 }}>
-                <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', marginBottom:10 }}>⚙️ Set Anggaran {activeCatDef.label}</div>
-                <div style={{ display:'flex', gap:10, alignItems:'flex-end', flexWrap:'wrap' }}>
-                  <div><label style={lbl}>Anggaran Tahunan (Rp)</label>
-                    <input className="input" style={{ width:200 }} defaultValue={activeCatDef.annualBudget} id={`budget-${activeCat}`} placeholder="0" /></div>
-                  <div><label style={lbl}>Threshold Alert (%)</label>
-                    <input type="number" className="input" style={{ width:100 }} defaultValue={activeCatDef.threshold} id={`threshold-${activeCat}`} min={50} max={100} /></div>
-                  <button className="btn btn-primary btn-sm" onClick={()=>{
-                    const budEl = document.getElementById(`budget-${activeCat}`) as HTMLInputElement
-                    const thrEl = document.getElementById(`threshold-${activeCat}`) as HTMLInputElement
-                    updateCatBudget(activeCat, parseInt(budEl.value.replace(/\D/g,''))||0, parseInt(thrEl.value)||80)
-                  }}>Simpan</button>
+            {/* Annual budget summary */}
+            <div className="card" style={{ padding:14, marginBottom:12 }}>
+              <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', marginBottom:10 }}>{activeCfg?.label} — Annual Plan</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                <div>
+                  <label style={lbl}>Anggaran Tahunan IDR</label>
+                  <input type="number" className="input" value={currentBudget.annualBudgetIDR||0} onChange={e=>setAnnual('annualBudgetIDR', Number(e.target.value))} />
+                  <div style={{ fontSize:11, color:'var(--text2)', marginTop:5 }}>Plan IDR: <b>Rp {fmt(currentBudget.annualBudgetIDR||0)}</b></div>
+                </div>
+                <div>
+                  <label style={lbl}>Anggaran Tahunan USD</label>
+                  <input type="number" className="input" value={currentBudget.annualBudgetUSD||0} onChange={e=>setAnnual('annualBudgetUSD', Number(e.target.value))} />
+                  <div style={{ fontSize:11, color:'var(--text2)', marginTop:5 }}>Plan USD: <b>$ {fmt(currentBudget.annualBudgetUSD||0)}</b></div>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Monthly table */}
-            <div className="card" style={{ overflow:'hidden' }}>
-              <table className="wp-table" style={{ width:'100%' }}>
-                <thead><tr>
-                  <th style={{ width:80 }}>Bulan</th>
-                  <th style={{ textAlign:'right' }}>Plan (Rp)</th>
-                  <th style={{ textAlign:'right' }}>Realisasi (Rp)</th>
-                  <th style={{ width:100 }}>Progress</th>
-                  <th style={{ width:80 }}>Selisih</th>
-                </tr></thead>
+            {/* Monthly realization table */}
+            <div className="card" style={{ overflow:'auto' }}>
+              <table className="wp-table">
+                <thead>
+                  <tr>
+                    <th>Bulan</th>
+                    <th>Realisasi (IDR)</th>
+                    <th>Realisasi (USD)</th>
+                    <th>Progress Kumulatif</th>
+                    <th>Catatan</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {MONTHS.map((m,i) => {
-                    const month = i+1
-                    const entry = getEntry(activeCat, month)
-                    const plan = entry?.planAmount || 0
-                    const actual = entry?.actualAmount || 0
-                    const diff = actual - plan
-                    const isPast = month <= new Date().getMonth()+1
-                    const isEditing = editCell?.key===activeCat && editCell?.month===month
-
+                  {MONTHS.map((mname, i) => {
+                    const m = i + 1
+                    const data = getMonth(m)
+                    const pct = progressPct(m)
                     return (
-                      <tr key={m} style={{ opacity: !isPast&&month>new Date().getMonth()+1 ? 0.5 : 1 }}>
-                        <td style={{ fontWeight:month===new Date().getMonth()+1?600:400, color:month===new Date().getMonth()+1?'var(--blue)':'var(--text2)' }}>{m} {month===new Date().getMonth()+1?'▸':''}</td>
-                        <td style={{ textAlign:'right' }}>
-                          {canManage && editCell?.key===activeCat && editCell?.month===month && editCell?.field==='plan' ? (
-                            <input autoFocus className="input" style={{ width:140, textAlign:'right' }} value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={()=>saveCell(activeCat,month,'plan')} onKeyDown={e=>{if(e.key==='Enter')saveCell(activeCat,month,'plan');if(e.key==='Escape')setEditCell(null)}} />
-                          ) : (
-                            <span style={{ cursor:canManage?'pointer':'default', color:'var(--text2)' }} onClick={()=>{if(!canManage)return;setEditCell({key:activeCat,month,field:'plan'});setEditVal(String(plan))}}>{plan>0?formatRp(plan):'—'}</span>
-                          )}
+                      <tr key={m}>
+                        <td style={{ fontWeight:600 }}>{mname}</td>
+                        <td><input type="number" className="input input-sm" style={{ width:130 }} value={data.realisasiIDR||0} onChange={e=>setMonth(m, 'realisasiIDR', Number(e.target.value))} /></td>
+                        <td><input type="number" className="input input-sm" style={{ width:100 }} value={data.realisasiUSD||0} onChange={e=>setMonth(m, 'realisasiUSD', Number(e.target.value))} /></td>
+                        <td style={{ minWidth:120 }}>
+                          <div style={{ fontSize:11, fontWeight:700, color: pct >= (activeCfg?.threshold||80) ? 'var(--red)' : pct >= 50 ? 'var(--amber)' : 'var(--green)' }}>
+                            {pct.toFixed(1)}%
+                          </div>
+                          <div style={{ fontSize:9, color:'var(--text3)' }}>Cumulative Jan-{mname}</div>
                         </td>
-                        <td style={{ textAlign:'right' }}>
-                          {canManage && editCell?.key===activeCat && editCell?.month===month && editCell?.field==='actual' ? (
-                            <input autoFocus className="input" style={{ width:140, textAlign:'right' }} value={editVal} onChange={e=>setEditVal(e.target.value)} onBlur={()=>saveCell(activeCat,month,'actual')} onKeyDown={e=>{if(e.key==='Enter')saveCell(activeCat,month,'actual');if(e.key==='Escape')setEditCell(null)}} />
-                          ) : (
-                            <span style={{ cursor:canManage?'pointer':'default', color:actual>plan&&plan>0?'var(--red)':'var(--green)' }} onClick={()=>{if(!canManage)return;setEditCell({key:activeCat,month,field:'actual'});setEditVal(String(actual))}}>{actual>0?formatRp(actual):'—'}</span>
-                          )}
-                        </td>
-                        <td>
-                          {plan > 0 && (
-                            <div className="prog-bar"><div className="prog-fill" style={{ width:`${Math.min(100,Math.round(actual/plan*100))}%`, background:actual>plan?'var(--red)':actual>plan*0.8?'var(--amber)':'var(--blue)' }} /></div>
-                          )}
-                        </td>
-                        <td style={{ fontSize:11, fontWeight:600, color:diff>0?'var(--red)':diff<0?'var(--green)':'var(--text3)' }}>
-                          {diff!==0 ? (diff>0?'+':'')+formatRp(diff) : '—'}
-                        </td>
+                        <td><input className="input input-sm" style={{ minWidth:160 }} value={data.notes||''} onChange={e=>setMonth(m, 'notes', e.target.value)} /></td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
-              {canManage && <div style={{ padding:'8px 12px', fontSize:11, color:'var(--text3)', borderTop:'1px solid var(--border)' }}>Klik nilai Plan atau Realisasi untuk mengedit langsung</div>}
             </div>
           </>
         )}
@@ -192,4 +178,5 @@ export default function BudgetPage() {
     </div>
   )
 }
+function chip(active:boolean):React.CSSProperties { return { padding:'4px 11px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${active?'var(--brand)':'var(--border)'}`, background:active?'var(--brand-soft)':'var(--bg3)', color:active?'var(--brand)':'var(--text2)' } }
 const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }

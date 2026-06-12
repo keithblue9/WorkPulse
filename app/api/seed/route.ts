@@ -11,14 +11,19 @@ export async function POST() {
     // Default PIN: 123456
     const defaultPin = await bcrypt.hash('123456', 10)
 
+    // Today MM-DD for birthday popup test (last user gets today as birthDate)
+    const today = new Date()
+    const tdStr = `1990-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+
     const users = [
-      { name:'Mas E',  email:'mas.e@workpulse.com',  password:defaultPin, role:'manager', division:'BPD Procurement', active:true, noPekerja:'BPD-001', jabatan:'Manager' },
-      { name:'Admin',  email:'admin@workpulse.com',  password:defaultPin, role:'admin',   division:'IT', active:true, jabatan:'IT Admin' },
-      { name:'Rina S', email:'rina.s@workpulse.com', password:defaultPin, role:'member',  division:'SS Procurement', active:true, jabatan:'Senior Analyst' },
-      { name:'Budi H', email:'budi.h@workpulse.com', password:defaultPin, role:'member',  division:'TnD', active:true },
-      { name:'Dewi P', email:'dewi.p@workpulse.com', password:defaultPin, role:'member',  division:'EIT', active:true },
-      { name:'Adi K',  email:'adi.k@workpulse.com',  password:defaultPin, role:'member',  division:'PMO', active:true },
-      { name:'Finance',email:'finance@workpulse.com',password:defaultPin, role:'finance', division:'Finance', active:true },
+      { name:'Mas E',   email:'mas.e@workpulse.com',   password:defaultPin, role:'manager', roles:['manager'],          division:'BPD Procurement', active:true, noPekerja:'BPD-001', jabatan:'Manager', birthDate:'1985-04-15', phone:'08123456001', bank:'Mandiri', noRekening:'1234567890' },
+      { name:'Admin',   email:'admin@workpulse.com',   password:defaultPin, role:'admin',   roles:['admin','manager'],  division:'IT', active:true, jabatan:'IT Admin', birthDate:'1988-06-20', phone:'08123456002' },
+      { name:'Rina S',  email:'rina.s@workpulse.com',  password:defaultPin, role:'member',  roles:['member'],           division:'SS Procurement', active:true, jabatan:'Senior Analyst', birthDate:'1990-09-12', phone:'08123456003' },
+      { name:'Budi H',  email:'budi.h@workpulse.com',  password:defaultPin, role:'member',  roles:['member'],           division:'TnD', active:true, birthDate:'1992-11-08', phone:'08123456004' },
+      { name:'Dewi P',  email:'dewi.p@workpulse.com',  password:defaultPin, role:'member',  roles:['member'],           division:'EIT', active:true, birthDate: tdStr, phone:'08123456005' },
+      { name:'Adi K',   email:'adi.k@workpulse.com',   password:defaultPin, role:'member',  roles:['member'],           division:'PMO', active:true, birthDate:'1989-03-22', phone:'08123456006' },
+      { name:'Finance', email:'finance@workpulse.com', password:defaultPin, role:'finance', roles:['finance'],          division:'Finance', active:true, phone:'08123456007' },
+      { name:'Cashier', email:'cashier@workpulse.com', password:defaultPin, role:'cashier', roles:['cashier'],          division:'Finance', active:true, phone:'08123456008', jabatan:'Kasir' },
     ]
     for (const u of users) {
       await UserModel.findOneAndUpdate({ email:u.email }, u, { upsert:true })

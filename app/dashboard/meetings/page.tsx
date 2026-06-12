@@ -12,6 +12,8 @@ function MeetingForm({ editing, categories, onClose, onSave }: { editing?:any; c
     notes:editing?.notes||'',
     pic:editing?.pic||user?.name||'',
     attendees:editing?.attendees?.join(', ')||'',
+    picTags: editing?.picTags || [],
+    categoryTags: editing?.categoryTags || [],
     tags:editing?.tags?.join(', ')||'',
   })
   const [evidenceFile, setEvidenceFile] = useState<string|null>(editing?.evidenceUrl||null)
@@ -37,6 +39,8 @@ function MeetingForm({ editing, categories, onClose, onSave }: { editing?:any; c
         body: JSON.stringify({
           ...form,
           attendees: form.attendees.split(',').map((s:string)=>s.trim()).filter(Boolean),
+          picTags: form.picTags,
+          categoryTags: form.categoryTags,
           tags: form.tags.split(',').map((s:string)=>s.trim()).filter(Boolean),
           evidenceUrl: evidenceFile, evidenceName,
           authorId: user?.id || user?.email, authorName: user?.name,
@@ -68,7 +72,32 @@ function MeetingForm({ editing, categories, onClose, onSave }: { editing?:any; c
             <div><label style={lbl}>Tanggal *</label><input type="date" className="input" value={form.meetingDate} onChange={e=>set('meetingDate',e.target.value)} /></div>
           </div>
           <div><label style={lbl}>PIC</label><input className="input" value={form.pic} onChange={e=>set('pic',e.target.value)} placeholder="Nama PIC..." /></div>
-          <div><label style={lbl}>Peserta (pisahkan koma)</label><input className="input" value={form.attendees} onChange={e=>set('attendees',e.target.value)} placeholder="Erwin, Nabila, ..." /></div>
+          <div>
+            <label style={lbl}>Peserta (pisahkan koma)</label>
+            <input className="input" value={form.attendees} onChange={e=>set('attendees',e.target.value)} placeholder="Erwin, Nabila, ..." />
+          </div>
+          <div>
+            <label style={lbl}>PIC (klik untuk tag)</label>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+              {(members||[]).map((m:any) => {
+                const checked = (form.picTags||[]).includes(m.name)
+                return (
+                  <button key={m._id} onClick={()=>set('picTags', checked ? form.picTags.filter((p:string)=>p!==m.name) : [...(form.picTags||[]), m.name])} className="btn btn-sm" style={{ background:checked?'var(--brand)':'var(--bg3)', color:checked?'#fff':'var(--text2)', borderColor:checked?'var(--brand)':'var(--border2)', fontSize:11 }}>{m.name}</button>
+                )
+              })}
+            </div>
+          </div>
+          <div>
+            <label style={lbl}>Kategori Activities terkait (klik untuk tag)</label>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+              {(activityCats||[]).map((c:any) => {
+                const checked = (form.categoryTags||[]).includes(c.key)
+                return (
+                  <button key={c.key} onClick={()=>set('categoryTags', checked ? form.categoryTags.filter((k:string)=>k!==c.key) : [...(form.categoryTags||[]), c.key])} className="btn btn-sm" style={{ background:checked?c.color:'var(--bg3)', color:checked?'#fff':'var(--text2)', borderColor:checked?c.color:'var(--border2)', fontSize:11 }}>{c.label}</button>
+                )
+              })}
+            </div>
+          </div>
           <div><label style={lbl}>Catatan Meeting *</label><textarea className="input" value={form.notes} onChange={e=>set('notes',e.target.value)} rows={5} placeholder="Tulis catatan meeting di sini..." style={{ resize:'vertical' }} /></div>
           <div><label style={lbl}>Evidence (Screenshot JPG/PNG)</label>
             <div style={{ border:'1px dashed var(--border2)', borderRadius:8, padding:14, textAlign:'center', cursor:'pointer' }} onClick={()=>document.getElementById('evidence-input')?.click()}>

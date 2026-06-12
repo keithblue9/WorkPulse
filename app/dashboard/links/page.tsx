@@ -51,7 +51,7 @@ function LinkForm({ onClose, onSave, editing }: { onClose:()=>void; onSave:()=>v
           <div><label style={lbl}>Deskripsi</label><input className="input" value={form.description} onChange={e=>set('description',e.target.value)} placeholder="Deskripsi singkat..." /></div>
           <div><label style={lbl}>Kategori</label>
             <select className="input" value={form.category} onChange={e=>set('category',e.target.value)}>
-              {DEFAULT_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+              {(linkCats||[]).map((c:any) => <option key={c.key} value={c.label}>{c.label}</option>)}
             </select></div>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             <div className={`toggle-wrap${form.pinned?' on':''}`} onClick={() => set('pinned',!form.pinned)} />
@@ -76,13 +76,20 @@ function LinkForm({ onClose, onSave, editing }: { onClose:()=>void; onSave:()=>v
 export default function LinksPage() {
   const { data:session } = useSession(); const user = session?.user as any
   const [links, setLinks] = useState<any[]>([])
+  const [linkCats, setLinkCats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('Semua')
 
-  async function load() { const d = await fetch('/api/links').then(r=>r.json()); setLinks(d.data||[]); setLoading(false) }
+  async function load() {
+    setLoading(true)
+    const [r, c] = await Promise.all([fetch('/api/links').then(r=>r.json()), fetch('/api/config').then(r=>r.json())])
+    setLinks(r.data||[])
+    setLinkCats(c.data?.linkCategories?.filter((x:any)=>x.active) || [])
+    setLoading(false)
+  }
   useEffect(() => { load() }, [])
 
   async function del(id: string) {

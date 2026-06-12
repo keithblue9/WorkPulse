@@ -6,21 +6,28 @@ export async function GET(req: NextRequest) {
   try {
     await connectDB()
     const { searchParams } = new URL(req.url)
-    const year = parseInt(searchParams.get('year') || '2026')
-    const entries = await BudgetModel.find({ year }).sort({ month: 1, categoryKey: 1 }).lean()
+    const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()))
+    const entries = await BudgetModel.find({ year }).lean()
     return NextResponse.json({ data: entries })
   } catch { return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
 }
 
-export async function POST(req: NextRequest) {
+// PUT: upsert one category's full budget for a year
+export async function PUT(req: NextRequest) {
   try {
     await connectDB()
-    const body = await req.json()
+    const { year, category, budget } = await req.json()
     const entry = await BudgetModel.findOneAndUpdate(
-      { categoryKey: body.categoryKey, year: body.year, month: body.month },
-      body,
+      { year, category },
+      { year, category, annualBudgetIDR: budget?.annualBudgetIDR||0, annualBudgetUSD: budget?.annualBudgetUSD||0, monthly: budget?.monthly||[] },
       { upsert: true, new: true }
     ).lean()
     return NextResponse.json({ data: entry })
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+}
+
+export async function POST(req: NextRequest) {
+  // Legacy support
+  try { await connectDB(); const body = await req.json(); const entry = await BudgetModel.create(body); return NextResponse.json({ data: entry }) }
+  catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
 }

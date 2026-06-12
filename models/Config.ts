@@ -1,15 +1,25 @@
 import mongoose, { Schema, models } from 'mongoose'
 
-const AttendanceTypeSchema = new Schema({
-  key:String, label:String, color:String, textColor:String, icon:String, active:{ type:Boolean, default:true },
+const TaxonomyItemSchema = new Schema({ key:String, label:String, color:String, active:{ type:Boolean, default:true } }, { _id:false })
+const BudgetCategorySchema = new Schema({ key:String, label:String, annualBudget:{ type:Number, default:0 }, annualBudgetUSD:{ type:Number, default:0 }, pic:String, threshold:{ type:Number, default:80 } }, { _id:false })
+const AttendanceTypeSchema = new Schema({ key:String, label:String, color:String, textColor:String, icon:String, active:{ type:Boolean, default:true } }, { _id:false })
+
+// NEW: role with menu permissions
+const RoleSchema = new Schema({
+  key: String,             // 'admin' | 'manager' | 'member' | 'finance' | 'cashier' | 'guest' | custom
+  label: String,
+  builtin: { type: Boolean, default: false },
+  allowedMenus: { type: [String], default: [] }, // ['dashboard','activities','calendar','issues',...]
+  description: String,
 }, { _id:false })
 
-const BudgetCategorySchema = new Schema({
-  key:String, label:String, annualBudget:{ type:Number, default:0 }, pic:String, threshold:{ type:Number, default:80 },
-}, { _id:false })
-
-const TaxonomyItemSchema = new Schema({
-  key:String, label:String, color:String, active:{ type:Boolean, default:true },
+// Dashboard widget toggle
+const DashboardWidgetSchema = new Schema({
+  key: String,            // 'stat-kpi','stat-nonkpi','stat-golive','stat-anggaran','stat-others','stat-highpriority','progress-chart','quotes','ai-insight-team','ai-insight-personal','top-contributors','agenda','issue-distribution','member-count'
+  label: String,
+  segment: { type:String, default:'main' }, // segment grouping (main/secondary)
+  active: { type: Boolean, default: true },
+  order: { type: Number, default: 0 },
 }, { _id:false })
 
 const ConfigSchema = new Schema({
@@ -21,16 +31,13 @@ const ConfigSchema = new Schema({
   loginTagline: { type:String, default:'BPD & SS Procurement — Pertamina' },
   loginBackgrounds: { type:[String], default:[] },
   loginSlideInterval: { type:Number, default:5000 },
-  loginBgMaxSize: { type:Number, default:5 }, // MB
+  loginBgMaxSize: { type:Number, default:5 },
 
   pwaInstallEnabled: { type:Boolean, default:true },
   pwaPromptDelay: { type:Number, default:8000 },
   pwaPromptCooldown: { type:Number, default:7 },
 
   activeYear: { type:Number, default:2026 },
-  midYearMonth: { type:Number, default:6 },
-  midYearTarget: { type:Number, default:50 },
-  yearEndTarget: { type:Number, default:100 },
 
   attendanceTypes: {
     type: [AttendanceTypeSchema],
@@ -44,17 +51,15 @@ const ConfigSchema = new Schema({
     ],
   },
 
+  // BUDGET: removed Cash Card / Petty Cash (slide 14), kept Travel & External Accommodation
   budgetCategories: {
     type: [BudgetCategorySchema],
     default: [
-      { key:'cash_card', label:'Cash Card', annualBudget:0, pic:'', threshold:80 },
-      { key:'petty_cash', label:'Petty Cash', annualBudget:0, pic:'', threshold:80 },
-      { key:'dinas_travel', label:'Dinas & Travel', annualBudget:0, pic:'', threshold:80 },
-      { key:'accommodation', label:'External Accommodation', annualBudget:0, pic:'', threshold:80 },
+      { key:'travel', label:'Dinas & Travel', annualBudget:0, annualBudgetUSD:0, pic:'', threshold:80 },
+      { key:'accommodation', label:'External Accommodation', annualBudget:0, annualBudgetUSD:0, pic:'', threshold:80 },
     ],
   },
 
-  // Activity hierarchy
   activityCategories: {
     type: [TaxonomyItemSchema],
     default: [
@@ -107,17 +112,63 @@ const ConfigSchema = new Schema({
     ],
   },
 
+  // NEW: Link Hub categories editable
+  linkCategories: {
+    type: [TaxonomyItemSchema],
+    default: [
+      { key:'doc',     label:'Document',      color:'#4f8ef7', active:true },
+      { key:'system',  label:'System Tool',   color:'#8b7adc', active:true },
+      { key:'sop',     label:'SOP',           color:'#56a47a', active:true },
+      { key:'others',  label:'Others',        color:'#9aa6b3', active:true },
+    ],
+  },
+
+  // NEW: Roles with menu permissions
+  roleDefs: {
+    type: [RoleSchema],
+    default: [
+      { key:'admin',   label:'Admin',   builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members','config'] },
+      { key:'manager', label:'Manager', builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members'] },
+      { key:'member',  label:'Member',  builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','reimbursement'] },
+      { key:'finance', label:'Finance', builtin:true,  allowedMenus:['dashboard','attendance','biodata','links','budget','reimbursement','cashcard','cashier'] },
+      { key:'cashier', label:'Cashier', builtin:true,  allowedMenus:['dashboard','reimbursement','cashier','cashcard','biodata'] },
+      { key:'guest',   label:'Guest',   builtin:true,  allowedMenus:['dashboard','links'] },
+    ],
+  },
+
+  // NEW: Dashboard widgets toggle
+  dashboardWidgets: {
+    type: [DashboardWidgetSchema],
+    default: [
+      { key:'stat-kpi',           label:'Stat: KPI',            segment:'stats', active:true,  order:1 },
+      { key:'stat-nonkpi',        label:'Stat: Non KPI',        segment:'stats', active:true,  order:2 },
+      { key:'stat-golive',        label:'Stat: Go Live',        segment:'stats', active:true,  order:3 },
+      { key:'stat-anggaran',      label:'Stat: Anggaran',       segment:'stats', active:true,  order:4 },
+      { key:'stat-others',        label:'Stat: Others',         segment:'stats', active:true,  order:5 },
+      { key:'stat-highpriority',  label:'Stat: High Priority',  segment:'stats', active:true,  order:6 },
+      { key:'progress-chart',     label:'Chart Progress Project (donut)', segment:'main',  active:true, order:1 },
+      { key:'ai-quotes',          label:'AI Quotes (daily)',    segment:'ai',    active:true,  order:1 },
+      { key:'ai-insight-personal',label:'AI Insight Personal',  segment:'ai',    active:true,  order:2 },
+      { key:'ai-insight-team',    label:'AI Insight Team',      segment:'ai',    active:true,  order:3 },
+      { key:'top-contributors',   label:'Top Contributors',     segment:'main',  active:true,  order:2 },
+      { key:'upcoming-agenda',    label:'Agenda Mendatang',     segment:'main',  active:true,  order:3 },
+      { key:'issue-distribution', label:'Issue Distribution',   segment:'main',  active:true,  order:4 },
+      { key:'member-count',       label:'Member Count Card',    segment:'main',  active:false, order:5 },
+    ],
+  },
+
+  // NEW: WhatsApp/Fonnte templates
+  fonnte: {
+    apiUrl: { type:String, default:'https://api.fonnte.com/send' },
+    cashierUserId: String, // userId who acts as cashier (gets pesan saat ada reimburse)
+    messageToCashier: { type:String, default:'🔔 Reimbursement Baru\n\nDari: {memberName}\nKeperluan: {purpose}\nNominal: {amount}\nKategori: {category}\n\nMohon segera diproses di menu Cashier.' },
+    messageToMember: { type:String, default:'✅ Reimbursement Disetujui\n\nHi {memberName}, pengajuan reimburse "{purpose}" senilai {amount} telah ditransfer ke:\n\n🏦 {bank}\n💳 {noRekening}\n\nTerima kasih.' },
+  },
+
   notifications: {
     waEnabled: { type:Boolean, default:true },
     waDueDateReminder: { type:Boolean, default:true },
     waWeeklyDigest: { type:Boolean, default:false },
-    digestDayOfWeek: { type:Number, default:5 },
-    digestHour: { type:Number, default:17 },
-  },
-  roles: {
-    managerCanEditAll: { type:Boolean, default:true },
-    memberSeeOwnOnly: { type:Boolean, default:false },
-    guestViewEnabled: { type:Boolean, default:false },
   },
 }, { timestamps:true })
 

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 
-type Tab = 'branding'|'login'|'taxonomies'|'attendance'|'budget'|'reset'|'system'
+type Tab = 'branding'|'login'|'taxonomies'|'attendance'|'budget'|'roles'|'widgets'|'fonnte'|'reset'|'system'
 
 function Section({ title, sub, children, action }: { title:string; sub?:string; children:React.ReactNode; action?:React.ReactNode }) {
   return (
@@ -129,6 +129,142 @@ function ResetSection() {
   )
 }
 
+
+const MENU_KEYS = ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members','config']
+const MENU_LABELS: Record<string,string> = {
+  dashboard:'Dashboard', activities:'Activities', calendar:'Calendar', issues:'Issues', progress:'Progress',
+  attendance:'Presensi', biodata:'Biodata', links:'Link Hub', meetings:'Meeting Reports', notes:'Notes',
+  budget:'Anggaran', reimbursement:'Reimbursement', cashcard:'Cash Card', cashier:'Cashier',
+  members:'Member', config:'Configuration'
+}
+
+function RolesEditor({ roles, onChange }: { roles:any[]; onChange:(roles:any[])=>void }) {
+  const [editing, setEditing] = useState<number|null>(null)
+  const [newRole, setNewRole] = useState({ key:'', label:'', allowedMenus:[] as string[] })
+  const [showAdd, setShowAdd] = useState(false)
+
+  function update(i:number, patch:any) { onChange(roles.map((r:any,idx:number)=>idx===i?{...r,...patch}:r)) }
+  function toggleMenu(i:number, menu:string) {
+    const role = roles[i]
+    const allowed = role.allowedMenus || []
+    const next = allowed.includes(menu) ? allowed.filter((m:string)=>m!==menu) : [...allowed, menu]
+    update(i, { allowedMenus: next })
+  }
+  function remove(i:number) { if(!confirm(`Hapus role "${roles[i].label}"?`))return; onChange(roles.filter((_:any,idx:number)=>idx!==i)) }
+  function add() {
+    if (!newRole.key) return
+    onChange([...roles, { ...newRole, builtin:false }])
+    setNewRole({ key:'', label:'', allowedMenus:[] }); setShowAdd(false)
+  }
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      {roles.map((r:any, i:number) => (
+        <div key={i} className="card" style={{ padding:12 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              {editing===i ? (
+                <>
+                  <input className="input input-sm" style={{ width:120 }} value={r.key} onChange={e=>update(i, { key:e.target.value })} disabled={r.builtin} />
+                  <input className="input input-sm" style={{ width:160 }} value={r.label} onChange={e=>update(i, { label:e.target.value })} placeholder="Label" />
+                </>
+              ) : (
+                <>
+                  <code style={{ fontSize:11, padding:'3px 8px', background:'var(--bg3)', borderRadius:5 }}>{r.key}</code>
+                  <span style={{ fontWeight:600, fontSize:13 }}>{r.label}</span>
+                  {r.builtin && <span className="badge" style={{ background:'var(--brand-soft)', color:'var(--brand)', fontSize:9 }}>built-in</span>}
+                </>
+              )}
+            </div>
+            <div style={{ display:'flex', gap:5 }}>
+              <button className="btn btn-icon btn-sm" onClick={()=>setEditing(editing===i?null:i)}>{editing===i?'✓':'✏️'}</button>
+              {!r.builtin && <button onClick={()=>remove(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>🗑</button>}
+            </div>
+          </div>
+          <div style={{ fontSize:10, color:'var(--text3)', marginBottom:5 }}>Menu yang bisa diakses:</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+            {MENU_KEYS.map(menu => {
+              const checked = (r.allowedMenus||[]).includes(menu)
+              return (
+                <button key={menu} onClick={()=>toggleMenu(i, menu)} style={{ padding:'3px 9px', borderRadius:14, fontSize:10, fontWeight:500, cursor:'pointer', border:`1px solid ${checked?'var(--brand)':'var(--border)'}`, background:checked?'var(--brand-soft)':'var(--bg3)', color:checked?'var(--brand)':'var(--text3)' }}>
+                  {checked?'✓ ':''}{MENU_LABELS[menu]}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+      {showAdd ? (
+        <div className="card" style={{ padding:12, border:'1px dashed var(--brand)' }}>
+          <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+            <input className="input input-sm" placeholder="Key (e.g. auditor)" value={newRole.key} onChange={e=>setNewRole(r=>({...r, key:e.target.value.replace(/\s+/g,'_').toLowerCase()}))} />
+            <input className="input input-sm" placeholder="Label (e.g. Auditor)" value={newRole.label} onChange={e=>setNewRole(r=>({...r, label:e.target.value}))} />
+            <button onClick={add} className="btn btn-primary btn-sm">+ Tambah</button>
+            <button onClick={()=>setShowAdd(false)} className="btn btn-sm">Batal</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={()=>setShowAdd(true)} className="btn btn-sm" style={{ alignSelf:'flex-start' }}>+ Tambah Role</button>
+      )}
+    </div>
+  )
+}
+
+function FonnteSettings({ config, onSave }: { config:any; onSave:(patch:any)=>void }) {
+  const [users, setUsers] = useState<any[]>([])
+  const [cashierUserId, setCashierUserId] = useState(config?.fonnte?.cashierUserId || '')
+  const [tplCashier, setTplCashier] = useState(config?.fonnte?.messageToCashier || '')
+  const [tplMember, setTplMember] = useState(config?.fonnte?.messageToMember || '')
+  const [testNum, setTestNum] = useState('')
+  const [sending, setSending] = useState(false)
+
+  useEffect(() => { fetch('/api/users').then(r=>r.json()).then(d=>setUsers(d.data||[])) }, [])
+
+  async function test() {
+    if (!testNum) { alert('Masukkan nomor HP test'); return }
+    setSending(true)
+    try {
+      const r = await fetch('/api/fonnte', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ target: testNum, message: '🧪 Test message dari WorkPulse. Konfigurasi Fonnte berhasil.' }) })
+      const d = await r.json()
+      if (r.ok) alert('Test kirim sukses. Cek WA target.'); else alert('Gagal: ' + (d.error||'unknown'))
+    } finally { setSending(false) }
+  }
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+      <div>
+        <label style={lbl}>Cashier User (yang punya token Fonnte)</label>
+        <select className="input" value={cashierUserId} onChange={e=>{ setCashierUserId(e.target.value); onSave({ cashierUserId: e.target.value }) }}>
+          <option value="">— Pilih cashier —</option>
+          {users.filter((u:any)=>u.active!==false).map((u:any) => (
+            <option key={u._id} value={u._id}>{u.name} ({u.email}) {u.fonnteToken?'✓ has token':''}</option>
+          ))}
+        </select>
+        <div style={{ fontSize:10, color:'var(--text3)', marginTop:5 }}>User yang dipilih harus punya role <code>cashier</code> dan token Fonnte di profil-nya.</div>
+      </div>
+      <div>
+        <label style={lbl}>Template Pesan ke Cashier (saat member submit reimburse)</label>
+        <textarea className="input" rows={5} value={tplCashier} onChange={e=>setTplCashier(e.target.value)} onBlur={()=>onSave({ messageToCashier: tplCashier })} />
+        <div style={{ fontSize:10, color:'var(--text3)', marginTop:5 }}>Variabel: <code>{`{memberName} {purpose} {amount} {category} {bank} {noRekening}`}</code></div>
+      </div>
+      <div>
+        <label style={lbl}>Template Pesan ke Member (saat cashier transfer)</label>
+        <textarea className="input" rows={5} value={tplMember} onChange={e=>setTplMember(e.target.value)} onBlur={()=>onSave({ messageToMember: tplMember })} />
+        <div style={{ fontSize:10, color:'var(--text3)', marginTop:5 }}>Variabel: <code>{`{memberName} {purpose} {amount} {category} {bank} {noRekening}`}</code></div>
+      </div>
+      <div className="card" style={{ padding:12, background:'var(--bg3)' }}>
+        <div style={{ fontSize:11, fontWeight:600, marginBottom:6 }}>🧪 Test Kirim WhatsApp</div>
+        <div style={{ display:'flex', gap:8 }}>
+          <input className="input input-sm" value={testNum} onChange={e=>setTestNum(e.target.value)} placeholder="08xxxxxxxxxx" />
+          <button onClick={test} disabled={sending} className="btn btn-primary btn-sm">{sending?'...':'Test Kirim'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 export default function ConfigPage() {
   const { data:session } = useSession(); const user = session?.user as any
   const [config, setConfig] = useState<any>(null)
@@ -171,6 +307,9 @@ export default function ConfigPage() {
     { key:'taxonomies', label:'Kategori & Status', icon:'🏷️' },
     { key:'attendance', label:'Tipe Absensi',  icon:'📅' },
     { key:'budget',     label:'Kategori Anggaran', icon:'💰' },
+    { key:'roles',      label:'Roles & Permissions', icon:'🔐' },
+    { key:'widgets',    label:'Dashboard Widgets', icon:'📊' },
+    { key:'fonnte',     label:'WhatsApp / Fonnte', icon:'💬' },
     { key:'reset',      label:'Reset Data',    icon:'🗑️' },
     { key:'system',     label:'Sistem Info',   icon:'ℹ️' },
   ]

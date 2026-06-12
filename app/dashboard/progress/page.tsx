@@ -1,306 +1,249 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import toast from 'react-hot-toast'
-import { useSession } from 'next-auth/react'
 
-const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
 
-// ─── Visual Month Range Picker ──────────────────────────────
-function MonthRangePicker({ label, color, start, end, onChange }: { label:string; color:string; start?:number; end?:number; onChange:(s:number,e:number)=>void }) {
-  const [dragMode, setDragMode] = useState<'none'|'start'|'end'>('none')
-  const [hoverMonth, setHoverMonth] = useState<number|null>(null)
+// Auto-calculate proportional % based on months blocked, total = 100% across all phases
+function calcProportional(phases:any[], field:'plan'|'actual'):number[] {
+  const startKey = field === 'plan' ? 'planStartMonth' : 'actualStartMonth'
+  const endKey = field === 'plan' ? 'planEndMonth' : 'actualEndMonth'
+  // Total months blocked across all phases
+  const monthsPerPhase = phases.map(p => {
+    const s = p[startKey], e = p[endKey]
+    if (!s || !e || s > e) return 0
+    return e - s + 1
+  })
+  const totalMonths = monthsPerPhase.reduce((a,b)=>a+b, 0)
+  if (totalMonths === 0) return phases.map(()=>0)
+  // Each phase % is proportional to its month-block
+  return monthsPerPhase.map(m => (m / totalMonths) * 100)
+}
 
-  function handleClick(m:number) {
-    if (!start || !end) { onChange(m, m); return }
-    if (m < start) onChange(m, end)
-    else if (m > end) onChange(start, m)
-    else { onChange(m, m) }
+function PhaseRow({ phase, idx, onChange, autoPlanPct, autoActualPct }: { phase:any; idx:number; onChange:(p:any)=>void; autoPlanPct:number; autoActualPct:number }) {
+  const months = Array.from({length:12}, (_,i)=>i+1)
+  function setRange(field:'plan'|'actual', m:number) {
+    const sKey = field==='plan'?'planStartMonth':'actualStartMonth'
+    const eKey = field==='plan'?'planEndMonth':'actualEndMonth'
+    const cs = phase[sKey], ce = phase[eKey]
+    if (!cs && !ce) onChange({ ...phase, [sKey]:m, [eKey]:m })
+    else if (cs && !ce) {
+      if (m < cs) onChange({ ...phase, [sKey]:m, [eKey]:cs })
+      else onChange({ ...phase, [eKey]:m })
+    }
+    else { onChange({ ...phase, [sKey]:m, [eKey]:m }) }
   }
-
-  const inRange = (m:number) => start && end && m >= start && m <= end
-  const isHovered = (m:number) => hoverMonth === m
-
+  function inRange(field:'plan'|'actual', m:number) {
+    const sKey = field==='plan'?'planStartMonth':'actualStartMonth'
+    const eKey = field==='plan'?'planEndMonth':'actualEndMonth'
+    return phase[sKey] && phase[eKey] && m >= phase[sKey] && m <= phase[eKey]
+  }
   return (
-    <div>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-        <span style={{ fontSize:11, fontWeight:600, color }}>{label}</span>
-        <span style={{ fontSize:10, color:'var(--text3)' }}>
-          {start && end ? `${MONTHS[start-1]} – ${MONTHS[end-1]}` : 'Belum di-set'}
-        </span>
+    <div className="card" style={{ padding:12, marginBottom:8 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:10, marginBottom:8, alignItems:'center' }}>
+        <input className="input input-sm" value={phase.name||''} onChange={e=>onChange({...phase, name:e.target.value})} placeholder={`Phase ${idx+1}`} />
+        <div style={{ fontSize:10, color:'var(--text3)' }}>auto-calc</div>
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(12,1fr)', gap:2, padding:2, background:'var(--bg4)', borderRadius:6 }}>
-        {MONTHS.map((mn,i) => {
-          const m = i+1
-          const active = inRange(m)
-          return (
-            <div key={m} onClick={()=>handleClick(m)} onMouseEnter={()=>setHoverMonth(m)} onMouseLeave={()=>setHoverMonth(null)}
-              style={{
-                padding:'5px 0', textAlign:'center', fontSize:9, fontWeight:600, cursor:'pointer',
-                borderRadius:4, transition:'all 0.15s',
-                background: active ? color : isHovered(m) ? color+'33' : 'transparent',
-                color: active ? '#fff' : isHovered(m) ? color : 'var(--text3)',
-              }}>{mn}</div>
-          )
-        })}
+      <div style={{ display:'grid', gridTemplateColumns:'60px 1fr 80px', gap:5, alignItems:'center', marginBottom:5 }}>
+        <div style={{ fontSize:10, color:'var(--brand)', fontWeight:600 }}>Plan</div>
+        <div style={{ display:'flex', gap:1 }}>
+          {months.map(m => (
+            <div key={m} onClick={()=>setRange('plan', m)} style={{ flex:1, height:24, fontSize:9, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', background: inRange('plan',m)?'var(--brand)':'var(--bg3)', color: inRange('plan',m)?'#fff':'var(--text3)', borderRight:m<12?'1px solid var(--bg2)':'none' }}>{MONTHS_SHORT[m-1].substring(0,1)}</div>
+          ))}
+        </div>
+        <div style={{ fontSize:11, fontWeight:700, color:'var(--brand)', textAlign:'right' }}>{autoPlanPct.toFixed(1)}%</div>
       </div>
+      <div style={{ display:'grid', gridTemplateColumns:'60px 1fr 80px', gap:5, alignItems:'center', marginBottom:8 }}>
+        <div style={{ fontSize:10, color:'var(--green)', fontWeight:600 }}>Actual</div>
+        <div style={{ display:'flex', gap:1 }}>
+          {months.map(m => (
+            <div key={m} onClick={()=>setRange('actual', m)} style={{ flex:1, height:24, fontSize:9, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', background: inRange('actual',m)?'var(--green)':'var(--bg3)', color: inRange('actual',m)?'#fff':'var(--text3)', borderRight:m<12?'1px solid var(--bg2)':'none' }}>{MONTHS_SHORT[m-1].substring(0,1)}</div>
+          ))}
+        </div>
+        <div style={{ fontSize:11, fontWeight:700, color:'var(--green)', textAlign:'right' }}>{autoActualPct.toFixed(1)}%</div>
+      </div>
+      <textarea className="input" rows={2} style={{ fontSize:11 }} value={phase.progressNotes||''} onChange={e=>onChange({...phase, progressNotes:e.target.value})} placeholder="Catatan progress phase ini (apa yang sudah dilakukan)" />
     </div>
   )
 }
 
-// ─── Phase Editor Card ──────────────────────────────────────
-function PhaseEditor({ phase, idx, onChange, onDelete }: { phase:any; idx:number; onChange:(p:any)=>void; onDelete:()=>void }) {
-  return (
-    <div className="glass" style={{ padding:'14px 16px', borderRadius:12, marginBottom:8 }}>
-      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
-        <div style={{ width:28, height:28, borderRadius:'50%', background:'var(--bluebg)', color:'var(--blue)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, flexShrink:0 }}>{idx+1}</div>
-        <input className="input" value={phase.name} onChange={e=>onChange({...phase, name:e.target.value})} placeholder="Nama phase..." style={{ flex:1, fontWeight:500 }} />
-        <button onClick={onDelete} className="btn btn-icon" style={{ fontSize:14, color:'var(--red)' }} title="Hapus phase">🗑</button>
-      </div>
-
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-        {/* PLAN */}
-        <div style={{ padding:'10px 12px', background:'var(--bg3)', borderRadius:8 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-            <span style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.07em' }}>📋 PLAN</span>
-            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <input type="number" min={0} max={100} className="input" value={phase.planPct||0} onChange={e=>onChange({...phase, planPct:Number(e.target.value)})} style={{ width:55, padding:'3px 6px', fontSize:11, textAlign:'center' }} />
-              <span style={{ fontSize:11, color:'var(--text2)', fontWeight:600 }}>%</span>
-            </div>
-          </div>
-          <MonthRangePicker label="Periode Plan" color="#9da3b8" start={phase.planStartMonth} end={phase.planEndMonth} onChange={(s,e)=>onChange({...phase, planStartMonth:s, planEndMonth:e})} />
-        </div>
-
-        {/* ACTUAL */}
-        <div style={{ padding:'10px 12px', background:'var(--bluebg)', borderRadius:8, border:'1px solid var(--blue)' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-            <span style={{ fontSize:10, fontWeight:700, color:'var(--blue)', textTransform:'uppercase', letterSpacing:'0.07em' }}>⚡ ACTUAL</span>
-            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <input type="number" min={0} max={100} className="input" value={phase.actualPct||0} onChange={e=>onChange({...phase, actualPct:Number(e.target.value)})} style={{ width:55, padding:'3px 6px', fontSize:11, textAlign:'center' }} />
-              <span style={{ fontSize:11, color:'var(--blue)', fontWeight:600 }}>%</span>
-            </div>
-          </div>
-          <MonthRangePicker label="Periode Actual" color="#4f8ef7" start={phase.actualStartMonth} end={phase.actualEndMonth} onChange={(s,e)=>onChange({...phase, actualStartMonth:s, actualEndMonth:e})} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function InitiativeForm({ editing, onClose, onSave }: { editing?:any; onClose:()=>void; onSave:()=>void }) {
+function InitiativeForm({ editing, onClose, onSave, members }: { editing?:any; onClose:()=>void; onSave:()=>void; members:any[] }) {
   const [form, setForm] = useState({
-    code: editing?.code||'',
-    title: editing?.title||'',
-    planProgress: editing?.planProgress||0,
-    actualProgress: editing?.actualProgress||0,
-    status: editing?.status||'on_track',
-    year: editing?.year||2026,
-    phases: editing?.phases||[{ name:'Phase 1', planPct:0, actualPct:0, planStartMonth:1, planEndMonth:3 }],
+    code: editing?.code || '',
+    title: editing?.title || '',
+    year: editing?.year || new Date().getFullYear(),
+    pic: editing?.pic && Array.isArray(editing.pic) ? editing.pic : [],
+    progressNotes: editing?.progressNotes || '',
+    phases: editing?.phases?.length ? editing.phases : [{ name:'Phase 1', planStartMonth:null, planEndMonth:null, actualStartMonth:null, actualEndMonth:null, progressNotes:'' }],
   })
   const [saving, setSaving] = useState(false)
-  const set = (k:string,v:any) => setForm(f=>({...f,[k]:v}))
+  const [picInput, setPicInput] = useState('')
 
-  function updatePhase(i:number, newPhase:any) { set('phases', form.phases.map((p:any,idx:number) => idx===i?newPhase:p)) }
-  function addPhase() { set('phases', [...form.phases, { name:`Phase ${form.phases.length+1}`, planPct:0, actualPct:0, planStartMonth:1, planEndMonth:3 }]) }
-  function delPhase(i:number) {
-    if (!confirm('Hapus phase ini?')) return
-    set('phases', form.phases.filter((_:any,idx:number)=>idx!==i))
-  }
+  const autoPlan = calcProportional(form.phases, 'plan')
+  const autoActual = calcProportional(form.phases, 'actual')
+  const totalPlan = autoPlan.reduce((a,b)=>a+b, 0)
+  const totalActual = autoActual.reduce((a,b)=>a+b, 0)
+
+  function setPhase(i:number, p:any) { setForm(f=>({...f, phases: f.phases.map((x:any,idx:number)=>idx===i?p:x) })) }
+  function addPhase() { setForm(f=>({...f, phases: [...f.phases, { name:`Phase ${f.phases.length+1}`, planStartMonth:null, planEndMonth:null, actualStartMonth:null, actualEndMonth:null, progressNotes:'' }] })) }
+  function removePhase(i:number) { setForm(f=>({...f, phases: f.phases.filter((_:any,idx:number)=>idx!==i) })) }
+  function addPic(name:string) { if (name && !form.pic.includes(name)) setForm(f=>({...f, pic:[...f.pic, name]})); setPicInput('') }
+  function removePic(name:string) { setForm(f=>({...f, pic: f.pic.filter((p:string)=>p!==name)})) }
 
   async function save() {
-    if (!form.code || !form.title) { toast.error('Code dan title wajib'); return }
+    if (!form.code || !form.title) { toast.error('Code & title wajib'); return }
     setSaving(true)
     try {
+      // Save phases with computed pcts
+      const phasesWithPct = form.phases.map((p:any, i:number) => ({ ...p, planPct: autoPlan[i], actualPct: autoActual[i] }))
+      const body = { ...form, phases: phasesWithPct, planProgress: totalPlan, actualProgress: totalActual }
       const url = editing ? `/api/initiatives/${editing._id}` : '/api/initiatives'
-      await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(form) })
-      toast.success(editing?'Diperbarui!':'Initiative dibuat!'); onSave(); onClose()
-    } catch { toast.error('Gagal') } finally { setSaving(false) }
+      await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+      toast.success(editing?'Diperbarui':'Initiative dibuat'); onSave(); onClose()
+    } finally { setSaving(false) }
   }
+  async function del() {
+    if (!confirm('Hapus initiative?')) return
+    await fetch(`/api/initiatives/${editing._id}`, { method:'DELETE' })
+    toast.success('Dihapus'); onSave(); onClose()
+  }
+
+  const suggestions = members.filter(m => m.name.toLowerCase().includes(picInput.toLowerCase()) && !form.pic.includes(m.name)).slice(0,5)
 
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="glass-strong scale-in" style={{ borderRadius:18, width:720, maxWidth:'92vw', maxHeight:'90vh', overflow:'hidden', display:'flex', flexDirection:'column' }}>
-        <div style={{ padding:'16px 22px', borderBottom:'1px solid var(--glass-border)', display:'flex', justifyContent:'space-between' }}>
-          <div>
-            <div style={{ fontSize:15, fontWeight:600 }}>{editing?'Edit Initiative':'+ Initiative Baru'}</div>
-            <div style={{ fontSize:10, color:'var(--text3)' }}>Strategic Initiative dengan multi-phase tracking</div>
-          </div>
+      <div className="modal" style={{ width:760, maxHeight:'92vh' }}>
+        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
+          <span style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit Initiative':'+ Initiative Baru'}</span>
           <button onClick={onClose} className="btn btn-icon">×</button>
         </div>
-        <div style={{ padding:'18px 22px', overflowY:'auto', flex:1 }}>
-          <div className="glass" style={{ padding:'14px 16px', borderRadius:12, marginBottom:16 }}>
-            <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>Informasi Initiative</div>
-            <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10, marginBottom:10 }}>
-              <div><label style={lbl}>Code *</label><input className="input" value={form.code} onChange={e=>set('code',e.target.value)} placeholder="SI-001" /></div>
-              <div><label style={lbl}>Title *</label><input className="input" value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Nama initiative..." /></div>
+        <div style={{ padding:'14px 20px', overflowY:'auto', flex:1, display:'flex', flexDirection:'column', gap:11 }}>
+          <div className="card" style={{ padding:12 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', marginBottom:8 }}>Informasi Initiative</div>
+            <div style={{ display:'grid', gridTemplateColumns:'120px 1fr 100px', gap:10, marginBottom:10 }}>
+              <div><label style={lbl}>Code *</label><input className="input" value={form.code} onChange={e=>setForm(f=>({...f, code:e.target.value}))} /></div>
+              <div><label style={lbl}>Title *</label><input className="input" value={form.title} onChange={e=>setForm(f=>({...f, title:e.target.value}))} /></div>
+              <div><label style={lbl}>Tahun</label><input type="number" className="input" value={form.year} onChange={e=>setForm(f=>({...f, year:Number(e.target.value)}))} /></div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8 }}>
-              <div><label style={lbl}>Plan %</label><input type="number" className="input" value={form.planProgress} onChange={e=>set('planProgress',Number(e.target.value))} /></div>
-              <div><label style={lbl}>Actual %</label><input type="number" className="input" value={form.actualProgress} onChange={e=>set('actualProgress',Number(e.target.value))} /></div>
-              <div><label style={lbl}>Status</label>
-                <select className="input" value={form.status} onChange={e=>set('status',e.target.value)}>
-                  <option value="on_track">On Track</option><option value="at_risk">At Risk</option>
-                  <option value="delayed">Delayed</option><option value="completed">Completed</option>
-                </select></div>
-              <div><label style={lbl}>Year</label><input type="number" className="input" value={form.year} onChange={e=>set('year',Number(e.target.value))} /></div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+              <div className="card" style={{ padding:'10px 12px', background:'var(--brand-soft)' }}>
+                <div style={{ fontSize:10, color:'var(--brand)' }}>Plan %</div>
+                <div style={{ fontSize:20, fontWeight:800, color:'var(--brand)' }}>{totalPlan.toFixed(1)}%</div>
+                <div style={{ fontSize:9, color:'var(--text3)' }}>auto from phases</div>
+              </div>
+              <div className="card" style={{ padding:'10px 12px', background:'var(--greenbg)' }}>
+                <div style={{ fontSize:10, color:'var(--green)' }}>Actual %</div>
+                <div style={{ fontSize:20, fontWeight:800, color:'var(--green)' }}>{totalActual.toFixed(1)}%</div>
+                <div style={{ fontSize:9, color:'var(--text3)' }}>auto from phases</div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom:10 }}>
+              <label style={lbl}>PIC (multi)</label>
+              <div className="input" style={{ display:'flex', flexWrap:'wrap', gap:5, minHeight:36 }}>
+                {form.pic.map((p:string) => (
+                  <span key={p} style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'3px 8px', background:'var(--brand-soft)', color:'var(--brand)', borderRadius:14, fontSize:11, fontWeight:600 }}>
+                    {p} <span style={{ cursor:'pointer' }} onClick={()=>removePic(p)}>×</span>
+                  </span>
+                ))}
+                <input style={{ border:'none', background:'transparent', outline:'none', flex:1, minWidth:80, color:'var(--text)', fontSize:12 }} value={picInput} onChange={e=>setPicInput(e.target.value)}
+                  onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault(); if(suggestions[0]) addPic(suggestions[0].name); else if(picInput) addPic(picInput)}}}
+                  placeholder={form.pic.length?'':'+ Tag PIC'} />
+              </div>
+              {picInput && suggestions.length > 0 && (
+                <div className="glass-strong" style={{ marginTop:4, borderRadius:6, padding:4, maxHeight:120, overflowY:'auto' }}>
+                  {suggestions.map((m:any) => (
+                    <div key={m._id} onClick={()=>addPic(m.name)} style={{ padding:'5px 9px', borderRadius:4, cursor:'pointer', fontSize:11 }}>{m.name}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <label style={lbl}>Progress (Catatan deskripsi progress yg sudah dilakukan)</label>
+              <textarea className="input" rows={3} value={form.progressNotes} onChange={e=>setForm(f=>({...f, progressNotes:e.target.value}))} placeholder="Apa yang sudah dilakukan, milestone, dll" />
             </div>
           </div>
 
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-            <div>
-              <div style={{ fontSize:13, fontWeight:600 }}>Phases ({form.phases.length})</div>
-              <div style={{ fontSize:10, color:'var(--text3)' }}>Klik bulan untuk set range Plan & Actual</div>
+          <div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+              <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase' }}>Phases (klik kotak bulan untuk set blok)</div>
+              <button onClick={addPhase} className="btn btn-sm">+ Phase</button>
             </div>
-            <button onClick={addPhase} className="btn btn-sm btn-primary">+ Tambah Phase</button>
+            {form.phases.map((p:any, i:number) => (
+              <div key={i} style={{ position:'relative' }}>
+                {form.phases.length > 1 && <button onClick={()=>removePhase(i)} className="btn btn-icon btn-sm" style={{ position:'absolute', top:6, right:6, color:'var(--red)', zIndex:5 }}>×</button>}
+                <PhaseRow phase={p} idx={i} onChange={(np:any)=>setPhase(i, np)} autoPlanPct={autoPlan[i]||0} autoActualPct={autoActual[i]||0} />
+              </div>
+            ))}
+            <div style={{ padding:'8px 12px', background:'var(--bg3)', borderRadius:7, fontSize:11, color:'var(--text3)', lineHeight:1.5 }}>
+              <b>Auto-calc rule:</b> Total % across all phases = 100% (jika semua phase di-block). Setiap phase % = proporsional (bulan phase / total bulan all phases) × 100. Klik kotak bulan untuk set start, klik lagi untuk set end.
+            </div>
           </div>
-          {form.phases.map((ph:any,i:number)=>(
-            <PhaseEditor key={i} phase={ph} idx={i} onChange={p=>updatePhase(i,p)} onDelete={()=>delPhase(i)} />
-          ))}
         </div>
-        <div style={{ padding:'14px 22px', borderTop:'1px solid var(--glass-border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
-          <button onClick={onClose} className="btn">Batal</button>
-          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'Menyimpan...':editing?'Simpan':'Buat Initiative'}</button>
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
+          {editing ? <button onClick={del} className="btn btn-danger btn-sm">🗑 Hapus</button> : <div />}
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={onClose} className="btn">Batal</button>
+            <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Simpan'}</button>
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-export default function ProgressOfProjectsPage() {
-  const { data:session } = useSession(); const user = session?.user as any
-  const [config, setConfig] = useState<any>(null)
+export default function ProgressPage() {
   const [initiatives, setInitiatives] = useState<any[]>([])
+  const [members, setMembers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('all')
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
 
   async function load() {
     setLoading(true)
-    const [c, i] = await Promise.all([fetch('/api/config').then(r=>r.json()), fetch('/api/initiatives').then(r=>r.json())])
-    setConfig(c.data); setInitiatives(i.data||[]); setLoading(false)
+    const [i, m] = await Promise.all([fetch('/api/initiatives').then(r=>r.json()), fetch('/api/users').then(r=>r.json())])
+    setInitiatives(i.data||[]); setMembers((m.data||[]).filter((u:any)=>u.active!==false)); setLoading(false)
   }
   useEffect(() => { load() }, [])
 
-  async function del(id:string) {
-    if (!confirm('Hapus initiative ini beserta phases?')) return
-    await fetch(`/api/initiatives/${id}`, { method:'DELETE' })
-    toast.success('Dihapus'); load()
-  }
-
-  const canEdit = user?.role === 'admin' || user?.role === 'manager'
-  const subTabs = config?.progressSubTabs?.filter((t:any)=>t.active) || []
-  const CURRENT_MONTH = new Date().getMonth() + 1
-
-  function toggle(id:string) { setExpanded(prev => { const s = new Set(prev); s.has(id)?s.delete(id):s.add(id); return s }) }
-
-  if (loading) return <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text3)' }}>Memuat...</div>
-
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', position:'relative' }}>
-      <div className="ambient-bg" style={{ position:'fixed' }}>
-        <div className="orb" style={{ width:380, height:380, background:'#4f8ef7', top:'5%', left:'10%' }} />
-        <div className="orb" style={{ width:340, height:340, background:'#a78bfa', bottom:'10%', right:'5%', animationDelay:'-8s' }} />
-      </div>
+    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      {(showForm||editing) && <InitiativeForm editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} members={members} />}
 
-      {(showForm||editing) && <InitiativeForm editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} />}
-
-      <div className="glass" style={{ padding:'14px 22px', borderBottom:'1px solid var(--glass-border)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, position:'relative', zIndex:1 }}>
+      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', flexShrink:0 }}>
         <div>
-          <div style={{ fontSize:16, fontWeight:700, letterSpacing:'-0.02em' }} className="gradient-text">Progress of Projects</div>
-          <div style={{ fontSize:11, color:'var(--text3)' }}>Plan vs Actual per phase · {initiatives.length} initiative</div>
+          <div style={{ fontSize:14, fontWeight:600 }}>Progress Initiatives</div>
+          <div style={{ fontSize:11, color:'var(--text3)' }}>{initiatives.length} initiative · Auto-calc % proportional dari phases</div>
         </div>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <div style={{ display:'flex', gap:12, fontSize:10, color:'var(--text3)' }}>
-            <span style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ width:12, height:7, background:'var(--bg5)', borderRadius:2 }} />Plan</span>
-            <span style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ width:12, height:7, background:'var(--blue)', borderRadius:2, opacity:0.8 }} />Actual</span>
-          </div>
-          {canEdit && <button className="btn btn-primary btn-sm" onClick={()=>setShowForm(true)}>+ Initiative</button>}
-        </div>
+        <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Initiative Baru</button>
       </div>
 
-      <div style={{ display:'flex', gap:5, padding:'10px 22px', flexShrink:0, flexWrap:'wrap', position:'relative', zIndex:1 }}>
-        <button onClick={()=>setActiveTab('all')} className={activeTab==='all'?'glass-strong':'glass'} style={{ padding:'6px 16px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer', color:activeTab==='all'?'var(--blue)':'var(--text2)', border: activeTab==='all'?'1px solid var(--blue)':'1px solid var(--glass-border)' }}>All</button>
-        {subTabs.map((t:any) => (
-          <button key={t.key} onClick={()=>setActiveTab(t.key)} className={activeTab===t.key?'glass-strong':'glass'} style={{ padding:'6px 16px', borderRadius:20, fontSize:12, fontWeight:600, cursor:'pointer', color:activeTab===t.key?t.color:'var(--text2)', border: activeTab===t.key?`1px solid ${t.color}`:'1px solid var(--glass-border)' }}>{t.label}</button>
-        ))}
-        <div style={{ flex:1 }} />
-        <button className="btn btn-sm" onClick={()=>setExpanded(new Set(initiatives.map(i=>i._id)))}>Expand All</button>
-        <button className="btn btn-sm" onClick={()=>setExpanded(new Set())}>Collapse All</button>
-      </div>
-
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 22px 24px', position:'relative', zIndex:1 }} className="safe-bottom">
-        {initiatives.length === 0 ? (
-          <div className="glass" style={{ textAlign:'center', padding:60, color:'var(--text3)', borderRadius:18 }}>
-            <div style={{ fontSize:36, marginBottom:8 }}>📈</div>
-            <div style={{ fontSize:12 }}>Belum ada initiative. {canEdit && 'Klik + Initiative untuk mulai.'}</div>
-          </div>
-        ) : (
-        <div className="glass" style={{ borderRadius:14, overflow:'hidden' }}>
-          <div style={{ display:'grid', gridTemplateColumns:'36px 1fr 76px 76px 1.2fr 90px', background:'var(--bg3)', borderBottom:'1px solid var(--glass-border)' }}>
-            {['','Activity','% Plan','% Actual','','Action'].map((h,i) => (
-              <div key={i} style={{ padding:'10px', fontSize:10, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.05em', borderRight: i<5?'1px solid var(--glass-border)':'none' }}>
-                {i === 4 ? (
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(12,1fr)' }}>
-                    {MONTHS.map((m,mi) => <div key={m} style={{ textAlign:'center', fontSize:9, fontWeight:mi+1===CURRENT_MONTH?700:400, color:mi+1===CURRENT_MONTH?'var(--blue)':'var(--text3)' }}>{m}</div>)}
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom">
+        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
+         initiatives.length === 0 ? <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>Belum ada initiative</div> : (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:10 }}>
+            {initiatives.map(i => (
+              <div key={i._id} className="card glass-hover" style={{ padding:14, cursor:'pointer' }} onClick={()=>setEditing(i)}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
+                  <div>
+                    <div style={{ fontSize:9, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.05em' }}>{i.code}</div>
+                    <div style={{ fontSize:13, fontWeight:600 }}>{i.title}</div>
                   </div>
-                ) : h}
+                  <div style={{ fontSize:9, color:'var(--text3)' }}>{i.year}</div>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
+                  <div><div style={{ fontSize:9, color:'var(--text3)' }}>Plan</div><div style={{ fontSize:16, fontWeight:700, color:'var(--brand)' }}>{(i.planProgress||0).toFixed(0)}%</div></div>
+                  <div><div style={{ fontSize:9, color:'var(--text3)' }}>Actual</div><div style={{ fontSize:16, fontWeight:700, color:'var(--green)' }}>{(i.actualProgress||0).toFixed(0)}%</div></div>
+                </div>
+                <div style={{ height:5, background:'var(--bg3)', borderRadius:3, overflow:'hidden', marginBottom:6 }}>
+                  <div style={{ width:`${Math.min(100,i.actualProgress||0)}%`, height:'100%', background:'var(--green)' }} />
+                </div>
+                {i.pic?.length > 0 && <div style={{ fontSize:10, color:'var(--text3)' }}>👤 {i.pic.join(', ')}</div>}
+                <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>📊 {i.phases?.length||0} phase{(i.phases?.length||0)>1?'s':''}</div>
               </div>
             ))}
           </div>
-          {initiatives.map((ini, idx) => {
-            const isExpanded = expanded.has(ini._id)
-            return (
-              <div key={ini._id}>
-                <div style={{ display:'grid', gridTemplateColumns:'36px 1fr 76px 76px 1.2fr 90px', borderBottom:'1px solid var(--glass-border)' }} className="glass">
-                  <div onClick={()=>toggle(ini._id)} style={{ padding:'10px', textAlign:'center', fontSize:12, fontWeight:700, color:'var(--blue)', borderRight:'1px solid var(--glass-border)', cursor:'pointer' }}>{idx+1}</div>
-                  <div onClick={()=>toggle(ini._id)} style={{ padding:'10px', fontSize:12, fontWeight:700, color:'var(--blue)', display:'flex', alignItems:'center', gap:6, borderRight:'1px solid var(--glass-border)', cursor:'pointer' }}>
-                    <span style={{ fontSize:10, color:'var(--text3)', transition:'transform 0.2s', display:'inline-block', transform: isExpanded?'rotate(90deg)':'rotate(0)' }}>▶</span>
-                    <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{ini.code} — {ini.title}</span>
-                  </div>
-                  <div style={{ padding:'10px', textAlign:'center', fontSize:12, fontWeight:600, color:'var(--text2)', borderRight:'1px solid var(--glass-border)' }}>{ini.planProgress}%</div>
-                  <div style={{ padding:'10px', textAlign:'center', fontSize:13, fontWeight:700, color: ini.actualProgress >= ini.planProgress ? 'var(--green)' : 'var(--amber)', borderRight:'1px solid var(--glass-border)' }}>{ini.actualProgress}%</div>
-                  <div style={{ padding:'10px', borderRight:'1px solid var(--glass-border)' }} />
-                  <div style={{ padding:'6px', display:'flex', gap:3, justifyContent:'center', alignItems:'center' }}>
-                    {canEdit && <>
-                      <button onClick={(e)=>{e.stopPropagation();setEditing(ini)}} className="btn btn-icon btn-sm" style={{ fontSize:11 }}>✏️</button>
-                      <button onClick={(e)=>{e.stopPropagation();del(ini._id)}} className="btn btn-icon btn-sm" style={{ fontSize:11 }}>🗑</button>
-                    </>}
-                  </div>
-                </div>
-
-                {isExpanded && ini.phases.map((phase:any, pi:number) => {
-                  const planLeft = phase.planStartMonth ? ((phase.planStartMonth-1)/12*100).toFixed(1) : 0
-                  const planWidth = phase.planStartMonth && phase.planEndMonth ? (((phase.planEndMonth-phase.planStartMonth+1)/12*100)).toFixed(1) : 0
-                  const actLeft = phase.actualStartMonth ? ((phase.actualStartMonth-1)/12*100).toFixed(1) : null
-                  const actWidth = phase.actualStartMonth && phase.actualEndMonth ? (((phase.actualEndMonth-phase.actualStartMonth+1)/12*100)).toFixed(1) : null
-                  const pctColor = phase.actualPct>=100?'var(--green)':phase.actualPct>0?'var(--blue)':'var(--text3)'
-                  return (
-                    <div key={pi} style={{ display:'grid', gridTemplateColumns:'36px 1fr 76px 76px 1.2fr 90px', borderBottom:'1px solid var(--glass-border)', background:'var(--bg2)' }}>
-                      <div style={{ padding:'10px', fontSize:10, color:'var(--text3)', textAlign:'center', borderRight:'1px solid var(--glass-border)', display:'flex', alignItems:'center', justifyContent:'center' }}>{idx+1}.{pi+1}</div>
-                      <div style={{ padding:'10px', fontSize:11, color:'var(--text)', borderRight:'1px solid var(--glass-border)', display:'flex', alignItems:'center' }}>{phase.name}</div>
-                      <div style={{ padding:'10px', textAlign:'center', fontSize:12, fontWeight:600, color:'var(--text2)', borderRight:'1px solid var(--glass-border)' }}>{phase.planPct||0}%</div>
-                      <div style={{ padding:'10px', textAlign:'center', fontSize:12, fontWeight:600, color:pctColor, borderRight:'1px solid var(--glass-border)' }}>{phase.actualPct||0}%</div>
-                      <div style={{ padding:'10px', position:'relative', display:'flex', flexDirection:'column', gap:3, justifyContent:'center', borderRight:'1px solid var(--glass-border)' }}>
-                        <div style={{ position:'absolute', left:`${((CURRENT_MONTH-0.5)/12*100).toFixed(1)}%`, top:0, bottom:0, width:1, background:'var(--blue)', opacity:0.4 }} />
-                        <div style={{ position:'relative', height:9, background:'var(--bg4)', borderRadius:3 }}>
-                          {planWidth ? <div style={{ position:'absolute', top:0, left:`${planLeft}%`, width:`${planWidth}%`, height:'100%', background:'var(--bg5)', borderRadius:3 }} /> : null}
-                        </div>
-                        <div style={{ position:'relative', height:9, background:'var(--bg4)', borderRadius:3 }}>
-                          {actLeft !== null && actWidth ? (
-                            <div style={{ position:'absolute', top:0, left:`${actLeft}%`, width:`${actWidth}%`, height:'100%', background:`linear-gradient(90deg, ${pctColor}, ${pctColor}aa)`, borderRadius:3 }} />
-                          ) : null}
-                        </div>
-                      </div>
-                      <div />
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })}
-        </div>
-        )}
+         )}
       </div>
     </div>
   )
