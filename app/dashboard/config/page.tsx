@@ -260,7 +260,7 @@ export default function ConfigPage() {
                       <div style={{ fontSize:10 }}>Tambah</div>
                       <input type="file" accept="image/*" style={{ display:'none' }} onChange={e=>{
                         const f = e.target.files?.[0]; if (!f) return
-                        if (f.size > 1000000) { toast.error('Max 1MB'); return }
+                        if (f.size > 5*1024*1024) { toast.error('Max 5MB'); return }
                         const reader = new FileReader()
                         reader.onload = () => save({ loginBackgrounds: [...(config.loginBackgrounds||[]), reader.result as string] })
                         reader.readAsDataURL(f)

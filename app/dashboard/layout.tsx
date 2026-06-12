@@ -4,51 +4,45 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useTheme, THEMES, Theme } from '@/lib/theme'
-import toast from 'react-hot-toast'
 import AppPopups from '@/components/AppPopups'
 
-// Drill-down structure: top-level groups expand to show sub-items
 const NAV_GROUPS = [
   {
-    key:'overview', label:'Overview', icon:'⊞',
+    key:'dashboard', label:'Dashboard & Overview',
     items:[
-      { href:'/dashboard',          label:'Dashboard',           icon:'📊', roles:['admin','manager','member','guest','finance'] },
-      { href:'/dashboard/progress', label:'Progress of Projects',icon:'📈', roles:['admin','manager','member'] },
-      { href:'/dashboard/kpi',      label:'KPI Tracker',         icon:'🎯', roles:['admin','manager','member'] },
-      { href:'/dashboard/issues',   label:'Issues',              icon:'◫',  roles:['admin','manager','member'] },
-      { href:'/dashboard/infograph',label:'Infografis',          icon:'◕',  roles:['admin','manager','member','guest'] },
+      { href:'/dashboard',          label:'Dashboard',           roles:['admin','manager','member','guest','finance'] },
+      { href:'/dashboard/progress', label:'Project Progress',    roles:['admin','manager','member'] },
+      { href:'/dashboard/issues',   label:'Issues',              roles:['admin','manager','member'] },
     ],
   },
   {
-    key:'activities', label:'Activities', icon:'⚡',
+    key:'activities', label:'Activities',
     items:[
-      { href:'/dashboard/activities', label:'Activities',     icon:'🗂', roles:['admin','manager','member'] },
-      { href:'/dashboard/agenda',     label:'Daily Agenda',   icon:'📅', roles:['admin','manager','member'] },
-      { href:'/dashboard/meetings',   label:'Meeting Reports',icon:'📝', roles:['admin','manager','member'] },
+      { href:'/dashboard/activities', label:'Activities',     roles:['admin','manager','member'] },
+      { href:'/dashboard/agenda',     label:'Daily Agenda',   roles:['admin','manager','member'] },
+      { href:'/dashboard/links',      label:'Link Hub',       roles:['admin','manager','member','guest','finance'] },
+      { href:'/dashboard/meetings',   label:'Meeting Reports',roles:['admin','manager','member'] },
     ],
   },
   {
-    key:'tim', label:'Tim', icon:'👥',
+    key:'team', label:'Team',
     items:[
-      { href:'/dashboard/attendance',    label:'Presensi',      icon:'▦',  roles:['admin','manager','member'] },
-      { href:'/dashboard/announcements', label:'Pengumuman',   icon:'📢', roles:['admin','manager','member','guest','finance'] },
-      { href:'/dashboard/reimbursements',label:'Reimbursement',icon:'💰', roles:['admin','manager','member','finance'] },
-      { href:'/dashboard/budget',       label:'Anggaran',     icon:'📊', roles:['admin','manager','finance'] },
-      { href:'/dashboard/links',        label:'Link Hub',     icon:'🔗', roles:['admin','manager','member','guest','finance'] },
+      { href:'/dashboard/attendance',     label:'Presensi',       roles:['admin','manager','member'] },
+      { href:'/dashboard/biodata',        label:'Member Biodata', roles:['admin','manager','member','finance'] },
     ],
   },
   {
-    key:'admin', label:'Admin', icon:'⚙️',
+    key:'finance', label:'Finance',
     items:[
-      { href:'/dashboard/members', label:'Member',      icon:'👥', roles:['admin'] },
-      { href:'/dashboard/config',  label:'Konfigurasi', icon:'⚙',  roles:['admin'] },
+      { href:'/dashboard/budget',         label:'Anggaran',       roles:['admin','manager','finance'] },
+      { href:'/dashboard/reimbursements', label:'Reimbursement',  roles:['admin','manager','member','finance'] },
     ],
   },
   {
-    key:'akun', label:'Akun', icon:'👤',
+    key:'admin', label:'Admin',
     items:[
-      { href:'/dashboard/profile',         label:'Profil Saya',  icon:'👤', roles:['admin','manager','member','finance','guest'] },
-      { href:'/dashboard/change-password', label:'Ganti Password',icon:'🔐', roles:['admin','manager','member','finance','guest'] },
+      { href:'/dashboard/members', label:'Member',        roles:['admin'] },
+      { href:'/dashboard/config',  label:'Configuration', roles:['admin'] },
     ],
   },
 ]
@@ -60,62 +54,51 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { theme, setTheme } = useTheme()
   const [collapsed, setCollapsed] = useState(false)
   const [showThemePicker, setShowThemePicker] = useState(false)
-  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [appConfig, setAppConfig] = useState<any>(null)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(['overview']))
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(['dashboard']))
   const themeRef = useRef<HTMLDivElement>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
 
   useEffect(()=>{ if(status==='unauthenticated') router.push('/login') },[status,router])
   useEffect(()=>{
-    if(!autoRefresh) return
-    const id = setInterval(()=>router.refresh(), 30000)
-    return ()=>clearInterval(id)
-  },[autoRefresh,router])
-  useEffect(()=>{
-    function h(e:MouseEvent){ if(themeRef.current&&!themeRef.current.contains(e.target as Node)) setShowThemePicker(false) }
+    function h(e:MouseEvent){
+      if(themeRef.current && !themeRef.current.contains(e.target as Node)) setShowThemePicker(false)
+      if(profileRef.current && !profileRef.current.contains(e.target as Node)) setShowProfileMenu(false)
+    }
     document.addEventListener('mousedown',h); return ()=>document.removeEventListener('mousedown',h)
   },[])
   useEffect(()=>{
     fetch('/api/config').then(r=>r.json()).then(d=>setAppConfig(d.data)).catch(()=>{})
   },[])
-  // Auto-expand the group containing current page
   useEffect(()=>{
     NAV_GROUPS.forEach(g => {
-      if (g.items.some(i => pathname===i.href||(i.href!=='/dashboard'&&pathname.startsWith(i.href)))) {
+      if (g.items.some(i => pathname===i.href || (i.href!=='/dashboard' && pathname.startsWith(i.href)))) {
         setExpanded(prev => new Set([...prev, g.key]))
       }
     })
   },[pathname])
 
   function toggleGroup(key:string) {
-    setExpanded(prev => {
-      const s = new Set(prev)
-      s.has(key) ? s.delete(key) : s.add(key)
-      return s
-    })
+    setExpanded(prev => { const s = new Set(prev); s.has(key)?s.delete(key):s.add(key); return s })
   }
 
   if(status==='loading') return (
     <div style={{ display:'flex', height:'100vh', alignItems:'center', justifyContent:'center', background:'var(--bg)' }}>
-      <div style={{ textAlign:'center' }}>
-        <div style={{ width:36, height:36, border:'3px solid var(--border2)', borderTopColor:'var(--blue)', borderRadius:'50%', margin:'0 auto 12px' }} className="spin" />
-        <div style={{ color:'var(--text3)' }}>Memuat...</div>
-      </div>
+      <div style={{ width:36, height:36, border:'3px solid var(--border2)', borderTopColor:'var(--brand)', borderRadius:'50%' }} className="spin" />
     </div>
   )
 
   const user = session?.user as any
   const userRole = user?.role||'guest'
   const initials = user?.name?.split(' ').map((n:string)=>n[0]).join('').slice(0,2)||'U'
-  const currentPage = NAV_GROUPS.flatMap(g=>g.items).find(n=>pathname===n.href||(n.href!=='/dashboard'&&pathname.startsWith(n.href)))?.label||'Dashboard'
+  const currentPage = NAV_GROUPS.flatMap(g=>g.items).find(n=>pathname===n.href||(n.href!=='/dashboard'&&pathname.startsWith(n.href)))?.label || (pathname==='/dashboard/profile'?'My Profile':'Dashboard')
   const appName = appConfig?.appName || 'WorkPulse'
   const appTagline = appConfig?.appTagline || 'BPD & SS Procurement'
-  const appColor = appConfig?.appColor || 'var(--blue)'
+  const appColor = appConfig?.appColor || 'var(--brand)'
 
   return (
     <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:'var(--bg)' }}>
-      
-
       <aside style={{ width:collapsed?56:230, background:'var(--bg2)', borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', flexShrink:0, transition:'width 0.2s ease', overflow:'hidden' }}>
         <div style={{ padding:collapsed?'14px 12px':'14px 16px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:10, justifyContent:collapsed?'center':'flex-start', minHeight:52 }}>
           {appConfig?.appIcon ? (
@@ -137,7 +120,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             const hasActive = visibleItems.some(i => pathname===i.href||(i.href!=='/dashboard'&&pathname.startsWith(i.href)))
 
             if (collapsed) {
-              // Show just icons when collapsed
               return (
                 <div key={group.key} style={{ marginBottom:6 }}>
                   {visibleItems.map(item=>{
@@ -145,7 +127,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     return (
                       <Link key={item.href} href={item.href} style={{ textDecoration:'none' }}>
                         <div className={`sidebar-link${active?' active':''}`} style={{ justifyContent:'center', padding:'10px' }} title={item.label}>
-                          <span style={{ fontSize:14 }}>{item.icon}</span>
+                          <span style={{ fontSize:11, fontWeight:600 }}>{item.label[0]}</span>
                         </div>
                       </Link>
                     )
@@ -157,8 +139,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             return (
               <div key={group.key} style={{ marginBottom:4 }}>
                 <div className={`sidebar-group-header${isExpanded?' expanded':''}`} onClick={()=>toggleGroup(group.key)}
-                  style={{ color: hasActive?'var(--blue)':'var(--text)' }}>
-                  <span style={{ fontSize:14 }}>{group.icon}</span>
+                  style={{ color: hasActive?'var(--brand)':'var(--text)' }}>
                   <span>{group.label}</span>
                   <span className="chevron">▶</span>
                 </div>
@@ -169,7 +150,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       return (
                         <Link key={item.href} href={item.href} style={{ textDecoration:'none' }}>
                           <div className={`sidebar-link${active?' active':''}`}>
-                            <span style={{ fontSize:12 }}>{item.icon}</span>
                             <span>{item.label}</span>
                           </div>
                         </Link>
@@ -181,24 +161,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )
           })}
         </nav>
-
-        <div style={{ padding:collapsed?'10px 8px':'12px 14px', borderTop:'1px solid var(--border)' }}>
-          {collapsed ? (
-            <div style={{ display:'flex', flexDirection:'column', gap:6, alignItems:'center' }}>
-              <div style={{ width:28, height:28, borderRadius:'50%', background:'var(--blue2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff' }}>{initials}</div>
-              <button onClick={()=>signOut({callbackUrl:'/login'})} className="btn btn-icon" style={{ fontSize:12,width:28,height:28 }} title="Keluar">⏻</button>
-            </div>
-          ):(
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <div style={{ width:30, height:30, borderRadius:'50%', background:'var(--blue2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', flexShrink:0 }}>{initials}</div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:500, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{user?.name}</div>
-                <div style={{ fontSize:10, color:'var(--text3)', textTransform:'capitalize' }}>{userRole}</div>
-              </div>
-              <button onClick={()=>signOut({callbackUrl:'/login'})} className="btn btn-icon" title="Keluar" style={{ fontSize:13 }}>⏻</button>
-            </div>
-          )}
-        </div>
       </aside>
 
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -209,27 +171,48 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span style={{ color:'var(--border2)' }}>›</span>
             <span style={{ color:'var(--text)', fontWeight:500 }}>{currentPage}</span>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--text3)' }}>
-            <span>{autoRefresh?'🔄':'⏸'}</span>
-            <div className={`toggle-wrap${autoRefresh?' on':''}`} onClick={()=>setAutoRefresh(!autoRefresh)} title="Auto-refresh 30s" />
-          </div>
+
+          {/* Theme picker */}
           <div ref={themeRef} style={{ position:'relative' }}>
             <button className="btn btn-sm" onClick={()=>setShowThemePicker(!showThemePicker)}>
               {THEMES.find(t=>t.key===theme)?.emoji} {THEMES.find(t=>t.key===theme)?.label}
             </button>
             {showThemePicker && (
-              <div className="scale-in" style={{ position:'absolute', top:'calc(100% + 6px)', right:0, background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:10, padding:6, zIndex:200, minWidth:160, boxShadow:'var(--shadow)' }}>
+              <div className="glass-strong scale-in" style={{ position:'absolute', top:'calc(100% + 6px)', right:0, borderRadius:10, padding:6, zIndex:200, minWidth:160 }}>
                 {THEMES.map(t=>(
-                  <div key={t.key} onClick={()=>{setTheme(t.key);setShowThemePicker(false)}} style={{ padding:'7px 10px', borderRadius:6, cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', gap:8, background:theme===t.key?'var(--bluebg)':'transparent', color:theme===t.key?'var(--blue)':'var(--text2)' }}
-                    onMouseEnter={e=>{if(theme!==t.key)(e.currentTarget as HTMLElement).style.background='var(--bg3)'}}
-                    onMouseLeave={e=>{if(theme!==t.key)(e.currentTarget as HTMLElement).style.background='transparent'}}>
-                    <span>{t.emoji}</span><span>{t.label}</span>{theme===t.key&&<span style={{ marginLeft:'auto' }}>✓</span>}
+                  <div key={t.key} onClick={()=>{setTheme(t.key);setShowThemePicker(false)}} style={{ padding:'7px 10px', borderRadius:6, cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', gap:8, background:theme===t.key?'var(--brand-soft)':'transparent', color:theme===t.key?'var(--brand)':'var(--text2)' }}>
+                    <span>{t.emoji}</span><span>{t.label}</span>{theme===t.key && <span style={{ marginLeft:'auto' }}>✓</span>}
                   </div>
                 ))}
               </div>
             )}
           </div>
-</header>
+
+          {/* Profile menu */}
+          <div ref={profileRef} style={{ position:'relative' }}>
+            <button onClick={()=>setShowProfileMenu(!showProfileMenu)} style={{ width:32, height:32, borderRadius:'50%', background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:'#fff', cursor:'pointer', border:'none' }}>{initials}</button>
+            {showProfileMenu && (
+              <div className="glass-strong scale-in" style={{ position:'absolute', top:'calc(100% + 6px)', right:0, borderRadius:10, padding:6, zIndex:200, minWidth:200 }}>
+                <div style={{ padding:'8px 10px', borderBottom:'1px solid var(--glass-border)', marginBottom:4 }}>
+                  <div style={{ fontSize:12, fontWeight:600, color:'var(--text)' }}>{user?.name}</div>
+                  <div style={{ fontSize:10, color:'var(--text3)', textTransform:'capitalize' }}>{userRole} · {user?.division || ''}</div>
+                </div>
+                <Link href="/dashboard/profile" style={{ textDecoration:'none' }}>
+                  <div onClick={()=>setShowProfileMenu(false)} style={{ padding:'7px 10px', borderRadius:6, cursor:'pointer', fontSize:12, color:'var(--text2)' }}
+                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='var(--bg3)'}
+                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                    👤 My Profile
+                  </div>
+                </Link>
+                <div onClick={()=>{setShowProfileMenu(false); signOut({callbackUrl:'/login'})}} style={{ padding:'7px 10px', borderRadius:6, cursor:'pointer', fontSize:12, color:'var(--red)' }}
+                  onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='var(--redbg)'}
+                  onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                  ⏻ Keluar
+                </div>
+              </div>
+            )}
+          </div>
+        </header>
         <main style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }} className="fade-in">
           {children}
         </main>
@@ -238,4 +221,3 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </div>
   )
 }
-const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }

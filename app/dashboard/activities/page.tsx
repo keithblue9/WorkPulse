@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useSession } from 'next-auth/react'
+import { useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 
 const STATUS_CFG: Record<string,{label:string;color:string;bg:string}> = {
@@ -168,7 +169,11 @@ export default function ActivitiesPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
-  const [filterCat, setFilterCat] = useState('All')
+  const searchParams = useSearchParams()
+  const initialCat = searchParams?.get('cat') || 'All'
+  const initialSub = searchParams?.get('sub') || ''
+  const [filterCat, setFilterCat] = useState(initialCat)
+  const [filterSub, setFilterSub] = useState(initialSub)
 
   async function loadAll() {
     setLoading(true)
@@ -191,7 +196,14 @@ export default function ActivitiesPage() {
     toast.success('Dihapus'); loadAll()
   }
 
-  const filtered = filterCat === 'All' ? activities : activities.filter(a => a.category === filterCat)
+  const filtered = activities.filter(a => {
+    if (filterCat !== 'All' && a.category !== filterCat) {
+      // Also check subType (KPI / Non-KPI / Go-Live / Anggaran / Others) when filter is one of those
+      const subMatch = a.subType === filterCat
+      if (!subMatch) return false
+    }
+    return true
+  })
   const catCounts: Record<string,number> = { All: activities.length }
   categories.forEach((c:any) => { catCounts[c.key] = activities.filter(a => a.category === c.key).length })
 

@@ -1,23 +1,33 @@
 import mongoose, { Schema, models } from 'mongoose'
 
+const DocumentSchema = new Schema({
+  url: String, name: String, type: String, size: Number,
+}, { _id: false })
+
 const ReimbursementSchema = new Schema({
-  userId: { type: String, required: true },
+  userId: String,
   userName: String,
-  billDate: { type: String, required: true },
-  purpose: { type: String, required: true },
-  category: { type: String, enum: ['transport','meal','accommodation','office','other'], default: 'other' },
-  bankName: { type: String, required: true },
-  accountNumber: { type: String, required: true },
-  accountName: String,
-  amount: { type: Number, required: true },
+  title: { type:String, required:true },
+  description: String,
+  amount: { type:Number, required:true },
+  category: { type:String, default:'general' },
+  // Source: cash_card or petty_cash
+  source: { type:String, enum:['cash_card','petty_cash'], default:'petty_cash' },
+  isCashCard: { type:Boolean, default:false }, // user flag
+  // Bank
+  bank: String,
+  noRekening: String,
+  // Multi-document upload
+  documents: { type:[DocumentSchema], default:[] },
+  // Legacy: single receiptUrl
   receiptUrl: String,
-  receiptName: String,
+  // Status workflow
+  status: { type:String, enum:['draft','submitted','approved','rejected','paid'], default:'submitted' },
+  submittedAt: String,
+  approvedAt: String,
+  approvedBy: String,
+  rejectReason: String,
   notes: String,
-  status: { type: String, enum: ['pending','approved','rejected','paid'], default: 'pending' },
-  reviewedBy: String,
-  reviewedAt: String,
-  reviewNote: String,
-  paidAt: String,
-}, { timestamps: true })
+}, { timestamps:true })
 
 export const ReimbursementModel = models.Reimbursement || mongoose.model('Reimbursement', ReimbursementSchema)

@@ -22,7 +22,7 @@ function MeetingForm({ editing, categories, onClose, onSave }: { editing?:any; c
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 600000) { toast.error('Max 600KB'); return }
+    if (file.size > 2*1024*1024) { toast.error('Max 2MB'); return }
     const reader = new FileReader()
     reader.onload = () => { setEvidenceFile(reader.result as string); setEvidenceName(file.name) }
     reader.readAsDataURL(file)
@@ -33,7 +33,7 @@ function MeetingForm({ editing, categories, onClose, onSave }: { editing?:any; c
     setSaving(true)
     try {
       const url = editing ? `/api/meetings/${editing._id}` : '/api/meetings'
-      await fetch(url, { method:editing?'PATCH':'POST', headers:{'Content-Type':'application/json'},
+      const r = await fetch(url, { method:editing?'PATCH':'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           ...form,
           attendees: form.attendees.split(',').map((s:string)=>s.trim()).filter(Boolean),
@@ -42,6 +42,11 @@ function MeetingForm({ editing, categories, onClose, onSave }: { editing?:any; c
           authorId: user?.id || user?.email, authorName: user?.name,
         })
       })
+      if (!r.ok) {
+        const e = await r.json().catch(()=>({error:'Unknown error'}))
+        toast.error('Gagal: ' + (e.error || r.statusText))
+        return
+      }
       toast.success(editing?'Diperbarui!':'Meeting report dibuat!'); onSave(); onClose()
     } catch { toast.error('Gagal') } finally { setSaving(false) }
   }

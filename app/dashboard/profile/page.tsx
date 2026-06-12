@@ -1,127 +1,98 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
+import Link from 'next/link'
 
-const SIZES_BAJU = ['XS','S','M','L','XL','XXL','XXXL']
-const SIZES_CELANA = ['28','29','30','31','32','33','34','36','38','40']
-const SIZES_SEPATU = ['38','39','40','41','42','43','44','45']
-
-export default function ProfilePage() {
-  const { data:session, update } = useSession(); const user = session?.user as any
-  const [profile, setProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+function ChangePinSection() {
+  const [form, setForm] = useState({ currentPin:'', newPin:'', confirmPin:'' })
+  const [show, setShow] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [avatarPreview, setAvatarPreview] = useState<string|null>(null)
-
-  useEffect(() => {
-    async function load() {
-      const d = await fetch('/api/users').then(r=>r.json())
-      const me = (d.data||[]).find((u:any) => u.email === user?.email)
-      if (me) { setProfile(me); setAvatarPreview(me.avatar || null) }
-      setLoading(false)
-    }
-    if (user?.email) load()
-  }, [user])
-
-  function set(k:string,v:any) { setProfile((p:any) => ({...p,[k]:v})) }
-
-  function handleAvatar(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 500000) { toast.error('Ukuran foto max 500KB'); return }
-    const reader = new FileReader()
-    reader.onload = () => { const b64 = reader.result as string; setAvatarPreview(b64); set('avatar', b64) }
-    reader.readAsDataURL(file)
-  }
 
   async function save() {
+    if (!/^\d{6}$/.test(form.newPin)) { toast.error('PIN baru harus 6 digit angka'); return }
+    if (form.newPin !== form.confirmPin) { toast.error('Konfirmasi PIN tidak sama'); return }
     setSaving(true)
     try {
-      await fetch('/api/profile', { method:'PATCH', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ userId: profile._id, ...profile }) })
-      toast.success('Profil disimpan!')
-    } catch { toast.error('Gagal menyimpan') } finally { setSaving(false) }
+      const r = await fetch('/api/auth/change-password', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ currentPassword: form.currentPin, newPassword: form.newPin }) })
+      const d = await r.json()
+      if (!r.ok) { toast.error(d.error||'Gagal'); return }
+      toast.success('PIN berhasil diubah')
+      setForm({ currentPin:'', newPin:'', confirmPin:'' }); setShow(false)
+    } catch { toast.error('Gagal') } finally { setSaving(false) }
   }
 
-  if (loading || !profile) return <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text3)' }}>Memuat...</div>
+  return (
+    <div className="card" style={{ padding:'16px 20px', marginTop:14 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: show?14:0 }}>
+        <div>
+          <div style={{ fontSize:13, fontWeight:600 }}>🔐 Ganti PIN</div>
+          <div style={{ fontSize:10, color:'var(--text3)' }}>PIN 6 digit untuk login</div>
+        </div>
+        <button onClick={()=>setShow(!show)} className="btn btn-sm">{show?'Batal':'Ubah PIN'}</button>
+      </div>
+      {show && (
+        <div style={{ display:'flex', flexDirection:'column', gap:10, paddingTop:14, borderTop:'1px solid var(--border)' }}>
+          <div>
+            <label style={lbl}>PIN Lama (6 digit)</label>
+            <input type="tel" inputMode="numeric" maxLength={6} className="input" value={form.currentPin} onChange={e=>setForm(f=>({...f,currentPin:e.target.value.replace(/\D/g,'')}))} placeholder="••••••" />
+          </div>
+          <div>
+            <label style={lbl}>PIN Baru (6 digit)</label>
+            <input type="tel" inputMode="numeric" maxLength={6} className="input" value={form.newPin} onChange={e=>setForm(f=>({...f,newPin:e.target.value.replace(/\D/g,'')}))} placeholder="••••••" />
+          </div>
+          <div>
+            <label style={lbl}>Konfirmasi PIN Baru</label>
+            <input type="tel" inputMode="numeric" maxLength={6} className="input" value={form.confirmPin} onChange={e=>setForm(f=>({...f,confirmPin:e.target.value.replace(/\D/g,'')}))} placeholder="••••••" />
+          </div>
+          <button onClick={save} disabled={saving} className="btn btn-primary" style={{ justifyContent:'center' }}>{saving?'Mengubah...':'Simpan PIN Baru'}</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function ProfilePage() {
+  const { data:session } = useSession(); const sessUser = session?.user as any
+  const router = useRouter()
+  const [profile, setProfile] = useState<any>(null)
+
+  useEffect(() => {
+    fetch('/api/profile').then(r=>r.json()).then(d=>setProfile(d.data)).catch(()=>{})
+  }, [])
+
+  if (!profile) return <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text3)' }}>Memuat...</div>
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-        <div><div style={{ fontSize:14, fontWeight:600 }}>Profil Saya</div><div style={{ fontSize:11, color:'var(--text3)' }}>Edit informasi personal lo</div></div>
-        <button onClick={save} disabled={saving} className="btn btn-primary btn-sm">{saving?'Menyimpan...':'💾 Simpan Perubahan'}</button>
+      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
+        <div style={{ fontSize:14, fontWeight:600 }}>My Profile</div>
+        <div style={{ fontSize:11, color:'var(--text3)' }}>Akun dan PIN</div>
       </div>
-
-      <div style={{ flex:1, overflowY:'auto', padding:'20px' }}>
-        <div style={{ maxWidth:700, margin:'0 auto' }}>
-          {/* Avatar & basic */}
-          <div className="card" style={{ padding:'20px', marginBottom:16 }}>
-            <div style={{ display:'flex', gap:20, alignItems:'flex-start' }}>
-              {/* Avatar */}
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
-                <div style={{ width:80, height:80, borderRadius:'50%', overflow:'hidden', background:'var(--bg4)', display:'flex', alignItems:'center', justifyContent:'center', border:'2px solid var(--border2)' }}>
-                  {avatarPreview ? <img src={avatarPreview} style={{ width:'100%', height:'100%', objectFit:'cover' }} alt="avatar" /> :
-                    <span style={{ fontSize:28, fontWeight:700, color:'var(--text2)' }}>{profile.name?.split(' ').map((n:string)=>n[0]).join('').slice(0,2)}</span>}
-                </div>
-                <label style={{ cursor:'pointer', fontSize:11, color:'var(--blue)', fontWeight:500 }}>
-                  📷 Ganti foto
-                  <input type="file" accept="image/*" style={{ display:'none' }} onChange={handleAvatar} />
-                </label>
-                <div style={{ fontSize:10, color:'var(--text3)' }}>Max 500KB</div>
-              </div>
-              {/* Basic info */}
-              <div style={{ flex:1, display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                <div style={{ gridColumn:'1/-1' }}><label style={lbl}>Nama Lengkap</label><input className="input" value={profile.name||''} onChange={e=>set('name',e.target.value)} /></div>
-                <div><label style={lbl}>Email</label><input className="input" value={profile.email||''} disabled style={{ opacity:0.6 }} /></div>
-                <div><label style={lbl}>Divisi</label><input className="input" value={profile.division||''} onChange={e=>set('division',e.target.value)} /></div>
-                <div><label style={lbl}>No. HP</label><input className="input" value={profile.phone||''} onChange={e=>set('phone',e.target.value)} placeholder="08xxxxxxxxxx" /></div>
-                <div><label style={lbl}>Role</label><input className="input" value={profile.role||''} disabled style={{ opacity:0.6, textTransform:'capitalize' }} /></div>
-              </div>
-            </div>
+      <div style={{ flex:1, overflowY:'auto', padding:'18px 20px' }} className="safe-bottom">
+        <div style={{ maxWidth:560, margin:'0 auto' }}>
+          {/* Profile summary card */}
+          <div className="card" style={{ padding:'20px 24px', textAlign:'center' }}>
+            <div style={{ width:84, height:84, borderRadius:'50%', background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:34, fontWeight:700, color:'#fff', margin:'0 auto 12px' }}>{profile.name?.[0]}</div>
+            <div style={{ fontSize:18, fontWeight:700, color:'var(--text)', letterSpacing:'-0.01em' }}>{profile.name}</div>
+            <div style={{ fontSize:11, color:'var(--text3)', marginTop:4 }}>{profile.role} · {profile.division||'—'}</div>
+            <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{profile.email}</div>
+            <Link href="/dashboard/biodata" style={{ display:'inline-block', marginTop:14 }}>
+              <button className="btn btn-sm btn-primary">✏️ Edit Biodata Lengkap</button>
+            </Link>
           </div>
 
-          {/* Personal info */}
-          <div className="card" style={{ padding:'16px 20px', marginBottom:16 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', marginBottom:14 }}>📋 Informasi Personal</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              <div><label style={lbl}>Tanggal Lahir</label><input type="date" className="input" value={profile.birthDate||''} onChange={e=>set('birthDate',e.target.value)} /></div>
-              <div><label style={lbl}>Tempat Lahir</label><input className="input" value={profile.birthPlace||''} onChange={e=>set('birthPlace',e.target.value)} placeholder="Kota kelahiran" /></div>
-              <div style={{ gridColumn:'1/-1' }}><label style={lbl}>Alamat Rumah</label><textarea className="input" value={profile.address||''} onChange={e=>set('address',e.target.value)} rows={2} placeholder="Alamat lengkap..." /></div>
-              <div><label style={lbl}>Hobi</label><input className="input" value={profile.hobbies||''} onChange={e=>set('hobbies',e.target.value)} placeholder="Olahraga, memasak, dll" /></div>
-              <div><label style={lbl}>Makanan Favorit</label><input className="input" value={profile.favoriteFood||''} onChange={e=>set('favoriteFood',e.target.value)} placeholder="Soto ayam, nasi goreng, dll" /></div>
-            </div>
-          </div>
+          {/* Change PIN */}
+          <ChangePinSection />
 
-          {/* Clothing sizes */}
-          <div className="card" style={{ padding:'16px 20px', marginBottom:16 }}>
-            <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', marginBottom:14 }}>👕 Ukuran Pakaian & Sepatu</div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
-              <div><label style={lbl}>Baju</label>
-                <select className="input" value={profile.sizeBaju||''} onChange={e=>set('sizeBaju',e.target.value)}>
-                  <option value="">Pilih...</option>
-                  {SIZES_BAJU.map(s=><option key={s} value={s}>{s}</option>)}
-                </select></div>
-              <div><label style={lbl}>Jaket</label>
-                <select className="input" value={profile.sizeJaket||''} onChange={e=>set('sizeJaket',e.target.value)}>
-                  <option value="">Pilih...</option>
-                  {SIZES_BAJU.map(s=><option key={s} value={s}>{s}</option>)}
-                </select></div>
-              <div><label style={lbl}>Celana</label>
-                <select className="input" value={profile.sizeCelana||''} onChange={e=>set('sizeCelana',e.target.value)}>
-                  <option value="">Pilih...</option>
-                  {SIZES_CELANA.map(s=><option key={s} value={s}>{s}</option>)}
-                </select></div>
-              <div><label style={lbl}>Sepatu</label>
-                <select className="input" value={profile.sizeSepatu||''} onChange={e=>set('sizeSepatu',e.target.value)}>
-                  <option value="">Pilih...</option>
-                  {SIZES_SEPATU.map(s=><option key={s} value={s}>{s}</option>)}
-                </select></div>
+          {/* Quick info */}
+          <div className="card" style={{ padding:'14px 18px', marginTop:14 }}>
+            <div style={{ fontSize:12, fontWeight:600, marginBottom:10 }}>Info Akun</div>
+            <div style={{ fontSize:11, color:'var(--text2)', lineHeight:1.8 }}>
+              Untuk update biodata lengkap (alamat, no rekening, kontak darurat, ukuran), klik <b>Edit Biodata Lengkap</b> di atas.
             </div>
-          </div>
-
-          <div style={{ display:'flex', justifyContent:'flex-end' }}>
-            <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'Menyimpan...':'💾 Simpan Semua Perubahan'}</button>
           </div>
         </div>
       </div>

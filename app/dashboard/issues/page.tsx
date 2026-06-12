@@ -6,12 +6,15 @@ import { useSession } from 'next-auth/react'
 
 type ViewMode = 'table' | 'kanban' | 'timeline'
 
+const CATEGORY_FILTERS = ['All','KPI','Non-KPI','Go-Live','Anggaran','Others']
+
 const STATUS_LABELS: Record<string,string> = { on_track:'On Track', at_risk:'At Risk', delayed:'Delayed', completed:'Completed' }
 const STATUS_COLS = ['on_track','at_risk','delayed','completed']
 const STATUS_COLORS: Record<string,string> = { on_track:'var(--green)', at_risk:'var(--amber)', delayed:'var(--red)', completed:'var(--blue)' }
 
 function IssueModal({ issue, onClose, onSave }: { issue: Issue; onClose: ()=>void; onSave: ()=>void }) {
-  const { data: session } = useSession(); const user = session?.user as any
+  const { data: session } = useSession()
+  const [filterCat, setFilterCat] = useState('All'); const user = session?.user as any
   const [form, setForm] = useState({ progress: issue.progress, status: issue.status, nextPlan: issue.nextPlan, dueDate: issue.dueDate, note: '' })
   const [comment, setComment] = useState(''); const [saving, setSaving] = useState(false); const [activeTab, setActiveTab] = useState<'edit'|'history'|'comments'>('edit')
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
@@ -213,8 +216,10 @@ export default function IssuesPage() {
   }
   useEffect(() => { load() }, [filterStatus, filterPIC])
 
-  const filtered = issues.filter(i => !search || i.title.toLowerCase().includes(search.toLowerCase()) || i.picName?.toLowerCase().includes(search.toLowerCase()))
+  const filtered = filteredIssues.filter(i => !search || i.title.toLowerCase().includes(search.toLowerCase()) || i.picName?.toLowerCase().includes(search.toLowerCase()))
   const getCode = (id: string) => initiatives.find(i => i._id === id)?.code || ''
+
+  const filteredIssues = filterCat === 'All' ? issues : issues.filter((i:any) => (i.category||'Others') === filterCat || (i.subType||'') === filterCat)
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -235,6 +240,13 @@ export default function IssuesPage() {
           ))}
         </div>
         <div style={{ fontSize:12, color:'var(--text3)' }}>{filtered.length} issue</div>
+      </div>
+
+      {/* Category filter chips */}
+      <div style={{ display:'flex', gap:5, padding:'8px 20px', flexShrink:0, flexWrap:'wrap', borderBottom:'1px solid var(--border)', background:'var(--bg2)' }}>
+        {CATEGORY_FILTERS.map(c => (
+          <button key={c} onClick={()=>setFilterCat(c)} style={{ padding:'4px 12px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${filterCat===c?'var(--brand)':'var(--border)'}`, background:filterCat===c?'var(--brand-soft)':'var(--bg3)', color:filterCat===c?'var(--brand)':'var(--text2)' }}>{c}</button>
+        ))}
       </div>
 
       {loading ? <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text3)' }}>Memuat...</div> : (
