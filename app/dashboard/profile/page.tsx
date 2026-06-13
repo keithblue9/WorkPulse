@@ -78,7 +78,6 @@ export default function ProfilePage() {
             <div style={{ width:84, height:84, borderRadius:'50%', background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:34, fontWeight:700, color:'#fff', margin:'0 auto 12px' }}>{profile.name?.[0]}</div>
             <div style={{ fontSize:18, fontWeight:700, color:'var(--text)', letterSpacing:'-0.01em' }}>{profile.name}</div>
             <div style={{ fontSize:11, color:'var(--text3)', marginTop:4 }}>{profile.role} · {profile.division||'—'}</div>
-            <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{profile.email}</div>
             <Link href="/dashboard/biodata" style={{ display:'inline-block', marginTop:14 }}>
               <button className="btn btn-sm btn-primary">✏️ Edit Biodata Lengkap</button>
             </Link>

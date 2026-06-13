@@ -240,7 +240,7 @@ function FonnteSettings({ config, onSave }: { config:any; onSave:(patch:any)=>vo
         <select className="input" value={cashierUserId} onChange={e=>{ setCashierUserId(e.target.value); onSave({ cashierUserId: e.target.value }) }}>
           <option value="">— Pilih cashier —</option>
           {users.filter((u:any)=>u.active!==false).map((u:any) => (
-            <option key={u._id} value={u._id}>{u.name} ({u.email}) {u.fonnteToken?'✓ has token':''}</option>
+            <option key={u._id} value={u._id}>{u.name}{u.division?` · ${u.division}`:''} {u.fonnteToken?'✓ has token':''}</option>
           ))}
         </select>
         <div style={{ fontSize:10, color:'var(--text3)', marginTop:5 }}>User yang dipilih harus punya role <code>cashier</code> dan token Fonnte di profil-nya.</div>
