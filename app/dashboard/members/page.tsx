@@ -127,7 +127,15 @@ export default function MembersPage() {
   }
   useEffect(() => { load() }, [])
 
-  const allRoles = config?.roleDefs || []
+  const FALLBACK_ROLES = [
+    { key:'admin', label:'Admin', builtin:true },
+    { key:'manager', label:'Manager', builtin:true },
+    { key:'member', label:'Member', builtin:true },
+    { key:'finance', label:'Finance', builtin:true },
+    { key:'cashier', label:'Cashier', builtin:true },
+    { key:'guest', label:'Guest', builtin:true },
+  ]
+  const allRoles = (config?.roleDefs && config.roleDefs.length > 0) ? config.roleDefs : FALLBACK_ROLES
   const filtered = users.filter(u => !search || u.name?.toLowerCase().includes(search.toLowerCase()))
 
   return (

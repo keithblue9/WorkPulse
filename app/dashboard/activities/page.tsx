@@ -181,8 +181,10 @@ export default function ActivitiesPage() {
   const [editing, setEditing] = useState<any>(null)
   const [filterCat, setFilterCat] = useState('All')
   const [filterSub, setFilterSub] = useState('')
-  useEffect(() => { if (typeof window !== 'undefined') { const sp = new URLSearchParams(window.location.search); const cat = sp.get('cat'); const sub = sp.get('sub'); if (cat) setFilterCat(cat); if (sub) setFilterSub(sub) } }, [])
   const [search, setSearch] = useState('')
+
+  // Read URL params on mount
+  useEffect(() => { if (typeof window !== 'undefined') { const sp = new URLSearchParams(window.location.search); const cat = sp.get('cat'); const sub = sp.get('sub'); if (cat) setFilterCat(cat); if (sub) setFilterSub(sub) } }, [])
 
   async function load() {
     setLoading(true)

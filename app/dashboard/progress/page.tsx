@@ -220,28 +220,63 @@ export default function ProgressPage() {
 
       <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
-         initiatives.length === 0 ? <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>Belum ada initiative</div> : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:10 }}>
+         initiatives.length === 0 ? <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>Belum ada initiative · klik <b>+ Initiative Baru</b></div> : (
+          <div className="card" style={{ padding:14, overflow:'auto' }}>
+            {/* Gantt header */}
+            <div style={{ display:'grid', gridTemplateColumns:'260px repeat(12, 1fr) 80px', gap:0, alignItems:'center', minWidth:1000, marginBottom:6, fontSize:10, color:'var(--text3)', fontWeight:600 }}>
+              <div style={{ padding:'6px 8px' }}>Initiative · PIC</div>
+              {['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'].map(m => (
+                <div key={m} style={{ textAlign:'center', borderLeft:'1px solid var(--border)', padding:'6px 0' }}>{m}</div>
+              ))}
+              <div style={{ textAlign:'right', padding:'6px 8px' }}>Plan / Actual</div>
+            </div>
             {initiatives.map(i => (
-              <div key={i._id} className="card glass-hover" style={{ padding:14, cursor:'pointer' }} onClick={()=>setEditing(i)}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6 }}>
-                  <div>
-                    <div style={{ fontSize:9, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.05em' }}>{i.code}</div>
-                    <div style={{ fontSize:13, fontWeight:600 }}>{i.title}</div>
-                  </div>
-                  <div style={{ fontSize:9, color:'var(--text3)' }}>{i.year}</div>
+              <div key={i._id} className="glass-hover" style={{ display:'grid', gridTemplateColumns:'260px repeat(12, 1fr) 80px', gap:0, alignItems:'center', minWidth:1000, padding:'8px 0', borderTop:'1px solid var(--border)', cursor:'pointer' }} onClick={()=>setEditing(i)}>
+                <div style={{ padding:'4px 8px', minWidth:0 }}>
+                  <div style={{ fontSize:9, color:'var(--text3)' }}>{i.code} · {i.year}</div>
+                  <div style={{ fontSize:12, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{i.title}</div>
+                  {i.pic?.length > 0 && <div style={{ fontSize:9, color:'var(--text3)' }}>👤 {i.pic.slice(0,3).join(', ')}{i.pic.length>3?` +${i.pic.length-3}`:''}</div>}
+                  <div style={{ fontSize:9, color:'var(--text3)' }}>📊 {i.phases?.length||0} phase{(i.phases?.length||0)>1?'s':''}</div>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8 }}>
-                  <div><div style={{ fontSize:9, color:'var(--text3)' }}>Plan</div><div style={{ fontSize:16, fontWeight:700, color:'var(--brand)' }}>{(i.planProgress||0).toFixed(0)}%</div></div>
-                  <div><div style={{ fontSize:9, color:'var(--text3)' }}>Actual</div><div style={{ fontSize:16, fontWeight:700, color:'var(--green)' }}>{(i.actualProgress||0).toFixed(0)}%</div></div>
+                <div style={{ gridColumn:'2 / span 12', position:'relative', height: Math.max(36, (i.phases?.length||0) * 26 + 12), borderLeft:'1px solid var(--border)' }}>
+                  {Array.from({length:12}).map((_,m) => (
+                    <div key={m} style={{ position:'absolute', left:`${(m/12)*100}%`, top:0, bottom:0, width:'1px', background:'var(--border)' }} />
+                  ))}
+                  {(i.phases||[]).map((ph:any, idx:number) => {
+                    const rowTop = 4 + idx * 26
+                    const elements:any[] = []
+                    if (ph.planStartMonth && ph.planEndMonth) {
+                      const start = ((ph.planStartMonth-1)/12)*100
+                      const width = ((ph.planEndMonth-ph.planStartMonth+1)/12)*100
+                      elements.push(
+                        <div key={`p${idx}`} style={{ position:'absolute', left:`${start}%`, width:`${width}%`, top:rowTop, height:10, background:'var(--brand)', borderRadius:3, opacity:0.65, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, color:'#fff', fontWeight:700 }} title={`Plan ${ph.name}: M${ph.planStartMonth}-M${ph.planEndMonth}`}>
+                          {width > 8 && (ph.name || 'P'+(idx+1))}
+                        </div>
+                      )
+                    }
+                    if (ph.actualStartMonth && ph.actualEndMonth) {
+                      const start = ((ph.actualStartMonth-1)/12)*100
+                      const width = ((ph.actualEndMonth-ph.actualStartMonth+1)/12)*100
+                      elements.push(
+                        <div key={`a${idx}`} style={{ position:'absolute', left:`${start}%`, width:`${width}%`, top:rowTop + 12, height:10, background:'var(--green)', borderRadius:3, opacity:0.85, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, color:'#fff', fontWeight:700 }} title={`Actual ${ph.name}: M${ph.actualStartMonth}-M${ph.actualEndMonth}`}>
+                          {width > 8 && 'A'}
+                        </div>
+                      )
+                    }
+                    return elements
+                  })}
                 </div>
-                <div style={{ height:5, background:'var(--bg3)', borderRadius:3, overflow:'hidden', marginBottom:6 }}>
-                  <div style={{ width:`${Math.min(100,i.actualProgress||0)}%`, height:'100%', background:'var(--green)' }} />
+                <div style={{ padding:'4px 8px', textAlign:'right', fontSize:11 }}>
+                  <div style={{ color:'var(--brand)', fontWeight:700 }}>P {(i.planProgress||0).toFixed(0)}%</div>
+                  <div style={{ color:'var(--green)', fontWeight:700 }}>A {(i.actualProgress||0).toFixed(0)}%</div>
                 </div>
-                {i.pic?.length > 0 && <div style={{ fontSize:10, color:'var(--text3)' }}>👤 {i.pic.join(', ')}</div>}
-                <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>📊 {i.phases?.length||0} phase{(i.phases?.length||0)>1?'s':''}</div>
               </div>
             ))}
+            <div style={{ display:'flex', gap:14, padding:'12px 8px 4px', fontSize:10, color:'var(--text3)' }}>
+              <span style={{ display:'flex', alignItems:'center', gap:5 }}><span style={{ width:14, height:8, background:'var(--brand)', borderRadius:2, opacity:0.65 }} /> Plan</span>
+              <span style={{ display:'flex', alignItems:'center', gap:5 }}><span style={{ width:14, height:8, background:'var(--green)', borderRadius:2, opacity:0.85 }} /> Actual</span>
+              <span style={{ marginLeft:'auto' }}>💡 Klik row untuk edit · Tiap baris di area chart = 1 phase</span>
+            </div>
           </div>
          )}
       </div>
