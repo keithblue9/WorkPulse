@@ -1,4 +1,5 @@
 'use client'
+import { picArray } from '@/lib/defaults'
 import { useEffect, useState } from 'react'
 import { format, startOfWeek, subDays } from 'date-fns'
 
@@ -109,7 +110,7 @@ export default function IssuesPage() {
                       <td style={{ whiteSpace:'pre-wrap', fontSize:11 }}>{a.nextPlan || <span style={{ color:'var(--text3)' }}>—</span>}</td>
                       <td style={{ fontSize:11 }}>{a.targetWeek || '—'}</td>
                       <td>{a.priority && <span className="badge" style={{ background:PRIORITY_CFG[a.priority]?.bg, color:PRIORITY_CFG[a.priority]?.color, fontSize:10 }}>{PRIORITY_CFG[a.priority]?.label}</span>}</td>
-                      <td style={{ fontSize:11 }}>{(a.pic||[]).length ? a.pic.join(', ') : (a.picName || '—')}</td>
+                      <td style={{ fontSize:11 }}>{picArray(a.pic).length ? picArray(a.pic).join(', ') : (a.picName || '—')}</td>
                     </tr>
                   )
                 })}

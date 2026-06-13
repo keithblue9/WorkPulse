@@ -1,4 +1,5 @@
 'use client'
+import { picArray } from '@/lib/defaults'
 import { useEffect, useState, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
@@ -271,7 +272,7 @@ export default function DashboardPage() {
                         <div style={{ padding:'4px 8px', minWidth:0 }}>
                           <div style={{ fontSize:9, color:'var(--text3)' }}>{i.code}</div>
                           <div style={{ fontSize:12, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{i.title}</div>
-                          {i.pic?.length > 0 && <div style={{ fontSize:9, color:'var(--text3)' }}>👤 {i.pic.slice(0,2).join(', ')}{i.pic.length>2?` +${i.pic.length-2}`:''}</div>}
+                          {picArray(i.pic).length > 0 && <div style={{ fontSize:9, color:'var(--text3)' }}>👤 {picArray(i.pic).slice(0,2).join(', ')}{i.pic.length>2?` +${i.pic.length-2}`:''}</div>}
                         </div>
                         {/* 12 month cells with phase bars */}
                         <div style={{ gridColumn:'2 / span 12', position:'relative', height:36, borderLeft:'1px solid var(--border)' }}>
@@ -345,7 +346,7 @@ export default function DashboardPage() {
                     {activities.filter(a=>a.priority==='high' && a.status!=='completed').slice(0,5).map(a => (
                       <div key={a._id} style={{ padding:'8px 0', borderBottom:'1px solid var(--border)', fontSize:11 }}>
                         <div style={{ fontWeight:600 }}>{a.title}</div>
-                        <div style={{ color:'var(--text3)', fontSize:10 }}>{a.category} · PIC: {(a.pic||[]).join(', ') || a.picName || '—'}</div>
+                        <div style={{ color:'var(--text3)', fontSize:10 }}>{a.category} · PIC: {picArray(a.pic).join(', ') || a.picName || '—'}</div>
                       </div>
                     ))}
                   </div>

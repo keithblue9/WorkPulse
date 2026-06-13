@@ -1,4 +1,5 @@
 'use client'
+import { picArray } from '@/lib/defaults'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -256,7 +257,7 @@ export default function ActivitiesPage() {
                        <div style={{ display:'flex', flexWrap:'wrap', gap:10, fontSize:10, color:'var(--text3)' }}>
                          {a.actionDate && <span>📅 {a.actionDate}</span>}
                          {a.targetWeek && <span>🗓 {a.targetWeek}</span>}
-                         {a.pic && a.pic.length > 0 && <span>👤 {a.pic.join(', ')}</span>}
+                         {picArray(a.pic).length > 0 && <span>👤 {picArray(a.pic).join(', ')}</span>}
                        </div>
                      </div>
                    </div>

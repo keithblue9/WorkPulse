@@ -120,21 +120,75 @@ export default function BudgetPage() {
       <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> : (
           <>
-            {/* Annual budget summary */}
+            {/* Annual plan + summary metrics */}
             <div className="card" style={{ padding:14, marginBottom:12 }}>
-              <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', marginBottom:10 }}>{activeCfg?.label} — Annual Plan</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:10 }}>
+                <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase' }}>{activeCfg?.label} — Annual Plan</div>
+                <div style={{ fontSize:10, color:'var(--text3)' }}>Threshold alert: <b>{activeCfg?.threshold || 80}%</b></div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
                 <div>
                   <label style={lbl}>Anggaran Tahunan IDR</label>
                   <input type="number" className="input" value={currentBudget.annualBudgetIDR||0} onChange={e=>setAnnual('annualBudgetIDR', Number(e.target.value))} />
-                  <div style={{ fontSize:11, color:'var(--text2)', marginTop:5 }}>Plan IDR: <b>Rp {fmt(currentBudget.annualBudgetIDR||0)}</b></div>
                 </div>
                 <div>
                   <label style={lbl}>Anggaran Tahunan USD</label>
                   <input type="number" className="input" value={currentBudget.annualBudgetUSD||0} onChange={e=>setAnnual('annualBudgetUSD', Number(e.target.value))} />
-                  <div style={{ fontSize:11, color:'var(--text2)', marginTop:5 }}>Plan USD: <b>$ {fmt(currentBudget.annualBudgetUSD||0)}</b></div>
                 </div>
               </div>
+              {/* Summary metric cards */}
+              {(() => {
+                const thisYear = new Date().getFullYear() === year
+                const currentMonth = new Date().getMonth() + 1 // 1-12
+                const monthsElapsed = thisYear ? currentMonth : 12
+                const cumIDR_now = cumulativeIDR(monthsElapsed)
+                const cumUSD_now = cumulativeUSD(monthsElapsed)
+                const cumIDR_eoy = cumulativeIDR(12)
+                const cumUSD_eoy = cumulativeUSD(12)
+                const planIDR = currentBudget.annualBudgetIDR || 0
+                const planUSD = currentBudget.annualBudgetUSD || 0
+                const usedIDR_now = cumIDR_now
+                const usedUSD_now = cumUSD_now
+                const sisaIDR = planIDR - cumIDR_eoy
+                const sisaUSD = planUSD - cumUSD_eoy
+                const avgIDRperMonth = monthsElapsed > 0 ? cumIDR_now / monthsElapsed : 0
+                const avgUSDperMonth = monthsElapsed > 0 ? cumUSD_now / monthsElapsed : 0
+                const prognosaIDR = avgIDRperMonth * 12
+                const prognosaUSD = avgUSDperMonth * 12
+                const pctUsed = progressPct(monthsElapsed)
+                const pctEOY = progressPct(12)
+                const threshold = activeCfg?.threshold || 80
+                return (
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(170px, 1fr))', gap:8 }}>
+                    <div className="card" style={{ padding:'10px 12px', background:'var(--bg3)' }}>
+                      <div style={{ fontSize:9, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.04em', fontWeight:600 }}>Plan Total</div>
+                      <div style={{ fontSize:13, fontWeight:700 }}>Rp {fmt(planIDR)}</div>
+                      <div style={{ fontSize:10, color:'var(--text3)' }}>$ {fmt(planUSD)}</div>
+                    </div>
+                    <div className="card" style={{ padding:'10px 12px', background:'var(--bg3)' }}>
+                      <div style={{ fontSize:9, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.04em', fontWeight:600 }}>Realisasi s/d {thisYear?['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][currentMonth-1]:'Des'}</div>
+                      <div style={{ fontSize:13, fontWeight:700, color:'var(--brand)' }}>Rp {fmt(usedIDR_now)}</div>
+                      <div style={{ fontSize:10, color:'var(--text3)' }}>$ {fmt(usedUSD_now)} · <b style={{ color: pctUsed>=threshold?'var(--red)':pctUsed>=50?'var(--amber)':'var(--green)' }}>{pctUsed.toFixed(1)}%</b></div>
+                    </div>
+                    <div className="card" style={{ padding:'10px 12px', background:'var(--bg3)' }}>
+                      <div style={{ fontSize:9, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.04em', fontWeight:600 }}>Sisa Tersedia (EOY)</div>
+                      <div style={{ fontSize:13, fontWeight:700, color: sisaIDR<0?'var(--red)':'var(--green)' }}>Rp {fmt(sisaIDR)}</div>
+                      <div style={{ fontSize:10, color:'var(--text3)' }}>$ {fmt(sisaUSD)}</div>
+                    </div>
+                    <div className="card" style={{ padding:'10px 12px', background:'var(--bg3)' }}>
+                      <div style={{ fontSize:9, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.04em', fontWeight:600 }}>Prognosa s/d Akhir Tahun</div>
+                      <div style={{ fontSize:13, fontWeight:700, color: prognosaIDR>planIDR?'var(--red)':'var(--text)' }}>Rp {fmt(Math.round(prognosaIDR))}</div>
+                      <div style={{ fontSize:10, color:'var(--text3)' }}>$ {fmt(Math.round(prognosaUSD))} · proyeksi based on avg</div>
+                    </div>
+                    {pctEOY >= threshold && (
+                      <div className="card" style={{ padding:'10px 12px', background:'var(--redbg)', border:'1px solid var(--red)' }}>
+                        <div style={{ fontSize:9, color:'var(--red)', textTransform:'uppercase', letterSpacing:'0.04em', fontWeight:600 }}>⚠️ Alert</div>
+                        <div style={{ fontSize:11, color:'var(--red)', fontWeight:600 }}>Cumulative EOY {pctEOY.toFixed(0)}% melewati threshold {threshold}%</div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
 
             {/* Monthly realization table */}

@@ -1,4 +1,5 @@
 'use client'
+import { picArray } from '@/lib/defaults'
 import { useEffect, useState, useMemo } from 'react'
 import toast from 'react-hot-toast'
 
@@ -26,12 +27,17 @@ function PhaseRow({ phase, idx, onChange, autoPlanPct, autoActualPct }: { phase:
     const sKey = field==='plan'?'planStartMonth':'actualStartMonth'
     const eKey = field==='plan'?'planEndMonth':'actualEndMonth'
     const cs = phase[sKey], ce = phase[eKey]
-    if (!cs && !ce) onChange({ ...phase, [sKey]:m, [eKey]:m })
-    else if (cs && !ce) {
-      if (m < cs) onChange({ ...phase, [sKey]:m, [eKey]:cs })
-      else onChange({ ...phase, [eKey]:m })
+    // No range yet → set both to m (single month)
+    if (!cs && !ce) { onChange({ ...phase, [sKey]:m, [eKey]:m }); return }
+    // Already a range (cs !== ce) → start over
+    if (cs && ce && cs !== ce) { onChange({ ...phase, [sKey]:m, [eKey]:m }); return }
+    // Single-month state (cs === ce) → extend or clear
+    if (cs === ce) {
+      if (m === cs) { onChange({ ...phase, [sKey]:null, [eKey]:null }); return } // clicked same → clear
+      if (m < cs) { onChange({ ...phase, [sKey]:m, [eKey]:cs }); return } // extend backward
+      onChange({ ...phase, [eKey]:m }); return // extend forward
     }
-    else { onChange({ ...phase, [sKey]:m, [eKey]:m }) }
+    onChange({ ...phase, [sKey]:m, [eKey]:m })
   }
   function inRange(field:'plan'|'actual', m:number) {
     const sKey = field==='plan'?'planStartMonth':'actualStartMonth'
@@ -235,7 +241,7 @@ export default function ProgressPage() {
                 <div style={{ padding:'4px 8px', minWidth:0 }}>
                   <div style={{ fontSize:9, color:'var(--text3)' }}>{i.code} · {i.year}</div>
                   <div style={{ fontSize:12, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{i.title}</div>
-                  {i.pic?.length > 0 && <div style={{ fontSize:9, color:'var(--text3)' }}>👤 {i.pic.slice(0,3).join(', ')}{i.pic.length>3?` +${i.pic.length-3}`:''}</div>}
+                  {picArray(i.pic).length > 0 && <div style={{ fontSize:9, color:'var(--text3)' }}>👤 {picArray(i.pic).slice(0,3).join(', ')}{i.pic.length>3?` +${i.pic.length-3}`:''}</div>}
                   <div style={{ fontSize:9, color:'var(--text3)' }}>📊 {i.phases?.length||0} phase{(i.phases?.length||0)>1?'s':''}</div>
                 </div>
                 <div style={{ gridColumn:'2 / span 12', position:'relative', height: Math.max(36, (i.phases?.length||0) * 26 + 12), borderLeft:'1px solid var(--border)' }}>

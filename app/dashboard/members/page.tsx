@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
+import { DEFAULT_ROLES } from '@/lib/defaults'
 
 const ROLE_COLORS: Record<string,string> = { admin:'var(--red)', manager:'var(--brand)', member:'var(--green)', guest:'var(--text3)', finance:'var(--amber)', cashier:'var(--purple)' }
 
@@ -127,15 +128,7 @@ export default function MembersPage() {
   }
   useEffect(() => { load() }, [])
 
-  const FALLBACK_ROLES = [
-    { key:'admin', label:'Admin', builtin:true },
-    { key:'manager', label:'Manager', builtin:true },
-    { key:'member', label:'Member', builtin:true },
-    { key:'finance', label:'Finance', builtin:true },
-    { key:'cashier', label:'Cashier', builtin:true },
-    { key:'guest', label:'Guest', builtin:true },
-  ]
-  const allRoles = (config?.roleDefs && config.roleDefs.length > 0) ? config.roleDefs : FALLBACK_ROLES
+  const allRoles = (config?.roleDefs && config.roleDefs.length > 0) ? config.roleDefs : DEFAULT_ROLES
   const filtered = users.filter(u => !search || u.name?.toLowerCase().includes(search.toLowerCase()))
 
   return (
