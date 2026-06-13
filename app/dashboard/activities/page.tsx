@@ -1,4 +1,7 @@
 'use client'
+// Normalize keys for filtering — handles 'KPI-SI' vs 'KPI - SI' vs 'kpi_si' etc.
+function normKey(s:any):string { return String(s||'').toLowerCase().replace(/[\s\-_]/g,'') }
+
 import { picArray } from '@/lib/defaults'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
@@ -203,8 +206,8 @@ export default function ActivitiesPage() {
 
   const filtered = activities.filter(a => {
     if (search && !a.title.toLowerCase().includes(search.toLowerCase())) return false
-    if (filterCat !== 'All' && a.category !== filterCat && a.subType !== filterCat) return false
-    if (filterSub && a.subType !== filterSub) return false
+    if (filterCat !== 'All' && normKey(a.category) !== normKey(filterCat) && normKey(a.subType) !== normKey(filterCat)) return false
+    if (filterSub && normKey(a.subType) !== normKey(filterSub)) return false
     return true
   })
 

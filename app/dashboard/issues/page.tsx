@@ -1,4 +1,7 @@
 'use client'
+// Normalize keys for filtering — handles 'KPI-SI' vs 'KPI - SI' vs 'kpi_si' etc.
+function normKey(s:any):string { return String(s||'').toLowerCase().replace(/[\s\-_]/g,'') }
+
 import { picArray } from '@/lib/defaults'
 import { useEffect, useState } from 'react'
 import { format, startOfWeek, subDays } from 'date-fns'
@@ -37,7 +40,7 @@ export default function IssuesPage() {
   } else if (period === 'custom') { dateFrom = customFrom; dateTo = customTo }
 
   const filtered = activities.filter(a => {
-    if (filterSub !== 'All' && a.subType !== filterSub) return false
+    if (filterSub !== 'All' && normKey(a.subType) !== normKey(filterSub) && normKey(a.category) !== normKey(filterSub)) return false
     if (dateFrom && a.actionDate < dateFrom) return false
     if (dateTo && a.actionDate > dateTo) return false
     return true

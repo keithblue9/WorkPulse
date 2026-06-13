@@ -55,7 +55,7 @@ function NoteForm({ editing, onClose, onSave, config, members }: { editing?:any;
             <div><label style={lbl}>Title *</label><input className="input" value={form.title} onChange={e=>set('title',e.target.value)} /></div>
             <div><label style={lbl}>Tanggal</label><input type="date" className="input" value={form.date} onChange={e=>set('date',e.target.value)} /></div>
           </div>
-          <div><label style={lbl}>Kategori</label>
+          <div><label style={lbl}>Kategori (Kolom Kanban)</label>
             <select className="input" value={form.category} onChange={e=>set('category',e.target.value)}>
               {cats.map((c:any)=><option key={c.key} value={c.key}>{c.label}</option>)}
             </select></div>
@@ -98,7 +98,7 @@ export default function NotesPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
-  const [filterCat, setFilterCat] = useState('All')
+  const [search, setSearch] = useState('')
 
   async function load() {
     setLoading(true)
@@ -107,52 +107,90 @@ export default function NotesPage() {
   }
   useEffect(() => { load() }, [])
   const cats = config?.activityCategories?.filter((c:any)=>c.active) || []
-  const filtered = filterCat==='All' ? notes : notes.filter(n => n.category === filterCat)
   function catColor(key:string) { return cats.find((c:any)=>c.key===key)?.color || 'var(--brand)' }
+  function catLabel(key:string) { return cats.find((c:any)=>c.key===key)?.label || key }
+
+  // Group notes by category (Kanban columns) + filter by search
+  const visible = search ? notes.filter(n => (n.title||'').toLowerCase().includes(search.toLowerCase()) || (n.content||'').toLowerCase().includes(search.toLowerCase())) : notes
+
+  const columns = cats.map((c:any) => ({
+    key: c.key, label: c.label, color: c.color,
+    items: visible.filter(n => n.category === c.key),
+  }))
+  // Add "Uncategorized" column for notes whose category isn't in current cats
+  const knownKeys = new Set(cats.map((c:any)=>c.key))
+  const orphans = visible.filter(n => !knownKeys.has(n.category))
+  if (orphans.length > 0) columns.push({ key:'__orphan', label:'Lainnya', color:'#9aa6b3', items: orphans })
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       {(showForm||editing) && <NoteForm editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} config={config} members={members} />}
 
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', flexShrink:0 }}>
+      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
         <div>
-          <div style={{ fontSize:14, fontWeight:600 }}>Notes</div>
-          <div style={{ fontSize:11, color:'var(--text3)' }}>Catatan project · {notes.length} note</div>
+          <div style={{ fontSize:14, fontWeight:600 }}>Notes — Kanban</div>
+          <div style={{ fontSize:11, color:'var(--text3)' }}>{notes.length} note · Kolom = kategori dari Activities</div>
         </div>
-        <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Note Baru</button>
+        <div style={{ display:'flex', gap:8 }}>
+          <input className="input" value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Cari..." style={{ width:180 }} />
+          <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Note Baru</button>
+        </div>
       </div>
 
-      <div style={{ display:'flex', gap:5, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, flexWrap:'wrap' }}>
-        <button onClick={()=>setFilterCat('All')} style={chip(filterCat==='All')}>All</button>
-        {cats.map((c:any) => (
-          <button key={c.key} onClick={()=>setFilterCat(c.key)} style={chip(filterCat===c.key, c.color)}>{c.label}</button>
-        ))}
-      </div>
-
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom">
-        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
-         filtered.length === 0 ? (
-           <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>📝</div><div>Belum ada note</div></div>
-         ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:10 }}>
-            {filtered.map(n => (
-              <div key={n._id} className="card" onClick={()=>setEditing(n)} style={{ padding:14, cursor:'pointer', borderLeft:`3px solid ${catColor(n.category)}` }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:6, gap:6 }}>
-                  <div style={{ fontSize:13, fontWeight:600, flex:1 }}>{n.title}</div>
-                  <span className="badge" style={{ background:catColor(n.category)+'22', color:catColor(n.category), fontSize:9 }}>{n.category}</span>
+      <div style={{ flex:1, overflow:'auto', padding:'14px 20px' }} className="safe-bottom">
+        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> : (
+          <div style={{ display:'flex', gap:12, alignItems:'flex-start', minHeight:'100%' }}>
+            {columns.map(col => (
+              <div key={col.key} style={{ flex:'0 0 280px', display:'flex', flexDirection:'column', gap:8 }}>
+                {/* Column header */}
+                <div className="card" style={{ padding:'10px 12px', borderTop:`3px solid ${col.color}`, display:'flex', justifyContent:'space-between', alignItems:'center', position:'sticky', top:0, zIndex:2 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <div style={{ width:8, height:8, borderRadius:'50%', background:col.color }} />
+                    <div style={{ fontSize:12, fontWeight:700 }}>{col.label}</div>
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--text3)', fontWeight:600, background:'var(--bg3)', padding:'2px 8px', borderRadius:10 }}>{col.items.length}</div>
                 </div>
-                <div style={{ fontSize:11, color:'var(--text2)', whiteSpace:'pre-wrap', lineHeight:1.5, marginBottom:8 }}>{(n.content||'').substring(0,150)}{n.content?.length>150?'...':''}</div>
-                <div style={{ display:'flex', gap:8, fontSize:10, color:'var(--text3)' }}>
-                  <span>📅 {n.date}</span>
-                  {n.picTags?.length > 0 && <span>👤 {n.picTags.length}</span>}
+                {/* Cards */}
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {col.items.length === 0 ? (
+                    <div style={{ padding:'18px 10px', textAlign:'center', color:'var(--text3)', fontSize:10, border:'1px dashed var(--border)', borderRadius:7, background:'var(--bg)' }}>Belum ada note</div>
+                  ) : col.items.map(n => (
+                    <div key={n._id} className="card glass-hover" onClick={()=>setEditing(n)} style={{ padding:11, cursor:'pointer' }}>
+                      <div style={{ fontSize:12, fontWeight:600, marginBottom:5, lineHeight:1.3 }}>{n.title}</div>
+                      {n.content && <div style={{ fontSize:10, color:'var(--text2)', lineHeight:1.5, marginBottom:7, whiteSpace:'pre-wrap', maxHeight:60, overflow:'hidden', textOverflow:'ellipsis' }}>{n.content.substring(0,120)}{n.content.length>120?'...':''}</div>}
+                      {/* PIC tags */}
+                      {n.picTags?.length > 0 && (
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:5 }}>
+                          {n.picTags.slice(0,3).map((p:string) => (
+                            <div key={p} style={{ width:20, height:20, borderRadius:'50%', background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color:'#fff' }} title={p}>{p[0]}</div>
+                          ))}
+                          {n.picTags.length > 3 && <div style={{ width:20, height:20, borderRadius:'50%', background:'var(--bg3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, color:'var(--text3)' }}>+{n.picTags.length-3}</div>}
+                        </div>
+                      )}
+                      {/* Cross-category tags */}
+                      {n.categoryTags?.length > 0 && (
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:5 }}>
+                          {n.categoryTags.filter((k:string)=>k!==n.category).slice(0,3).map((k:string) => (
+                            <span key={k} className="badge" style={{ fontSize:8, background:catColor(k)+'22', color:catColor(k) }}>{catLabel(k)}</span>
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ fontSize:9, color:'var(--text3)', display:'flex', justifyContent:'space-between' }}>
+                        <span>📅 {n.date}</span>
+                        {n.authorName && <span>· {n.authorName.split(' ')[0]}</span>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
+                {/* Quick add at bottom of column */}
+                <button onClick={()=>setShowForm(true)} className="btn btn-sm" style={{ width:'100%', justifyContent:'center', borderStyle:'dashed', fontSize:11, color:'var(--text3)' }}>+ Tambah ke {col.label}</button>
               </div>
             ))}
+            {columns.length === 0 && <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>Belum ada kategori. Tambah di Config → Kategori.</div>}
           </div>
-         )}
+        )}
       </div>
     </div>
   )
 }
-function chip(active:boolean, color:string='var(--brand)'):React.CSSProperties { return { padding:'4px 11px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${active?color:'var(--border)'}`, background:active?color+'1a':'var(--bg3)', color:active?color:'var(--text2)' } }
 const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }

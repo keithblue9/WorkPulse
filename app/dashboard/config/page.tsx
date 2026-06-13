@@ -266,6 +266,57 @@ function FonnteSettings({ config, onSave }: { config:any; onSave:(patch:any)=>vo
 }
 
 
+
+function WidgetGroupsEditor({ widgets, onChange }: { widgets:any[]; onChange:(w:any[])=>void }) {
+  // Group widgets by segment with dashboard-tab semantic mapping
+  const GROUPS: { key:string; label:string; icon:string }[] = [
+    { key:'stats', label:'Tab General — Stat Cards', icon:'📊' },
+    { key:'ai',    label:'Tab General — AI Insights', icon:'🤖' },
+    { key:'main',  label:'Tab General — Main Widgets', icon:'📈' },
+  ]
+  function toggleAll(segment:string, active:boolean) {
+    onChange(widgets.map(w => w.segment === segment ? { ...w, active } : w))
+  }
+  function toggleOne(key:string, active:boolean) {
+    onChange(widgets.map(w => w.key === key ? { ...w, active } : w))
+  }
+  return (
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(360px, 1fr))', gap:14 }}>
+      {GROUPS.map(g => {
+        const items = widgets.filter(w => w.segment === g.key)
+        const allOn = items.length > 0 && items.every(w => w.active !== false)
+        return (
+          <div key={g.key} className="card" style={{ padding:14 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+              <div style={{ fontSize:13, fontWeight:700, display:'flex', alignItems:'center', gap:6 }}>
+                <span>{g.icon}</span><span>{g.label}</span>
+              </div>
+              <button onClick={()=>toggleAll(g.key, !allOn)} className="btn btn-sm" style={{ background: allOn ? 'var(--brand-soft)' : 'var(--bg3)', color: allOn ? 'var(--brand)' : 'var(--text2)' }}>
+                {allOn ? 'Sembunyikan Semua' : 'Tampilkan Semua'}
+              </button>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
+              {items.length === 0 ? (
+                <div style={{ padding:10, color:'var(--text3)', fontSize:11, textAlign:'center' }}>Tidak ada widget di group ini</div>
+              ) : items.map(w => (
+                <label key={w.key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'9px 10px', borderRadius:6, cursor:'pointer', borderBottom:'1px solid var(--border)' }}
+                  onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='var(--bg3)'}
+                  onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:12, fontWeight:500, color:'var(--text)' }}>{w.label}</div>
+                    <div style={{ fontSize:10, color:'var(--text3)' }}>key: <code style={{ fontSize:9 }}>{w.key}</code></div>
+                  </div>
+                  <input type="checkbox" checked={w.active !== false} onChange={e=>toggleOne(w.key, e.target.checked)} style={{ width:18, height:18, cursor:'pointer', accentColor:'var(--brand)' }} />
+                </label>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function ConfigPage() {
   const { data:session } = useSession(); const user = session?.user as any
   const [config, setConfig] = useState<any>(null)
@@ -497,6 +548,35 @@ export default function ConfigPage() {
           </Section>
         )}
 
+        {tab === 'roles' && (
+          <Section title="🔐 Roles & Permissions" sub="Atur role dan menu apa saja yang bisa diakses per role" action={
+            <button className="btn btn-sm btn-primary" onClick={()=>save({ roleDefs: (config.roleDefs && config.roleDefs.length) ? config.roleDefs : DEFAULT_ROLES })}>💾 Simpan Roles</button>
+          }>
+            <RolesEditor roles={(config.roleDefs && config.roleDefs.length) ? config.roleDefs : DEFAULT_ROLES} onChange={(v:any)=>setConfig((c:any)=>({...c, roleDefs:v}))} />
+          </Section>
+        )}
+        {tab === 'widgets' && (
+          <Section title="📊 Widget Dashboard" sub="Tampilkan/sembunyikan komponen dashboard per tab. Cocok untuk fokus ke metrik yang penting saja." action={
+            <button className="btn btn-sm btn-primary" onClick={()=>save({ dashboardWidgets: (config.dashboardWidgets && config.dashboardWidgets.length) ? config.dashboardWidgets : DEFAULT_WIDGETS, linkCategories: (config.linkCategories && config.linkCategories.length) ? config.linkCategories : DEFAULT_LINK_CATEGORIES })}>💾 Simpan</button>
+          }>
+            <WidgetGroupsEditor widgets={(config.dashboardWidgets && config.dashboardWidgets.length) ? config.dashboardWidgets : DEFAULT_WIDGETS} onChange={(v:any)=>setConfig((c:any)=>({...c, dashboardWidgets:v}))} />
+            <div style={{ marginTop:18, paddingTop:18, borderTop:'1px solid var(--border)' }}>
+              <div style={{ fontSize:13, fontWeight:600, marginBottom:6 }}>🔗 Kategori Link Hub</div>
+              <div style={{ fontSize:11, color:'var(--text3)', marginBottom:10 }}>Kategori link yang dipakai di menu Link Hub</div>
+              <TaxonomyEditor items={(config.linkCategories && config.linkCategories.length) ? config.linkCategories : DEFAULT_LINK_CATEGORIES} onChange={(v:any)=>setConfig((c:any)=>({...c, linkCategories:v}))} label="Link Categories" />
+            </div>
+          </Section>
+        )}
+        {tab === 'fonnte' && (
+          <Section title="💬 WhatsApp / Fonnte Integration" sub="Konfigurasi notifikasi WhatsApp otomatis via fonnte.com">
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <div className="card" style={{ padding:12, background:'var(--bg3)', fontSize:11, color:'var(--text3)', lineHeight:1.6 }}>
+                <b style={{ color:'var(--text)' }}>How it works:</b> Set role <code>cashier</code> ke salah satu user di menu Member. Edit member tsb, masukkan Token Fonnte (dari fonnte.com → Device → Token) dan no HP. Lalu pilih user-nya di dropdown di bawah.
+              </div>
+              <FonnteSettings config={{...config, fonnte: { ...DEFAULT_FONNTE, ...(config.fonnte||{}) }}} onSave={(patch:any)=>save({ fonnte: { ...DEFAULT_FONNTE, ...(config.fonnte||{}), ...patch } })} />
+            </div>
+          </Section>
+        )}
         {tab === 'reset' && <ResetSection />}
 
         {tab === 'system' && (
