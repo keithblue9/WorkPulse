@@ -31,6 +31,50 @@ function ProgressRing({ plan, actual, size=120 }: { plan:number; actual:number; 
   )
 }
 
+// Read-only Gantt timeline (12 month × 4 week) for a list of phases
+function MiniGantt({ phases }: { phases:any[] }) {
+  const MS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
+  function seg(cells:string[]) { return (cells||[]).map((c:string)=>{ const [m,w]=c.split('-').map(Number); return {m,w} }) }
+  return (
+    <div style={{ overflowX:'auto', marginTop:10 }}>
+      <div style={{ minWidth:760 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'100px repeat(12, 1fr)', fontSize:8, color:'var(--text3)', fontWeight:600 }}>
+          <div />
+          {MS.map(m => <div key={m} style={{ textAlign:'center', borderLeft:'1px solid var(--border)', padding:'3px 0' }}>{m}</div>)}
+        </div>
+        {phases.map((ph:any, idx:number) => {
+          const ps = seg(ph.planCells), as = seg(ph.actualCells)
+          return (
+            <div key={idx} style={{ display:'grid', gridTemplateColumns:'100px repeat(12, 1fr)', alignItems:'center', borderTop:'1px solid var(--border)', minHeight:30 }}>
+              <div style={{ fontSize:9, fontWeight:600, padding:'2px 4px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{ph.name || `Phase ${idx+1}`}</div>
+              {Array.from({length:12}).map((_, mi) => {
+                const m = mi+1
+                return (
+                  <div key={m} style={{ height:24, borderLeft:'1px solid var(--border)', display:'flex' }}>
+                    {[1,2,3,4].map(w => {
+                      const hp = ps.some((s:any)=>s.m===m&&s.w===w), ha = as.some((s:any)=>s.m===m&&s.w===w)
+                      return (
+                        <div key={w} style={{ flex:1, display:'flex', flexDirection:'column', gap:1, padding:'2px 0.5px' }}>
+                          <div style={{ flex:1, background:hp?'var(--brand)':'transparent', opacity:0.6, borderRadius:1 }} />
+                          <div style={{ flex:1, background:ha?'var(--green)':'transparent', borderRadius:1 }} />
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+        <div style={{ display:'flex', gap:12, padding:'6px 4px', fontSize:8, color:'var(--text3)' }}>
+          <span style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ width:12, height:6, background:'var(--brand)', opacity:0.6, borderRadius:1 }} /> Plan</span>
+          <span style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ width:12, height:6, background:'var(--green)', borderRadius:1 }} /> Actual</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Week-level month/week picker for a phase
 function WeekPicker({ cells, color, onChange }: { cells:string[]; color:string; onChange:(c:string[])=>void }) {
   const [openMonth, setOpenMonth] = useState<number|null>(null)
@@ -279,6 +323,7 @@ export default function ProgressPage() {
                         ))}
                         {calc.phases.length === 0 && <div style={{ fontSize:11, color:'var(--text3)' }}>Belum ada phase</div>}
                       </div>
+                      {(i.phases||[]).length > 0 && <MiniGantt phases={i.phases} />}
                     </div>
                     {/* Right: progress ring widget */}
                     <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, minWidth:140, borderLeft:'1px solid var(--border)', paddingLeft:16 }}>

@@ -68,6 +68,59 @@ function ProgressRing({ plan, actual, size=120 }: { plan:number; actual:number; 
   )
 }
 
+function MiniGantt({ phases }: { phases:any[] }) {
+  const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
+  // collect plan/actual week cells per phase. Cell key "M-W" (month 1-12, week 1-4)
+  function cellsToSegments(cells:string[]) {
+    // returns array of {month, week} for rendering
+    return (cells||[]).map((c:string) => { const [m,w] = c.split('-').map(Number); return { m, w } })
+  }
+  return (
+    <div style={{ overflowX:'auto', marginTop:8, marginBottom:4 }}>
+      <div style={{ minWidth:720 }}>
+        {/* Month header */}
+        <div style={{ display:'grid', gridTemplateColumns:'90px repeat(12, 1fr)', gap:0, fontSize:8, color:'var(--text3)', fontWeight:600 }}>
+          <div />
+          {MONTHS.map(m => <div key={m} style={{ textAlign:'center', borderLeft:'1px solid var(--border)', padding:'3px 0' }}>{m}</div>)}
+        </div>
+        {/* Phase rows */}
+        {phases.map((ph:any, idx:number) => {
+          const planSeg = cellsToSegments(ph.planCells)
+          const actualSeg = cellsToSegments(ph.actualCells)
+          return (
+            <div key={idx} style={{ display:'grid', gridTemplateColumns:'90px repeat(12, 1fr)', gap:0, alignItems:'center', borderTop:'1px solid var(--border)', minHeight:30 }}>
+              <div style={{ fontSize:9, fontWeight:600, padding:'2px 4px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{ph.name || `Phase ${idx+1}`}</div>
+              {/* 12 month columns, each split into 4 weeks */}
+              {Array.from({length:12}).map((_, mi) => {
+                const m = mi+1
+                return (
+                  <div key={m} style={{ position:'relative', height:24, borderLeft:'1px solid var(--border)', display:'flex' }}>
+                    {[1,2,3,4].map(w => {
+                      const hasPlan = planSeg.some((s:any)=>s.m===m && s.w===w)
+                      const hasActual = actualSeg.some((s:any)=>s.m===m && s.w===w)
+                      return (
+                        <div key={w} style={{ flex:1, display:'flex', flexDirection:'column', gap:1, padding:'2px 0.5px' }}>
+                          <div style={{ flex:1, background: hasPlan?'var(--brand)':'transparent', opacity:0.6, borderRadius:1 }} />
+                          <div style={{ flex:1, background: hasActual?'var(--green)':'transparent', borderRadius:1 }} />
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+        <div style={{ display:'flex', gap:12, padding:'6px 4px', fontSize:8, color:'var(--text3)' }}>
+          <span style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ width:12, height:6, background:'var(--brand)', opacity:0.6, borderRadius:1 }} /> Plan</span>
+          <span style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ width:12, height:6, background:'var(--green)', borderRadius:1 }} /> Actual</span>
+          <span style={{ marginLeft:'auto' }}>tiap bulan dibagi 4 minggu</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const { data:session } = useSession(); const user = session?.user as any
   const [tab, setTab] = useState<'general'|'progress'|'issues'>('general')
@@ -316,6 +369,7 @@ export default function DashboardPage() {
                                   </div>
                                 ))}
                               </div>
+                              <MiniGantt phases={i.phases || []} />
                             </div>
                             <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minWidth:140, borderLeft:'1px solid var(--border)', paddingLeft:16 }}>
                               <ProgressRing plan={calc.planProgress} actual={calc.actualProgress} size={130} />
