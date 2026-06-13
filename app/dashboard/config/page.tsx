@@ -346,10 +346,15 @@ export default function ConfigPage() {
   }
 
   const userRoles = (user?.roles && user.roles.length) ? user.roles : (user?.role ? [user.role] : [])
-  if (!userRoles.includes('admin')) return (
-    <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:8, color:'var(--text3)' }}>
+  const isAdmin = userRoles.includes('admin') || user?.role === 'admin'
+  if (user && !isAdmin) return (
+    <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:10, color:'var(--text3)', padding:20, textAlign:'center' }}>
       <div style={{ fontSize:32 }}>🔒</div>
       <div>Hanya admin yang bisa akses Konfigurasi</div>
+      <div style={{ fontSize:11, maxWidth:360, lineHeight:1.6 }}>
+        Kalau kamu sudah di-set role <b>admin</b> di menu Member tapi masih muncul pesan ini, coba <b>logout lalu login ulang</b> — sesi login lama belum memuat role baru.
+      </div>
+      <button onClick={()=>{ import('next-auth/react').then(m=>m.signOut({ callbackUrl:'/login' })) }} className="btn btn-primary btn-sm">Logout sekarang</button>
     </div>
   )
 

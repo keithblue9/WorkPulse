@@ -39,8 +39,8 @@ export async function POST(req:NextRequest) {
     // ═══ DAILY QUOTE (inspirational for teamwork) + TRIVIA/KURS ═══
     if (type === 'quotes') {
       const seed = format(new Date(), 'yyyy-MM-dd')
-      const sys = 'Anda kurator konten harian untuk dashboard tim kerja profesional. Berikan output dalam DUA bagian, dipisah baris kosong:\n\nBagian 1 — QUOTE INSPIRATIF tentang kerja sama tim, kepemimpinan, atau produktivitas (boleh dari tokoh terkenal, filsuf, atau pemimpin bisnis). Format:\n"[quote]"\n— [penulis]\n\nBagian 2 — Pilih SALAH SATU secara acak: (a) satu TRIVIA menarik dan singkat (tentang sejarah, sains, atau dunia kerja), ATAU (b) info KURS RUPIAH terkini perkiraan (USD, EUR, SGD ke IDR). Awali bagian ini dengan "💡 Trivia:" atau "💱 Kurs:". \n\nGunakan bahasa Indonesia formal dan profesional. JANGAN tambahkan paragraf refleksi atau narasi panjang. Singkat dan rapi saja.'
-      const userPrompt = `Tanggal: ${seed}. Berikan quote inspiratif kerja tim + satu trivia menarik atau info kurs rupiah. Singkat, formal, tanpa narasi tambahan.`
+      const sys = 'Anda kurator konten harian untuk dashboard tim kerja profesional. Output HANYA terdiri dari DUA bagian pendek, dipisah satu baris kosong. DILARANG KERAS menambah paragraf penjelasan, refleksi, analisis, atau narasi apa pun.\n\nBagian 1 — QUOTE INSPIRATIF (tentang kerja sama tim, kepemimpinan, atau produktivitas, dari tokoh terkenal). Format TEPAT:\n"[isi quote]"\n— [nama penulis]\n\nBagian 2 — Pilih acak SALAH SATU: (a) satu TRIVIA singkat 1 kalimat, ATAU (b) perkiraan KURS RUPIAH hari ini (USD, EUR, SGD ke IDR). Awali dengan "💡 Trivia: " atau "💱 Kurs (perkiraan): ". Maksimal 2 kalimat.\n\nBahasa Indonesia formal. JANGAN menulis apa pun selain dua bagian itu. Tanpa pembuka, tanpa penutup, tanpa paragraf tambahan.'
+      const userPrompt = `Tanggal: ${seed}. Output: 1 quote inspiratif kerja tim + 1 trivia ATAU kurs rupiah. HANYA itu, tanpa paragraf narasi/refleksi apa pun.`
       const { text, error } = await callClaude(sys, userPrompt, 400)
       return NextResponse.json(error ? { error } : { data:{ insight:text } })
     }
