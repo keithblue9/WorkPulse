@@ -53,7 +53,6 @@ function NoteForm({ editing, onClose, onSave, config, members }: { editing?:any;
   }
 
   function togglePic(name:string) { setForm(f=>({...f, picTags: f.picTags.includes(name) ? f.picTags.filter((p:string)=>p!==name) : [...f.picTags, name] })) }
-  function toggleCat(key:string) { setForm(f=>({...f, categoryTags: f.categoryTags.includes(key) ? f.categoryTags.filter((c:string)=>c!==key) : [...f.categoryTags, key] })) }
 
   async function save() {
     if (!form.title) { toast.error('Title wajib'); return }
@@ -119,15 +118,7 @@ function NoteForm({ editing, onClose, onSave, config, members }: { editing?:any;
               ))}
             </div>
           </div>
-          <div>
-            <label style={lbl}>Kategori Activities terkait (klik untuk tag)</label>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-              {cats.map((c:any) => (
-                <button key={c.key} onClick={()=>toggleCat(c.key)} className="btn btn-sm" style={{ background:form.categoryTags.includes(c.key)?c.color:'var(--bg3)', color:form.categoryTags.includes(c.key)?'#fff':'var(--text2)', borderColor:form.categoryTags.includes(c.key)?c.color:'var(--border2)', fontSize:11 }}>{c.label}</button>
-              ))}
-            </div>
-          </div>
-          <div><label style={lbl}>Tags (comma)</label><input className="input" value={form.tags} onChange={e=>set('tags',e.target.value)} /></div>
+
         </div>
         <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
           {editing ? <button onClick={del} className="btn btn-danger btn-sm">🗑 Hapus</button> : <div/>}

@@ -345,7 +345,8 @@ export default function ConfigPage() {
     reader.readAsDataURL(file)
   }
 
-  if (user?.role !== 'admin') return (
+  const userRoles = (user?.roles && user.roles.length) ? user.roles : (user?.role ? [user.role] : [])
+  if (!userRoles.includes('admin')) return (
     <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:8, color:'var(--text3)' }}>
       <div style={{ fontSize:32 }}>🔒</div>
       <div>Hanya admin yang bisa akses Konfigurasi</div>

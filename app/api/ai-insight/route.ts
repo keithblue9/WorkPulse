@@ -36,11 +36,11 @@ export async function POST(req:NextRequest) {
       return NextResponse.json(error ? { error } : { data:{ insight:text } })
     }
 
-    // ═══ DAILY QUOTE ═══
+    // ═══ DAILY QUOTE (inspirational for teamwork) + TRIVIA/KURS ═══
     if (type === 'quotes') {
       const seed = format(new Date(), 'yyyy-MM-dd')
-      const sys = 'Kamu kurator quote inspiratif. Pilih SATU quote menarik (boleh Shakespeare, filsuf Yunani, tokoh modern, atau trivia menarik tentang business/productivity/work culture). Berikan dalam format:\n\n"[quote dalam bahasa asli atau English]"\n— [penulis/sumber]\n\n[2-3 kalimat refleksi singkat dalam bahasa Indonesia, gimana relate ke kerja team procurement]'
-      const userPrompt = `Date seed: ${seed}. Berikan satu inspirational quote atau trivia menarik hari ini.`
+      const sys = 'Anda kurator konten harian untuk dashboard tim kerja profesional. Berikan output dalam DUA bagian, dipisah baris kosong:\n\nBagian 1 — QUOTE INSPIRATIF tentang kerja sama tim, kepemimpinan, atau produktivitas (boleh dari tokoh terkenal, filsuf, atau pemimpin bisnis). Format:\n"[quote]"\n— [penulis]\n\nBagian 2 — Pilih SALAH SATU secara acak: (a) satu TRIVIA menarik dan singkat (tentang sejarah, sains, atau dunia kerja), ATAU (b) info KURS RUPIAH terkini perkiraan (USD, EUR, SGD ke IDR). Awali bagian ini dengan "💡 Trivia:" atau "💱 Kurs:". \n\nGunakan bahasa Indonesia formal dan profesional. JANGAN tambahkan paragraf refleksi atau narasi panjang. Singkat dan rapi saja.'
+      const userPrompt = `Tanggal: ${seed}. Berikan quote inspiratif kerja tim + satu trivia menarik atau info kurs rupiah. Singkat, formal, tanpa narasi tambahan.`
       const { text, error } = await callClaude(sys, userPrompt, 400)
       return NextResponse.json(error ? { error } : { data:{ insight:text } })
     }
@@ -60,8 +60,8 @@ export async function POST(req:NextRequest) {
         initiatives: inits.map((i:any)=>({ code:i.code, title:i.title, plan:i.planProgress, actual:i.actualProgress, status:i.status })),
       }
       const topAtRisk = issues.filter((i:any)=>i.status==='at_risk'||i.status==='delayed').slice(0,5).map((i:any)=>({title:i.title, pic:i.picName, status:i.status, priority:i.priority}))
-      const sys = 'Kamu konsultan procurement yang ngasih ACTION-oriented insight, bukan narasi umum. WAJIB: kasih 3-5 bullet action point konkret yang harus dilakukan team minggu ini. Setiap bullet harus actionable (start dengan verb: "Follow up...", "Schedule...", "Review...", "Eskalasi..."). Tone direktif tapi enak. Bahasa Indonesia casual. Format dengan emoji bullet 🎯 di tiap point. Max 5 bullet, masing-masing 1-2 kalimat.'
-      const userPrompt = `Data dashboard tim BPD Procurement:\n${JSON.stringify(stats, null, 2)}\n\nTop at-risk/delayed:\n${JSON.stringify(topAtRisk, null, 2)}\n\nKasih saran ACTION konkret apa yang harus team kerjain minggu ini berdasarkan data di atas. Bukan narasi general, tapi to-do list konkret.`
+      const sys = 'Anda konsultan strategis untuk tim procurement yang memberikan insight tingkat STRATEGIS (bukan teknis detail). Insight ini dibaca oleh manajer, jadi fokus pada arahan strategis, prioritas, dan risiko bisnis. WAJIB: berikan 3-5 poin strategis konkret untuk fokus tim minggu ini. Setiap poin diawali kata kerja strategis ("Prioritaskan...", "Mitigasi risiko...", "Tinjau...", "Eskalasi...", "Selaraskan..."). Gunakan bahasa Indonesia FORMAL dan profesional — TANPA bahasa gaul, TANPA kata gue/lo. Format dengan emoji 🎯 di setiap poin. Maksimal 5 poin, masing-masing 1-2 kalimat.'
+      const userPrompt = `Data dashboard tim BPD Procurement:\n${JSON.stringify(stats, null, 2)}\n\nTop at-risk/delayed:\n${JSON.stringify(topAtRisk, null, 2)}\n\nBerikan arahan STRATEGIS (bukan teknis) untuk fokus tim minggu ini berdasarkan data. Bahasa Indonesia formal, untuk dibaca manajer.`
       const { text, error } = await callClaude(sys, userPrompt, 700)
       return NextResponse.json(error ? { error } : { data:{ insight:text } })
     }
@@ -83,8 +83,8 @@ export async function POST(req:NextRequest) {
         upcomingActions: userActivities.filter((a:any)=>a.actionDate && new Date(a.actionDate)>=new Date()).slice(0,5).map((a:any)=>({title:a.title, date:a.actionDate, priority:a.priority, status:a.status, nextPlan:a.nextPlan})),
         recentActivitiesNarrative: userActivities.slice(0,5).map((a:any)=>({title:a.title, progress:a.progressNotes, nextPlan:a.nextPlan})),
       }
-      const sys = `Kamu personal productivity coach untuk ${userName} (procurement team). WAJIB: SUGGEST 3-4 NEXT ACTION konkret khusus untuk ${userName}, berdasarkan activities dan issues mereka sendiri. JANGAN narasi umum. Setiap suggestion harus:\n- Start dengan verb action ("Selesaikan...", "Follow up...", "Jadwalkan...", "Update progress...")\n- Refer ke aktivitas/issue spesifik mereka\n- Berikan urgency indicator (🔥 urgent / ⚡ priority / 📋 normal)\nBahasa Indonesia casual. Max 4 bullet.`
-      const userPrompt = `Data ${userName}:\n${JSON.stringify(summary, null, 2)}\n\nKasih saya 3-4 NEXT ACTION konkret yang harus saya lakukan, urut by prioritas. Bukan motivational speech, tapi to-do list specific.`
+      const sys = `Anda asisten produktivitas profesional untuk ${userName} (tim procurement). Berikan 3-4 rekomendasi tindakan (next action) konkret khusus untuk ${userName} berdasarkan aktivitas dan issue mereka. Setiap rekomendasi harus:\n- Diawali kata kerja ("Selesaikan...", "Tindak lanjuti...", "Jadwalkan...", "Perbarui...")\n- Merujuk ke aktivitas/issue spesifik mereka\n- Diberi indikator urgensi (🔥 mendesak / ⚡ prioritas / 📋 normal)\nGunakan bahasa Indonesia FORMAL dan profesional — TANPA kata gue/lo atau bahasa gaul. Maksimal 4 poin.`
+      const userPrompt = `Data ${userName}:\n${JSON.stringify(summary, null, 2)}\n\nBerikan 3-4 rekomendasi tindakan konkret berdasarkan prioritas. Bahasa Indonesia formal dan profesional.`
       const { text, error } = await callClaude(sys, userPrompt, 600)
       return NextResponse.json(error ? { error } : { data:{ insight:text } })
     }
