@@ -4,6 +4,7 @@ const NotesSchema = new Schema({
   category: { type:String, default:'Others' }, // from activityCategories (iVendor, iPRO, ...)
   date: String,
   content: String,         // free narasi
+  images: { type:[String], default:[] }, // pasted images (base64 data urls)
   attendees: [String],
   picTags: [String],       // tag PIC
   categoryTags: [String],  // tag activity categories

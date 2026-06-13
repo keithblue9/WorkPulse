@@ -86,8 +86,6 @@ function BiodataDetail({ user, isMine, onUpdate }: { user:any; isMine:boolean; o
           <FieldRow label="Tanggal Lahir" value={form.birthDate} onChange={v=>set('birthDate',v)} type="date" editing={editing} />
           <FieldRow label="Alamat Jakarta" value={form.alamatJakarta} onChange={v=>set('alamatJakarta',v)} editing={editing} />
           <FieldRow label="Alamat Asal" value={form.alamatAsal} onChange={v=>set('alamatAsal',v)} editing={editing} />
-          <FieldRow label="Email Kantor" value={form.emailKantor || form.email} onChange={v=>set('emailKantor',v)} editing={editing} />
-          <FieldRow label="Email Pribadi" value={form.emailPribadi} onChange={v=>set('emailPribadi',v)} editing={editing} />
           <FieldRow label="No HP" value={form.phone} onChange={v=>set('phone',v)} editing={editing} />
           <FieldRow label="No HP (Link Aja)" value={form.phoneLinkAja} onChange={v=>set('phoneLinkAja',v)} editing={editing} />
         </div>

@@ -129,6 +129,22 @@ export default function MembersPage() {
   }
   useEffect(() => { load() }, [])
 
+  async function moveMember(idx:number, dir:number) {
+    const newIdx = idx + dir
+    if (newIdx < 0 || newIdx >= users.length) return
+    const reordered = [...users]
+    const [moved] = reordered.splice(idx, 1)
+    reordered.splice(newIdx, 0, moved)
+    setUsers(reordered)
+    // Persist new order via sortOrder field
+    try {
+      await Promise.all(reordered.map((u, i) =>
+        fetch(`/api/users/${u._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ sortOrder: i }) })
+      ))
+      toast.success('Urutan disimpan')
+    } catch { toast.error('Gagal simpan urutan') }
+  }
+
   const allRoles = (config?.roleDefs && config.roleDefs.length > 0) ? config.roleDefs : DEFAULT_ROLES
   const filtered = users.filter(u => !search || u.name?.toLowerCase().includes(search.toLowerCase()))
 
@@ -151,13 +167,15 @@ export default function MembersPage() {
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> : (
           <div className="card" style={{ overflow:'auto' }}>
             <table className="wp-table">
-              <thead><tr><th>Nama</th><th>Divisi</th><th>Roles</th><th>No HP</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th style={{width:40}}>#</th><th>Nama</th><th>Roles</th><th>No. HP</th><th>Status</th><th style={{width:120}}>Urutan</th><th></th></tr></thead>
               <tbody>
-                {filtered.map(u => {
+                {filtered.map((u, idx) => {
                   const roles = u.roles && u.roles.length ? u.roles : (u.role ? [u.role] : [])
+                  const canReorder = !search
                   return (
-                    <tr key={u._id} onClick={()=>setEditing(u)} style={{ cursor:'pointer' }}>
-                      <td>
+                    <tr key={u._id} style={{ cursor:'pointer' }}>
+                      <td style={{ fontSize:11, color:'var(--text3)', textAlign:'center' }} onClick={()=>setEditing(u)}>{idx+1}</td>
+                      <td onClick={()=>setEditing(u)}>
                         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                           <div style={{ width:30, height:30, borderRadius:'50%', background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff' }}>{u.name?.[0]}</div>
                           <div>
@@ -166,17 +184,22 @@ export default function MembersPage() {
                           </div>
                         </div>
                       </td>
-                      <td style={{ fontSize:11 }}>{u.division||'—'}</td>
-                      <td>
+                      <td onClick={()=>setEditing(u)}>
                         <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
                           {roles.map((r:string) => (
                             <span key={r} className="badge" style={{ background:(ROLE_COLORS[r]||'var(--brand)')+'22', color:ROLE_COLORS[r]||'var(--brand)', fontSize:9 }}>{r}</span>
                           ))}
                         </div>
                       </td>
-                      <td style={{ fontSize:11 }}>{u.phone||'—'}</td>
-                      <td><span className="badge" style={{ background: u.active!==false?'var(--greenbg)':'var(--redbg)', color: u.active!==false?'var(--green)':'var(--red)', fontSize:9 }}>{u.active!==false?'Active':'Inactive'}</span></td>
-                      <td><button className="btn btn-icon btn-sm">✏️</button></td>
+                      <td style={{ fontSize:11 }} onClick={()=>setEditing(u)}>{u.phone||'—'}</td>
+                      <td onClick={()=>setEditing(u)}><span className="badge" style={{ background: u.active!==false?'var(--greenbg)':'var(--redbg)', color: u.active!==false?'var(--green)':'var(--red)', fontSize:9 }}>{u.active!==false?'Active':'Inactive'}</span></td>
+                      <td>
+                        <div style={{ display:'flex', gap:3 }}>
+                          <button onClick={(e)=>{e.stopPropagation(); moveMember(idx, -1)}} disabled={!canReorder || idx===0} className="btn btn-icon btn-sm" title="Naik" style={{ opacity:(!canReorder||idx===0)?0.3:1 }}>▲</button>
+                          <button onClick={(e)=>{e.stopPropagation(); moveMember(idx, 1)}} disabled={!canReorder || idx===filtered.length-1} className="btn btn-icon btn-sm" title="Turun" style={{ opacity:(!canReorder||idx===filtered.length-1)?0.3:1 }}>▼</button>
+                        </div>
+                      </td>
+                      <td onClick={()=>setEditing(u)}><button className="btn btn-icon btn-sm">✏️</button></td>
                     </tr>
                   )
                 })}

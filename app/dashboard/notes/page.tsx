@@ -1,6 +1,6 @@
 'use client'
 import { getConfig } from '@/lib/configCache'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
@@ -14,10 +14,43 @@ function NoteForm({ editing, onClose, onSave, config, members }: { editing?:any;
     content: editing?.content || '',
     picTags: editing?.picTags || [],
     categoryTags: editing?.categoryTags || [],
+    images: editing?.images || [],
     tags: editing?.tags?.join(',') || '',
   })
   const [saving, setSaving] = useState(false)
   const set = (k:string,v:any) => setForm(f=>({...f,[k]:v}))
+  const contentRef = useRef<HTMLTextAreaElement>(null)
+
+  async function handlePaste(e:React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault()
+        const blob = item.getAsFile()
+        if (!blob) continue
+        if (blob.size > 3 * 1024 * 1024) { toast.error('Gambar max 3MB'); continue }
+        const reader = new FileReader()
+        reader.onload = (ev) => {
+          const dataUrl = ev.target?.result as string
+          setForm(f => ({ ...f, images: [...f.images, dataUrl] }))
+          toast.success('Gambar ditempel')
+        }
+        reader.readAsDataURL(blob)
+      }
+    }
+  }
+
+  function insertBullet(prefix:string) {
+    const ta = contentRef.current
+    if (!ta) return
+    const start = ta.selectionStart
+    const text = form.content || ''
+    const lineStart = text.lastIndexOf('\n', start - 1) + 1
+    const newText = text.slice(0, lineStart) + prefix + ' ' + text.slice(lineStart)
+    set('content', newText)
+    setTimeout(()=>{ ta.focus(); ta.setSelectionRange(lineStart + prefix.length + 1, lineStart + prefix.length + 1) }, 0)
+  }
 
   function togglePic(name:string) { setForm(f=>({...f, picTags: f.picTags.includes(name) ? f.picTags.filter((p:string)=>p!==name) : [...f.picTags, name] })) }
   function toggleCat(key:string) { setForm(f=>({...f, categoryTags: f.categoryTags.includes(key) ? f.categoryTags.filter((c:string)=>c!==key) : [...f.categoryTags, key] })) }
@@ -60,8 +93,24 @@ function NoteForm({ editing, onClose, onSave, config, members }: { editing?:any;
             <select className="input" value={form.category} onChange={e=>set('category',e.target.value)}>
               {cats.map((c:any)=><option key={c.key} value={c.key}>{c.label}</option>)}
             </select></div>
-          <div><label style={lbl}>Konten / Catatan</label>
-            <textarea className="input" rows={6} value={form.content} onChange={e=>set('content',e.target.value)} placeholder="Isi catatan, point-point, narasi..." /></div>
+          <div>
+            <label style={lbl}>Konten / Catatan <span style={{ color:'var(--text3)', fontWeight:400 }}>(bisa paste gambar: Ctrl/Cmd+V)</span></label>
+            <div style={{ display:'flex', gap:4, marginBottom:4 }}>
+              <button type="button" onClick={()=>insertBullet('•')} className="btn btn-sm btn-icon" title="Bullet">•</button>
+              <button type="button" onClick={()=>insertBullet('1.')} className="btn btn-sm btn-icon" title="Number" style={{ fontSize:11 }}>1.</button>
+            </div>
+            <textarea ref={contentRef} className="input" rows={6} value={form.content} onChange={e=>set('content',e.target.value)} onPaste={handlePaste} placeholder="Isi catatan. Paste gambar langsung dari clipboard (Ctrl+V / Cmd+V)..." />
+            {form.images.length > 0 && (
+              <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:8 }}>
+                {form.images.map((img:string, i:number) => (
+                  <div key={i} style={{ position:'relative' }}>
+                    <img src={img} alt={`paste-${i}`} style={{ maxWidth:120, maxHeight:120, borderRadius:6, border:'1px solid var(--border)', objectFit:'cover' }} />
+                    <button type="button" onClick={()=>set('images', form.images.filter((_:any,idx:number)=>idx!==i))} style={{ position:'absolute', top:-6, right:-6, width:20, height:20, borderRadius:'50%', background:'var(--red)', color:'#fff', border:'none', cursor:'pointer', fontSize:12, lineHeight:1 }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <div>
             <label style={lbl}>PIC (klik untuk tag)</label>
             <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
@@ -176,8 +225,8 @@ export default function NotesPage() {
                           ))}
                         </div>
                       )}
-                      <div style={{ fontSize:9, color:'var(--text3)', display:'flex', justifyContent:'space-between' }}>
-                        <span>📅 {n.date}</span>
+                      <div style={{ fontSize:9, color:'var(--text3)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <span>📅 {n.date}{n.images?.length > 0 ? ` · 🖼 ${n.images.length}` : ''}</span>
                         {n.authorName && <span>· {n.authorName.split(' ')[0]}</span>}
                       </div>
                     </div>

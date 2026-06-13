@@ -6,6 +6,7 @@ const UserSchema = new Schema({
   // role kept for back-compat. roles[] is the new multi-role field
   role: { type: String, default: 'member' },
   roles: { type: [String], default: ['member'] },
+  sortOrder: { type: Number, default: 999 },
   division: { type: String, default: '' },
   avatar: String,
   active: { type: Boolean, default: true },

@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs'
 export async function GET() {
   try {
     await connectDB()
-    const users = await UserModel.find({}, { password: 0 }).lean()
+    const users = await UserModel.find({}, { password: 0 }).sort({ sortOrder: 1, createdAt: 1 }).lean()
     return NextResponse.json({ data: users })
   } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })

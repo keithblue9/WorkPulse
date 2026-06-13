@@ -6,13 +6,7 @@ import { AppConfig, AttendanceType } from '@/types'
 import toast from 'react-hot-toast'
 import { format, getDaysInMonth, getDay, startOfMonth } from 'date-fns'
 
-const TEAM = [
-  { id:'mas-e',  name:'Mas E',  division:'BPD Proc', color:'#2563d4' },
-  { id:'rina-s', name:'Rina S', division:'SS Proc',  color:'#7c3aed' },
-  { id:'budi-h', name:'Budi H', division:'TnD',      color:'#0d9488' },
-  { id:'dewi-p', name:'Dewi P', division:'EIT',       color:'#d97706' },
-  { id:'adi-k',  name:'Adi K',  division:'PMO',       color:'#16a34a' },
-]
+const TEAM_COLORS = ['#2563d4','#7c3aed','#0d9488','#d97706','#16a34a','#dc2626','#0891b2','#7c2d12']
 
 function SlotForm({ date, attTypes, onClose, onSave }: { date:string; attTypes:AttendanceType[]; onClose:()=>void; onSave:(slot:any)=>void }) {
   const [type, setType] = useState(attTypes[0]?.key || 'wfo')
@@ -73,17 +67,23 @@ export default function AttendancePage() {
   const [records, setRecords] = useState<any[]>([])
   const [config, setConfig] = useState<AppConfig|null>(null)
   const [summary, setSummary] = useState<any>(null)
-  const [selectedUserId, setSelectedUserId] = useState('mas-e')
+  const [selectedUserId, setSelectedUserId] = useState('')
+  const [team, setTeam] = useState<any[]>([])
   const [showSlotForm, setShowSlotForm] = useState<string|null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
-      const [cfg, att, sum] = await Promise.all([
+      const [cfg, usr, sum] = await Promise.all([
         getConfig().then((data:any)=>({ data })),
-        fetch(`/api/attendance?userId=${selectedUserId}&month=${month}`).then(r=>r.json()),
+        fetch('/api/users').then(r=>r.json()),
         fetch(`/api/attendance/summary?month=${month}`).then(r=>r.json()),
       ])
+      const activeMembers = (usr.data||[]).filter((u:any)=>u.active!==false).map((u:any, idx:number)=>({ id:u._id, name:u.name, division:u.division||u.role, color: TEAM_COLORS[idx % TEAM_COLORS.length] }))
+      setTeam(activeMembers)
+      let uid = selectedUserId
+      if (!uid && activeMembers.length) { uid = activeMembers[0].id; setSelectedUserId(uid) }
+      const att = await fetch(`/api/attendance?userId=${uid}&month=${month}`).then(r=>r.json()).catch(()=>({data:[]}))
       setConfig(cfg.data); setRecords(att.data||[]); setSummary(sum.data); setLoading(false)
     }
     load()
@@ -148,7 +148,7 @@ export default function AttendancePage() {
           <div>
             {/* User selector */}
             <div style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
-              {TEAM.map(m => (
+              {team.map(m => (
                 <button key={m.id} onClick={()=>setSelectedUserId(m.id)} style={{ padding:'5px 12px', borderRadius:20, fontSize:12, fontWeight:500, cursor:'pointer', border:`1px solid ${selectedUserId===m.id?m.color:'var(--border)'}`, background:selectedUserId===m.id?m.color+'33':'var(--bg3)', color:selectedUserId===m.id?m.color:'var(--text2)' }}>
                   {m.name}
                 </button>
@@ -213,7 +213,7 @@ export default function AttendancePage() {
             {/* Selected user detail */}
             <div className="card" style={{ padding:14 }}>
               <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', marginBottom:10 }}>
-                Detail — {TEAM.find(t=>t.id===selectedUserId)?.name} · {month}
+                Detail — {team.find(t=>t.id===selectedUserId)?.name} · {month}
               </div>
               {/* Type summary */}
               {attTypes.map(t => {
@@ -234,7 +234,7 @@ export default function AttendancePage() {
             {/* Team summary */}
             <div className="card" style={{ padding:14 }}>
               <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', marginBottom:10 }}>Rekap Tim</div>
-              {TEAM.map(m => {
+              {team.map(m => {
                 const ms = summary?.summary?.find((s:any) => s.name===m.name)
                 const wfo = ms?.counts?.wfo || 0
                 const pct = Math.round((wfo/22)*100)

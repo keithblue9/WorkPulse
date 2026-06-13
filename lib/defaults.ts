@@ -57,3 +57,23 @@ export function picArray(p: any): string[] {
   if (typeof p === 'string') return p ? [p] : []
   return []
 }
+
+
+// ─── Initiative progress calculation (week-level) ───
+// planPct per phase = (phase plan weeks / total plan weeks across all phases) × 100
+// actualPct per phase = (phase actual weeks / phase plan weeks) × phase planPct
+// total planProgress = sum(planPct) ; total actualProgress = sum(actualPct)
+export function calcInitiativeProgress(phases: any[]) {
+  const planWeeksArr = phases.map(p => (p.planCells || []).length)
+  const totalPlanWeeks = planWeeksArr.reduce((a, b) => a + b, 0)
+  const result = phases.map((p, i) => {
+    const planWeeks = planWeeksArr[i]
+    const actualWeeks = (p.actualCells || []).length
+    const planPct = totalPlanWeeks > 0 ? (planWeeks / totalPlanWeeks) * 100 : 0
+    const actualPct = planWeeks > 0 ? (actualWeeks / planWeeks) * planPct : 0
+    return { ...p, planPct, actualPct, _planWeeks: planWeeks, _actualWeeks: actualWeeks }
+  })
+  const planProgress = result.reduce((a, b) => a + b.planPct, 0)
+  const actualProgress = result.reduce((a, b) => a + b.actualPct, 0)
+  return { phases: result, planProgress, actualProgress }
+}

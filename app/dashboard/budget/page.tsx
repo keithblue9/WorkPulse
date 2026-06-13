@@ -24,6 +24,16 @@ export default function BudgetPage() {
   }
   useEffect(() => { load() }, [year])
 
+  async function setThreshold(catKey:string, val:number) {
+    if (!config) return
+    const newCats = (config.budgetCategories||[]).map((c:any) => c.key===catKey ? { ...c, threshold: val } : c)
+    setConfig({ ...config, budgetCategories: newCats })
+    try {
+      await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ budgetCategories: newCats }) })
+      invalidateConfig()
+    } catch {}
+  }
+
   const visibleCats = (config?.budgetCategories || []).filter((c:any) => c.key !== 'cash_card' && c.key !== 'petty_cash')
   const currentBudget = budgets.find(b => b.category === activeCat) || {
     year, category: activeCat,
@@ -125,7 +135,13 @@ export default function BudgetPage() {
             <div className="card" style={{ padding:14, marginBottom:12 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:10 }}>
                 <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase' }}>{activeCfg?.label} — Annual Plan</div>
-                <div style={{ fontSize:10, color:'var(--text3)' }}>Threshold alert: <b>{activeCfg?.threshold || 80}%</b></div>
+                <div style={{ fontSize:10, color:'var(--text3)', display:'flex', alignItems:'center', gap:6 }}>
+                  Threshold alert:
+                  <input type="number" min={1} max={100} value={activeCfg?.threshold || 80}
+                    onChange={e=>setThreshold(activeCat, parseInt(e.target.value)||80)}
+                    style={{ width:56, padding:'3px 6px', fontSize:11, borderRadius:5, border:'1px solid var(--border2)', background:'var(--bg3)', color:'var(--text)' }} />
+                  <span>%</span>
+                </div>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
                 <div>

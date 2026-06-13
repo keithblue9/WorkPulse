@@ -57,6 +57,7 @@ const handler = NextAuth({
           name: user.name,
           email: user.email,
           role: user.role,
+          roles: (user.roles && user.roles.length) ? user.roles : (user.role ? [user.role] : ['member']),
           division: user.division,
         }
       },
@@ -64,11 +65,11 @@ const handler = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }: any) {
-      if (user) { token.role = user.role; token.division = user.division; token.id = user.id }
+      if (user) { token.role = user.role; token.roles = user.roles; token.division = user.division; token.id = user.id }
       return token
     },
     async session({ session, token }: any) {
-      if (session.user) { session.user.role = token.role; session.user.division = token.division; session.user.id = token.id }
+      if (session.user) { session.user.role = token.role; session.user.roles = token.roles; session.user.division = token.division; session.user.id = token.id }
       return session
     },
   },

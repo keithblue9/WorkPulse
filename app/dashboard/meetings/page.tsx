@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 
-function MeetingForm({ editing, categories, onClose, onSave }: { editing?:any; categories:any[]; onClose:()=>void; onSave:()=>void }) {
+function MeetingForm({ editing, categories, onClose, onSave, members, activityCats }: { editing?:any; categories:any[]; onClose:()=>void; onSave:()=>void; members:any[]; activityCats:any[] }) {
   const { data:session } = useSession(); const user = session?.user as any
   const [form, setForm] = useState({
     title:editing?.title||'',
@@ -131,15 +131,20 @@ export default function MeetingsPage() {
   const [editing, setEditing] = useState<any>(null)
   const [search, setSearch] = useState('')
   const [viewing, setViewing] = useState<any>(null)
+  const [members, setMembers] = useState<any[]>([])
+  const [activityCats, setActivityCats] = useState<any[]>([])
 
   async function load() {
     setLoading(true)
-    const [m, c] = await Promise.all([
+    const [m, c, u] = await Promise.all([
       fetch('/api/meetings').then(r=>r.json()),
       getConfig().then((data:any)=>({ data })),
+      fetch('/api/users').then(r=>r.json()),
     ])
     setMeetings(m.data||[])
     setCategories(c.data?.meetingCategories?.filter((x:any)=>x.active) || [])
+    setMembers((u.data||[]).filter((x:any)=>x.active!==false))
+    setActivityCats(c.data?.activityCategories?.filter((x:any)=>x.active) || [])
     setLoading(false)
   }
   useEffect(()=>{ load() }, [])
@@ -154,7 +159,7 @@ export default function MeetingsPage() {
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      {(showForm||editing) && <MeetingForm editing={editing} categories={categories} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} />}
+      {(showForm||editing) && <MeetingForm editing={editing} categories={categories} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} members={members} activityCats={activityCats} />}
       {viewing && (
         <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setViewing(null)}>
           <div className="modal" style={{ width:640 }}>

@@ -4,6 +4,7 @@ import { getConfig } from '@/lib/configCache'
 function normKey(s:any):string { return String(s||'').toLowerCase().replace(/[\s\-_]/g,'') }
 
 import { picArray } from '@/lib/defaults'
+import RichTextarea from '@/components/RichTextarea'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -113,8 +114,8 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
           <div><label style={lbl}>Judul Aktivitas *</label>
             <input className="input" value={form.title} onChange={e=>set('title', e.target.value)} placeholder="Title singkat..." /></div>
           <div><label style={lbl}>Aktivitas (Narasi / Point-Point Progress)</label>
-            <textarea className="input" rows={4} value={form.description} onChange={e=>set('description', e.target.value)}
-              placeholder="Isi narasi atau point-point progress aktivitas, contoh:&#10;- Sudah meeting dengan vendor X&#10;- Review draft kontrak&#10;- Approval pending dari procurement" /></div>
+            <RichTextarea rows={4} value={form.description} onChange={v=>set('description', v)}
+              placeholder="Isi narasi atau point-point progress aktivitas. Klik tombol • atau 1. untuk bullet/numbering" /></div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
             <div><label style={lbl}>Status</label>
               <select className="input" value={form.status} onChange={e=>set('status', e.target.value)}>
@@ -130,8 +131,8 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
           <div><label style={lbl}>PIC (multi tag)</label>
             <PicTagInput value={form.pic} onChange={v=>set('pic', v)} members={members} /></div>
           <div><label style={lbl}>Next Plan (Narasi / Point-Point)</label>
-            <textarea className="input" rows={3} value={form.nextPlan} onChange={e=>set('nextPlan', e.target.value)}
-              placeholder="Plan kedepannya, point-point:&#10;- Schedule call dengan tim legal&#10;- Submit dokumen final" /></div>
+            <RichTextarea rows={3} value={form.nextPlan} onChange={v=>set('nextPlan', v)}
+              placeholder="Plan kedepannya. Klik • atau 1. untuk bullet/numbering" /></div>
           <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10 }}>
             <div><label style={lbl}>Target Week</label>
               <input className="input" value={form.targetWeek} onChange={e=>set('targetWeek', e.target.value)} placeholder="W23" /></div>
@@ -186,6 +187,7 @@ export default function ActivitiesPage() {
   const [editing, setEditing] = useState<any>(null)
   const [filterCat, setFilterCat] = useState('All')
   const [filterSub, setFilterSub] = useState('')
+  const [filterPic, setFilterPic] = useState('All')
   const [search, setSearch] = useState('')
 
   // Read URL params on mount
@@ -209,6 +211,7 @@ export default function ActivitiesPage() {
     if (search && !a.title.toLowerCase().includes(search.toLowerCase())) return false
     if (filterCat !== 'All' && normKey(a.category) !== normKey(filterCat) && normKey(a.subType) !== normKey(filterCat)) return false
     if (filterSub && normKey(a.subType) !== normKey(filterSub)) return false
+    if (filterPic !== 'All' && !picArray(a.pic).includes(filterPic)) return false
     return true
   })
 
@@ -225,7 +228,11 @@ export default function ActivitiesPage() {
       </div>
 
       <div style={{ display:'flex', gap:8, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, flexWrap:'wrap', alignItems:'center' }}>
-        <input className="input" style={{ width:200 }} value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Cari..." />
+        <input className="input" style={{ width:180 }} value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Cari..." />
+        <select className="input" style={{ width:160 }} value={filterPic} onChange={e=>setFilterPic(e.target.value)}>
+          <option value="All">👤 Semua PIC</option>
+          {members.map(m => <option key={m._id} value={m.name}>{m.name}</option>)}
+        </select>
         <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
           <button onClick={()=>setFilterCat('All')} style={chip(filterCat==='All')}>All</button>
           {subs.map((s:any) => (
