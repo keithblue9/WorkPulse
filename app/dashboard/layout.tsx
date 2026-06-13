@@ -1,4 +1,5 @@
 'use client'
+import { getConfig } from '@/lib/configCache'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState, useRef } from 'react'
@@ -84,7 +85,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
     document.addEventListener('mousedown',h); return ()=>document.removeEventListener('mousedown',h)
   },[])
-  useEffect(()=>{ fetch('/api/config').then(r=>r.json()).then(d=>setAppConfig(d.data)).catch(()=>{}) },[])
+  useEffect(()=>{ fetch('/api/warmup').catch(()=>{}); getConfig().then(d=>setAppConfig(d)).catch(()=>{}) },[])
   useEffect(()=>{
     NAV_GROUPS.forEach(g => {
       if (g.items.some(i => pathname===i.href || (i.href!=='/dashboard' && pathname.startsWith(i.href)))) {

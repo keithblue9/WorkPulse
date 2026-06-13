@@ -1,4 +1,5 @@
 'use client'
+import { getConfig } from '@/lib/configCache'
 // Normalize keys for filtering — handles 'KPI-SI' vs 'KPI - SI' vs 'kpi_si' etc.
 function normKey(s:any):string { return String(s||'').toLowerCase().replace(/[\s\-_]/g,'') }
 
@@ -194,7 +195,7 @@ export default function ActivitiesPage() {
     setLoading(true)
     const [a,c,m] = await Promise.all([
       fetch('/api/projects').then(r=>r.json()),
-      fetch('/api/config').then(r=>r.json()),
+      getConfig().then((data:any)=>({ data })),
       fetch('/api/users').then(r=>r.json()),
     ])
     setActivities(a.data||[]); setConfig(c.data); setMembers((m.data||[]).filter((u:any)=>u.active!==false)); setLoading(false)

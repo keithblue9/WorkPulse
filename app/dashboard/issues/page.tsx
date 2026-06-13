@@ -1,4 +1,5 @@
 'use client'
+import { getConfig } from '@/lib/configCache'
 // Normalize keys for filtering — handles 'KPI-SI' vs 'KPI - SI' vs 'kpi_si' etc.
 function normKey(s:any):string { return String(s||'').toLowerCase().replace(/[\s\-_]/g,'') }
 
@@ -23,7 +24,7 @@ export default function IssuesPage() {
 
   async function load() {
     setLoading(true)
-    const [a, c] = await Promise.all([fetch('/api/projects').then(r=>r.json()), fetch('/api/config').then(r=>r.json())])
+    const [a, c] = await Promise.all([fetch('/api/projects').then(r=>r.json()), getConfig().then((data:any)=>({ data }))])
     setActivities(a.data||[]); setConfig(c.data); setLoading(false)
   }
   useEffect(() => { load() }, [])

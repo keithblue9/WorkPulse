@@ -1,4 +1,5 @@
 'use client'
+import { getConfig } from '@/lib/configCache'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -135,7 +136,7 @@ export default function MeetingsPage() {
     setLoading(true)
     const [m, c] = await Promise.all([
       fetch('/api/meetings').then(r=>r.json()),
-      fetch('/api/config').then(r=>r.json()),
+      getConfig().then((data:any)=>({ data })),
     ])
     setMeetings(m.data||[])
     setCategories(c.data?.meetingCategories?.filter((x:any)=>x.active) || [])

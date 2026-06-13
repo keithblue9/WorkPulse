@@ -1,4 +1,5 @@
 'use client'
+import { getConfig } from '@/lib/configCache'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 
@@ -15,7 +16,7 @@ export default function BudgetPage() {
 
   async function load() {
     setLoading(true)
-    const [c, b] = await Promise.all([fetch('/api/config').then(r=>r.json()), fetch(`/api/budget?year=${year}`).then(r=>r.json())])
+    const [c, b] = await Promise.all([getConfig().then((data:any)=>({ data })), fetch(`/api/budget?year=${year}`).then(r=>r.json())])
     setConfig(c.data); setBudgets(b.data||[])
     const cats = c.data?.budgetCategories?.filter((x:any)=>x.key!=='cash_card' && x.key!=='petty_cash') || []
     if (cats.length > 0 && !activeCat) setActiveCat(cats[0].key)

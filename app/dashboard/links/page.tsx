@@ -1,4 +1,5 @@
 'use client'
+import { getConfig } from '@/lib/configCache'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -85,7 +86,7 @@ export default function LinksPage() {
 
   async function load() {
     setLoading(true)
-    const [r, c] = await Promise.all([fetch('/api/links').then(r=>r.json()), fetch('/api/config').then(r=>r.json())])
+    const [r, c] = await Promise.all([fetch('/api/links').then(r=>r.json()), getConfig().then((data:any)=>({ data }))])
     setLinks(r.data||[])
     setLinkCats(c.data?.linkCategories?.filter((x:any)=>x.active) || [])
     setLoading(false)

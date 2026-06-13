@@ -1,4 +1,5 @@
 'use client'
+import { getConfig } from '@/lib/configCache'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -102,7 +103,7 @@ export default function NotesPage() {
 
   async function load() {
     setLoading(true)
-    const [n,c,m] = await Promise.all([fetch('/api/notes').then(r=>r.json()), fetch('/api/config').then(r=>r.json()), fetch('/api/users').then(r=>r.json())])
+    const [n,c,m] = await Promise.all([fetch('/api/notes').then(r=>r.json()), getConfig().then((data:any)=>({ data })), fetch('/api/users').then(r=>r.json())])
     setNotes(n.data||[]); setConfig(c.data); setMembers((m.data||[]).filter((u:any)=>u.active!==false)); setLoading(false)
   }
   useEffect(() => { load() }, [])

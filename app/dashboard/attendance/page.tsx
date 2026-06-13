@@ -1,4 +1,5 @@
 'use client'
+import { getConfig } from '@/lib/configCache'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { AppConfig, AttendanceType } from '@/types'
@@ -79,7 +80,7 @@ export default function AttendancePage() {
   useEffect(() => {
     async function load() {
       const [cfg, att, sum] = await Promise.all([
-        fetch('/api/config').then(r=>r.json()),
+        getConfig().then((data:any)=>({ data })),
         fetch(`/api/attendance?userId=${selectedUserId}&month=${month}`).then(r=>r.json()),
         fetch(`/api/attendance/summary?month=${month}`).then(r=>r.json()),
       ])

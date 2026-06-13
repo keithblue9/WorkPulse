@@ -1,4 +1,5 @@
 'use client'
+import { getConfig } from '@/lib/configCache'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -56,7 +57,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
       // Auto WA to cashier on new submit
       if (!editing) {
         try {
-          const cfgR = await fetch('/api/config').then(r=>r.json())
+          const cfgR = await getConfig().then((data:any)=>({ data }))
           const cfg = cfgR.data
           if (cfg?.fonnte?.cashierUserId) {
             const usersR = await fetch('/api/users').then(r=>r.json())

@@ -1,4 +1,5 @@
 'use client'
+import { getConfig } from '@/lib/configCache'
 import { picArray } from '@/lib/defaults'
 import { useEffect, useState } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, isSameMonth } from 'date-fns'
@@ -96,7 +97,7 @@ export default function CalendarPage() {
     const [a,m,c] = await Promise.all([
       fetch('/api/projects').then(r=>r.json()),
       fetch('/api/users').then(r=>r.json()),
-      fetch('/api/config').then(r=>r.json()),
+      getConfig().then((data:any)=>({ data })),
     ])
     setActivities(a.data||[]); setMembers(m.data||[]); setConfig(c.data); setLoading(false)
   }

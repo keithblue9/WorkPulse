@@ -1,4 +1,5 @@
 'use client'
+import { getConfig } from '@/lib/configCache'
 import { picArray } from '@/lib/defaults'
 import { useEffect, useState, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
@@ -70,7 +71,7 @@ export default function DashboardPage() {
       fetch('/api/initiatives').then(r=>r.json()),
       fetch('/api/issues').then(r=>r.json()),
       fetch('/api/users').then(r=>r.json()),
-      fetch('/api/config').then(r=>r.json()),
+      getConfig().then((data:any)=>({ data })),
     ])
     setActivities(a.data||[]); setInitiatives(init.data||[]); setIssues(iss.data||[]); setMembers(m.data||[]); setConfig(c.data); setLoading(false)
   }

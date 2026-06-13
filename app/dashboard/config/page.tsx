@@ -1,4 +1,5 @@
 'use client'
+import { getConfig, invalidateConfig } from '@/lib/configCache'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -324,14 +325,14 @@ export default function ConfigPage() {
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState<Tab>('branding')
 
-  useEffect(()=>{ fetch('/api/config').then(r=>r.json()).then(d=>{ setConfig(d.data); setLoading(false) }) }, [])
+  useEffect(()=>{ getConfig().then((data:any)=>({ data })).then(d=>{ setConfig(d.data); setLoading(false) }) }, [])
 
   async function save(patch:any) {
     setSaving(true)
     try {
       const r = await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) })
       const d = await r.json()
-      setConfig(d.data); toast.success('Tersimpan!')
+      setConfig(d.data); invalidateConfig(); toast.success('Tersimpan!')
     } catch { toast.error('Gagal') } finally { setSaving(false) }
   }
 

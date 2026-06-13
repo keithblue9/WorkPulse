@@ -1,4 +1,5 @@
 'use client'
+import { getConfig } from '@/lib/configCache'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -32,7 +33,7 @@ function TransferModal({ item, onClose, onSave }: { item:any; onClose:()=>void; 
 
       // 2) Send WA to member
       try {
-        const cfgR = await fetch('/api/config').then(r=>r.json())
+        const cfgR = await getConfig().then((data:any)=>({ data }))
         const cfg = cfgR.data
         const usersR = await fetch('/api/users').then(r=>r.json())
         const member = (usersR.data||[]).find((u:any)=>u.name===item.userName || u.email===item.userId)

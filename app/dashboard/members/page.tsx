@@ -1,4 +1,5 @@
 'use client'
+import { getConfig } from '@/lib/configCache'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -123,7 +124,7 @@ export default function MembersPage() {
 
   async function load() {
     setLoading(true)
-    const [u,c] = await Promise.all([fetch('/api/users').then(r=>r.json()), fetch('/api/config').then(r=>r.json())])
+    const [u,c] = await Promise.all([fetch('/api/users').then(r=>r.json()), getConfig().then((data:any)=>({ data }))])
     setUsers(u.data||[]); setConfig(c.data); setLoading(false)
   }
   useEffect(() => { load() }, [])

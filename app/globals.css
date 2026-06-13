@@ -293,3 +293,14 @@ select.input { cursor:pointer }
 .stat-display-lg { font-size:58px; font-weight:800; letter-spacing:-0.05em; line-height:1; font-feature-settings:"tnum" 1 }
 
 html { scroll-behavior:smooth }
+
+/* Skeleton loading shimmer */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg3) 0%, var(--bg2) 50%, var(--bg3) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 6px;
+}
+@keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+.skeleton-line { height: 12px; margin: 6px 0; }
+.skeleton-card { height: 80px; margin-bottom: 8px; }
