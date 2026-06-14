@@ -115,7 +115,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const appTagline = appConfig?.appTagline || 'BPD & SS Procurement'
 
   return (
-    <div className="app-shell" style={{ display:'flex', height:'100vh', overflow:'hidden', background:'var(--bg)' }}>
+    <div className="app-shell" style={{ display:'flex', overflow:'hidden', background:'var(--bg)' }}>
       {/* Mobile backdrop */}
       <div className={`mobile-backdrop${mobileOpen?' show':''}`} onClick={()=>setMobileOpen(false)} />
       <aside className={`app-sidebar${mobileOpen?' mobile-open':''}`} style={{ width:collapsed?56:230, background:'var(--bg2)', borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', flexShrink:0, transition:'width 0.2s ease, transform 0.25s ease', overflow:'hidden' }}>
