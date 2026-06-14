@@ -440,9 +440,14 @@ html { scroll-behavior:smooth }
 
 /* ═══ Biodata: stack member-list above detail on mobile ═══ */
 @media (max-width: 768px) {
-  .biodata-split { flex-direction: column !important; overflow: visible !important; }
+  .biodata-split {
+    flex-direction: column !important;
+    overflow: hidden !important;   /* keep bounded height so child can scroll */
+    min-height: 0;
+  }
   .biodata-list {
     width: 100% !important;
+    flex-shrink: 0;                /* fixed strip, doesn't grow */
     border-right: none !important;
     border-bottom: 1px solid var(--border);
     display: flex; flex-direction: row; flex-wrap: nowrap;
@@ -459,9 +464,24 @@ html { scroll-behavior:smooth }
     white-space: nowrap;
     padding: 7px 12px !important;
   }
+  /* The detail pane (sibling after the list) fills remaining height and scrolls */
+  .biodata-split > div:last-child {
+    flex: 1 1 auto !important;
+    min-height: 0;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
   /* The detail BiodataDetail 2-col already stacks via dash-2col */
 
   /* Attendance "Rekap Tim" rows can overflow names — let them wrap/scroll */
   .rekap-row { min-width: 0; }
   .rekap-row span, .rekap-row div { overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* ═══ Modal form bodies: on mobile, cap to fit the bottom-sheet (92vh modal − header/footer) ═══ */
+@media (max-width: 768px) {
+  /* Any inline maxHeight 70-76vh inside a modal gets overridden to fit the sheet */
+  .modal [style*="maxHeight"], .modal [style*="max-height"] {
+    max-height: 70vh !important;
+  }
 }
