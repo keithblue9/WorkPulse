@@ -375,7 +375,8 @@ html { scroll-behavior:smooth }
   body { font-size: 13px; }
 
   /* ---- Filter chip rows scroll horizontally instead of wrapping into a tall stack ---- */
-  .chip-row { overflow-x: auto; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+  .chip-row { overflow-x: auto; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch; padding-bottom: 4px; scrollbar-width: none; }
+  .chip-row::-webkit-scrollbar { display: none; }
   .chip-row > * { flex-shrink: 0; }
 
   /* ---- Two-column dashboard sections stack ---- */

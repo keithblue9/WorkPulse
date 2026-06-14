@@ -146,10 +146,10 @@ export default function AttendancePage() {
         <div className="dash-2col" style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:16 }}>
           {/* Calendar */}
           <div>
-            {/* User selector */}
-            <div style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
+            {/* User selector — horizontal scroll on mobile */}
+            <div className="chip-row" style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
               {team.map(m => (
-                <button key={m.id} onClick={()=>setSelectedUserId(m.id)} style={{ padding:'5px 12px', borderRadius:20, fontSize:12, fontWeight:500, cursor:'pointer', border:`1px solid ${selectedUserId===m.id?m.color:'var(--border)'}`, background:selectedUserId===m.id?m.color+'33':'var(--bg3)', color:selectedUserId===m.id?m.color:'var(--text2)' }}>
+                <button key={m.id} onClick={()=>setSelectedUserId(m.id)} style={{ padding:'6px 14px', borderRadius:20, fontSize:12, fontWeight:500, cursor:'pointer', whiteSpace:'nowrap', border:`1px solid ${selectedUserId===m.id?m.color:'var(--border)'}`, background:selectedUserId===m.id?m.color+'33':'var(--bg3)', color:selectedUserId===m.id?m.color:'var(--text2)' }}>
                   {m.name}
                 </button>
               ))}
