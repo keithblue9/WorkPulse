@@ -30,4 +30,9 @@ const ProjectSchema = new Schema({
   startDate: String, endDate: String, progress: Number, kpiId: String, color: String, tags: [String],
 }, { timestamps: true })
 
+ProjectSchema.index({ subType: 1 })
+ProjectSchema.index({ category: 1 })
+ProjectSchema.index({ actionDate: 1 })
+ProjectSchema.index({ priority: 1 })
+
 export const ProjectModel = models.Project || mongoose.model('Project', ProjectSchema)

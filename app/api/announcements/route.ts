@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
   try {
     await connectDB()
     const announcements = await AnnouncementModel.find({}).sort({ pinned: -1, createdAt: -1 }).lean()
-    return NextResponse.json({ data: announcements })
+    return NextResponse.json({ data: announcements }, { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=120' } })
   } catch { return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
 }
 

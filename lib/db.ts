@@ -18,12 +18,13 @@ export async function connectDB() {
       bufferCommands: false,
       // Serverless-tuned options — faster cold start
       serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 10000,
-      connectTimeoutMS: 5000,
-      maxPoolSize: 5,        // small pool for serverless
-      minPoolSize: 0,
-      maxIdleTimeMS: 10000,
+      socketTimeoutMS: 20000,
+      connectTimeoutMS: 8000,
+      maxPoolSize: 10,       // up to 10 concurrent ops per warm function instance
+      minPoolSize: 1,        // keep 1 connection warm to cut reconnect latency
+      maxIdleTimeMS: 30000,  // hold idle conns longer (fewer reconnects during active day)
       family: 4,             // prefer IPv4 (faster DNS)
+      compressors: ['zlib'], // compress wire traffic — helps with larger payloads
     } as any).then((m) => m.connection)
   }
 

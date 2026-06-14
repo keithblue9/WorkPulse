@@ -28,4 +28,7 @@ const ReimbursementSchema = new Schema({
   submittedAt: String, approvedAt: String, approvedBy: String, rejectReason: String, notes: String,
 }, { timestamps:true })
 
+ReimbursementSchema.index({ status: 1 })
+ReimbursementSchema.index({ createdAt: -1 })
+
 export const ReimbursementModel = models.Reimbursement || mongoose.model('Reimbursement', ReimbursementSchema)

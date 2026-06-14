@@ -26,4 +26,6 @@ const InitiativeSchema = new Schema({
   phases: { type:[PhaseSchema], default:[] },
 }, { timestamps:true })
 
+InitiativeSchema.index({ year: 1 })
+
 export const InitiativeModel = models.Initiative || mongoose.model('Initiative', InitiativeSchema)

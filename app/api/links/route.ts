@@ -6,7 +6,7 @@ export async function GET() {
   try {
     await connectDB()
     const links = await LinkHubModel.find({}).sort({ pinned: -1, createdAt: -1 }).lean()
-    return NextResponse.json({ data: links })
+    return NextResponse.json({ data: links }, { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=120' } })
   } catch { return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
 }
 

@@ -30,4 +30,8 @@ const IssueSchema = new Schema({
   createdBy: String,
 }, { timestamps: true })
 
+IssueSchema.index({ status: 1 })
+IssueSchema.index({ priority: 1 })
+IssueSchema.index({ initiativeId: 1 })
+
 export const IssueModel = models.Issue || mongoose.model('Issue', IssueSchema)
