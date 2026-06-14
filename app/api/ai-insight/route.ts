@@ -71,7 +71,7 @@ export async function POST(req:NextRequest) {
       const rand = Math.floor(Math.random() * 100000)
       const sys = `Anda kurator konten harian untuk dashboard tim kerja profesional di Indonesia. Hari ini ${now.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}.
 
-Berikan output dalam 4 BAGIAN, dipisah satu baris kosong. Gunakan judul bagian PERSIS seperti di bawah (dengan emoji). WAJIB BERBEDA setiap kali diminta — jangan ulang ayat/quote/berita yang umum dipakai.
+Berikan output dalam 5 BAGIAN, dipisah satu baris kosong. Gunakan judul bagian PERSIS seperti di bawah (dengan emoji). WAJIB BERBEDA setiap kali diminta — jangan ulang ayat/quote/berita yang umum dipakai.
 
 📖 AYAT AL-QURAN
 Pilih SATU ayat Al-Quran (acak, variasikan surah — jangan selalu Al-Baqarah/Ar-Rahman) yang relevan dengan kehidupan, syukur, kesabaran, ujian, rezeki, atau kerja keras. Tampilkan:
@@ -86,11 +86,18 @@ Satu quote motivasi/kehidupan dari tokoh berbeda-beda (Shakespeare, filsuf, pemi
 💱 KURS RUPIAH HARI INI
 Kurs terkini (gunakan tool pencarian untuk data terupdate): USD, EUR, SGD, JPY terhadap IDR. Sebutkan tanggal/sumber jika ada.
 
-🌍 BERITA EKONOMI & GEOPOLITIK
-2-3 headline berita ekonomi global & geopolitik TERKINI (gunakan tool pencarian). Format poin singkat, masing-masing 1 kalimat.
+🍜 REKOMENDASI KULINER
+Satu rekomendasi tempat makan / makanan yang sedang viral atau populer (gunakan tool pencarian, variasikan tiap kali — bisa di Jakarta atau kota besar Indonesia lain). Tampilkan:
+- Nama tempat / makanan
+- Lokasi (kota/area)
+- Link Google Maps (format: https://www.google.com/maps/search/?api=1&query=NAMA+TEMPAT)
+- Rating bintang (mis. ⭐ 4.6/5)
+
+🔥 YANG LAGI VIRAL
+Satu topik yang sedang viral/trending untuk dibaca santai (gunakan tool pencarian) — bisa berita ringan, barang viral, tren media sosial, fenomena budaya pop, atau apa pun yang seru. Tulis 1-2 kalimat yang menarik dan menghibur. Variasikan tiap kali, jangan topik yang itu-itu saja.
 
 Bahasa Indonesia formal. Variasi konten tiap permintaan sangat penting. Seed: ${rand}`
-      const userPrompt = `Waktu: ${seed} (seed ${rand}). Berikan konten harian 4 bagian. Cari kurs rupiah terupdate dan berita ekonomi+geopolitik terkini lewat tool pencarian. Pastikan ayat Quran dan quote BERBEDA dari biasanya.`
+      const userPrompt = `Waktu: ${seed} (seed ${rand}). Berikan konten harian 5 bagian. Cari kurs rupiah terupdate, rekomendasi kuliner viral, dan topik yang lagi viral lewat tool pencarian. Pastikan ayat Quran, quote, kuliner, dan topik viral SELALU BERBEDA tiap permintaan.`
       const { text, error } = await callClaudeWithSearch(sys, userPrompt, 1500)
       return NextResponse.json(error ? { error } : { data:{ insight:text } })
     }

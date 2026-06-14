@@ -51,6 +51,20 @@ function DonutChart({ data, size=180 }: { data: {label:string; value:number; col
   )
 }
 
+function Linkify({ text }: { text:string }) {
+  if (!text) return null
+  const parts = text.split(/(https?:\/\/[^\s]+)/g)
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^https?:\/\//.test(part)
+          ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" style={{ color:'var(--brand)', textDecoration:'underline', wordBreak:'break-all' }}>🔗 Buka link</a>
+          : <span key={i}>{part}</span>
+      )}
+    </>
+  )
+}
+
 function stripMd(t:string):string {
   if (!t) return ''
   return t
@@ -266,7 +280,7 @@ export default function DashboardPage() {
                       </div>
                       {!aiQuotes && !loadingQuotes ? <button onClick={genQuotes} className="btn btn-sm" style={{ width:'100%' }}>✨ Tampilkan</button> :
                        loadingQuotes ? <div style={{ fontSize:11, color:'var(--text3)' }}>Generating...</div> :
-                       <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}>{stripMd(aiQuotes)}</div>
+                       <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}><Linkify text={stripMd(aiQuotes)} /></div>
                       }
                     </div>
                   )}
