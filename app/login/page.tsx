@@ -76,9 +76,9 @@ export default function LoginPage() {
   const appColor = config.appColor || '#4f8ef7'
 
   return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', position:'relative', overflow:'hidden', background:'#f5f5f7', padding:'24px 5vw' }} className="safe-all">
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', position:'relative', overflow:'hidden', background:'#f5f5f7', padding:'24px 5vw' }} className="safe-all login-shell">
       {hasBg && bgs.map((bg:string, i:number) => (
-        <div key={i} className={`login-bg-slide${i===currentSlide?' active':''}`} style={{ backgroundImage:`url("${bg}")` }} />
+        <div key={i} className={`login-bg-slide login-bg-img${i===currentSlide?' active':''}`} style={{ backgroundImage:`url("${bg}")` }} />
       ))}
       {!hasBg && (
         <div className="ambient-bg">
@@ -88,7 +88,7 @@ export default function LoginPage() {
       )}
 
       {/* Apple-style light glass card, positioned LEFT */}
-      <div style={{
+      <div className="login-card" style={{
         position:'relative', zIndex:2, width:'100%', maxWidth:380,
         padding:'32px 28px', borderRadius:22,
         background: 'rgba(255,255,255,0.72)',
