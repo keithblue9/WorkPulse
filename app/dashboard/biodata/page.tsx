@@ -165,7 +165,7 @@ export default function BiodataPage() {
         </div>
 
         {/* Right: biodata detail */}
-        <div style={{ flex:1, overflowY:'auto', padding:20 }} className="safe-bottom">
+        <div style={{ flex:1, overflowY:'auto', padding:20 }} className="safe-bottom page-pad">
           {selected ? (
             <BiodataDetail user={selected} isMine={selected.email === sessUser?.email} onUpdate={load} />
           ) : (

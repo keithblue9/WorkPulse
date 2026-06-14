@@ -211,7 +211,7 @@ export default function ReimbursementsPage() {
         <button onClick={()=>setTab('done')} style={chip(tab==='done', 'var(--green)')}>Done ({stats.done})</button>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom">
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
          filtered.length === 0 ? (
           <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>💸</div><div>Belum ada reimburse</div></div>

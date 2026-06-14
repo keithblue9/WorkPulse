@@ -132,7 +132,7 @@ export default function CashCardPage() {
         </div>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom">
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         <div className="card" style={{ overflow:'auto' }}>
           <table className="wp-table" style={{ minWidth:1000 }}>
             <thead>

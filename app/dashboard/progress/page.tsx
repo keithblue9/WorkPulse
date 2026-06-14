@@ -281,7 +281,7 @@ export default function ProgressPage() {
         <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Initiative Baru</button>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom">
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
          initiatives.length === 0 ? <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>Belum ada initiative · klik <b>+ Initiative Baru</b></div> : (
           <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
@@ -289,7 +289,7 @@ export default function ProgressPage() {
               const calc = calcInitiativeProgress(i.phases || [])
               return (
                 <div key={i._id} className="card" style={{ padding:16 }}>
-                  <div style={{ display:'flex', gap:16 }}>
+                  <div className="initiative-card-inner" style={{ display:'flex', gap:16 }}>
                     {/* Left: info + phases detail */}
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
@@ -326,7 +326,7 @@ export default function ProgressPage() {
                       {(i.phases||[]).length > 0 && <MiniGantt phases={i.phases} />}
                     </div>
                     {/* Right: progress ring widget */}
-                    <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, minWidth:140, borderLeft:'1px solid var(--border)', paddingLeft:16 }}>
+                    <div className="initiative-ring-panel" style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, minWidth:140, borderLeft:'1px solid var(--border)', paddingLeft:16 }}>
                       <ProgressRing plan={calc.planProgress} actual={calc.actualProgress} size={130} />
                       <div style={{ fontSize:10, color:'var(--text3)', textAlign:'center' }}>{calc.phases.length} phase{calc.phases.length>1?'s':''}</div>
                     </div>

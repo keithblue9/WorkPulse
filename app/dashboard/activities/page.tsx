@@ -233,7 +233,7 @@ export default function ActivitiesPage() {
           <option value="All">👤 Semua PIC</option>
           {members.map(m => <option key={m._id} value={m.name}>{m.name}</option>)}
         </select>
-        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+        <div className="chip-row" style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
           <button onClick={()=>setFilterCat('All')} style={chip(filterCat==='All')}>All</button>
           {subs.map((s:any) => (
             <button key={s.key} onClick={()=>setFilterCat(s.key)} style={chip(filterCat===s.key, s.color)}>{s.label}</button>
@@ -241,7 +241,7 @@ export default function ActivitiesPage() {
         </div>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom">
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
          filtered.length === 0 ? (
            <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>

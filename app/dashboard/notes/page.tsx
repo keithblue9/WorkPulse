@@ -178,7 +178,7 @@ export default function NotesPage() {
         </div>
       </div>
 
-      <div style={{ flex:1, overflow:'auto', padding:'14px 20px' }} className="safe-bottom">
+      <div style={{ flex:1, overflow:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> : (
           <div style={{ display:'flex', gap:12, alignItems:'flex-start', minHeight:'100%' }}>
             {columns.map(col => (

@@ -304,3 +304,94 @@ html { scroll-behavior:smooth }
 @keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
 .skeleton-line { height: 12px; margin: 6px 0; }
 .skeleton-card { height: 80px; margin-bottom: 8px; }
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — phone / PWA (≤768px)
+   Sidebar becomes a slide-in drawer; content gets full width
+   and comfortable spacing so the screen doesn't feel cramped.
+   ═══════════════════════════════════════════════════════════ */
+.mobile-backdrop { display:none }
+
+@media (max-width: 768px) {
+  /* ---- Sidebar as slide-in drawer ---- */
+  .app-sidebar {
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    width: 270px !important;
+    z-index: 1000;
+    transform: translateX(-100%);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.25);
+  }
+  .app-sidebar.mobile-open { transform: translateX(0); }
+
+  .mobile-backdrop {
+    display: block;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .mobile-backdrop.show { opacity: 1; pointer-events: auto; }
+
+  /* Main fills full width since sidebar floats above */
+  .app-main { width: 100%; }
+
+  /* ---- Header: tighter ---- */
+  .app-header { padding: 0 12px !important; height: 50px !important; gap: 6px !important; }
+  .app-header .btn { padding: 5px 8px; font-size: 11px; }
+
+  /* ---- Page content padding: comfortable, not cramped ---- */
+  .page-pad { padding: 12px !important; }
+
+  /* ---- Cards: full width, more vertical rhythm ---- */
+  .card { border-radius: 12px; }
+
+  /* ---- Stat card grids → 2 columns on phone instead of cramped many ---- */
+  .stat-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+
+  /* ---- Any auto-fit grid collapses to single column ---- */
+  .responsive-grid { grid-template-columns: 1fr !important; }
+
+  /* ---- Tables: allow horizontal scroll instead of squishing ---- */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .wp-table { min-width: 640px; }
+
+  /* ---- Modals: near full screen, bottom-anchored feel ---- */
+  .modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92vh !important;
+    border-radius: 16px 16px 0 0 !important;
+    margin-top: auto !important;
+  }
+  .modal-overlay { align-items: flex-end !important; padding: 0 !important; }
+
+  /* ---- Bigger tap targets ---- */
+  button, .btn, select, input[type=checkbox] { min-height: 36px; }
+  .btn-icon { min-width: 36px; }
+
+  /* ---- Reduce font sizes slightly for density balance ---- */
+  body { font-size: 13px; }
+
+  /* ---- Filter chip rows scroll horizontally instead of wrapping into a tall stack ---- */
+  .chip-row { overflow-x: auto; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+  .chip-row > * { flex-shrink: 0; }
+
+  /* ---- Two-column dashboard sections stack ---- */
+  .dash-2col { grid-template-columns: 1fr !important; }
+
+  /* ---- Progress/initiative card: stack ring below detail ---- */
+  .initiative-card-inner { flex-direction: column !important; }
+  .initiative-ring-panel { border-left: none !important; border-top: 1px solid var(--border); padding-left: 0 !important; padding-top: 12px !important; margin-top: 8px; width: 100% !important; }
+
+  /* ---- Kanban columns: comfortable width ---- */
+  .kanban-col { min-width: 240px; max-width: 260px; }
+}
+
+/* Small phones (≤400px): even tighter */
+@media (max-width: 400px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .page-pad { padding: 10px !important; }
+  .app-header { padding: 0 10px !important; }
+}

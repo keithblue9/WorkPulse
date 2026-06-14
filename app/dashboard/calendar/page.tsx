@@ -135,7 +135,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px', display:'grid', gridTemplateColumns:'1fr 320px', gap:14 }} className="safe-bottom">
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px', display:'grid', gridTemplateColumns:'1fr 320px', gap:14 }} className="safe-bottom page-pad dash-2col">
         {/* Calendar grid */}
         <div className="card" style={{ padding:14 }}>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:1, fontSize:11, color:'var(--text3)', fontWeight:600, textAlign:'center', marginBottom:6 }}>

@@ -253,7 +253,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom">
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:60, color:'var(--text3)' }}>Memuat data...</div> : (
           <>
             {/* ============ GENERAL TAB ============ */}
@@ -271,7 +271,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* AI Insights row */}
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:10 }}>
+                <div className="responsive-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:10 }}>
                   {isWidgetActive('ai-quotes') && (
                     <div className="card glass" style={{ padding:14 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
@@ -369,7 +369,7 @@ export default function DashboardPage() {
                       const calc = calcInitiativeProgress(i.phases || [])
                       return (
                         <div key={i._id} className="card glass-hover" style={{ padding:16, cursor:'pointer' }} onClick={()=>{ window.location.href='/dashboard/progress' }}>
-                          <div style={{ display:'flex', gap:16 }}>
+                          <div className="initiative-card-inner" style={{ display:'flex', gap:16 }}>
                             <div style={{ flex:1, minWidth:0 }}>
                               <div style={{ fontSize:9, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.05em' }}>{i.code} · {i.year}</div>
                               <div style={{ fontSize:15, fontWeight:700, marginBottom:4 }}>{i.title}</div>
@@ -395,7 +395,7 @@ export default function DashboardPage() {
                               </div>
                               <MiniGantt phases={i.phases || []} />
                             </div>
-                            <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minWidth:140, borderLeft:'1px solid var(--border)', paddingLeft:16 }}>
+                            <div className="initiative-ring-panel" style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minWidth:140, borderLeft:'1px solid var(--border)', paddingLeft:16 }}>
                               <ProgressRing plan={calc.planProgress} actual={calc.actualProgress} size={130} />
                               <div style={{ fontSize:10, color:'var(--text3)', marginTop:6 }}>{calc.phases.length} phase{calc.phases.length>1?'s':''}</div>
                             </div>
@@ -412,7 +412,7 @@ export default function DashboardPage() {
             {tab === 'issues' && (
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                 {/* Compact summary row */}
-                <div style={{ display:'grid', gridTemplateColumns:'minmax(220px, 0.6fr) 1fr', gap:10 }}>
+                <div className="dash-2col" style={{ display:'grid', gridTemplateColumns:'minmax(220px, 0.6fr) 1fr', gap:10 }}>
                   <div className="card" style={{ padding:12 }}>
                     <div style={{ fontSize:10, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Status Distribution</div>
                     <div style={{ display:'flex', alignItems:'center', gap:10 }}>

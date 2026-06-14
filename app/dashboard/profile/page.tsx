@@ -71,7 +71,7 @@ export default function ProfilePage() {
         <div style={{ fontSize:14, fontWeight:600 }}>My Profile</div>
         <div style={{ fontSize:11, color:'var(--text3)' }}>Akun dan PIN</div>
       </div>
-      <div style={{ flex:1, overflowY:'auto', padding:'18px 20px' }} className="safe-bottom">
+      <div style={{ flex:1, overflowY:'auto', padding:'18px 20px' }} className="safe-bottom page-pad">
         <div style={{ maxWidth:560, margin:'0 auto' }}>
           {/* Profile summary card */}
           <div className="card" style={{ padding:'20px 24px', textAlign:'center' }}>

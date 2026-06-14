@@ -56,7 +56,7 @@ export default function IssuesPage() {
 
       {/* Filter row */}
       <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, flexWrap:'wrap', alignItems:'center' }}>
-        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+        <div className="chip-row" style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
           <button onClick={()=>setFilterSub('All')} style={chip(filterSub==='All')}>All</button>
           {subs.map((s:any) => (
             <button key={s.key} onClick={()=>setFilterSub(s.key)} style={chip(filterSub===s.key, s.color)}>{s.label}</button>
@@ -76,7 +76,7 @@ export default function IssuesPage() {
         )}
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom">
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
          filtered.length === 0 ? (
            <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>

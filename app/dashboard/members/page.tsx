@@ -163,10 +163,10 @@ export default function MembersPage() {
         </div>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom">
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> : (
           <div className="card" style={{ overflow:'auto' }}>
-            <table className="wp-table">
+            <div className="table-scroll"><table className="wp-table">
               <thead><tr><th style={{width:40}}>#</th><th>Nama</th><th>Roles</th><th>No. HP</th><th>Status</th><th style={{width:120}}>Urutan</th><th></th></tr></thead>
               <tbody>
                 {filtered.map((u, idx) => {
@@ -204,7 +204,7 @@ export default function MembersPage() {
                   )
                 })}
               </tbody>
-            </table>
+            </table></div>
           </div>
         )}
       </div>
