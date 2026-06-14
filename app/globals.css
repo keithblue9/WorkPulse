@@ -381,6 +381,7 @@ html { scroll-behavior:smooth }
 
   /* ---- Two-column dashboard sections stack ---- */
   .dash-2col { grid-template-columns: 1fr !important; }
+  .dash-2col > * { min-width: 0; }   /* allow children to shrink, prevents sideways overflow */
 
   /* ---- Progress/initiative card: stack ring below detail ---- */
   .initiative-card-inner { flex-direction: column !important; }

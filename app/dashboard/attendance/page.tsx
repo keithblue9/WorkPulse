@@ -231,30 +231,6 @@ export default function AttendancePage() {
               })}
             </div>
 
-            {/* Team summary */}
-            <div className="card" style={{ padding:14 }}>
-              <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', marginBottom:10 }}>Rekap Tim</div>
-              {team.map(m => {
-                const ms = summary?.summary?.find((s:any) => s.name===m.name)
-                const wfo = ms?.counts?.wfo || 0
-                const pct = Math.round((wfo/22)*100)
-                return (
-                  <div key={m.id} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-                    <div style={{ width:26, height:26, borderRadius:'50%', background:m.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff', flexShrink:0 }}>
-                      {m.name.split(' ').slice(0,2).map((x:string)=>x[0]).join('')}
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:12, fontWeight:500, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.name}</div>
-                      <div style={{ height:4, background:'var(--bg4)', borderRadius:2, marginTop:3, overflow:'hidden' }}>
-                        <div style={{ height:'100%', width:`${pct}%`, background:m.color, borderRadius:2 }} />
-                      </div>
-                    </div>
-                    <span style={{ fontSize:11, fontWeight:600, color:'var(--text3)' }}>{pct}%</span>
-                  </div>
-                )
-              })}
-            </div>
-
             {/* Today's slots for selected user */}
             {(() => {
               const todayRec = getRecord(parseInt(today.split('-')[2]))
