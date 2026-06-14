@@ -30,7 +30,7 @@ function SlotForm({ date, attTypes, onClose, onSave }: { date:string; attTypes:A
         </div>
         <div style={{ padding:'14px 18px', display:'flex', flexDirection:'column', gap:12 }}>
           <div><label style={lbl}>Tipe Kehadiran</label>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+            <div className="chip-row" style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               {attTypes.map(t => (
                 <button key={t.key} onClick={()=>setType(t.key)} style={{ padding:'5px 12px', borderRadius:6, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${type===t.key?t.textColor:'var(--border)'}`, background:type===t.key?t.color:' var(--bg3)', color:type===t.key?t.textColor:'var(--text2)' }}>{t.label}</button>
               ))}
@@ -143,7 +143,7 @@ export default function AttendancePage() {
       </div>
 
       <div style={{ flex:1, overflow:'auto', padding:'16px 20px' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:16 }}>
+        <div className="dash-2col" style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:16 }}>
           {/* Calendar */}
           <div>
             {/* User selector */}
@@ -241,10 +241,10 @@ export default function AttendancePage() {
                 return (
                   <div key={m.id} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
                     <div style={{ width:26, height:26, borderRadius:'50%', background:m.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff', flexShrink:0 }}>
-                      {m.name.split(' ').map((x:string)=>x[0]).join('')}
+                      {m.name.split(' ').slice(0,2).map((x:string)=>x[0]).join('')}
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:12, fontWeight:500, color:'var(--text)' }}>{m.name}</div>
+                      <div style={{ fontSize:12, fontWeight:500, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.name}</div>
                       <div style={{ height:4, background:'var(--bg4)', borderRadius:2, marginTop:3, overflow:'hidden' }}>
                         <div style={{ height:'100%', width:`${pct}%`, background:m.color, borderRadius:2 }} />
                       </div>

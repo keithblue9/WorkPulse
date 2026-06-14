@@ -78,7 +78,7 @@ function BiodataDetail({ user, isMine, onUpdate }: { user:any; isMine:boolean; o
         )}
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
+      <div className="dash-2col" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
         {/* LEFT: Personal info */}
         <div>
           <div style={{ fontSize:11, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8, paddingBottom:4, borderBottom:'1px solid var(--brand)' }}>Informasi Personal</div>
@@ -148,9 +148,9 @@ export default function BiodataPage() {
         <div style={{ fontSize:11, color:'var(--text3)' }}>Data lengkap anggota tim · {users.length} member</div>
       </div>
 
-      <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
+      <div className="biodata-split" style={{ flex:1, display:'flex', overflow:'hidden' }}>
         {/* Left: member list */}
-        <div style={{ width:240, borderRight:'1px solid var(--border)', overflowY:'auto', background:'var(--bg2)', padding:8, flexShrink:0 }}>
+        <div className="biodata-list" style={{ width:240, borderRight:'1px solid var(--border)', overflowY:'auto', background:'var(--bg2)', padding:8, flexShrink:0 }}>
           {users.map(u => {
             const isSelected = selected?._id === u._id
             return (

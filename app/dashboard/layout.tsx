@@ -72,6 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { theme, setTheme } = useTheme()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const [showThemePicker, setShowThemePicker] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [appConfig, setAppConfig] = useState<any>(null)
@@ -89,6 +90,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   },[])
   useEffect(()=>{ fetch('/api/warmup').catch(()=>{}); getConfig().then(d=>setAppConfig(d)).catch(()=>{}) },[])
   useEffect(()=>{ setMobileOpen(false) },[pathname])
+  useEffect(()=>{
+    const check = () => setIsMobile(window.innerWidth <= 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  },[])
   useEffect(()=>{
     NAV_GROUPS.forEach(g => {
       if (g.items.some(i => pathname===i.href || (i.href!=='/dashboard' && pathname.startsWith(i.href)))) {
@@ -119,7 +126,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="app-shell" style={{ display:'flex', overflow:'hidden', background:'var(--bg)' }}>
       {/* Mobile backdrop */}
       <div className={`mobile-backdrop${mobileOpen?' show':''}`} onClick={()=>setMobileOpen(false)} />
-      <aside className={`app-sidebar${mobileOpen?' mobile-open':''}`} style={{ width:collapsed?56:230, background:'var(--bg2)', borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', flexShrink:0, transition:'width 0.2s ease, transform 0.25s ease', overflow:'hidden' }}>
+      <aside className={`app-sidebar${mobileOpen?' mobile-open':''}`} style={{ width:(collapsed && !isMobile)?56:230, background:'var(--bg2)', borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', flexShrink:0, transition:'width 0.2s ease, transform 0.25s ease', overflow:'hidden' }}>
         <div style={{ padding:collapsed?'14px 12px':'14px 16px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:10, justifyContent:collapsed?'center':'flex-start', minHeight:52 }}>
           {appConfig?.appIcon ? (
             <img src={appConfig.appIcon} style={{ width:28, height:28, borderRadius:7, objectFit:'cover', flexShrink:0 }} alt="logo" />
@@ -137,7 +144,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             if (visibleItems.length === 0) return null
             const isExpanded = expanded.has(group.key)
             const hasActive = visibleItems.some(i => pathname===i.href||(i.href!=='/dashboard'&&pathname.startsWith(i.href)))
-            if (collapsed) {
+            if (collapsed && !isMobile) {
               return (
                 <div key={group.key} style={{ marginBottom:6 }}>
                   {visibleItems.map(item=>{
@@ -179,7 +186,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <div className="app-main" style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
         <header className="app-header" style={{ display:'flex', alignItems:'center', gap:8, padding:'0 16px', height:52, borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
-          <button onClick={()=>{ setCollapsed(!collapsed); setMobileOpen(o=>!o) }} className="btn btn-icon hamburger-btn" style={{ fontSize:16 }}>☰</button>
+          <button onClick={()=>{ if (window.innerWidth <= 768) setMobileOpen(o=>!o); else setCollapsed(c=>!c) }} className="btn btn-icon hamburger-btn" style={{ fontSize:16 }}>☰</button>
           <div style={{ flex:1, display:'flex', alignItems:'center', gap:6, fontSize:13 }}>
             <span style={{ color:'var(--text3)' }}>{appName}</span>
             <span style={{ color:'var(--border2)' }}>›</span>
