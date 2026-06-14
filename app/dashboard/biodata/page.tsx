@@ -81,6 +81,7 @@ function BiodataDetail({ user, isMine, onUpdate }: { user:any; isMine:boolean; o
           <div style={{ fontSize:11, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8, paddingBottom:4, borderBottom:'1px solid var(--brand)' }}>Informasi Personal</div>
           <FieldRow label="Nama Lengkap" value={form.name} onChange={v=>set('name',v)} editing={editing} />
           <FieldRow label="No Pekerja" value={form.noPekerja} onChange={v=>set('noPekerja',v)} editing={editing} />
+          <FieldRow label="No KTP" value={form.noKtp} onChange={v=>set('noKtp',v)} editing={editing} />
           <FieldRow label="Jabatan" value={form.jabatan} onChange={v=>set('jabatan',v)} editing={editing} />
           <FieldRow label="Tempat Lahir" value={form.birthPlace} onChange={v=>set('birthPlace',v)} editing={editing} />
           <FieldRow label="Tanggal Lahir" value={form.birthDate} onChange={v=>set('birthDate',v)} type="date" editing={editing} />

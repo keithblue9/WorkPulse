@@ -12,7 +12,7 @@ const UserSchema = new Schema({
   active: { type: Boolean, default: true },
   lastLogin: String,
   // Biodata
-  noPekerja: String, jabatan: String,
+  noPekerja: String, jabatan: String, noKtp: String,
   birthPlace: String, birthDate: String,
   alamatJakarta: String, alamatAsal: String,
   emailKantor: String, emailPribadi: String,
