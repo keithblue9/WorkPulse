@@ -65,8 +65,14 @@ function PresensiPopup() {
   const [attendanceTypes, setAttendanceTypes] = useState<any[]>([])
   const [profile, setProfile] = useState<any>(null)
 
+  // Roles that should NOT get the daily attendance popup (e.g. external collaborators)
+  const NO_PRESENSI_ROLES = ['external', 'guest']
+  const userRoles = (user?.roles && user.roles.length) ? user.roles : (user?.role ? [user.role] : [])
+  const skipPresensi = userRoles.some((r:string) => NO_PRESENSI_ROLES.includes(String(r).toLowerCase()))
+
   useEffect(() => {
     if (!session?.user?.email) return
+    if (skipPresensi) return  // external/guest: no daily attendance prompt
     async function check() {
       const [pr, cfg] = await Promise.all([
         fetch('/api/profile').then(r=>r.json()),
@@ -74,6 +80,9 @@ function PresensiPopup() {
       ])
       setProfile(pr.data)
       setAttendanceTypes((cfg.data?.attendanceTypes||[]).filter((t:any)=>t.active))
+      // Double-check role from fresh profile too (in case session is stale)
+      const prRoles = (pr.data?.roles && pr.data.roles.length) ? pr.data.roles : (pr.data?.role ? [pr.data.role] : [])
+      if (prRoles.some((r:string) => NO_PRESENSI_ROLES.includes(String(r).toLowerCase()))) return
       const today = new Date().toISOString().split('T')[0]
       if (pr.data?.lastAttendanceCheck !== today) {
         // also check if attendance record exists for today
