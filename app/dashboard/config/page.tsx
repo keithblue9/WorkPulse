@@ -32,6 +32,13 @@ function TaxonomyEditor({ items, onChange, label }: { items:any[]; onChange:(ite
     if (!confirm(`Hapus "${items[i].label}"?`)) return
     onChange(items.filter((_,idx) => idx!==i))
   }
+  function move(i:number, dir:number) {
+    const j = i + dir
+    if (j < 0 || j >= items.length) return
+    const arr = [...items]
+    const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp
+    onChange(arr)
+  }
   function add() {
     if (!newItem.key || !newItem.label) { toast.error('Key dan label wajib'); return }
     if (items.some(i => i.key === newItem.key)) { toast.error('Key sudah ada'); return }
@@ -45,6 +52,11 @@ function TaxonomyEditor({ items, onChange, label }: { items:any[]; onChange:(ite
       <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:10 }}>
         {items.map((item:any, i:number) => (
           <div key={i} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 10px', background:'var(--bg3)', borderRadius:7, border:`1px solid ${item.color}33`, opacity:item.active?1:0.5 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:1, flexShrink:0 }}>
+              <button onClick={()=>move(i,-1)} disabled={i===0} title="Naik" style={{ background:'none', border:'none', cursor:i===0?'default':'pointer', color:'var(--text3)', fontSize:9, lineHeight:1, padding:0, opacity:i===0?0.25:0.8 }}>▲</button>
+              <button onClick={()=>move(i,1)} disabled={i===items.length-1} title="Turun" style={{ background:'none', border:'none', cursor:i===items.length-1?'default':'pointer', color:'var(--text3)', fontSize:9, lineHeight:1, padding:0, opacity:i===items.length-1?0.25:0.8 }}>▼</button>
+            </div>
+            <span style={{ fontSize:10, color:'var(--text3)', minWidth:16, textAlign:'center', flexShrink:0 }}>{i+1}</span>
             <input type="color" value={item.color} onChange={e=>update(i,{color:e.target.value})} style={{ width:24, height:24, borderRadius:4, border:'1px solid var(--border)', cursor:'pointer', flexShrink:0 }} />
             <input value={item.label} onChange={e=>update(i,{label:e.target.value})} style={{ flex:1, background:'transparent', border:'none', outline:'none', color:'var(--text)', fontSize:12, fontWeight:500 }} />
             <span style={{ fontSize:10, color:'var(--text3)' }}>{item.key}</span>
@@ -229,7 +241,8 @@ function FonnteSettings({ config, onSave }: { config:any; onSave:(patch:any)=>vo
       const r = await fetch('/api/fonnte', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ target: testNum, message: '🧪 Test message dari WorkPulse. Konfigurasi Fonnte berhasil.' }) })
       const d = await r.json()
-      if (r.ok) alert('Test kirim sukses. Cek WA target.'); else alert('Gagal: ' + (d.error||'unknown'))
+      if (r.ok && d.success) alert('✅ Test kirim sukses (via ' + (d.resolvedFrom||'?') + '). Cek WA target.')
+      else alert('❌ Gagal: ' + (d.error||'unknown'))
     } finally { setSending(false) }
   }
 

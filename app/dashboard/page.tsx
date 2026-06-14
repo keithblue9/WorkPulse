@@ -51,6 +51,16 @@ function DonutChart({ data, size=180 }: { data: {label:string; value:number; col
   )
 }
 
+function stripMd(t:string):string {
+  if (!t) return ''
+  return t
+    .replace(/^#{1,6}\s+/gm, '')        // headings
+    .replace(/\*\*(.+?)\*\*/g, '$1')   // bold
+    .replace(/\*(.+?)\*/g, '$1')         // italic
+    .replace(/`(.+?)`/g, '$1')             // inline code
+    .trim()
+}
+
 function ProgressRing({ plan, actual, size=120 }: { plan:number; actual:number; size?:number }) {
   const r = size/2 - 10
   const circ = 2 * Math.PI * r
@@ -251,12 +261,12 @@ export default function DashboardPage() {
                   {isWidgetActive('ai-quotes') && (
                     <div className="card glass" style={{ padding:14 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                        <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>💡 Quote of the Day</div>
+                        <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>📅 Inspirasi & Info Hari Ini</div>
                         <button onClick={genQuotes} disabled={loadingQuotes} className="btn btn-icon btn-sm">↻</button>
                       </div>
-                      {!aiQuotes && !loadingQuotes ? <button onClick={genQuotes} className="btn btn-sm" style={{ width:'100%' }}>✨ Generate Quote</button> :
+                      {!aiQuotes && !loadingQuotes ? <button onClick={genQuotes} className="btn btn-sm" style={{ width:'100%' }}>✨ Tampilkan</button> :
                        loadingQuotes ? <div style={{ fontSize:11, color:'var(--text3)' }}>Generating...</div> :
-                       <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}>{aiQuotes}</div>
+                       <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}>{stripMd(aiQuotes)}</div>
                       }
                     </div>
                   )}
@@ -266,10 +276,10 @@ export default function DashboardPage() {
                         <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>🤖 AI Insight — Personal</div>
                         <button onClick={genPersonal} disabled={loadingPersonal} className="btn btn-icon btn-sm">↻</button>
                       </div>
-                      <div style={{ fontSize:9, color:'var(--text3)', marginBottom:6 }}>Khusus untuk {user?.name}, ga bisa dibaca user lain</div>
+                      <div style={{ fontSize:9, color:'var(--text3)', marginBottom:6 }}>Rekomendasi tindakan untuk {user?.name?.split(' ')[0]}</div>
                       {!aiPersonal && !loadingPersonal ? <button onClick={genPersonal} className="btn btn-sm" style={{ width:'100%' }}>✨ Generate Next Actions</button> :
                        loadingPersonal ? <div style={{ fontSize:11, color:'var(--text3)' }}>Generating...</div> :
-                       <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}>{aiPersonal}</div>
+                       <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}>{stripMd(aiPersonal)}</div>
                       }
                     </div>
                   )}
@@ -281,7 +291,7 @@ export default function DashboardPage() {
                       </div>
                       {!aiTeam && !loadingTeam ? <button onClick={genTeam} className="btn btn-sm" style={{ width:'100%' }}>✨ Generate Actions</button> :
                        loadingTeam ? <div style={{ fontSize:11, color:'var(--text3)' }}>Generating...</div> :
-                       <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}>{aiTeam}</div>
+                       <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}>{stripMd(aiTeam)}</div>
                       }
                     </div>
                   )}
