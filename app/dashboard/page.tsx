@@ -378,14 +378,23 @@ export default function DashboardPage() {
             {/* ============ PROGRESS PROJECT TAB (inline detail, no nav) ============ */}
             {tab === 'progress' && (
               <div>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, gap:10, flexWrap:'wrap' }}>
                   <div>
                     <div style={{ fontSize:13, fontWeight:600 }}>Progress Initiatives</div>
                     <div style={{ fontSize:11, color:'var(--text3)' }}>{initiatives.length} initiative · klik card untuk edit/update</div>
                   </div>
+                  <Link href="/dashboard/progress" style={{ textDecoration:'none' }}>
+                    <button className="btn btn-primary btn-sm">+ Initiative Baru</button>
+                  </Link>
                 </div>
                 {initiatives.length === 0 ? (
-                  <div className="card" style={{ padding:30, textAlign:'center', color:'var(--text3)' }}>Belum ada initiative</div>
+                  <Link href="/dashboard/progress" style={{ textDecoration:'none' }}>
+                    <div className="card glass-hover" style={{ padding:30, textAlign:'center', color:'var(--text3)', cursor:'pointer' }}>
+                      <div style={{ fontSize:28, marginBottom:8 }}>📈</div>
+                      <div style={{ fontSize:13, fontWeight:600, color:'var(--text2)', marginBottom:4 }}>Belum ada initiative</div>
+                      <div style={{ fontSize:11 }}>Klik di sini untuk membuat progress project pertama →</div>
+                    </div>
+                  </Link>
                 ) : (
                   <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                     {initiatives.map(i => {
