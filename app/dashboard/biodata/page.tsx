@@ -40,6 +40,9 @@ function BiodataDetail({ user, isMine, onUpdate }: { user:any; isMine:boolean; o
   const [saving, setSaving] = useState(false)
   const set = (k:string,v:any) => setForm((f:any)=>({...f,[k]:v}))
 
+  // Re-sync form whenever a different member is selected (prop change)
+  useEffect(() => { setForm(user); setEditing(false) }, [user])
+
   async function save() {
     setSaving(true)
     try {
@@ -168,7 +171,7 @@ export default function BiodataPage() {
         {/* Right: biodata detail */}
         <div style={{ flex:1, overflowY:'auto', padding:20 }} className="safe-bottom page-pad">
           {selected ? (
-            <BiodataDetail user={selected} isMine={selected.email === sessUser?.email} onUpdate={load} />
+            <BiodataDetail key={selected._id} user={selected} isMine={selected.email === sessUser?.email} onUpdate={load} />
           ) : (
             <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Pilih member</div>
           )}
