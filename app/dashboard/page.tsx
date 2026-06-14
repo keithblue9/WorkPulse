@@ -25,7 +25,8 @@ function CountUp({ end, prefix='', suffix='' }: { end:number; prefix?:string; su
 
 // Pie/donut chart component using SVG
 function DonutChart({ data, size=180 }: { data: {label:string; value:number; color:string}[]; size?:number }) {
-  const total = data.reduce((s,d)=>s+d.value,0) || 1
+  const realTotal = data.reduce((s,d)=>s+d.value,0)
+  const total = realTotal || 1  // avoid divide-by-zero for angles only
   let cumAngle = 0
   const radius = size/2 - 12
   const center = size/2
@@ -45,7 +46,7 @@ function DonutChart({ data, size=180 }: { data: {label:string; value:number; col
         )
       })}
       <circle cx={center} cy={center} r={radius*0.55} fill="var(--bg2)" />
-      <text x={center} y={center-4} textAnchor="middle" fontSize="22" fontWeight="700" fill="var(--text)">{total}</text>
+      <text x={center} y={center-4} textAnchor="middle" fontSize="22" fontWeight="700" fill="var(--text)">{realTotal}</text>
       <text x={center} y={center+12} textAnchor="middle" fontSize="9" fill="var(--text3)">Total</text>
     </svg>
   )
@@ -222,13 +223,25 @@ export default function DashboardPage() {
 
   // Progress chart data
   const progressData = useMemo(() => {
-    const cfg = config?.activitySubTypes?.filter((s:any)=>s.active) || []
-    return cfg.map((c:any) => ({
-      label: c.label,
-      value: activities.filter(a => a.subType === c.key).length,
-      color: c.color || 'var(--brand)',
+    // Distribution of PROGRESS PROJECTS (initiatives) by status
+    const STATUS_META: Record<string,{label:string;color:string}> = {
+      on_track:  { label:'On Track',  color:'var(--green)' },
+      at_risk:   { label:'At Risk',   color:'var(--amber)' },
+      delayed:   { label:'Delayed',   color:'var(--red)' },
+      completed: { label:'Completed', color:'var(--brand)' },
+    }
+    const counts: Record<string, number> = {}
+    initiatives.forEach((i:any) => {
+      const k = i.status || 'on_track'
+      counts[k] = (counts[k] || 0) + 1
+    })
+    return Object.keys(STATUS_META).map(k => ({
+      key: k,
+      label: STATUS_META[k].label,
+      value: counts[k] || 0,
+      color: STATUS_META[k].color,
     })).filter(d => d.value > 0)
-  }, [activities, config])
+  }, [initiatives])
 
   // Issue distribution by status
   const issueDist = useMemo(() => {
@@ -314,20 +327,30 @@ export default function DashboardPage() {
                 {/* Progress chart + upcoming */}
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                   {isWidgetActive('progress-chart') && (
-                    <div className="card" style={{ padding:14 }}>
-                      <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>📊 Progress Project Distribution</div>
-                      <div style={{ display:'flex', alignItems:'center', gap:14 }}>
-                        <DonutChart data={progressData} />
-                        <div style={{ flex:1, display:'flex', flexDirection:'column', gap:5 }}>
-                          {progressData.map((d, i) => (
-                            <div key={i} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11 }}>
-                              <div style={{ width:10, height:10, borderRadius:2, background:d.color }} />
-                              <span style={{ flex:1 }}>{d.label}</span>
-                              <span style={{ fontWeight:600 }}>{d.value}</span>
-                            </div>
-                          ))}
-                        </div>
+                    <div className="card glass-hover" style={{ padding:14, cursor:'pointer' }} onClick={()=>setTab('progress')}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                        <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>📊 Progress Project Distribution</div>
+                        <span style={{ fontSize:10, color:'var(--brand)' }}>Lihat detail →</span>
                       </div>
+                      {progressData.length === 0 ? (
+                        <div style={{ textAlign:'center', padding:'24px 0', color:'var(--text3)', fontSize:12 }}>
+                          Belum ada progress project.<br/>
+                          <span style={{ fontSize:11 }}>Tambah di tab Progress Project</span>
+                        </div>
+                      ) : (
+                        <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+                          <DonutChart data={progressData} />
+                          <div style={{ flex:1, display:'flex', flexDirection:'column', gap:5 }}>
+                            {progressData.map((d, i) => (
+                              <div key={i} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11 }}>
+                                <div style={{ width:10, height:10, borderRadius:2, background:d.color }} />
+                                <span style={{ flex:1 }}>{d.label}</span>
+                                <span style={{ fontWeight:600 }}>{d.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   {isWidgetActive('upcoming-agenda') && (
