@@ -69,7 +69,7 @@ function CashCardForm({ editing, onClose, onSave }: { editing?:any; onClose:()=>
           <div><label style={lbl}>Catatan</label><input className="input" value={form.notes} onChange={e=>set('notes',e.target.value)} /></div>
           {form.topUpAmount > 0 && (
             <div style={{ padding:'10px 12px', background:'var(--bg3)', borderRadius:8, fontSize:12 }}>
-              <b>%:</b> {((form.settlementAmount/form.topUpAmount)*100).toFixed(1)}% · <b>Pengembalian:</b> Rp {fmt(form.refundAmount||0)} · <b>Operasional:</b> Rp {fmt((form.topUpAmount||0)-(form.settlementAmount||0)-(form.refundAmount||0))}
+              <b>%:</b> {((form.settlementAmount/form.topUpAmount)*100).toFixed(1)}% · <b>Pengembalian:</b> Rp {fmt(form.refundAmount||0)} · <b>Operasional:</b> {form.settlementAmount > 0 ? `Rp ${fmt(Math.max(0,(form.topUpAmount||0)-(form.settlementAmount||0)-(form.refundAmount||0)))}` : '— (isi settlement dulu)'}
             </div>
           )}
         </div>
@@ -105,11 +105,18 @@ export default function CashCardPage() {
   const totalTopUp = items.reduce((s,i)=>s+(i.topUpAmount||0),0)
   const totalSettlement = items.reduce((s,i)=>s+(i.settlementAmount||0),0)
   const totalRefund = items.reduce((s,i)=>s+(i.refundAmount||0),0)
-  // Pengeluaran Operasional = leftover still in hand = Top Up - Settlement - Pengembalian Dana.
-  // Raw difference (no per-row floor) so the total reconciles exactly with the cashier Saldo Kas.
-  // For a month with topup but no settlement/refund yet (in progress), this equals the full top up.
-  const totalOperasional = items.reduce((s,i)=>
-    s + ((i.topUpAmount||0)-(i.settlementAmount||0)-(i.refundAmount||0)), 0)
+  // Pengeluaran Operasional per row: only counts when Settlement has been entered.
+  // Until settlement is recorded, that month's top up is still part of Saldo Kas (in hand, not yet used).
+  // Floor at 0 (small negative selisih from bank fees/rounding shows as 0).
+  const rowOperasional = (i:any) => (i.settlementAmount||0) > 0
+    ? Math.max(0, (i.topUpAmount||0)-(i.settlementAmount||0)-(i.refundAmount||0))
+    : null   // null = '—' in the UI
+  const totalOperasional = items.reduce((s,i)=> s + (rowOperasional(i) ?? 0), 0)
+  // Saldo Kas = Top Up dari row yang BELUM di-settle, dikurangi total operasional.
+  // Rasionalnya: top up yang belum di-settle masih utuh di tangan tim; total operasional sudah
+  // 'kepakai' jadi mengurangi saldo (kalau ada).
+  const topUpUnsettled = items.reduce((s,i)=> s + ((i.settlementAmount||0) === 0 ? (i.topUpAmount||0) : 0), 0)
+  const saldoKasCC = Math.max(0, topUpUnsettled - totalOperasional)
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -128,7 +135,7 @@ export default function CashCardPage() {
         </div>
       </div>
 
-      <div className="stat-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:10, padding:'12px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+      <div className="stat-grid" style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:10, padding:'12px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
         <div className="card" style={{ padding:'10px 14px' }}>
           <div style={{ fontSize:10, color:'var(--text3)' }}>Total Top Up</div>
           <div style={{ fontSize:17, fontWeight:700, color:'var(--brand)' }}>Rp {fmt(totalTopUp)}</div>
@@ -147,7 +154,12 @@ export default function CashCardPage() {
         <div className="card" style={{ padding:'10px 14px' }}>
           <div style={{ fontSize:10, color:'var(--text3)' }}>Pengeluaran Operasional</div>
           <div style={{ fontSize:17, fontWeight:700, color:'var(--red)' }}>Rp {fmt(totalOperasional)}</div>
-          <div style={{ fontSize:9, color:'var(--text3)', marginTop:2 }}>Top Up − Settle − Kembali</div>
+          <div style={{ fontSize:9, color:'var(--text3)', marginTop:2 }}>Total selisih row yang sdh settle</div>
+        </div>
+        <div className="card" style={{ padding:'10px 14px', background:'var(--brand-soft)', border:'1px solid var(--brand)' }}>
+          <div style={{ fontSize:10, color:'var(--brand)' }}>Saldo Kas</div>
+          <div style={{ fontSize:17, fontWeight:800, color:'var(--brand)' }}>Rp {fmt(saldoKasCC)}</div>
+          <div style={{ fontSize:9, color:'var(--brand)', marginTop:2 }}>Top Up belum settle − Operasional</div>
         </div>
       </div>
 
@@ -174,7 +186,7 @@ export default function CashCardPage() {
                      <td>{i.jojonomicId||'—'}</td><td>{i.poNo||'—'}</td><td style={{ textAlign:'right', fontWeight:600 }}>{fmt(i.settlementAmount)}</td>
                      <td style={{ fontWeight:600, color: pct>=100?'var(--green)':pct>0?'var(--brand)':'var(--text3)' }}>{pct.toFixed(1)}%</td>
                      <td style={{ textAlign:'right', fontWeight:600, color:'var(--green)' }}>{fmt(i.refundAmount||0)}</td>
-                     <td style={{ textAlign:'right', fontWeight:600, color:'var(--red)' }}>{fmt((i.topUpAmount||0)-(i.settlementAmount||0)-(i.refundAmount||0))}</td>
+                     <td style={{ textAlign:'right', fontWeight:600, color:'var(--red)' }}>{rowOperasional(i) !== null ? fmt(rowOperasional(i) as number) : '—'}</td>
                      <td style={{ display:'flex', gap:4 }}>
                        <button onClick={()=>setEditing(i)} className="btn btn-icon btn-sm">✏️</button>
                        <button onClick={()=>del(i._id)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>🗑</button>
