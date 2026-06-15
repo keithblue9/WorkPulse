@@ -15,6 +15,8 @@ const ProjectSchema = new Schema({
   // NEW: Action Date (replaces startDate/endDate/progress)
   actionDate: String,       // start date (or single day)
   actionDateEnd: String,    // optional end date for multi-day activities
+  recurrence: String,       // '', 'weekly', 'biweekly', 'monthly'
+  recurrenceGroupId: String, // links generated recurring instances together
   // NEW: Progress narrative (point2 / bullet)
   progressNotes: String,
   // NEW: Next Plan narrative

@@ -57,6 +57,8 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
     pic: editing?.pic && Array.isArray(editing.pic) ? editing.pic : (editing?.picName ? [editing.picName] : (user?.name ? [user.name] : [])),
     actionDate: editing?.actionDate || '',
     actionDateEnd: editing?.actionDateEnd || '',
+    recurrence: editing?.recurrence || '',
+    recurrenceEnd: '',
     targetWeek: editing?.targetWeek || '',
     progressNotes: editing?.progressNotes || '',
     nextPlan: editing?.nextPlan || '',
@@ -68,16 +70,50 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
   const [saving, setSaving] = useState(false)
   const set = (k:string, v:any) => setForm(f=>({...f, [k]:v}))
 
+  // Generate the list of start dates for a recurring activity (capped for safety)
+  function buildRecurrenceDates(startStr:string, freq:string, endStr:string): string[] {
+    const dates:string[] = [startStr]
+    if (!freq || !endStr) return dates
+    const start = new Date(startStr + 'T00:00:00')
+    const end = new Date(endStr + 'T00:00:00')
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return dates
+    const cur = new Date(start)
+    let guard = 0
+    while (guard < 200) {
+      guard++
+      if (freq === 'weekly') cur.setDate(cur.getDate() + 7)
+      else if (freq === 'biweekly') cur.setDate(cur.getDate() + 14)
+      else if (freq === 'monthly') cur.setMonth(cur.getMonth() + 1)
+      else break
+      if (cur > end) break
+      dates.push(cur.toISOString().split('T')[0])
+    }
+    return dates
+  }
+
   async function save() {
     if (!form.title) { toast.error('Aktivitas wajib diisi'); return }
     if (!form.actionDate) { toast.error('Action Date wajib diisi'); return }
+    if (form.recurrence && !editing && !form.recurrenceEnd) { toast.error('Isi tanggal "Berulang sampai" untuk aktivitas berulang'); return }
     setSaving(true)
     try {
-      const url = editing ? `/api/projects/${editing._id}` : '/api/projects'
-      const r = await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ ...form, picName: form.pic[0] || '', members: form.pic }) })
-      if (!r.ok) { const e = await r.json(); toast.error('Gagal: '+(e.error||r.statusText)); return }
-      toast.success(editing?'Diperbarui!':'Aktivitas dibuat!'); onSave(); onClose()
+      if (editing) {
+        const r = await fetch(`/api/projects/${editing._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ ...form, picName: form.pic[0] || '', members: form.pic }) })
+        if (!r.ok) { const e = await r.json(); toast.error('Gagal: '+(e.error||r.statusText)); return }
+        toast.success('Diperbarui!'); onSave(); onClose(); return
+      }
+      // NEW: handle recurrence by creating one activity per occurrence
+      const dates = form.recurrence ? buildRecurrenceDates(form.actionDate, form.recurrence, form.recurrenceEnd) : [form.actionDate]
+      const groupId = form.recurrence ? `rec_${Date.now()}_${Math.random().toString(36).slice(2,8)}` : ''
+      let ok = 0
+      for (const d of dates) {
+        const r = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ ...form, actionDate: d, actionDateEnd:'', recurrenceGroupId: groupId, picName: form.pic[0] || '', members: form.pic }) })
+        if (r.ok) ok++
+      }
+      if (ok === 0) { toast.error('Gagal membuat aktivitas'); return }
+      toast.success(dates.length>1 ? `${ok} aktivitas berulang dibuat!` : 'Aktivitas dibuat!'); onSave(); onClose()
     } catch { toast.error('Gagal') } finally { setSaving(false) }
   }
 
@@ -129,9 +165,23 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
             <div><label style={lbl}>Action Date (Dari) *</label>
               <input type="date" className="input" value={form.actionDate} onChange={e=>set('actionDate', e.target.value)} /></div>
             <div><label style={lbl}>Sampai (opsional)</label>
-              <input type="date" className="input" value={form.actionDateEnd} min={form.actionDate||undefined} onChange={e=>set('actionDateEnd', e.target.value)} />
+              <input type="date" className="input" value={form.actionDateEnd} min={form.actionDate||undefined} onChange={e=>set('actionDateEnd', e.target.value)} disabled={!!form.recurrence} />
               <div style={{ fontSize:9, color:'var(--text3)', marginTop:3 }}>Isi kalau kegiatan lebih dari 1 hari — muncul di kalender sepanjang rentang</div></div>
           </div>
+          {!editing && (
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, padding:'10px 12px', background:'var(--bg3)', borderRadius:8 }}>
+              <div><label style={lbl}>🔁 Berulang</label>
+                <select className="input" value={form.recurrence} onChange={e=>set('recurrence', e.target.value)}>
+                  <option value="">Tidak berulang</option>
+                  <option value="weekly">Tiap minggu</option>
+                  <option value="biweekly">Tiap 2 minggu</option>
+                  <option value="monthly">Tiap bulan</option>
+                </select></div>
+              <div><label style={lbl}>Berulang sampai {form.recurrence && <span style={{ color:'var(--red)' }}>*</span>}</label>
+                <input type="date" className="input" value={form.recurrenceEnd} min={form.actionDate||undefined} onChange={e=>set('recurrenceEnd', e.target.value)} disabled={!form.recurrence} />
+                <div style={{ fontSize:9, color:'var(--text3)', marginTop:3 }}>Agenda otomatis muncul di kalender tiap pengulangan</div></div>
+            </div>
+          )}
           <div><label style={lbl}>PIC (multi tag)</label>
             <PicTagInput value={form.pic} onChange={v=>set('pic', v)} members={members} /></div>
           <div><label style={lbl}>Next Plan (Narasi / Point-Point)</label>
