@@ -68,10 +68,18 @@ export function calcInitiativeProgress(phases: any[]) {
   const totalPlanWeeks = planWeeksArr.reduce((a, b) => a + b, 0)
   const result = phases.map((p, i) => {
     const planWeeks = planWeeksArr[i]
-    const actualWeeks = (p.actualCells || []).length
+    const planCells: string[] = p.planCells || []
+    const actualCells: string[] = p.actualCells || []
+    // Count actual weeks that fall WITHIN the planned weeks ("on-plan" completion).
+    // Working weeks beyond the plan window = late/overrun, they do NOT add progress.
+    const onPlanActual = actualCells.filter(c => planCells.includes(c)).length
+    const actualWeeks = actualCells.length
     const planPct = totalPlanWeeks > 0 ? (planWeeks / totalPlanWeeks) * 100 : 0
-    const actualPct = planWeeks > 0 ? (actualWeeks / planWeeks) * planPct : 0
-    return { ...p, planPct, actualPct, _planWeeks: planWeeks, _actualWeeks: actualWeeks }
+    // actual completion = how much of THIS phase's plan is covered, capped at 100% of the phase.
+    // Overrun (actual beyond plan) never pushes a phase above its planned weight.
+    const completionRatio = planWeeks > 0 ? Math.min(onPlanActual / planWeeks, 1) : 0
+    const actualPct = completionRatio * planPct
+    return { ...p, planPct, actualPct, _planWeeks: planWeeks, _actualWeeks: actualWeeks, _onPlanActual: onPlanActual }
   })
   const planProgress = result.reduce((a, b) => a + b.planPct, 0)
   const actualProgress = result.reduce((a, b) => a + b.actualPct, 0)

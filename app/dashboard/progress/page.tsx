@@ -185,7 +185,7 @@ function InitiativeForm({ editing, onClose, onSave, members }: { editing?:any; o
     toast.success('Dihapus'); onSave(); onClose()
   }
 
-  const suggestions = members.filter(m => m.name.toLowerCase().includes(picInput.toLowerCase()) && !form.pic.includes(m.name)).slice(0,5)
+  const suggestions = members.filter(m => (m.name||'').toLowerCase().includes(picInput.toLowerCase()) && !form.pic.includes(m.name)).slice(0,5)
 
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>

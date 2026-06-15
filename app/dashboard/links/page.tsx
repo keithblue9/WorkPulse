@@ -111,7 +111,7 @@ export default function LinksPage() {
 
   const categories = ['Semua', ...Array.from(new Set(links.map(l => l.category||'General')))]
   const filtered = links.filter(l => {
-    const matchSearch = !search || l.title.toLowerCase().includes(search.toLowerCase()) || l.description?.toLowerCase().includes(search.toLowerCase())
+    const matchSearch = !search || (l.title||'').toLowerCase().includes(search.toLowerCase()) || (l.description||'').toLowerCase().includes(search.toLowerCase())
     const matchCat = activeCategory === 'Semua' || l.category === activeCategory
     return matchSearch && matchCat
   })

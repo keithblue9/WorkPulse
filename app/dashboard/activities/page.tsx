@@ -12,7 +12,7 @@ import toast from 'react-hot-toast'
 function PicTagInput({ value, onChange, members }: { value:string[]; onChange:(v:string[])=>void; members:any[] }) {
   const [input, setInput] = useState('')
   const [showSuggest, setShowSuggest] = useState(false)
-  const suggestions = members.filter(m => m.name.toLowerCase().includes(input.toLowerCase()) && !value.includes(m.name)).slice(0,8)
+  const suggestions = members.filter(m => (m.name||'').toLowerCase().includes(input.toLowerCase()) && !value.includes(m.name)).slice(0,8)
   function addTag(name:string) { if (name && !value.includes(name)) onChange([...value, name]); setInput(''); setShowSuggest(false) }
   function removeTag(name:string) { onChange(value.filter(v=>v!==name)) }
   return (
