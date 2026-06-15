@@ -86,10 +86,18 @@ export default function LinksPage() {
 
   async function load() {
     setLoading(true)
-    const [r, c] = await Promise.all([fetch('/api/links').then(r=>r.json()), getConfig().then((data:any)=>({ data }))])
-    setLinks(r.data||[])
-    setLinkCats(c.data?.linkCategories?.filter((x:any)=>x.active) || [])
-    setLoading(false)
+    try {
+      const [r, c] = await Promise.all([
+        fetch('/api/links').then(r=>r.json()).catch(()=>({ data:[] })),
+        getConfig().then((data:any)=>({ data })).catch(()=>({ data:null })),
+      ])
+      setLinks(Array.isArray(r?.data) ? r.data : [])
+      setLinkCats(c?.data?.linkCategories?.filter((x:any)=>x.active) || [])
+    } catch {
+      setLinks([]); setLinkCats([])
+    } finally {
+      setLoading(false)
+    }
   }
   useEffect(() => { load() }, [])
 
