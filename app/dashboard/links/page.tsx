@@ -131,7 +131,6 @@ export default function LinksPage() {
     return matchSearch && matchCat
   })
 
-  const canManage = ['admin','manager'].includes(user?.role||'')
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -180,11 +179,9 @@ export default function LinksPage() {
                       {link?.clickCount > 0 && <span style={{ padding:'2px 8px', borderRadius:20, fontSize:10, background:'var(--bg4)', color:'var(--text3)' }}>👆 {link.clickCount}</span>}
                     </div>
                     <div style={{ display:'flex', gap:4 }}>
-                      {canManage && <>
-                        <button className="btn btn-icon btn-sm" onClick={e=>{e.stopPropagation();togglePin(link)}} style={{ fontSize:11 }}>📌</button>
-                        <button className="btn btn-icon btn-sm" onClick={e=>{e.stopPropagation();setEditing(link)}} style={{ fontSize:11 }}>✏️</button>
-                        <button className="btn btn-icon btn-sm" onClick={e=>{e.stopPropagation();del(link._id)}} style={{ fontSize:11 }}>🗑</button>
-                      </>}
+                      <button className="btn btn-icon btn-sm" title="Pin" onClick={e=>{e.stopPropagation();togglePin(link)}} style={{ fontSize:11 }}>📌</button>
+                      <button className="btn btn-icon btn-sm" title="Edit" onClick={e=>{e.stopPropagation();setEditing(link)}} style={{ fontSize:11 }}>✏️</button>
+                      <button className="btn btn-icon btn-sm" title="Hapus" onClick={e=>{e.stopPropagation();del(link._id)}} style={{ fontSize:11 }}>🗑</button>
                       <button className="btn btn-sm btn-primary" onClick={()=>trackClick(link)} style={{ fontSize:11 }}>Buka →</button>
                     </div>
                   </div>
