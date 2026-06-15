@@ -66,9 +66,11 @@ export function picArray(p: any): string[] {
 //  2. SPI (Schedule Performance Index): schedule efficiency. Standard PMBOK Earned
 //     Value metric adapted to week-cells. Per phase, walk each planned week as a
 //     deadline checkpoint; the k-th planned week is "earned" only if at least k actual
-//     weeks were done on-or-before it. Late work misses the checkpoint → SPI drops.
-//     SPI = 1.0 on schedule, <1.0 behind (late), capped at 1.0 (no ahead-of-schedule
-//     bonus). Overall SPI is weighted by each phase's planned weeks.
+//     weeks were done on-or-before it. PLUS an overrun penalty: actual weeks that fall
+//     after the phase's last planned week (the deadline) are late delivery and subtract
+//     proportionally. So finishing past the plan window (plan Jun, actual Jul) lands
+//     SPI below 100%. SPI = 1.0 on schedule, <1.0 late, clamped to 0..1.
+//     Overall SPI is weighted by each phase's planned weeks.
 // Cell format "M-W" (month-week), converted to an absolute week index for ordering.
 function _weekIndex(cell: string): number {
   const [m, w] = String(cell).split('-').map(Number)
@@ -88,18 +90,27 @@ export function calcInitiativeProgress(phases: any[]) {
     const completionRatio = planWeeks > 0 ? Math.min(actualWeeks / planWeeks, 1) : 0
     const actualPct = completionRatio * planPct
 
-    // ── SPI: schedule efficiency per phase (checkpoint model), capped at 1.0 ──
+    // ── SPI: schedule efficiency per phase (checkpoint model + overrun penalty) ──
+    // (a) Checkpoint: each planned week is a deadline; the k-th planned week is met
+    //     only if >= k actual weeks were done on-or-before it (early counts as on time).
+    // (b) Overrun penalty: any actual week AFTER the phase's last planned week is late
+    //     delivery (missed the deadline) and subtracts proportionally. This is what
+    //     makes 'plan Juni, actual Juli' land below 100%.
     let spi: number | null = null
-    if (planWeeks > 0) {
+    if (planWeeks > 0 && actualCells.length > 0) {
       const planSorted = [...planCells].map(_weekIndex).sort((a, b) => a - b)
       const actualIdx = actualCells.map(_weekIndex).sort((a, b) => a - b)
+      const planDeadline = planSorted[planSorted.length - 1]  // overall phase deadline
       let earned = 0
       for (let k = 0; k < planSorted.length; k++) {
         const deadline = planSorted[k]
         const doneByDeadline = actualIdx.filter(a => a <= deadline).length
         if (doneByDeadline >= k + 1) earned++
       }
-      spi = Math.min(earned / planWeeks, 1)
+      const checkpointSpi = earned / planWeeks
+      const overrunWeeks = actualIdx.filter(a => a > planDeadline).length
+      const overrunPenalty = overrunWeeks / planWeeks
+      spi = Math.max(0, Math.min(checkpointSpi, 1) - overrunPenalty)
     }
     return { ...p, planPct, actualPct, spi, _planWeeks: planWeeks, _actualWeeks: actualWeeks }
   })
