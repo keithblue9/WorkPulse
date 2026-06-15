@@ -69,6 +69,11 @@ export async function POST(req:NextRequest) {
       const now = new Date()
       const seed = now.toISOString() // full timestamp → forces variety each click
       const rand = Math.floor(Math.random() * 100000)
+      // Human-readable date for the "on this day in history" section
+      const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
+      const todayDay = now.getDate()
+      const todayMonth = MONTHS_ID[now.getMonth()]
+      const todayLabel = `${todayDay} ${todayMonth}`
       const sys = `Anda kurator konten harian untuk dashboard tim kerja profesional di Indonesia. Hari ini ${now.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}.
 
 Berikan output dalam 5 BAGIAN, dipisah satu baris kosong. Gunakan judul bagian PERSIS seperti di bawah (dengan emoji). WAJIB BERBEDA setiap kali diminta — jangan ulang ayat/quote/berita yang umum dipakai.
@@ -93,11 +98,11 @@ Satu rekomendasi tempat makan / makanan yang sedang viral atau populer (gunakan 
 - Link Google Maps (format: https://www.google.com/maps/search/?api=1&query=NAMA+TEMPAT)
 - Rating bintang (mis. ⭐ 4.6/5)
 
-🔥 YANG LAGI VIRAL
-Satu topik yang sedang viral/trending untuk dibaca santai (gunakan tool pencarian) — bisa berita ringan, barang viral, tren media sosial, fenomena budaya pop, atau apa pun yang seru. Tulis 1-2 kalimat yang menarik dan menghibur. Variasikan tiap kali, jangan topik yang itu-itu saja.
+📅 HARI INI DALAM SEJARAH
+Satu peristiwa sejarah menarik yang terjadi pada tanggal ${todayLabel} (gunakan tool pencarian untuk akurasi). Bisa peristiwa dunia atau Indonesia, penemuan, kelahiran/wafat tokoh penting, atau fun fact bersejarah. Sebutkan TAHUN-nya. Tulis 1-2 kalimat yang informatif dan menarik. Variasikan tiap permintaan — kalau ada beberapa peristiwa di tanggal ${todayLabel}, pilih yang berbeda tiap kali. Format: sebutkan tahun di awal, mis. "Tahun 1945, ..." 
 
 Bahasa Indonesia formal. Variasi konten tiap permintaan sangat penting. Seed: ${rand}`
-      const userPrompt = `Waktu: ${seed} (seed ${rand}). Berikan konten harian 5 bagian. Cari kurs rupiah terupdate, rekomendasi kuliner viral, dan topik yang lagi viral lewat tool pencarian. Pastikan ayat Quran, quote, kuliner, dan topik viral SELALU BERBEDA tiap permintaan.`
+      const userPrompt = `Waktu: ${seed} (seed ${rand}). Tanggal hari ini: ${todayLabel}. Berikan konten harian 5 bagian. Cari kurs rupiah terupdate, rekomendasi kuliner viral, dan peristiwa sejarah pada tanggal ${todayLabel} lewat tool pencarian. Pastikan ayat Quran, quote, kuliner, dan peristiwa sejarah SELALU BERBEDA tiap permintaan.`
       const { text, error } = await callClaudeWithSearch(sys, userPrompt, 1500)
       return NextResponse.json(error ? { error } : { data:{ insight:text } })
     }
