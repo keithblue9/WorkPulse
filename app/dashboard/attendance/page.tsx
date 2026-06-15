@@ -6,6 +6,20 @@ import { AppConfig, AttendanceType } from '@/types'
 import toast from 'react-hot-toast'
 import { format, getDaysInMonth, getDay, startOfMonth } from 'date-fns'
 
+// Robust slot helpers — handle legacy slots (missing isFullDay / 'fullday' sentinel / missing times)
+function slotIsFullDay(slot:any): boolean {
+  if (slot?.isFullDay === true) return true
+  if (slot?.isFullDay === false) return false
+  // legacy / fallback: treat as full day if times are missing or marked 'fullday'
+  const st = slot?.startTime, et = slot?.endTime
+  if (!st || !et || st === 'fullday' || et === 'fullday') return true
+  return false
+}
+function slotTimeLabel(slot:any): string {
+  if (slotIsFullDay(slot)) return 'Full Day'
+  return `${slot.startTime}–${slot.endTime}`
+}
+
 const TEAM_COLORS = ['#2563d4','#7c3aed','#0d9488','#d97706','#16a34a','#dc2626','#0891b2','#7c2d12']
 
 function SlotForm({ date, attTypes, onClose, onSave }: { date:string; attTypes:AttendanceType[]; onClose:()=>void; onSave:(slot:any)=>void }) {
@@ -108,7 +122,7 @@ export default function AttendancePage() {
       body: JSON.stringify({ userId:selectedUserId, date:dateStr, slot }) })
     const d = await r.json()
     setRecords(prev => { const filtered=prev.filter(r=>r.date!==dateStr); return [...filtered, d.data] })
-    toast.success(`Ditambahkan: ${slot.label} ${slot.isFullDay ? '(Full Day)' : `${slot.startTime}–${slot.endTime}`}`)
+    toast.success(`Ditambahkan: ${slot.label||slot.type} ${slotIsFullDay(slot) ? '(Full Day)' : `${slot.startTime}–${slot.endTime}`}`)
   }
 
   async function removeSlot(day: number, slotId: string) {
@@ -177,7 +191,7 @@ export default function AttendancePage() {
 
                   return (
                     <div key={day} onClick={()=>!isWeekend&&setShowSlotForm(dateStr)}
-                      title={slots.length>0 ? slots.map((s:any)=>`${s.label}${s.isFullDay?'':`  ${s.startTime}-${s.endTime}`}`).join('\n') : 'Klik untuk tambah kehadiran'}
+                      title={slots.length>0 ? slots.map((s:any)=>`${s.label||s.type} ${slotTimeLabel(s)}`).join('\n') : 'Klik untuk tambah kehadiran'}
                       style={{ minHeight:52, borderRadius:7, cursor:isWeekend?'default':'pointer', border:`${isToday?'2px':'1px'} solid ${isToday?'var(--blue)':primaryType?primaryType.textColor+'44':'var(--border)'}`, background:primaryType?primaryType.color:isWeekend?'var(--bg3)':'var(--bg4)', opacity:isWeekend&&!primaryType?0.4:1, transition:'all 0.1s', position:'relative', overflow:'hidden' }}
                       onMouseEnter={e=>!isWeekend&&((e.currentTarget as HTMLElement).style.transform='scale(1.04)')}
                       onMouseLeave={e=>((e.currentTarget as HTMLElement).style.transform='scale(1)')}>
@@ -186,7 +200,7 @@ export default function AttendancePage() {
                         const t = attTypes.find(x=>x.key===slot.type)
                         return (
                           <div key={si} style={{ margin:'1px 3px', padding:'1px 4px', borderRadius:3, fontSize:9, fontWeight:600, background:t?t.textColor+'33':'var(--bg5)', color:t?t.textColor:'var(--text3)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', display:'flex', justifyContent:'space-between', alignItems:'center', gap:2 }}>
-                            <span>{t?.label||slot.type} {!slot.isFullDay&&`${slot.startTime}`}</span>
+                            <span>{t?.label||slot.type}{!slotIsFullDay(slot)?` ${slot.startTime}`:''}</span>
                             <span onClick={e=>{e.stopPropagation();removeSlot(day,slot._id)}} style={{ cursor:'pointer', opacity:0.6 }}>×</span>
                           </div>
                         )
@@ -244,7 +258,7 @@ export default function AttendancePage() {
                       <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6, padding:'6px 10px', background:t?t.color:'var(--bg3)', borderRadius:6 }}>
                         <div style={{ fontSize:11, fontWeight:600, color:t?t.textColor:'var(--text2)', flex:1 }}>{t?.label||slot.type}</div>
                         <div style={{ fontSize:10, color:t?t.textColor+'aa':'var(--text3)' }}>
-                          {slot.isFullDay ? 'Full Day' : `${slot.startTime}–${slot.endTime}`}
+                          {slotTimeLabel(slot)}
                         </div>
                       </div>
                     )
