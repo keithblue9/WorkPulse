@@ -3,6 +3,13 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 
+// External/guest collaborators are not internal staff → excluded from biodata
+const NON_STAFF_ROLES = ['external', 'guest']
+function isInternalMember(u:any): boolean {
+  const roles = (u?.roles && u.roles.length) ? u.roles : (u?.role ? [u.role] : [])
+  return !roles.some((r:string) => NON_STAFF_ROLES.includes(String(r).toLowerCase()))
+}
+
 const BANKS = ['BCA','Mandiri','BRI','BNI','BSI','CIMB Niaga','Permata','Danamon','BTN','Mega','OCBC NISP','UOB','Bank Jago','Bank Neo Commerce','Other']
 
 function FieldRow({ label, value, onChange, type='text', editing }: { label:string; value:any; onChange:(v:any)=>void; type?:string; editing:boolean }) {
@@ -126,7 +133,7 @@ export default function BiodataPage() {
   async function load() {
     setLoading(true)
     const d = await fetch('/api/users').then(r=>r.json())
-    const list = (d.data||[]).filter((u:any)=>u.active!==false)
+    const list = (d.data||[]).filter((u:any)=>u.active!==false && isInternalMember(u))
     setUsers(list)
     // Default selection: self
     const me = list.find((u:any)=>u.email===sessUser?.email)

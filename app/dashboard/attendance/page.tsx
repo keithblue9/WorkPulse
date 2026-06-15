@@ -6,6 +6,13 @@ import { AppConfig, AttendanceType } from '@/types'
 import toast from 'react-hot-toast'
 import { format, getDaysInMonth, getDay, startOfMonth } from 'date-fns'
 
+// External/guest collaborators are not internal staff → excluded from presensi & biodata
+const NON_STAFF_ROLES = ['external', 'guest']
+function isInternalMember(u:any): boolean {
+  const roles = (u?.roles && u.roles.length) ? u.roles : (u?.role ? [u.role] : [])
+  return !roles.some((r:string) => NON_STAFF_ROLES.includes(String(r).toLowerCase()))
+}
+
 // Robust slot helpers — handle legacy slots (missing isFullDay / 'fullday' sentinel / missing times)
 function slotIsFullDay(slot:any): boolean {
   if (slot?.isFullDay === true) return true
@@ -93,7 +100,7 @@ export default function AttendancePage() {
         fetch('/api/users').then(r=>r.json()),
         fetch(`/api/attendance/summary?month=${month}`).then(r=>r.json()),
       ])
-      const activeMembers = (usr.data||[]).filter((u:any)=>u.active!==false).map((u:any, idx:number)=>({ id:u._id, name:u.name, division:u.division||u.role, color: TEAM_COLORS[idx % TEAM_COLORS.length] }))
+      const activeMembers = (usr.data||[]).filter((u:any)=>u.active!==false && isInternalMember(u)).map((u:any, idx:number)=>({ id:u._id, name:u.name, division:u.division||u.role, color: TEAM_COLORS[idx % TEAM_COLORS.length] }))
       setTeam(activeMembers)
       let uid = selectedUserId
       if (!uid && activeMembers.length) { uid = activeMembers[0].id; setSelectedUserId(uid) }
