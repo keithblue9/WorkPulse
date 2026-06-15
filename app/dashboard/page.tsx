@@ -76,6 +76,7 @@ function stripMd(t:string):string {
     .trim()
 }
 
+function spiColor(spi:number|null) { if (spi===null||spi===undefined) return 'var(--text3)'; if (spi>=0.95) return 'var(--green)'; if (spi>=0.80) return 'var(--amber)'; return 'var(--red)' }
 function ProgressRing({ plan, actual, size=120 }: { plan:number; actual:number; size?:number }) {
   const r = size/2 - 10
   const circ = 2 * Math.PI * r
@@ -429,6 +430,9 @@ export default function DashboardPage() {
                             </div>
                             <div className="initiative-ring-panel" style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minWidth:140, borderLeft:'1px solid var(--border)', paddingLeft:16 }}>
                               <ProgressRing plan={calc.planProgress} actual={calc.actualProgress} size={130} />
+                              {calc.spi !== null && calc.spi !== undefined && (
+                                <div style={{ marginTop:6, padding:'3px 9px', borderRadius:7, background:spiColor(calc.spi)+'1a', border:`1px solid ${spiColor(calc.spi)}44`, fontSize:12, fontWeight:800, color:spiColor(calc.spi) }}>SPI {(calc.spi*100).toFixed(0)}%</div>
+                              )}
                               <div style={{ fontSize:10, color:'var(--text3)', marginTop:6 }}>{calc.phases.length} phase{calc.phases.length>1?'s':''}</div>
                             </div>
                           </div>

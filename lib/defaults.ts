@@ -60,9 +60,20 @@ export function picArray(p: any): string[] {
 
 
 // ─── Initiative progress calculation (week-level) ───
-// planPct per phase = (phase plan weeks / total plan weeks across all phases) × 100
-// actualPct per phase = (phase actual weeks / phase plan weeks) × phase planPct
-// total planProgress = sum(planPct) ; total actualProgress = sum(actualPct)
+// TWO metrics per the team's KPI model:
+//  1. COMPLETION (planProgress / actualProgress): how much work is done vs planned
+//     amount. Counts all actual weeks (early/on-time/late), capped at 100% (no bonus).
+//  2. SPI (Schedule Performance Index): schedule efficiency. Standard PMBOK Earned
+//     Value metric adapted to week-cells. Per phase, walk each planned week as a
+//     deadline checkpoint; the k-th planned week is "earned" only if at least k actual
+//     weeks were done on-or-before it. Late work misses the checkpoint → SPI drops.
+//     SPI = 1.0 on schedule, <1.0 behind (late), capped at 1.0 (no ahead-of-schedule
+//     bonus). Overall SPI is weighted by each phase's planned weeks.
+// Cell format "M-W" (month-week), converted to an absolute week index for ordering.
+function _weekIndex(cell: string): number {
+  const [m, w] = String(cell).split('-').map(Number)
+  return ((m || 1) - 1) * 4 + ((w || 1) - 1)
+}
 export function calcInitiativeProgress(phases: any[]) {
   const planWeeksArr = phases.map(p => (p.planCells || []).length)
   const totalPlanWeeks = planWeeksArr.reduce((a, b) => a + b, 0)
@@ -70,18 +81,35 @@ export function calcInitiativeProgress(phases: any[]) {
     const planWeeks = planWeeksArr[i]
     const planCells: string[] = p.planCells || []
     const actualCells: string[] = p.actualCells || []
-    // Count actual weeks that fall WITHIN the planned weeks ("on-plan" completion).
-    // Working weeks beyond the plan window = late/overrun, they do NOT add progress.
-    const onPlanActual = actualCells.filter(c => planCells.includes(c)).length
     const actualWeeks = actualCells.length
     const planPct = totalPlanWeeks > 0 ? (planWeeks / totalPlanWeeks) * 100 : 0
-    // actual completion = how much of THIS phase's plan is covered, capped at 100% of the phase.
-    // Overrun (actual beyond plan) never pushes a phase above its planned weight.
-    const completionRatio = planWeeks > 0 ? Math.min(onPlanActual / planWeeks, 1) : 0
+
+    // ── COMPLETION: work done vs planned amount, capped at 100% (early or late both count) ──
+    const completionRatio = planWeeks > 0 ? Math.min(actualWeeks / planWeeks, 1) : 0
     const actualPct = completionRatio * planPct
-    return { ...p, planPct, actualPct, _planWeeks: planWeeks, _actualWeeks: actualWeeks, _onPlanActual: onPlanActual }
+
+    // ── SPI: schedule efficiency per phase (checkpoint model), capped at 1.0 ──
+    let spi: number | null = null
+    if (planWeeks > 0) {
+      const planSorted = [...planCells].map(_weekIndex).sort((a, b) => a - b)
+      const actualIdx = actualCells.map(_weekIndex).sort((a, b) => a - b)
+      let earned = 0
+      for (let k = 0; k < planSorted.length; k++) {
+        const deadline = planSorted[k]
+        const doneByDeadline = actualIdx.filter(a => a <= deadline).length
+        if (doneByDeadline >= k + 1) earned++
+      }
+      spi = Math.min(earned / planWeeks, 1)
+    }
+    return { ...p, planPct, actualPct, spi, _planWeeks: planWeeks, _actualWeeks: actualWeeks }
   })
   const planProgress = result.reduce((a, b) => a + b.planPct, 0)
   const actualProgress = result.reduce((a, b) => a + b.actualPct, 0)
-  return { phases: result, planProgress, actualProgress }
+  // Overall SPI weighted by phase planned weeks
+  const spiPhases = result.filter(r => r.spi !== null)
+  const totalSpiW = spiPhases.reduce((a, b) => a + b._planWeeks, 0)
+  const spi = totalSpiW > 0
+    ? spiPhases.reduce((a, b) => a + (b.spi as number) * b._planWeeks, 0) / totalSpiW
+    : null
+  return { phases: result, planProgress, actualProgress, spi }
 }

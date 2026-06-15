@@ -19,6 +19,7 @@ const InitiativeSchema = new Schema({
   title: { type:String, required:true },
   planProgress: { type:Number, default:0 },     // auto = sum of phase planPct (=100 if all planned)
   actualProgress: { type:Number, default:0 },   // auto = sum of phase actualPct
+  spi: { type:Number, default:null },           // Schedule Performance Index (schedule efficiency, capped 1.0)
   status: { type:String, default:'on_track' },
   year: { type:Number, default:2026 },
   pic: { type:[String], default:[] },

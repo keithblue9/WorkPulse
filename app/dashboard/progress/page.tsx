@@ -8,6 +8,20 @@ import { calcInitiativeProgress } from '@/lib/defaults'
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
 
 // Circular progress ring widget
+// SPI (Schedule Performance Index) → color + label. 1.0 = on schedule, <1 = late.
+function spiColor(spi:number|null) {
+  if (spi === null) return 'var(--text3)'
+  if (spi >= 0.95) return 'var(--green)'
+  if (spi >= 0.80) return 'var(--amber)'
+  return 'var(--red)'
+}
+function spiLabel(spi:number|null) {
+  if (spi === null) return '—'
+  if (spi >= 0.95) return 'On schedule'
+  if (spi >= 0.80) return 'Sedikit telat'
+  return 'Telat'
+}
+
 function ProgressRing({ plan, actual, size=120 }: { plan:number; actual:number; size?:number }) {
   const r = size/2 - 10
   const circ = 2 * Math.PI * r
@@ -173,7 +187,7 @@ function InitiativeForm({ editing, onClose, onSave, members }: { editing?:any; o
         const { _planWeeks, _actualWeeks, ...rest } = p
         return rest
       })
-      const body = { ...form, phases: phasesWithPct, planProgress: calc.planProgress, actualProgress: calc.actualProgress }
+      const body = { ...form, phases: phasesWithPct, planProgress: calc.planProgress, actualProgress: calc.actualProgress, spi: calc.spi }
       const url = editing ? `/api/initiatives/${editing._id}` : '/api/initiatives'
       await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
       toast.success(editing?'Diperbarui':'Initiative dibuat'); onSave(); onClose()
@@ -239,7 +253,7 @@ function InitiativeForm({ editing, onClose, onSave, members }: { editing?:any; o
               <PhaseEditor key={i} phase={p} idx={i} onChange={(np:any)=>setPhase(i, np)} onRemove={()=>removePhase(i)} computed={calc.phases[i]} />
             ))}
             <div style={{ padding:'8px 12px', background:'var(--bg3)', borderRadius:7, fontSize:11, color:'var(--text3)', lineHeight:1.5 }}>
-              <b>Rumus:</b> Plan% phase = (minggu plan phase / total minggu plan semua phase) × 100. Actual% phase = (minggu actual / minggu plan phase) × Plan% phase. Total = penjumlahan semua phase.
+              <b>Rumus:</b> <b>Completion</b> = (minggu actual / minggu plan) capped 100% — seberapa banyak kerjaan kelar (telat/cepat tetap dihitung). <b>SPI</b> (Schedule Performance Index) = ketepatan waktu: tiap minggu plan jadi checkpoint deadline; kalau kerjaan telat lewat checkpoint, SPI turun. SPI 100% = tepat jadwal, &lt;100% = telat. Cap 100% (lebih cepat ga dapat bonus).
             </div>
           </div>
         </div>
@@ -311,6 +325,10 @@ export default function ProgressPage() {
                                 <span style={{ color:'var(--brand)', fontWeight:700 }}>Plan {ph.planPct.toFixed(0)}%</span>
                                 <span style={{ color:'var(--text3)' }}> · </span>
                                 <span style={{ color:'var(--green)', fontWeight:700 }}>Actual {ph.actualPct.toFixed(1)}%</span>
+                                {ph.spi !== null && ph.spi !== undefined && (
+                                  <><span style={{ color:'var(--text3)' }}> · </span>
+                                  <span style={{ color:spiColor(ph.spi), fontWeight:700 }} title="Schedule Performance Index — ketepatan waktu phase ini">SPI {(ph.spi*100).toFixed(0)}%</span></>
+                                )}
                               </div>
                             </div>
                             {/* Mini progress bar */}
@@ -328,6 +346,12 @@ export default function ProgressPage() {
                     {/* Right: progress ring widget */}
                     <div className="initiative-ring-panel" style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, minWidth:140, borderLeft:'1px solid var(--border)', paddingLeft:16 }}>
                       <ProgressRing plan={calc.planProgress} actual={calc.actualProgress} size={130} />
+                      {calc.spi !== null && calc.spi !== undefined && (
+                        <div style={{ textAlign:'center', padding:'4px 10px', borderRadius:8, background:spiColor(calc.spi)+'1a', border:`1px solid ${spiColor(calc.spi)}44` }}>
+                          <div style={{ fontSize:15, fontWeight:800, color:spiColor(calc.spi), lineHeight:1 }}>SPI {(calc.spi*100).toFixed(0)}%</div>
+                          <div style={{ fontSize:9, color:spiColor(calc.spi), marginTop:2 }}>{spiLabel(calc.spi)}</div>
+                        </div>
+                      )}
                       <div style={{ fontSize:10, color:'var(--text3)', textAlign:'center' }}>{calc.phases.length} phase{calc.phases.length>1?'s':''}</div>
                     </div>
                   </div>
