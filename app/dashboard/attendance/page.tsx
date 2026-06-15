@@ -15,11 +15,12 @@ function isInternalMember(u:any): boolean {
 
 // Robust slot helpers — handle legacy slots (missing isFullDay / 'fullday' sentinel / missing times)
 function slotIsFullDay(slot:any): boolean {
-  if (slot?.isFullDay === true) return true
-  if (slot?.isFullDay === false) return false
-  // legacy / fallback: treat as full day if times are missing or marked 'fullday'
   const st = slot?.startTime, et = slot?.endTime
+  // Times are the source of truth: missing or 'fullday' sentinel = full day,
+  // regardless of the isFullDay flag (which may be a stale/incorrect false on
+  // legacy slots that have no real times).
   if (!st || !et || st === 'fullday' || et === 'fullday') return true
+  if (slot?.isFullDay === true) return true
   return false
 }
 function slotTimeLabel(slot:any): string {
