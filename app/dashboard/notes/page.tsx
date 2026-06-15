@@ -5,8 +5,26 @@ import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 
+// Fullscreen image preview (lightbox). Click backdrop or × to close.
+function Lightbox({ src, onClose }: { src:string|null; onClose:()=>void }) {
+  useEffect(() => {
+    if (!src) return
+    const onKey = (e:KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [src, onClose])
+  if (!src) return null
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:3000, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center', padding:24, cursor:'zoom-out' }}>
+      <button onClick={onClose} style={{ position:'absolute', top:16, right:20, width:40, height:40, borderRadius:'50%', background:'rgba(255,255,255,0.15)', color:'#fff', border:'none', fontSize:22, cursor:'pointer', lineHeight:1 }}>×</button>
+      <img src={src} alt="preview" onClick={e=>e.stopPropagation()} style={{ maxWidth:'95vw', maxHeight:'90vh', objectFit:'contain', borderRadius:8, boxShadow:'0 8px 40px rgba(0,0,0,0.5)', cursor:'default' }} />
+    </div>
+  )
+}
+
 function NoteForm({ editing, onClose, onSave, config, members }: { editing?:any; onClose:()=>void; onSave:()=>void; config:any; members:any[] }) {
   const { data:session } = useSession(); const user = session?.user as any
+  const [lightbox, setLightbox] = useState<string|null>(null)
   const [form, setForm] = useState({
     title: editing?.title || '',
     category: editing?.category || (config?.activityCategories?.[0]?.key || 'Others'),
@@ -100,14 +118,18 @@ function NoteForm({ editing, onClose, onSave, config, members }: { editing?:any;
             </div>
             <textarea ref={contentRef} className="input" rows={6} value={form.content} onChange={e=>set('content',e.target.value)} onPaste={handlePaste} placeholder="Isi catatan. Paste gambar langsung dari clipboard (Ctrl+V / Cmd+V)..." />
             {form.images.length > 0 && (
-              <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:8 }}>
-                {form.images.map((img:string, i:number) => (
-                  <div key={i} style={{ position:'relative' }}>
-                    <img src={img} alt={`paste-${i}`} style={{ maxWidth:120, maxHeight:120, borderRadius:6, border:'1px solid var(--border)', objectFit:'cover' }} />
-                    <button type="button" onClick={()=>set('images', form.images.filter((_:any,idx:number)=>idx!==i))} style={{ position:'absolute', top:-6, right:-6, width:20, height:20, borderRadius:'50%', background:'var(--red)', color:'#fff', border:'none', cursor:'pointer', fontSize:12, lineHeight:1 }}>×</button>
-                  </div>
-                ))}
-              </div>
+              <>
+                <div style={{ fontSize:10, color:'var(--text3)', marginTop:8 }}>Klik gambar untuk lihat ukuran penuh</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:4 }}>
+                  {form.images.map((img:string, i:number) => (
+                    <div key={i} style={{ position:'relative' }}>
+                      <img src={img} alt={`paste-${i}`} onClick={()=>setLightbox(img)} style={{ maxWidth:120, maxHeight:120, borderRadius:6, border:'1px solid var(--border)', objectFit:'cover', cursor:'zoom-in' }} />
+                      <button type="button" onClick={()=>set('images', form.images.filter((_:any,idx:number)=>idx!==i))} style={{ position:'absolute', top:-6, right:-6, width:20, height:20, borderRadius:'50%', background:'var(--red)', color:'#fff', border:'none', cursor:'pointer', fontSize:12, lineHeight:1 }}>×</button>
+                    </div>
+                  ))}
+                </div>
+                <Lightbox src={lightbox} onClose={()=>setLightbox(null)} />
+              </>
             )}
           </div>
           <div>
@@ -216,6 +238,14 @@ export default function NotesPage() {
                           ))}
                         </div>
                       )}
+                      {n.images?.length > 0 && (
+                        <div style={{ display:'flex', gap:4, flexWrap:'wrap', margin:'6px 0' }}>
+                          {n.images.slice(0,4).map((img:string, ii:number) => (
+                            <img key={ii} src={img} alt={`img-${ii}`} onClick={(e)=>{e.stopPropagation();setCardLightbox(img)}} style={{ width:54, height:54, objectFit:'cover', borderRadius:5, border:'1px solid var(--border)', cursor:'zoom-in' }} />
+                          ))}
+                          {n.images.length > 4 && <div style={{ width:54, height:54, borderRadius:5, background:'var(--bg3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, color:'var(--text3)', fontWeight:600 }}>+{n.images.length-4}</div>}
+                        </div>
+                      )}
                       <div style={{ fontSize:9, color:'var(--text3)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                         <span>📅 {n.date}{n.images?.length > 0 ? ` · 🖼 ${n.images.length}` : ''}</span>
                         {n.authorName && <span>· {n.authorName.split(' ')[0]}</span>}
@@ -231,6 +261,7 @@ export default function NotesPage() {
           </div>
         )}
       </div>
+      <Lightbox src={cardLightbox} onClose={()=>setCardLightbox(null)} />
     </div>
   )
 }
