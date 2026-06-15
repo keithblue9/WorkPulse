@@ -20,7 +20,21 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
   })
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [profileLoaded, setProfileLoaded] = useState(false)
   const set = (k:string,v:any) => setForm(f=>({...f,[k]:v}))
+
+  // Auto-fill bank & no rekening from the user's biodata (only for a NEW reimburse,
+  // and only if not already filled, so editing an existing one is untouched)
+  useEffect(() => {
+    if (editing) { setProfileLoaded(true); return }
+    let cancelled = false
+    fetch('/api/profile').then(r=>r.json()).then(pr => {
+      if (cancelled) return
+      const p = pr?.data
+      if (p) setForm(f => ({ ...f, bank: f.bank || p.bank || '', noRekening: f.noRekening || p.noRekening || '' }))
+    }).catch(()=>{}).finally(()=>{ if(!cancelled) setProfileLoaded(true) })
+    return () => { cancelled = true }
+  }, [editing])
 
   async function handleFileUpload(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -100,8 +114,8 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
               </select></div>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Bank *</label><input className="input" value={form.bank} onChange={e=>set('bank',e.target.value)} placeholder="BCA, Mandiri, BRI..." /></div>
-            <div><label style={lbl}>No. Rekening *</label><input className="input" value={form.noRekening} onChange={e=>set('noRekening',e.target.value)} /></div>
+            <div><label style={lbl}>Bank * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(otomatis dari biodata)</span></label><input className="input" value={form.bank} onChange={e=>set('bank',e.target.value)} placeholder="BCA, Mandiri, BRI..." /></div>
+            <div><label style={lbl}>No. Rekening * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(otomatis dari biodata)</span></label><input className="input" value={form.noRekening} onChange={e=>set('noRekening',e.target.value)} placeholder="Isi di Member Biodata agar otomatis" /></div>
           </div>
           <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, cursor:'pointer' }}>
             <input type="checkbox" checked={form.isCashCard} onChange={e=>set('isCashCard',e.target.checked)} />
