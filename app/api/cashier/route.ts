@@ -15,13 +15,16 @@ export async function GET(req:NextRequest) {
       cashier = created.toObject()
     }
     const cashCardRows = await CashCardModel.find({ year }).lean()
-    const cashCardKasMasuk = cashCardRows.reduce((s,r:any)=>s+(r.topUpAmount||0),0)
-    const cashCardKeluar = cashCardRows.reduce((s,r:any)=>s+(r.settlementAmount||0),0)
+    const cashCardKasMasuk = cashCardRows.reduce((s,r:any)=>s+(r.topUpAmount||0),0)       // top up = uang masuk ke kas tim
+    const cashCardKeluar = cashCardRows.reduce((s,r:any)=>s+(r.settlementAmount||0),0)     // settlement = dipertanggungjawabkan (keluar)
+    const cashCardPengembalian = cashCardRows.reduce((s,r:any)=>s+(r.refundAmount||0),0)   // pengembalian = dikembalikan ke kantor (keluar dari kas tim)
     const reimbursDone = await ReimbursementModel.find({ status:{ $in:['done','reversal_requested'] } }).lean() as any[]
-    const operasionalKeluar = reimbursDone.filter((r:any)=>!r.isCashCard).reduce((s,r:any)=>s+(r.totalTransfer||r.amount||0),0)
+    const operasionalKeluar = reimbursDone.filter((r:any)=>!r.isCashCard).reduce((s,r:any)=>s+(r.totalTransfer||r.amount||0),0) // petty cash payouts via reimburse
     const manualTopUpTotal = (cashier.manualTopUps||[]).reduce((s:number,t:any)=>s+(t.amount||0),0)
-    const saldoKas = (cashier.saldoAwal||0) + manualTopUpTotal + cashCardKasMasuk - cashCardKeluar - operasionalKeluar
-    return NextResponse.json({ data: { ...cashier, summary: { saldoAwal:cashier.saldoAwal||0, kasMasuk: cashCardKasMasuk + manualTopUpTotal, kasKeluarCashCard: cashCardKeluar, kasKeluarOperasional: operasionalKeluar, saldoKas, manualTopUpTotal } } })
+    // Saldo Kas = uang yang masih di tangan tim:
+    //   saldo awal + masuk (topup + manual) - settlement - pengembalian (balik ke kantor) - operasional petty cash
+    const saldoKas = (cashier.saldoAwal||0) + manualTopUpTotal + cashCardKasMasuk - cashCardKeluar - cashCardPengembalian - operasionalKeluar
+    return NextResponse.json({ data: { ...cashier, summary: { saldoAwal:cashier.saldoAwal||0, kasMasuk: cashCardKasMasuk + manualTopUpTotal, kasKeluarCashCard: cashCardKeluar, cashCardPengembalian, kasKeluarOperasional: operasionalKeluar, saldoKas, manualTopUpTotal } } })
   } catch (e:any) { return NextResponse.json({ error:e.message }, { status:500 }) }
 }
 export async function PATCH(req:NextRequest) {

@@ -189,7 +189,7 @@ export default function CashierPage() {
 
   const pending = reimburses.filter(r => r.status === 'submitted' || r.status === 'approved' || r.status === 'draft')
   const done = reimburses.filter(r => r.status === 'done' || r.status === 'paid' || r.status === 'reversal_requested' || r.status === 'reversal_approved')
-  const summary = cashier?.summary || { saldoAwal:0, kasMasuk:0, kasKeluarCashCard:0, kasKeluarOperasional:0, saldoKas:0 }
+  const summary = cashier?.summary || { saldoAwal:0, kasMasuk:0, kasKeluarCashCard:0, cashCardPengembalian:0, kasKeluarOperasional:0, saldoKas:0 }
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -209,7 +209,7 @@ export default function CashierPage() {
       </div>
 
       {/* Balance summary cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:8, padding:'12px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+      <div className="stat-grid" style={{ display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:8, padding:'12px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
         <div className="card" style={{ padding:'10px 12px' }}>
           <div style={{ fontSize:9, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.05em' }}>Saldo Awal</div>
           <div style={{ fontSize:14, fontWeight:700 }}>Rp {fmt(summary.saldoAwal)}</div>
@@ -229,9 +229,15 @@ export default function CashierPage() {
           <div style={{ fontSize:14, fontWeight:700, color:'var(--red)' }}>− Rp {fmt(summary.kasKeluarOperasional)}</div>
           <div style={{ fontSize:9, color:'var(--text3)' }}>Reimburse petty cash</div>
         </div>
+        <div className="card" style={{ padding:'10px 12px' }}>
+          <div style={{ fontSize:9, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.05em' }}>Keluar — Pengembalian</div>
+          <div style={{ fontSize:14, fontWeight:700, color:'var(--amber)' }}>− Rp {fmt(summary.cashCardPengembalian||0)}</div>
+          <div style={{ fontSize:9, color:'var(--text3)' }}>Cash card balik ke kantor</div>
+        </div>
         <div className="card" style={{ padding:'10px 12px', background:'var(--brand-soft)', border:'1px solid var(--brand)' }}>
           <div style={{ fontSize:9, color:'var(--brand)', textTransform:'uppercase', letterSpacing:'0.05em' }}>Saldo Kas</div>
           <div style={{ fontSize:14, fontWeight:800, color:'var(--brand)' }}>Rp {fmt(summary.saldoKas)}</div>
+          <div style={{ fontSize:9, color:'var(--brand)' }}>Uang di tangan sekarang</div>
         </div>
       </div>
 
