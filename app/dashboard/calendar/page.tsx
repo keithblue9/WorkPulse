@@ -154,17 +154,20 @@ export default function CalendarPage() {
               const isSelected = isSameDay(day, selectedDay)
               return (
                 <div key={day.toISOString()} onClick={()=>setSelectedDay(day)} style={{
-                  minHeight:80, padding:6, borderRadius:7, cursor:'pointer',
+                  minHeight:80, minWidth:0, padding:6, borderRadius:7, cursor:'pointer', overflow:'hidden',
                   background: isSelected ? 'var(--brand-soft)' : isToday ? 'var(--bg3)' : 'transparent',
                   border: `1px solid ${isSelected?'var(--brand)':'var(--border)'}`,
                   opacity: isCurrentMonth ? 1 : 0.4,
                 }}>
                   <div style={{ fontSize:11, fontWeight: isToday?700:500, color: isToday?'var(--brand)':'var(--text2)', marginBottom:3 }}>{format(day,'d')}</div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-                    {dayActivities.slice(0,3).map(a => (
-                      <div key={a._id} style={{ fontSize:9, padding:'2px 5px', background:catColor(a.category)+'22', color:catColor(a.category), borderRadius:3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.title}</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:2, minWidth:0 }}>
+                    {dayActivities.slice(0,2).map(a => (
+                      <div key={a._id} title={a.title} style={{ display:'flex', alignItems:'center', gap:3, fontSize:9, minWidth:0 }}>
+                        <span style={{ width:5, height:5, borderRadius:'50%', background:catColor(a.category), flexShrink:0 }} />
+                        <span style={{ color:'var(--text2)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 }}>{a.title}</span>
+                      </div>
                     ))}
-                    {dayActivities.length > 3 && <div style={{ fontSize:9, color:'var(--text3)' }}>+{dayActivities.length-3} more</div>}
+                    {dayActivities.length > 2 && <div style={{ fontSize:9, color:'var(--text3)', fontWeight:600 }}>+{dayActivities.length-2} lagi</div>}
                   </div>
                 </div>
               )
