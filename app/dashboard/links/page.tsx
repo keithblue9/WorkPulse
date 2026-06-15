@@ -6,26 +6,32 @@ import toast from 'react-hot-toast'
 
 const DEFAULT_CATS = ['General','Files','Tools','References','Reports','Social','Other']
 
-function LinkForm({ onClose, onSave, editing }: { onClose:()=>void; onSave:()=>void; editing?:any }) {
-  const { data:session } = useSession(); const user = session?.user as any
-  const [form, setForm] = useState({ title:editing?.title||'', url:editing?.url||'', description:editing?.description||'', category:editing?.category||'General', pinned:editing?.pinned||false })
+function getIcon(url: string) {
+  const u = String(url || '')
+  if (u.includes('drive.google')) return '📁'
+  if (u.includes('docs.google')) return '📄'
+  if (u.includes('sheets.google')) return '📊'
+  if (u.includes('slides.google')) return '📊'
+  if (u.includes('notion')) return '📓'
+  if (u.includes('figma')) return '🎨'
+  if (u.includes('github')) return '💻'
+  if (u.includes('teams') || u.includes('microsoft')) return '💼'
+  if (u.includes('zoom')) return '🔵'
+  if (u.includes('youtube')) return '▶️'
+  if (u.includes('slack')) return '💬'
+  return '🔗'
+}
+
+function LinkForm({ onClose, onSave, editing, linkCats, userName }: { onClose:()=>void; onSave:()=>void; editing?:any; linkCats:any[]; userName?:string }) {
+  const [form, setForm] = useState({
+    title: editing?.title || '',
+    url: editing?.url || '',
+    description: editing?.description || '',
+    category: editing?.category || 'General',
+    pinned: editing?.pinned || false,
+  })
   const [saving, setSaving] = useState(false)
   const set = (k:string,v:any) => setForm(f=>({...f,[k]:v}))
-
-  function getIcon(url: string) {
-    if (url.includes('drive.google')) return '📁'
-    if (url.includes('docs.google')) return '📄'
-    if (url.includes('sheets.google')) return '📊'
-    if (url.includes('slides.google')) return '📊'
-    if (url.includes('notion')) return '📓'
-    if (url.includes('figma')) return '🎨'
-    if (url.includes('github')) return '💻'
-    if (url.includes('teams') || url.includes('microsoft')) return '💼'
-    if (url.includes('zoom')) return '🔵'
-    if (url.includes('youtube')) return '▶️'
-    if (url.includes('slack')) return '💬'
-    return '🔗'
-  }
 
   async function save() {
     if (!form.title || !form.url) { toast.error('Judul dan URL wajib'); return }
@@ -34,10 +40,12 @@ function LinkForm({ onClose, onSave, editing }: { onClose:()=>void; onSave:()=>v
     try {
       const url = editing ? `/api/links/${editing._id}` : '/api/links'
       await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ ...form, icon: getIcon(form.url), addedBy: user?.name }) })
+        body: JSON.stringify({ ...form, icon: getIcon(form.url), addedBy: userName }) })
       toast.success(editing ? 'Link diperbarui!' : 'Link ditambahkan!'); onSave(); onClose()
     } catch { toast.error('Gagal') } finally { setSaving(false) }
   }
+
+  const cats = (linkCats && linkCats.length) ? linkCats.map((c:any)=>({ key:c.key, label:c.label })) : DEFAULT_CATS.map(c=>({ key:c, label:c }))
 
   return (
     <div className="modal-overlay" onClick={e => e.target===e.currentTarget&&onClose()}>
@@ -52,7 +60,7 @@ function LinkForm({ onClose, onSave, editing }: { onClose:()=>void; onSave:()=>v
           <div><label style={lbl}>Deskripsi</label><input className="input" value={form.description} onChange={e=>set('description',e.target.value)} placeholder="Deskripsi singkat..." /></div>
           <div><label style={lbl}>Kategori</label>
             <select className="input" value={form.category} onChange={e=>set('category',e.target.value)}>
-              {(linkCats||[]).map((c:any) => <option key={c.key} value={c.label}>{c.label}</option>)}
+              {cats.map((c:any) => <option key={c.key} value={c.label}>{c.label}</option>)}
             </select></div>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             <div className={`toggle-wrap${form.pinned?' on':''}`} onClick={() => set('pinned',!form.pinned)} />
@@ -60,7 +68,7 @@ function LinkForm({ onClose, onSave, editing }: { onClose:()=>void; onSave:()=>v
           </div>
           {form.url && form.url.startsWith('http') && (
             <div style={{ padding:'8px 12px', background:'var(--bg3)', borderRadius:7, fontSize:12, color:'var(--text2)', display:'flex', alignItems:'center', gap:8 }}>
-              <span style={{ fontSize:18 }}>{['📁','📄','📊','📓','🎨','💻','💼','🔵','▶️','💬','🔗'].includes('🔗') ? '🔗' : '🔗'}</span>
+              <span style={{ fontSize:18 }}>{getIcon(form.url)}</span>
               <span>{form.title || 'Preview link'}</span>
             </div>
           )}
@@ -92,7 +100,8 @@ export default function LinksPage() {
         getConfig().then((data:any)=>({ data })).catch(()=>({ data:null })),
       ])
       setLinks(Array.isArray(r?.data) ? r.data : [])
-      setLinkCats(c?.data?.linkCategories?.filter((x:any)=>x.active) || [])
+      const cats = c?.data?.linkCategories
+      setLinkCats(Array.isArray(cats) ? cats.filter((x:any)=>x?.active) : [])
     } catch {
       setLinks([]); setLinkCats([])
     } finally {
@@ -103,24 +112,22 @@ export default function LinksPage() {
 
   async function del(id: string) {
     if (!confirm('Hapus link ini?')) return
-    await fetch(`/api/links/${id}`, { method:'DELETE' })
-    toast.success('Link dihapus'); load()
+    try { await fetch(`/api/links/${id}`, { method:'DELETE' }); toast.success('Link dihapus'); load() } catch { toast.error('Gagal hapus') }
   }
-
   async function togglePin(link: any) {
-    await fetch(`/api/links/${link._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ pinned: !link.pinned }) })
-    load()
+    try { await fetch(`/api/links/${link._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ pinned: !link.pinned }) }); load() } catch {}
   }
-
   async function trackClick(link: any) {
-    await fetch(`/api/links/${link._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ clickCount: (link.clickCount||0)+1 }) })
-    window.open(link.url, '_blank')
+    try { await fetch(`/api/links/${link._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ clickCount: (link.clickCount||0)+1 }) }) } catch {}
+    if (link.url) window.open(link.url, '_blank')
   }
 
-  const categories = ['Semua', ...Array.from(new Set(links.map(l => l.category||'General')))]
-  const filtered = links.filter(l => {
-    const matchSearch = !search || (l.title||'').toLowerCase().includes(search.toLowerCase()) || (l.description||'').toLowerCase().includes(search.toLowerCase())
-    const matchCat = activeCategory === 'Semua' || l.category === activeCategory
+  const categories = ['Semua', ...Array.from(new Set((links||[]).map(l => l?.category || 'General')))]
+  const filtered = (links||[]).filter(l => {
+    const title = String(l?.title || '')
+    const desc = String(l?.description || '')
+    const matchSearch = !search || title.toLowerCase().includes(search.toLowerCase()) || desc.toLowerCase().includes(search.toLowerCase())
+    const matchCat = activeCategory === 'Semua' || l?.category === activeCategory
     return matchSearch && matchCat
   })
 
@@ -128,7 +135,7 @@ export default function LinksPage() {
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      {(showForm||editing) && <LinkForm onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} editing={editing} />}
+      {(showForm||editing) && <LinkForm onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} editing={editing} linkCats={linkCats} userName={user?.name} />}
 
       <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
         <div><div style={{ fontSize:14, fontWeight:600 }}>Link Hub</div><div style={{ fontSize:11, color:'var(--text3)' }}>Koleksi link tim — files, tools, referensi</div></div>
@@ -137,15 +144,15 @@ export default function LinksPage() {
 
       <div style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', gap:8, alignItems:'center', flexShrink:0, flexWrap:'wrap' }}>
         <input className="input" style={{ width:200 }} value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Cari link..." />
-        <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+        <div className="chip-row" style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
           {categories.map(cat => (
-            <button key={cat} onClick={()=>setActiveCategory(cat)} style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:500, cursor:'pointer', border:`1px solid ${activeCategory===cat?'var(--blue)':'var(--border)'}`, background: activeCategory===cat?'var(--bluebg)':'var(--bg3)', color: activeCategory===cat?'var(--blue)':'var(--text2)' }}>{cat}</button>
+            <button key={cat} onClick={()=>setActiveCategory(cat)} style={{ padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:500, cursor:'pointer', whiteSpace:'nowrap', border:`1px solid ${activeCategory===cat?'var(--blue)':'var(--border)'}`, background: activeCategory===cat?'var(--bluebg)':'var(--bg3)', color: activeCategory===cat?'var(--blue)':'var(--text2)' }}>{cat}</button>
           ))}
         </div>
         <div style={{ marginLeft:'auto', fontSize:12, color:'var(--text3)' }}>{filtered.length} link</div>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }}>
+      <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }} className="page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> : (
           filtered.length === 0 ? (
             <div style={{ textAlign:'center', padding:60, color:'var(--text3)' }}>
@@ -153,24 +160,24 @@ export default function LinksPage() {
               <div>Belum ada link. Tambahkan link pertama tim lo!</div>
             </div>
           ) : (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:10 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))', gap:10 }} className="responsive-grid">
               {filtered.map((link, i) => (
-                <div key={link._id} className="card fade-in" style={{ padding:'14px 16px', cursor:'pointer', transition:'all 0.15s', animationDelay:`${i*0.04}s`, position:'relative' }}
+                <div key={link?._id || i} className="card fade-in" style={{ padding:'14px 16px', cursor:'pointer', transition:'all 0.15s', position:'relative' }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor='var(--blue)'}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor='var(--border)'}>
-                  {link.pinned && <span style={{ position:'absolute', top:10, right:10, fontSize:11 }}>📌</span>}
+                  {link?.pinned && <span style={{ position:'absolute', top:10, right:10, fontSize:11 }}>📌</span>}
                   <div style={{ display:'flex', alignItems:'flex-start', gap:10, marginBottom:8 }}>
-                    <span style={{ fontSize:22, flexShrink:0 }}>{link.icon || '🔗'}</span>
+                    <span style={{ fontSize:22, flexShrink:0 }}>{link?.icon || '🔗'}</span>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', marginBottom:3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{link.title}</div>
-                      <div style={{ fontSize:10, color:'var(--text3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{link.url}</div>
+                      <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', marginBottom:3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{link?.title || '(tanpa judul)'}</div>
+                      <div style={{ fontSize:10, color:'var(--text3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{link?.url}</div>
                     </div>
                   </div>
-                  {link.description && <div style={{ fontSize:11, color:'var(--text2)', marginBottom:8, lineHeight:1.4 }}>{link.description}</div>}
+                  {link?.description && <div style={{ fontSize:11, color:'var(--text2)', marginBottom:8, lineHeight:1.4 }}>{link.description}</div>}
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                     <div style={{ display:'flex', gap:4 }}>
-                      <span style={{ padding:'2px 8px', borderRadius:20, fontSize:10, background:'var(--bg4)', color:'var(--text3)' }}>{link.category}</span>
-                      {link.clickCount > 0 && <span style={{ padding:'2px 8px', borderRadius:20, fontSize:10, background:'var(--bg4)', color:'var(--text3)' }}>👆 {link.clickCount}</span>}
+                      <span style={{ padding:'2px 8px', borderRadius:20, fontSize:10, background:'var(--bg4)', color:'var(--text3)' }}>{link?.category || 'General'}</span>
+                      {link?.clickCount > 0 && <span style={{ padding:'2px 8px', borderRadius:20, fontSize:10, background:'var(--bg4)', color:'var(--text3)' }}>👆 {link.clickCount}</span>}
                     </div>
                     <div style={{ display:'flex', gap:4 }}>
                       {canManage && <>
