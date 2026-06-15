@@ -56,6 +56,7 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
     priority: editing?.priority || 'medium',
     pic: editing?.pic && Array.isArray(editing.pic) ? editing.pic : (editing?.picName ? [editing.picName] : (user?.name ? [user.name] : [])),
     actionDate: editing?.actionDate || '',
+    actionDateEnd: editing?.actionDateEnd || '',
     targetWeek: editing?.targetWeek || '',
     progressNotes: editing?.progressNotes || '',
     nextPlan: editing?.nextPlan || '',
@@ -125,8 +126,11 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
               <select className="input" value={form.priority} onChange={e=>set('priority', e.target.value)}>
                 <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
               </select></div>
-            <div><label style={lbl}>Action Date *</label>
+            <div><label style={lbl}>Action Date (Dari) *</label>
               <input type="date" className="input" value={form.actionDate} onChange={e=>set('actionDate', e.target.value)} /></div>
+            <div><label style={lbl}>Sampai (opsional)</label>
+              <input type="date" className="input" value={form.actionDateEnd} min={form.actionDate||undefined} onChange={e=>set('actionDateEnd', e.target.value)} />
+              <div style={{ fontSize:9, color:'var(--text3)', marginTop:3 }}>Isi kalau kegiatan lebih dari 1 hari — muncul di kalender sepanjang rentang</div></div>
           </div>
           <div><label style={lbl}>PIC (multi tag)</label>
             <PicTagInput value={form.pic} onChange={v=>set('pic', v)} members={members} /></div>

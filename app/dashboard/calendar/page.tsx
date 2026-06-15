@@ -62,7 +62,7 @@ function ActivityDetail({ activity, onClose, onSave, members, config }: { activi
               {activity.description && <div><div style={{ fontSize:11, color:'var(--text3)' }}>Aktivitas / Progress</div><div style={{ fontSize:12, whiteSpace:'pre-wrap', marginTop:4, lineHeight:1.6 }}>{activity.description}</div></div>}
               {activity.nextPlan && <div><div style={{ fontSize:11, color:'var(--text3)' }}>Next Plan</div><div style={{ fontSize:12, whiteSpace:'pre-wrap', marginTop:4, lineHeight:1.6 }}>{activity.nextPlan}</div></div>}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                <div><div style={{ fontSize:10, color:'var(--text3)' }}>Action Date</div><div style={{ fontSize:12, fontWeight:500 }}>{activity.actionDate || '—'}</div></div>
+                <div><div style={{ fontSize:10, color:'var(--text3)' }}>Action Date</div><div style={{ fontSize:12, fontWeight:500 }}>{activity.actionDate || '—'}{activity.actionDateEnd && activity.actionDateEnd!==activity.actionDate ? ` → ${activity.actionDateEnd}` : ''}</div></div>
                 <div><div style={{ fontSize:10, color:'var(--text3)' }}>Target Week</div><div style={{ fontSize:12, fontWeight:500 }}>{activity.targetWeek || '—'}</div></div>
               </div>
               <div><div style={{ fontSize:10, color:'var(--text3)' }}>PIC</div><div style={{ fontSize:12 }}>{(activity.pic||[]).join(', ') || activity.picName || '—'}</div></div>
@@ -111,7 +111,12 @@ export default function CalendarPage() {
 
   function activitiesOn(d:Date) {
     const ds = format(d,'yyyy-MM-dd')
-    return activities.filter(a => a.actionDate === ds)
+    return activities.filter(a => {
+      if (!a.actionDate) return false
+      const start = a.actionDate
+      const end = a.actionDateEnd || a.actionDate   // single-day if no end
+      return ds >= start && ds <= end               // string compare works for yyyy-MM-dd
+    })
   }
   const selectedDayActivities = activitiesOn(selectedDay)
 

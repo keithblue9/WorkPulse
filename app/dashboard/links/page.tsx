@@ -45,7 +45,11 @@ function LinkForm({ onClose, onSave, editing, linkCats, userName }: { onClose:()
     } catch { toast.error('Gagal') } finally { setSaving(false) }
   }
 
-  const cats = (linkCats && linkCats.length) ? linkCats.map((c:any)=>({ key:c.key, label:c.label })) : DEFAULT_CATS.map(c=>({ key:c, label:c }))
+  const baseCats = (linkCats && linkCats.length) ? linkCats.map((c:any)=>({ key:c.key, label:c.label })) : DEFAULT_CATS.map(c=>({ key:c, label:c }))
+  // Ensure the current value is always an available option (prevents silent fallback to first item)
+  const cats = form.category && !baseCats.some((c:any)=>c.label===form.category)
+    ? [...baseCats, { key:form.category, label:form.category }]
+    : baseCats
 
   return (
     <div className="modal-overlay" onClick={e => e.target===e.currentTarget&&onClose()}>

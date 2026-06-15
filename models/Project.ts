@@ -13,7 +13,8 @@ const ProjectSchema = new Schema({
   picName: String, // legacy single-PIC display
   members: [String], // legacy/optional
   // NEW: Action Date (replaces startDate/endDate/progress)
-  actionDate: String,
+  actionDate: String,       // start date (or single day)
+  actionDateEnd: String,    // optional end date for multi-day activities
   // NEW: Progress narrative (point2 / bullet)
   progressNotes: String,
   // NEW: Next Plan narrative
