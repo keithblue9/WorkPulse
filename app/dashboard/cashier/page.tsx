@@ -165,8 +165,30 @@ export default function CashierPage() {
   }
   useEffect(() => { load() }, [])
 
+  async function delReversed(item:any) {
+    if (!confirm(`Hapus reimburse "${item.title}" yang sudah disetujui pembatalannya? Dana akan dikembalikan ke kas.`)) return
+    try {
+      await fetch(`/api/reimbursements/${item._id}`, { method:'DELETE' })
+      toast.success('Reimburse dibatalkan & dihapus. Kas diperbarui.')
+      load()
+    } catch { toast.error('Gagal menghapus') }
+  }
+
+  async function requestReversal(item:any) {
+    const reason = prompt('Alasan pembatalan reimburse ini? (akan dikirim ke pengaju untuk disetujui)')
+    if (reason === null) return
+    try {
+      await fetch(`/api/reimbursements/${item._id}`, {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ status:'reversal_requested', reversalReason: reason, reversalRequestedAt: new Date().toISOString() })
+      })
+      toast.success('Permintaan pembatalan dikirim ke pengaju untuk disetujui')
+      load()
+    } catch { toast.error('Gagal mengirim permintaan pembatalan') }
+  }
+
   const pending = reimburses.filter(r => r.status === 'submitted' || r.status === 'approved' || r.status === 'draft')
-  const done = reimburses.filter(r => r.status === 'done' || r.status === 'paid')
+  const done = reimburses.filter(r => r.status === 'done' || r.status === 'paid' || r.status === 'reversal_requested' || r.status === 'reversal_approved')
   const summary = cashier?.summary || { saldoAwal:0, kasMasuk:0, kasKeluarCashCard:0, kasKeluarOperasional:0, saldoKas:0 }
 
   return (
@@ -250,7 +272,7 @@ export default function CashierPage() {
           ) : (
             <div className="card" style={{ overflow:'auto' }}>
               <table className="wp-table" style={{ minWidth:900 }}>
-                <thead><tr><th>Pengaju</th><th>Keperluan</th><th>Nominal</th><th>Biaya</th><th>Total</th><th>Sumber</th><th>Transferred</th></tr></thead>
+                <thead><tr><th>Pengaju</th><th>Keperluan</th><th>Nominal</th><th>Biaya</th><th>Total</th><th>Sumber</th><th>Transferred</th><th>Aksi</th></tr></thead>
                 <tbody>
                   {done.map(r => (
                     <tr key={r._id}>
@@ -261,6 +283,15 @@ export default function CashierPage() {
                       <td style={{ fontWeight:700, color:'var(--brand)' }}>Rp {fmt(r.totalTransfer||r.amount)}</td>
                       <td><span className="badge" style={{ background:r.isCashCard?'var(--brand-soft)':'var(--bg3)', color:r.isCashCard?'var(--brand)':'var(--text2)', fontSize:9 }}>{r.isCashCard?'Cash Card':'Petty Cash'}</span></td>
                       <td style={{ fontSize:10 }}>{r.transferredAt?new Date(r.transferredAt).toLocaleDateString('id-ID'):'—'}</td>
+                      <td>
+                        {r.status === 'done' || r.status === 'paid' ? (
+                          <button onClick={()=>requestReversal(r)} className="btn btn-sm" style={{ fontSize:10 }}>↩️ Reverse</button>
+                        ) : r.status === 'reversal_requested' ? (
+                          <span className="badge" style={{ background:'var(--amberbg)', color:'var(--amber)', fontSize:9 }}>⏳ Menunggu persetujuan pengaju</span>
+                        ) : r.status === 'reversal_approved' ? (
+                          <button onClick={()=>delReversed(r)} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑 Hapus (disetujui)</button>
+                        ) : null}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

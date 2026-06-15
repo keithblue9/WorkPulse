@@ -152,6 +152,19 @@ export default function ReimbursementsPage() {
   useEffect(() => { load() }, [])
 
   const userRoles = user?.roles || (user?.role ? [user.role] : [])
+  async function approveReversal(item:any, e:any) {
+    e.stopPropagation()
+    if (!confirm(`Setujui pembatalan reimburse "${item.title}"? Setelah disetujui, kasir bisa menghapusnya.`)) return
+    try {
+      await fetch(`/api/reimbursements/${item._id}`, {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ status:'reversal_approved', reversalApprovedAt: new Date().toISOString() })
+      })
+      toast.success('Pembatalan disetujui. Kasir dapat menghapus reimburse ini.')
+      load()
+    } catch { toast.error('Gagal menyetujui') }
+  }
+
   const isAdminish = userRoles.includes('admin') || userRoles.includes('manager') || userRoles.includes('finance') || userRoles.includes('cashier')
 
   const visible = isAdminish ? items : items.filter(i => i.userName === user?.name || i.userId === user?.id || i.userId === user?.email)
@@ -232,7 +245,11 @@ export default function ReimbursementsPage() {
                     <td><span className="badge" style={{ background:r.isCashCard?'var(--brand-soft)':'var(--bg3)', color:r.isCashCard?'var(--brand)':'var(--text2)', fontSize:9 }}>{r.isCashCard?'Cash Card':'Petty Cash'}</span></td>
                     <td>{statusBadge(r.status)}</td>
                     <td style={{ fontSize:10 }}>{r.submittedAt?new Date(r.submittedAt).toLocaleDateString('id-ID'):'—'}</td>
-                    <td>{r.documents?.length > 0 && <span style={{ fontSize:10, color:'var(--text3)' }}>📎 {r.documents.length}</span>}</td>
+                    <td onClick={e=>e.stopPropagation()}>
+                      {r.status === 'reversal_requested' && (r.userName === user?.name || r.userId === user?.id || r.userId === user?.email || isAdminish) ? (
+                        <button onClick={(e)=>approveReversal(r,e)} className="btn btn-sm btn-primary" style={{ fontSize:10 }}>✓ Setujui Pembatalan</button>
+                      ) : r.documents?.length > 0 ? <span style={{ fontSize:10, color:'var(--text3)' }}>📎 {r.documents.length}</span> : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -246,6 +263,8 @@ export default function ReimbursementsPage() {
 function statusBadge(s:string) {
   const cfg: Record<string,{label:string;color:string;bg:string}> = {
     submitted: { label:'Menunggu', color:'var(--amber)', bg:'var(--amberbg)' },
+    reversal_requested: { label:'Pembatalan Diminta', color:'var(--amber)', bg:'var(--amberbg)' },
+    reversal_approved: { label:'Pembatalan Disetujui', color:'var(--red)', bg:'var(--redbg)' },
     approved: { label:'Menunggu', color:'var(--amber)', bg:'var(--amberbg)' },
     done: { label:'Done', color:'var(--green)', bg:'var(--greenbg)' },
     paid: { label:'Done', color:'var(--green)', bg:'var(--greenbg)' },

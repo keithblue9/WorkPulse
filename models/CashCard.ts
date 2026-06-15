@@ -10,6 +10,7 @@ const CashCardSchema = new Schema({
   jojonomicId: String,
   poNo: String,
   settlementAmount: { type:Number, default:0 },
+  refundAmount: { type:Number, default:0 },   // Pengembalian Dana — sisa yang dikembalikan ke kantor
   notes: String,
   createdBy: String,
 }, { timestamps:true })

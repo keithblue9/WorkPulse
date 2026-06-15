@@ -17,7 +17,7 @@ export async function GET(req:NextRequest) {
     const cashCardRows = await CashCardModel.find({ year }).lean()
     const cashCardKasMasuk = cashCardRows.reduce((s,r:any)=>s+(r.topUpAmount||0),0)
     const cashCardKeluar = cashCardRows.reduce((s,r:any)=>s+(r.settlementAmount||0),0)
-    const reimbursDone = await ReimbursementModel.find({ status:'done' }).lean() as any[]
+    const reimbursDone = await ReimbursementModel.find({ status:{ $in:['done','reversal_requested'] } }).lean() as any[]
     const operasionalKeluar = reimbursDone.filter((r:any)=>!r.isCashCard).reduce((s,r:any)=>s+(r.totalTransfer||r.amount||0),0)
     const manualTopUpTotal = (cashier.manualTopUps||[]).reduce((s:number,t:any)=>s+(t.amount||0),0)
     const saldoKas = (cashier.saldoAwal||0) + manualTopUpTotal + cashCardKasMasuk - cashCardKeluar - operasionalKeluar

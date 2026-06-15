@@ -17,6 +17,7 @@ function CashCardForm({ editing, onClose, onSave }: { editing?:any; onClose:()=>
     jojonomicId: editing?.jojonomicId || '',
     poNo: editing?.poNo || '',
     settlementAmount: editing?.settlementAmount || 0,
+    refundAmount: editing?.refundAmount || 0,
     notes: editing?.notes || '',
   })
   const [saving, setSaving] = useState(false)
@@ -61,10 +62,14 @@ function CashCardForm({ editing, onClose, onSave }: { editing?:any; onClose:()=>
             <div><label style={lbl}>PO No.</label><input className="input" value={form.poNo} onChange={e=>set('poNo',e.target.value)} /></div>
             <div><label style={lbl}>Nominal (Rp)</label><input type="number" className="input" value={form.settlementAmount} onChange={e=>set('settlementAmount',Number(e.target.value))} /></div>
           </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:10, alignItems:'end' }}>
+            <div><label style={lbl}>Pengembalian Dana (Rp)</label><input type="number" className="input" value={form.refundAmount} onChange={e=>set('refundAmount',Number(e.target.value))} placeholder="Sisa yang dikembalikan ke kantor" /></div>
+            <button type="button" className="btn btn-sm" onClick={()=>set('refundAmount', Math.max(0,(form.topUpAmount||0)-(form.settlementAmount||0)))}>= Sisa (Top Up − Settlement)</button>
+          </div>
           <div><label style={lbl}>Catatan</label><input className="input" value={form.notes} onChange={e=>set('notes',e.target.value)} /></div>
           {form.topUpAmount > 0 && (
             <div style={{ padding:'10px 12px', background:'var(--bg3)', borderRadius:8, fontSize:12 }}>
-              <b>%:</b> {((form.settlementAmount/form.topUpAmount)*100).toFixed(1)}% · <b>Sisa:</b> Rp {fmt(form.topUpAmount - form.settlementAmount)}
+              <b>%:</b> {((form.settlementAmount/form.topUpAmount)*100).toFixed(1)}% · <b>Sisa:</b> Rp {fmt(form.topUpAmount - form.settlementAmount)} · <b>Pengembalian:</b> Rp {fmt(form.refundAmount||0)}
             </div>
           )}
         </div>
@@ -140,12 +145,12 @@ export default function CashCardPage() {
                 <th>Tahun</th><th>Bulan</th>
                 <th>PR No.</th><th>Top Up (Rp)</th>
                 <th>Ref ID Jojonomic</th><th>PO No.</th><th>Settlement (Rp)</th>
-                <th>%</th><th></th>
+                <th>%</th><th style={{ textAlign:'right' }}>PENGEMBALIAN DANA</th><th></th>
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={9} style={{ textAlign:'center', padding:20, color:'var(--text3)' }}>Memuat...</td></tr> :
-               items.length === 0 ? <tr><td colSpan={9} style={{ textAlign:'center', padding:30, color:'var(--text3)' }}>Belum ada data</td></tr> :
+              {loading ? <tr><td colSpan={10} style={{ textAlign:'center', padding:20, color:'var(--text3)' }}>Memuat...</td></tr> :
+               items.length === 0 ? <tr><td colSpan={10} style={{ textAlign:'center', padding:30, color:'var(--text3)' }}>Belum ada data</td></tr> :
                items.map(i => {
                  const pct = i.topUpAmount > 0 ? ((i.settlementAmount/i.topUpAmount)*100) : 0
                  return (
@@ -154,6 +159,7 @@ export default function CashCardPage() {
                      <td>{i.prNo||'—'}</td><td style={{ textAlign:'right', fontWeight:600 }}>{fmt(i.topUpAmount)}</td>
                      <td>{i.jojonomicId||'—'}</td><td>{i.poNo||'—'}</td><td style={{ textAlign:'right', fontWeight:600 }}>{fmt(i.settlementAmount)}</td>
                      <td style={{ fontWeight:600, color: pct>=100?'var(--green)':pct>0?'var(--brand)':'var(--text3)' }}>{pct.toFixed(1)}%</td>
+                     <td style={{ textAlign:'right', fontWeight:600, color:'var(--green)' }}>{fmt(i.refundAmount ?? Math.max(0,(i.topUpAmount||0)-(i.settlementAmount||0)))}</td>
                      <td style={{ display:'flex', gap:4 }}>
                        <button onClick={()=>setEditing(i)} className="btn btn-icon btn-sm">✏️</button>
                        <button onClick={()=>del(i._id)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>🗑</button>

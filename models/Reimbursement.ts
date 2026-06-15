@@ -16,7 +16,10 @@ const ReimbursementSchema = new Schema({
   documents: { type:[DocumentSchema], default:[] },
   receiptUrl: String,
   // Slide 17: simplified to submitted | done
-  status: { type:String, enum:['submitted','done','rejected','draft','approved','paid'], default:'submitted' },
+  status: { type:String, enum:['submitted','done','rejected','draft','approved','paid','reversal_requested','reversal_approved'], default:'submitted' },
+  // Reversal / cancellation flow
+  reversalRequestedBy: String, reversalRequestedAt: String, reversalReason: String,
+  reversalApprovedBy: String, reversalApprovedAt: String,
   // Cashier transfer
   biayaAntarBank: { type:Number, default:0 },
   hasBiayaAntarBank: { type:Boolean, default:false },
