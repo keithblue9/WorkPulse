@@ -162,6 +162,7 @@ export default function NotesPage() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [search, setSearch] = useState('')
+  const [cardLightbox, setCardLightbox] = useState<string|null>(null)
 
   async function load() {
     setLoading(true)
