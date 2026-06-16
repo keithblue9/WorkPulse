@@ -119,7 +119,7 @@ export default function CashCardPage() {
   // Rasionalnya: top up yang belum di-settle masih utuh di tangan tim; total operasional sudah
   // 'kepakai' jadi mengurangi saldo (kalau ada).
   const topUpUnsettled = items.reduce((s,i)=> s + ((i.settlementAmount||0) === 0 ? (i.topUpAmount||0) : 0), 0)
-  const saldoKasCC = topUpUnsettled - totalOperasional
+  const saldoKasCC = topUpUnsettled - Math.abs(totalOperasional)
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
