@@ -69,7 +69,7 @@ function CashCardForm({ editing, onClose, onSave }: { editing?:any; onClose:()=>
           <div><label style={lbl}>Catatan</label><input className="input" value={form.notes} onChange={e=>set('notes',e.target.value)} /></div>
           {form.topUpAmount > 0 && (
             <div style={{ padding:'10px 12px', background:'var(--bg3)', borderRadius:8, fontSize:12 }}>
-              <b>%:</b> {((form.settlementAmount/form.topUpAmount)*100).toFixed(1)}% · <b>Pengembalian:</b> Rp {fmt(form.refundAmount||0)} · <b>Operasional:</b> {form.settlementAmount > 0 ? `Rp ${fmt(Math.max(0,(form.topUpAmount||0)-(form.settlementAmount||0)-(form.refundAmount||0)))}` : '— (isi settlement dulu)'}
+              <b>%:</b> {((form.settlementAmount/form.topUpAmount)*100).toFixed(1)}% · <b>Pengembalian:</b> Rp {fmt(form.refundAmount||0)} · <b>Operasional:</b> {form.settlementAmount > 0 ? `Rp ${fmt((form.topUpAmount||0)-(form.settlementAmount||0)-(form.refundAmount||0))}` : '— (isi settlement dulu)'}
             </div>
           )}
         </div>
@@ -108,15 +108,18 @@ export default function CashCardPage() {
   // Pengeluaran Operasional per row: only counts when Settlement has been entered.
   // Until settlement is recorded, that month's top up is still part of Saldo Kas (in hand, not yet used).
   // Floor at 0 (small negative selisih from bank fees/rounding shows as 0).
+  // Operasional = selisih dari (Top Up − Settlement) vs Pengembalian Dana.
+  // Bisa negatif (kalau pengembalian melebihi sisa setelah settle — mis. biaya bank, pembulatan).
+  // Tampilkan apa adanya, jangan di-floor.
   const rowOperasional = (i:any) => (i.settlementAmount||0) > 0
-    ? Math.max(0, (i.topUpAmount||0)-(i.settlementAmount||0)-(i.refundAmount||0))
-    : null   // null = '—' in the UI
+    ? ((i.topUpAmount||0)-(i.settlementAmount||0)-(i.refundAmount||0))
+    : null   // null = '—' in the UI (settlement belum diisi)
   const totalOperasional = items.reduce((s,i)=> s + (rowOperasional(i) ?? 0), 0)
   // Saldo Kas = Top Up dari row yang BELUM di-settle, dikurangi total operasional.
   // Rasionalnya: top up yang belum di-settle masih utuh di tangan tim; total operasional sudah
   // 'kepakai' jadi mengurangi saldo (kalau ada).
   const topUpUnsettled = items.reduce((s,i)=> s + ((i.settlementAmount||0) === 0 ? (i.topUpAmount||0) : 0), 0)
-  const saldoKasCC = Math.max(0, topUpUnsettled - totalOperasional)
+  const saldoKasCC = topUpUnsettled - totalOperasional
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -186,7 +189,7 @@ export default function CashCardPage() {
                      <td>{i.jojonomicId||'—'}</td><td>{i.poNo||'—'}</td><td style={{ textAlign:'right', fontWeight:600 }}>{fmt(i.settlementAmount)}</td>
                      <td style={{ fontWeight:600, color: pct>=100?'var(--green)':pct>0?'var(--brand)':'var(--text3)' }}>{pct.toFixed(1)}%</td>
                      <td style={{ textAlign:'right', fontWeight:600, color:'var(--green)' }}>{fmt(i.refundAmount||0)}</td>
-                     <td style={{ textAlign:'right', fontWeight:600, color:'var(--red)' }}>{rowOperasional(i) !== null ? fmt(rowOperasional(i) as number) : '—'}</td>
+                     <td style={{ textAlign:'right', fontWeight:600, color: rowOperasional(i) === null ? 'var(--text3)' : (rowOperasional(i) as number) < 0 ? 'var(--amber)' : 'var(--red)' }}>{rowOperasional(i) !== null ? fmt(rowOperasional(i) as number) : '—'}</td>
                      <td style={{ display:'flex', gap:4 }}>
                        <button onClick={()=>setEditing(i)} className="btn btn-icon btn-sm">✏️</button>
                        <button onClick={()=>del(i._id)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>🗑</button>
