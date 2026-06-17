@@ -16,6 +16,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
     isCashCard: editing?.isCashCard || false,
     bank: editing?.bank || '',
     noRekening: editing?.noRekening || '',
+    billDate: editing?.billDate || '',
     documents: editing?.documents || [],
   })
   const [saving, setSaving] = useState(false)
@@ -104,8 +105,9 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
         <div style={{ padding:'14px 20px', overflowY:'auto', maxHeight:'72vh', display:'flex', flexDirection:'column', gap:11 }}>
           <div><label style={lbl}>Keperluan *</label><input className="input" value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Misal: Beli ATK kantor" /></div>
           <div><label style={lbl}>Keterangan</label><textarea className="input" rows={2} value={form.description} onChange={e=>set('description',e.target.value)} /></div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
             <div><label style={lbl}>Nominal (Rp) *</label><input type="number" className="input" value={form.amount} onChange={e=>set('amount',Number(e.target.value))} /></div>
+            <div><label style={lbl}>Tgl Bukti / Bill Date</label><input type="date" className="input" value={form.billDate} onChange={e=>set('billDate',e.target.value)} /></div>
             <div><label style={lbl}>Kategori</label>
               <select className="input" value={form.category} onChange={e=>set('category',e.target.value)}>
                 <option value="petty_cash">Petty Cash / Operasional</option>
@@ -202,6 +204,7 @@ export default function ReimbursementsPage() {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:11 }}>
                 <div><span style={{ color:'var(--text3)' }}>Pengaju:</span> {viewing.userName}</div>
                 <div><span style={{ color:'var(--text3)' }}>Nominal:</span> Rp {fmt(viewing.amount)}</div>
+                {viewing.billDate && <div><span style={{ color:'var(--text3)' }}>Tgl Bukti:</span> {new Date(viewing.billDate).toLocaleDateString('id-ID')}</div>}
                 <div><span style={{ color:'var(--text3)' }}>Bank:</span> {viewing.bank}</div>
                 <div><span style={{ color:'var(--text3)' }}>No. Rek:</span> {viewing.noRekening}</div>
                 <div><span style={{ color:'var(--text3)' }}>Sumber:</span> {viewing.isCashCard?'Cash Card':'Petty Cash'}</div>
@@ -245,7 +248,7 @@ export default function ReimbursementsPage() {
          ) : (
           <div className="card" style={{ overflow:'auto' }}>
             <table className="wp-table" style={{ minWidth:900 }}>
-              <thead><tr><th>Pengaju</th><th>Keperluan</th><th>Nominal</th><th>Bank / Rek</th><th>Sumber</th><th>Status</th><th>Tgl Submit</th><th></th></tr></thead>
+              <thead><tr><th>Pengaju</th><th>Keperluan</th><th>Nominal</th><th>Tgl Bukti</th><th>Bank / Rek</th><th>Sumber</th><th>Status</th><th>Tgl Submit</th><th></th></tr></thead>
               <tbody>
                 {filtered.map(r => (
                   <tr key={r._id} style={{ cursor:'pointer' }} onClick={()=>setViewing(r)}>
@@ -255,6 +258,7 @@ export default function ReimbursementsPage() {
                       {r.description && <div style={{ color:'var(--text3)', fontSize:10 }}>{r.description.substring(0,60)}</div>}
                     </td>
                     <td style={{ fontWeight:600 }}>Rp {fmt(r.amount)}</td>
+                    <td style={{ fontSize:11, color:'var(--text2)' }}>{r.billDate ? new Date(r.billDate).toLocaleDateString('id-ID') : '—'}</td>
                     <td style={{ fontSize:11 }}>{r.bank}<br/><span style={{ color:'var(--text3)', fontSize:10 }}>{r.noRekening}</span></td>
                     <td><span className="badge" style={{ background:r.isCashCard?'var(--brand-soft)':'var(--bg3)', color:r.isCashCard?'var(--brand)':'var(--text2)', fontSize:9 }}>{r.isCashCard?'Cash Card':'Petty Cash'}</span></td>
                     <td>{statusBadge(r.status)}</td>
