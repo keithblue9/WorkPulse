@@ -9,6 +9,8 @@ const MeetingReportSchema = new Schema({
   picTags: [String],
   categoryTags: [String],
   agenda: String, discussion: String, decisions: String, actionItems: String,
+  // Form-facing fields used by /dashboard/meetings (the schema missed these → Mongoose strip-on-save)
+  notes: String, pic: String,
   attachments: { type:[{url:String,name:String,type:String,size:Number}], default:[] },
   evidenceUrl: String, evidenceName: String,
   tags: [String],
