@@ -216,10 +216,8 @@ export default function MeetingsPage() {
                         </div>
                         <div style={{ display:'flex', gap:3 }}>
                           {m.evidenceUrl && <span title="Ada evidence" style={{ fontSize:11 }}>📎</span>}
-                          {m.authorName === user?.name && <>
-                            <button className="btn btn-icon btn-sm" onClick={(e)=>{e.stopPropagation();setEditing(m)}} style={{ fontSize:10, width:22, height:22 }}>✏️</button>
-                            <button className="btn btn-icon btn-sm" onClick={(e)=>{e.stopPropagation();del(m._id)}} style={{ fontSize:10, width:22, height:22 }}>🗑</button>
-                          </>}
+                          <button title="Edit" className="btn btn-icon btn-sm" onClick={(e)=>{e.stopPropagation();setEditing(m)}} style={{ fontSize:10, width:22, height:22 }}>✏️</button>
+                          <button title="Hapus" className="btn btn-icon btn-sm" onClick={(e)=>{e.stopPropagation();del(m._id)}} style={{ fontSize:10, width:22, height:22 }}>🗑</button>
                         </div>
                       </div>
                     </div>

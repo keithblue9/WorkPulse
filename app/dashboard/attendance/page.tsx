@@ -30,12 +30,17 @@ function slotTimeLabel(slot:any): string {
 
 const TEAM_COLORS = ['#2563d4','#7c3aed','#0d9488','#d97706','#16a34a','#dc2626','#0891b2','#7c2d12']
 
-function SlotForm({ date, attTypes, onClose, onSave }: { date:string; attTypes:AttendanceType[]; onClose:()=>void; onSave:(slot:any)=>void }) {
-  const [type, setType] = useState(attTypes[0]?.key || 'wfo')
-  const [isFullDay, setIsFullDay] = useState(true)
-  const [startTime, setStartTime] = useState('08:00')
-  const [endTime, setEndTime] = useState('17:00')
-  const [note, setNote] = useState('')
+function SlotForm({ date, editing, attTypes, onClose, onSave }: { date:string; editing?:any; attTypes:AttendanceType[]; onClose:()=>void; onSave:(slot:any)=>void }) {
+  const isEdit = !!editing
+  // Initialize from editing slot if provided; helpers handle legacy time shape
+  const editIsFullDay = editing ? (
+    !editing.startTime || !editing.endTime || editing.startTime === 'fullday' || editing.endTime === 'fullday' || editing.isFullDay === true
+  ) : true
+  const [type, setType] = useState(editing?.type || attTypes[0]?.key || 'wfo')
+  const [isFullDay, setIsFullDay] = useState(editIsFullDay)
+  const [startTime, setStartTime] = useState(editing?.startTime && editing.startTime !== 'fullday' ? editing.startTime : '08:00')
+  const [endTime, setEndTime] = useState(editing?.endTime && editing.endTime !== 'fullday' ? editing.endTime : '17:00')
+  const [note, setNote] = useState(editing?.note || '')
   const typeDef = attTypes.find(t => t.key === type)
 
   function save() {
@@ -47,7 +52,7 @@ function SlotForm({ date, attTypes, onClose, onSave }: { date:string; attTypes:A
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal" style={{ width:400 }}>
         <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:13, fontWeight:600 }}>+ Tambah Kehadiran — {date}</span>
+          <span style={{ fontSize:13, fontWeight:600 }}>{isEdit?'Edit':'+ Tambah'} Kehadiran — {date}</span>
           <button onClick={onClose} className="btn btn-icon">×</button>
         </div>
         <div style={{ padding:'14px 18px', display:'flex', flexDirection:'column', gap:12 }}>
@@ -76,7 +81,7 @@ function SlotForm({ date, attTypes, onClose, onSave }: { date:string; attTypes:A
         </div>
         <div style={{ padding:'12px 18px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
           <button onClick={onClose} className="btn">Batal</button>
-          <button onClick={save} className="btn btn-primary">Tambah</button>
+          <button onClick={save} className="btn btn-primary">{isEdit?'Simpan':'Tambah'}</button>
         </div>
       </div>
     </div>
@@ -92,6 +97,7 @@ export default function AttendancePage() {
   const [selectedUserId, setSelectedUserId] = useState('')
   const [team, setTeam] = useState<any[]>([])
   const [showSlotForm, setShowSlotForm] = useState<string|null>(null)
+  const [editingSlot, setEditingSlot] = useState<{date:string; slot:any}|null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -140,6 +146,17 @@ export default function AttendancePage() {
     toast.success('Slot dihapus')
   }
 
+  async function updateSlot(day:number, slotId:string, newSlot:any) {
+    const dateStr = `${month}-${String(day).padStart(2,'0')}`
+    // Delete old slot then add the new one (atomic enough for our purposes)
+    await fetch(`/api/attendance?userId=${selectedUserId}&date=${dateStr}&slotId=${slotId}`, { method:'DELETE' })
+    const r = await fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ userId:selectedUserId, date:dateStr, slot:newSlot }) })
+    const d = await r.json()
+    setRecords(prev => { const filtered=prev.filter(r=>r.date!==dateStr); return [...filtered, d.data] })
+    toast.success('Slot diperbarui')
+  }
+
   const daysInMonth = getDaysInMonth(new Date(month+'-01'))
   const firstDayDow = (getDay(startOfMonth(new Date(month+'-01')))+6)%7
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -154,6 +171,7 @@ export default function AttendancePage() {
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       {showSlotForm && <SlotForm date={showSlotForm} attTypes={attTypes} onClose={()=>setShowSlotForm(null)} onSave={slot => { const day=parseInt(showSlotForm.split('-')[2]); addSlot(day,slot); setShowSlotForm(null) }} />}
+      {editingSlot && <SlotForm date={editingSlot.date} editing={editingSlot.slot} attTypes={attTypes} onClose={()=>setEditingSlot(null)} onSave={async (slot)=>{ const day=parseInt(editingSlot.date.split('-')[2]); await updateSlot(day, editingSlot.slot._id, slot); setEditingSlot(null) }} />}
 
       <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
         <div><div style={{ fontSize:14, fontWeight:600 }}>Absensi Harian</div><div style={{ fontSize:11, color:'var(--text3)' }}>Klik tanggal untuk tambah slot kehadiran</div></div>
@@ -208,8 +226,8 @@ export default function AttendancePage() {
                         const t = attTypes.find(x=>x.key===slot.type)
                         return (
                           <div key={si} style={{ margin:'1px 3px', padding:'1px 4px', borderRadius:3, fontSize:9, fontWeight:600, background:t?t.textColor+'33':'var(--bg5)', color:t?t.textColor:'var(--text3)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', display:'flex', justifyContent:'space-between', alignItems:'center', gap:2 }}>
-                            <span>{t?.label||slot.type}{!slotIsFullDay(slot)?` ${slot.startTime}`:''}</span>
-                            <span onClick={e=>{e.stopPropagation();removeSlot(day,slot._id)}} style={{ cursor:'pointer', opacity:0.6 }}>×</span>
+                            <span title="Klik untuk edit" onClick={e=>{e.stopPropagation();setEditingSlot({date:dateStr, slot})}} style={{ cursor:'pointer', flex:1, overflow:'hidden', textOverflow:'ellipsis' }}>{t?.label||slot.type}{!slotIsFullDay(slot)?` ${slot.startTime}`:''}</span>
+                            <span title="Hapus" onClick={e=>{e.stopPropagation();removeSlot(day,slot._id)}} style={{ cursor:'pointer', opacity:0.6 }}>×</span>
                           </div>
                         )
                       })}
