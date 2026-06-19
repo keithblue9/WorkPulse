@@ -160,7 +160,7 @@ export default function MembersPage() {
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      {(showForm||editing) && <MemberModal editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} allRoles={allRoles} />}
+      {(showForm||editing) && <MemberModal editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} allRoles={allRoles.filter((r:any)=>r.key!=='guest')} />}
 
       <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
         <div>

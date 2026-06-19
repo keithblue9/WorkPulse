@@ -11,8 +11,14 @@ const handler = NextAuth({
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
+        guest: { label: 'Guest', type: 'text' },
       },
       async authorize(credentials) {
+        // External / Guest: no PIN required — synthetic, DB-less session with role 'guest'.
+        if ((credentials as any)?.guest === 'true') {
+          console.log('[AUTH] Guest/external login')
+          return { id: 'guest', name: 'Guest', email: 'guest@external.local', role: 'guest', roles: ['guest'], division: 'External' } as any
+        }
         if (!credentials?.email || !credentials?.password) {
           console.log('[AUTH] Missing credentials:', { hasEmail: !!credentials?.email, hasPassword: !!credentials?.password })
           return null
