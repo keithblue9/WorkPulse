@@ -484,11 +484,11 @@ export default function DashboardPage() {
             {tab === 'issues' && (
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                 <div style={{ display:'flex', justifyContent:'flex-end' }} data-export-hide>
-                  <ExportMenu targetRef={issuesRef} filename="issues-report" title="Issues — WinS" />
+                  <ExportMenu getNodes={() => issuesRef.current ? Array.from(issuesRef.current.querySelectorAll<HTMLElement>('[data-export-card]')) : []} filename="issues-report" title="Issues — WinS" />
                 </div>
                 <div ref={issuesRef} style={{ display:'flex', flexDirection:'column', gap:12 }}>
                 {/* Compact summary row */}
-                <div className="dash-2col" style={{ display:'grid', gridTemplateColumns:'minmax(220px, 0.6fr) 1fr', gap:10 }}>
+                <div data-export-card className="dash-2col" style={{ display:'grid', gridTemplateColumns:'minmax(220px, 0.6fr) 1fr', gap:10 }}>
                   <div className="card" style={{ padding:12 }}>
                     <div style={{ fontSize:10, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Status Distribution</div>
                     <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -520,7 +520,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Inline detail table — scrollable */}
-                <div className="card" style={{ padding:0, overflow:'hidden' }}>
+                <div data-export-card className="card" style={{ padding:0, overflow:'hidden' }}>
                   <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, flexWrap:'wrap' }}>
                     <div style={{ fontSize:12, fontWeight:600 }}>
                       Detail Issues <span style={{ color:'var(--text3)', fontWeight:400 }}>({visibleActivities.length}{hiddenCount>0 ? ` · ${hiddenCount} disembunyikan` : ''})</span>

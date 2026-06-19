@@ -300,7 +300,7 @@ export default function ProgressPage() {
           <div style={{ fontSize:11, color:'var(--text3)' }}>{initiatives.length} initiative · Detail per phase (week-level){isInternal ? ' · klik card untuk edit' : ''}</div>
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <ExportMenu targetRef={exportRef} filename="progress-initiatives" title="Progress Initiatives — WinS" />
+          <ExportMenu getNodes={() => exportRef.current ? Array.from(exportRef.current.querySelectorAll<HTMLElement>('[data-export-card]')) : []} filename="progress-initiatives" title="Progress Initiative — WinS" />
           {isInternal && <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Initiative Baru</button>}
         </div>
       </div>
@@ -312,7 +312,7 @@ export default function ProgressPage() {
             {initiatives.map(i => {
               const calc = calcInitiativeProgress(i.phases || [])
               return (
-                <div key={i._id} className="card" style={{ padding:16 }}>
+                <div key={i._id} data-export-card className="card" style={{ padding:16 }}>
                   <div className="initiative-card-inner" style={{ display:'flex', gap:16 }}>
                     {/* Left: info + phases detail */}
                     <div style={{ flex:1, minWidth:0 }}>

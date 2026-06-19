@@ -3,7 +3,9 @@ import { useState, useRef, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { exportJpg, exportPdf, exportPpt } from '@/lib/exportView'
 
-export default function ExportMenu({ targetRef, filename, title }: { targetRef: React.RefObject<any>; filename: string; title?: string }) {
+// getNodes returns the list of section nodes to export — each becomes its own
+// page (PDF) / slide (PPT) / image (JPG), so nothing gets crammed/shrunk.
+export default function ExportMenu({ getNodes, filename, title }: { getNodes: () => HTMLElement[]; filename: string; title?: string }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -15,14 +17,14 @@ export default function ExportMenu({ targetRef, filename, title }: { targetRef: 
   }, [])
 
   async function run(kind: 'pdf' | 'jpg' | 'ppt') {
-    const node = targetRef.current as HTMLElement | null
-    if (!node) { toast.error('Konten belum siap untuk diexport'); return }
+    const nodes = (getNodes() || []).filter(Boolean)
+    if (!nodes.length) { toast.error('Belum ada konten untuk diexport'); return }
     setOpen(false); setBusy(kind)
     const t = toast.loading(`Menyiapkan ${kind.toUpperCase()}...`)
     try {
-      if (kind === 'pdf') await exportPdf(node, filename)
-      else if (kind === 'jpg') await exportJpg(node, filename)
-      else await exportPpt(node, filename, title)
+      if (kind === 'pdf') await exportPdf(nodes, filename)
+      else if (kind === 'jpg') await exportJpg(nodes, filename)
+      else await exportPpt(nodes, filename, title)
       toast.success(`${kind.toUpperCase()} berhasil diunduh`, { id: t })
     } catch (e: any) {
       toast.error(`Gagal export ${kind.toUpperCase()}: ${e?.message || 'error'}`, { id: t })
