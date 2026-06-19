@@ -1,5 +1,5 @@
 'use client'
-import { getConfig } from '@/lib/configCache'
+import { getConfig, invalidateConfig } from '@/lib/configCache'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 

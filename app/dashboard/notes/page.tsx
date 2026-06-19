@@ -204,7 +204,7 @@ export default function NotesPage() {
       <div style={{ flex:1, overflow:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> : (
           <div style={{ display:'flex', gap:12, alignItems:'flex-start', minHeight:'100%' }}>
-            {columns.map(col => (
+            {columns.map((col:any) => (
               <div key={col.key} style={{ flex:'0 0 280px', display:'flex', flexDirection:'column', gap:8 }}>
                 {/* Column header */}
                 <div className="card" style={{ padding:'10px 12px', borderTop:`3px solid ${col.color}`, display:'flex', justifyContent:'space-between', alignItems:'center', position:'sticky', top:0, zIndex:2 }}>
@@ -218,7 +218,7 @@ export default function NotesPage() {
                 <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                   {col.items.length === 0 ? (
                     <div style={{ padding:'18px 10px', textAlign:'center', color:'var(--text3)', fontSize:10, border:'1px dashed var(--border)', borderRadius:7, background:'var(--bg)' }}>Belum ada note</div>
-                  ) : col.items.map(n => (
+                  ) : col.items.map((n:any) => (
                     <div key={n._id} className="card glass-hover" onClick={()=>setEditing(n)} style={{ padding:11, cursor:'pointer' }}>
                       <div style={{ fontSize:12, fontWeight:600, marginBottom:5, lineHeight:1.3 }}>{n.title}</div>
                       {n.content && <div style={{ fontSize:10, color:'var(--text2)', lineHeight:1.5, marginBottom:7, whiteSpace:'pre-wrap', maxHeight:60, overflow:'hidden', textOverflow:'ellipsis' }}>{n.content.substring(0,120)}{n.content.length>120?'...':''}</div>}

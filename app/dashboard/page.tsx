@@ -452,9 +452,9 @@ export default function DashboardPage() {
                   <div className="card" style={{ padding:12 }}>
                     <div style={{ fontSize:10, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Status Distribution</div>
                     <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                      <DonutChart data={issueDist.filter(d=>d.value>0)} size={120} />
+                      <DonutChart data={issueDist.filter((d:any)=>d.value>0)} size={120} />
                       <div style={{ flex:1, display:'flex', flexDirection:'column', gap:3 }}>
-                        {issueDist.map((d, i) => (
+                        {issueDist.map((d:any, i:number) => (
                           <div key={i} style={{ display:'flex', alignItems:'center', gap:5, fontSize:10 }}>
                             <div style={{ width:8, height:8, borderRadius:2, background:d.color }} />
                             <span style={{ flex:1 }}>{d.label}</span>
