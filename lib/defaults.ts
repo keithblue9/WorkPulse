@@ -65,20 +65,33 @@ export function picArray(p: any): string[] {
 // TWO metrics per the team's KPI model:
 //  1. COMPLETION (planProgress / actualProgress): how much work is done vs planned
 //     amount. Counts all actual weeks (early/on-time/late), capped at 100% (no bonus).
-//  2. SPI (Schedule Performance Index): schedule efficiency. Standard PMBOK Earned
-//     Value metric adapted to week-cells. Per phase, walk each planned week as a
-//     deadline checkpoint; the k-th planned week is "earned" only if at least k actual
-//     weeks were done on-or-before it. PLUS an overrun penalty: actual weeks that fall
-//     after the phase's last planned week (the deadline) are late delivery and subtract
-//     proportionally. So finishing past the plan window (plan Jun, actual Jul) lands
-//     SPI below 100%. SPI = 1.0 on schedule, <1.0 late, clamped to 0..1.
-//     Overall SPI is weighted by each phase's planned weeks.
+//  2. SPI (Schedule Performance Index): schedule efficiency vs TODAY. Only planned
+//     weeks whose schedule has already arrived (on-or-before the current week) are
+//     evaluated — future planned weeks are not yet due and never count against you.
+//     Per due planned week (a deadline checkpoint), it's "earned" if enough actual
+//     weeks were done on-or-before it. SPI = earned / due, clamped 0..1. A phase that
+//     is entirely in the future returns null (excluded from the overall SPI).
+//     Overall SPI is weighted by each phase's number of due planned weeks.
 // Cell format "M-W" (month-week), converted to an absolute week index for ordering.
 function _weekIndex(cell: string): number {
   const [m, w] = String(cell).split('-').map(Number)
   return ((m || 1) - 1) * 4 + ((w || 1) - 1)
 }
-export function calcInitiativeProgress(phases: any[]) {
+// Absolute week index of "now" within a given plan year. Earlier year than now →
+// everything is due (Infinity); a future year → nothing due yet (-1); same year →
+// month/week index of today (week-of-month 1..4 by 7-day buckets).
+function _nowIndex(year?: number): number {
+  const now = new Date()
+  const cy = now.getFullYear()
+  const y = year || cy
+  if (cy > y) return Infinity
+  if (cy < y) return -1
+  const m = now.getMonth() + 1
+  const w = Math.min(4, Math.ceil(now.getDate() / 7))
+  return (m - 1) * 4 + (w - 1)
+}
+export function calcInitiativeProgress(phases: any[], year?: number) {
+  const nowIdx = _nowIndex(year)
   const planWeeksArr = phases.map(p => (p.planCells || []).length)
   const totalPlanWeeks = planWeeksArr.reduce((a, b) => a + b, 0)
   const result = phases.map((p, i) => {
@@ -92,37 +105,38 @@ export function calcInitiativeProgress(phases: any[]) {
     const completionRatio = planWeeks > 0 ? Math.min(actualWeeks / planWeeks, 1) : 0
     const actualPct = completionRatio * planPct
 
-    // ── SPI: schedule efficiency per phase (checkpoint model + overrun penalty) ──
-    // (a) Checkpoint: each planned week is a deadline; the k-th planned week is met
-    //     only if >= k actual weeks were done on-or-before it (early counts as on time).
-    // (b) Overrun penalty: any actual week AFTER the phase's last planned week is late
-    //     delivery (missed the deadline) and subtracts proportionally. This is what
-    //     makes 'plan Juni, actual Juli' land below 100%.
+    // ── SPI: schedule efficiency vs TODAY ──
+    // Only evaluate planned weeks whose schedule has already arrived (deadline on-or-before
+    // the current week). Future planned weeks are not yet due and must NOT count against us.
+    // Per due planned week (a deadline checkpoint), it's "earned" if enough actual weeks
+    // were done on-or-before it. SPI = earned / due, clamped 0..1.
     let spi: number | null = null
-    if (planWeeks > 0 && actualCells.length > 0) {
+    let dueWeeks = 0
+    if (planWeeks > 0) {
       const planSorted = [...planCells].map(_weekIndex).sort((a, b) => a - b)
-      const actualIdx = actualCells.map(_weekIndex).sort((a, b) => a - b)
-      const planDeadline = planSorted[planSorted.length - 1]  // overall phase deadline
-      let earned = 0
-      for (let k = 0; k < planSorted.length; k++) {
-        const deadline = planSorted[k]
-        const doneByDeadline = actualIdx.filter(a => a <= deadline).length
-        if (doneByDeadline >= k + 1) earned++
+      const duePlan = planSorted.filter(idx => idx <= nowIdx)
+      dueWeeks = duePlan.length
+      if (dueWeeks > 0) {
+        const actualIdx = actualCells.map(_weekIndex).sort((a, b) => a - b)
+        let earned = 0
+        for (let k = 0; k < duePlan.length; k++) {
+          const deadline = duePlan[k]
+          const doneByDeadline = actualIdx.filter(a => a <= deadline).length
+          if (doneByDeadline >= k + 1) earned++
+        }
+        spi = Math.max(0, Math.min(earned / dueWeeks, 1))
       }
-      const checkpointSpi = earned / planWeeks
-      const overrunWeeks = actualIdx.filter(a => a > planDeadline).length
-      const overrunPenalty = overrunWeeks / planWeeks
-      spi = Math.max(0, Math.min(checkpointSpi, 1) - overrunPenalty)
+      // else: phase entirely in the future → not yet due → spi stays null (excluded)
     }
-    return { ...p, planPct, actualPct, spi, _planWeeks: planWeeks, _actualWeeks: actualWeeks }
+    return { ...p, planPct, actualPct, spi, _planWeeks: planWeeks, _actualWeeks: actualWeeks, _dueWeeks: dueWeeks }
   })
   const planProgress = result.reduce((a, b) => a + b.planPct, 0)
   const actualProgress = result.reduce((a, b) => a + b.actualPct, 0)
-  // Overall SPI weighted by phase planned weeks
-  const spiPhases = result.filter(r => r.spi !== null)
-  const totalSpiW = spiPhases.reduce((a, b) => a + b._planWeeks, 0)
-  const spi = totalSpiW > 0
-    ? spiPhases.reduce((a, b) => a + (b.spi as number) * b._planWeeks, 0) / totalSpiW
+  // Overall SPI weighted by each phase's DUE planned weeks (phases with no due work yet excluded)
+  const spiPhases = result.filter(r => r.spi !== null && r._dueWeeks > 0)
+  const totalDueW = spiPhases.reduce((a, b) => a + b._dueWeeks, 0)
+  const spi = totalDueW > 0
+    ? spiPhases.reduce((a, b) => a + (b.spi as number) * b._dueWeeks, 0) / totalDueW
     : null
   return { phases: result, planProgress, actualProgress, spi }
 }

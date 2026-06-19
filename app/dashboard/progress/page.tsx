@@ -173,7 +173,7 @@ function InitiativeForm({ editing, onClose, onSave, members }: { editing?:any; o
   const [saving, setSaving] = useState(false)
   const [picInput, setPicInput] = useState('')
 
-  const calc = calcInitiativeProgress(form.phases)
+  const calc = calcInitiativeProgress(form.phases, form.year)
 
   function setPhase(i:number, p:any) { setForm(f=>({...f, phases: f.phases.map((x:any,idx:number)=>idx===i?p:x) })) }
   function addPhase() { setForm(f=>({...f, phases: [...f.phases, { name:`Phase ${f.phases.length+1}`, planCells:[], actualCells:[], progressNotes:'' }] })) }
@@ -255,7 +255,7 @@ function InitiativeForm({ editing, onClose, onSave, members }: { editing?:any; o
               <PhaseEditor key={i} phase={p} idx={i} onChange={(np:any)=>setPhase(i, np)} onRemove={()=>removePhase(i)} computed={calc.phases[i]} />
             ))}
             <div style={{ padding:'8px 12px', background:'var(--bg3)', borderRadius:7, fontSize:11, color:'var(--text3)', lineHeight:1.5 }}>
-              <b>Rumus:</b> <b>Completion</b> = (minggu actual / minggu plan) capped 100% — seberapa banyak kerjaan kelar (telat/cepat tetap dihitung). <b>SPI</b> (Schedule Performance Index) = ketepatan waktu: tiap minggu plan jadi checkpoint deadline; kalau kerjaan telat lewat checkpoint, SPI turun. SPI 100% = tepat jadwal, &lt;100% = telat. Cap 100% (lebih cepat ga dapat bonus).
+              <b>Rumus:</b> <b>Completion</b> = (minggu actual / minggu plan) capped 100% — seberapa banyak kerjaan kelar (telat/cepat tetap dihitung). <b>SPI</b> (Schedule Performance Index) = ketepatan waktu dibanding HARI INI: cuma minggu plan yang jadwalnya sudah lewat (s/d minggu sekarang) yang dinilai — minggu plan yang masih di masa depan belum jatuh tempo, jadi tidak dihitung telat. SPI 100% = sesuai jadwal, kurang dari 100% = telat. Cap 100% (lebih cepat tidak dapat bonus).
             </div>
           </div>
         </div>
@@ -310,7 +310,7 @@ export default function ProgressPage() {
          initiatives.length === 0 ? <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>{isInternal ? <>Belum ada initiative · klik <b>+ Initiative Baru</b></> : 'Belum ada initiative'}</div> : (
           <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
             {initiatives.map(i => {
-              const calc = calcInitiativeProgress(i.phases || [])
+              const calc = calcInitiativeProgress(i.phases || [], i.year)
               return (
                 <div key={i._id} data-export-card className="card" style={{ padding:16 }}>
                   <div className="initiative-card-inner" style={{ display:'flex', gap:16 }}>

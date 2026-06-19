@@ -435,7 +435,7 @@ export default function DashboardPage() {
                 ) : (
                   <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                     {initiatives.map(i => {
-                      const calc = calcInitiativeProgress(i.phases || [])
+                      const calc = calcInitiativeProgress(i.phases || [], i.year)
                       return (
                         <div key={i._id} className="card glass-hover" style={{ padding:16, cursor:'pointer' }} onClick={()=>{ window.location.href='/dashboard/progress' }}>
                           <div className="initiative-card-inner" style={{ display:'flex', gap:16 }}>
