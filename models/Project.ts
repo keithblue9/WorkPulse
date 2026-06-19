@@ -31,6 +31,8 @@ const ProjectSchema = new Schema({
   endTime: String,
   // Legacy
   startDate: String, endDate: String, progress: Number, kpiId: String, color: String, tags: [String],
+  // Hide from dashboard Issues view (Status Distribution / High Priority / Detail all respect this)
+  hidden: { type: Boolean, default: false },
 }, { timestamps: true })
 
 ProjectSchema.index({ subType: 1 })

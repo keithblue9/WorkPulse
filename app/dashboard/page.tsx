@@ -1,7 +1,7 @@
 'use client'
 import { getConfig } from '@/lib/configCache'
 import { picArray, calcInitiativeProgress } from '@/lib/defaults'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { format, subDays } from 'date-fns'
@@ -161,6 +161,12 @@ export default function DashboardPage() {
   const [aiTeam, setAiTeam] = useState(''); const [loadingTeam, setLoadingTeam] = useState(false)
   const [aiPersonal, setAiPersonal] = useState(''); const [loadingPersonal, setLoadingPersonal] = useState(false)
   const [statDetail, setStatDetail] = useState<{title:string; items:any[]}|null>(null)
+  const [showHidden, setShowHidden] = useState(false)
+  const autoRan = useRef(false)
+
+  // Guest/external users (only 'guest' role, no internal role) get a reduced dashboard
+  const userRoles: string[] = (user?.roles && user.roles.length) ? user.roles : (user?.role ? [user.role] : ['guest'])
+  const isInternal = userRoles.some((r:string) => r !== 'guest')
 
   async function load() {
     setLoading(true)
@@ -222,6 +228,32 @@ export default function DashboardPage() {
   const widgets = config?.dashboardWidgets || []
   const isWidgetActive = (key:string) => widgets.find((w:any) => w.key === key)?.active !== false
 
+  // Auto-load AI insights on mount — no manual trigger needed. Personal/Tim only for internal users.
+  useEffect(() => {
+    if (loading || !user || autoRan.current) return
+    autoRan.current = true
+    if (isWidgetActive('ai-quotes')) genQuotes()
+    if (isInternal && isWidgetActive('ai-insight-personal')) genPersonal()
+    if (isInternal && isWidgetActive('ai-insight-team')) genTeam()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user])
+
+  // Issues visibility — hidden activities are excluded from ALL dashboard Issues sections
+  // (Status Distribution, High Priority Active, Detail) so everything stays aligned.
+  const visibleActivities = useMemo(() => activities.filter((a:any)=>!a.hidden), [activities])
+  const hiddenCount = activities.length - visibleActivities.length
+
+  async function toggleHidden(a:any) {
+    const next = !a.hidden
+    setActivities(prev => prev.map((x:any)=> x._id===a._id ? { ...x, hidden: next } : x)) // optimistic
+    try {
+      const r = await fetch(`/api/projects/${a._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ hidden: next }) })
+      if (!r.ok) throw new Error('failed')
+    } catch {
+      setActivities(prev => prev.map((x:any)=> x._id===a._id ? { ...x, hidden: !next } : x)) // rollback on error
+    }
+  }
+
   // Progress chart data
   const progressData = useMemo(() => {
     // Distribution of PROGRESS PROJECTS (initiatives) by status
@@ -244,11 +276,11 @@ export default function DashboardPage() {
     })).filter(d => d.value > 0)
   }, [initiatives])
 
-  // Issue distribution by status
+  // Issue distribution by status — only counts VISIBLE issues (aligned with what's shown)
   const issueDist = useMemo(() => {
     const statuses = config?.issueStatuses?.filter((s:any)=>s.active) || []
-    return statuses.map((s:any) => ({ label:s.label, value:activities.filter(a=>a.status===s.key).length, color:s.color }))
-  }, [activities, config])
+    return statuses.map((s:any) => ({ label:s.label, value:visibleActivities.filter((a:any)=>a.status===s.key).length, color:s.color }))
+  }, [visibleActivities, config])
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -298,7 +330,7 @@ export default function DashboardPage() {
                       }
                     </div>
                   )}
-                  {isWidgetActive('ai-insight-personal') && (
+                  {isInternal && isWidgetActive('ai-insight-personal') && (
                     <div className="card glass" style={{ padding:14 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
                         <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>🤖 AI Insight — Personal</div>
@@ -311,7 +343,7 @@ export default function DashboardPage() {
                       }
                     </div>
                   )}
-                  {isWidgetActive('ai-insight-team') && (
+                  {isInternal && isWidgetActive('ai-insight-team') && (
                     <div className="card glass" style={{ padding:14 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
                         <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>🤝 AI Insight — Tim</div>
@@ -467,9 +499,9 @@ export default function DashboardPage() {
                   <div className="card" style={{ padding:12 }}>
                     <div style={{ fontSize:10, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>🔥 High Priority Active</div>
                     <div style={{ maxHeight:140, overflowY:'auto' }}>
-                      {activities.filter(a=>a.priority==='high' && a.status!=='completed').length === 0 ? (
+                      {visibleActivities.filter((a:any)=>a.priority==='high' && a.status!=='completed').length === 0 ? (
                         <div style={{ fontSize:10, color:'var(--text3)', padding:'10px 0' }}>Tidak ada high priority aktif</div>
-                      ) : activities.filter(a=>a.priority==='high' && a.status!=='completed').map(a => (
+                      ) : visibleActivities.filter((a:any)=>a.priority==='high' && a.status!=='completed').map((a:any) => (
                         <div key={a._id} style={{ padding:'6px 0', borderBottom:'1px solid var(--border)', fontSize:10.5 }}>
                           <div style={{ fontWeight:600 }}>{a.title}</div>
                           <div style={{ color:'var(--text3)', fontSize:9.5 }}>{a.category} · PIC: {picArray(a.pic).join(', ') || a.picName || '—'}</div>
@@ -481,8 +513,13 @@ export default function DashboardPage() {
 
                 {/* Inline detail table — scrollable */}
                 <div className="card" style={{ padding:0, overflow:'hidden' }}>
-                  <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--border)', fontSize:12, fontWeight:600 }}>
-                    Detail Issues <span style={{ color:'var(--text3)', fontWeight:400 }}>({activities.length})</span>
+                  <div style={{ padding:'10px 14px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, flexWrap:'wrap' }}>
+                    <div style={{ fontSize:12, fontWeight:600 }}>
+                      Detail Issues <span style={{ color:'var(--text3)', fontWeight:400 }}>({visibleActivities.length}{hiddenCount>0 ? ` · ${hiddenCount} disembunyikan` : ''})</span>
+                    </div>
+                    {isInternal && hiddenCount > 0 && (
+                      <button onClick={()=>setShowHidden(v=>!v)} className="btn btn-sm">{showHidden ? '🙈 Sembunyikan yg hidden' : `👁 Tampilkan ${hiddenCount} hidden`}</button>
+                    )}
                   </div>
                   <div style={{ maxHeight:'calc(100vh - 420px)', minHeight:200, overflowY:'auto' }}>
                     <table className="wp-table" style={{ minWidth:900 }}>
@@ -498,18 +535,26 @@ export default function DashboardPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {activities.length === 0 ? (
+                        {(showHidden ? activities : visibleActivities).length === 0 ? (
                           <tr><td colSpan={7} style={{ textAlign:'center', padding:24, color:'var(--text3)' }}>Belum ada activity/issue</td></tr>
-                        ) : activities.map(a => {
+                        ) : (showHidden ? activities : visibleActivities).map((a:any) => {
                           const catColor = (config?.activityCategories||[]).find((c:any)=>c.key===a.category)?.color || 'var(--brand)'
                           const pc: any = { high:{l:'High',c:'var(--red)',b:'var(--redbg)'}, medium:{l:'Medium',c:'var(--amber)',b:'var(--amberbg)'}, low:{l:'Low',c:'var(--green)',b:'var(--greenbg)'} }
                           return (
-                            <tr key={a._id}>
+                            <tr key={a._id} style={{ opacity: a.hidden ? 0.45 : 1 }}>
                               <td>
-                                <div style={{ fontSize:11.5, fontWeight:600 }}>{a.title}</div>
-                                <div style={{ display:'flex', gap:4, marginTop:3, flexWrap:'wrap' }}>
-                                  <span className="badge" style={{ background:catColor+'22', color:catColor, fontSize:9 }}>{a.category}</span>
-                                  <span className="badge" style={{ background:'var(--bg3)', color:'var(--text2)', fontSize:9 }}>{a.subType}</span>
+                                <div style={{ display:'flex', alignItems:'flex-start', gap:6 }}>
+                                  {isInternal && (
+                                    <button onClick={()=>toggleHidden(a)} className="btn btn-icon btn-sm" style={{ flexShrink:0 }}
+                                      title={a.hidden ? 'Tampilkan di dashboard' : 'Sembunyikan dari dashboard'}>{a.hidden ? '🙈' : '👁'}</button>
+                                  )}
+                                  <div>
+                                    <div style={{ fontSize:11.5, fontWeight:600 }}>{a.title}</div>
+                                    <div style={{ display:'flex', gap:4, marginTop:3, flexWrap:'wrap' }}>
+                                      <span className="badge" style={{ background:catColor+'22', color:catColor, fontSize:9 }}>{a.category}</span>
+                                      <span className="badge" style={{ background:'var(--bg3)', color:'var(--text2)', fontSize:9 }}>{a.subType}</span>
+                                    </div>
+                                  </div>
                                 </div>
                               </td>
                               <td style={{ fontSize:10.5, whiteSpace:'pre-wrap' }}>{a.description || a.progressNotes || '—'}</td>
