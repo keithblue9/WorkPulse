@@ -414,11 +414,13 @@ export default function DashboardPage() {
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, gap:10, flexWrap:'wrap' }}>
                   <div>
                     <div style={{ fontSize:13, fontWeight:600 }}>Progress Initiatives</div>
-                    <div style={{ fontSize:11, color:'var(--text3)' }}>{initiatives.length} initiative · klik card untuk edit/update</div>
+                    <div style={{ fontSize:11, color:'var(--text3)' }}>{initiatives.length} initiative{isInternal ? ' · klik card untuk edit/update' : ''}</div>
                   </div>
-                  <Link href="/dashboard/progress" style={{ textDecoration:'none' }}>
-                    <button className="btn btn-primary btn-sm">+ Initiative Baru</button>
-                  </Link>
+                  {isInternal && (
+                    <Link href="/dashboard/progress" style={{ textDecoration:'none' }}>
+                      <button className="btn btn-primary btn-sm">+ Initiative Baru</button>
+                    </Link>
+                  )}
                 </div>
                 {initiatives.length === 0 ? (
                   <Link href="/dashboard/progress" style={{ textDecoration:'none' }}>

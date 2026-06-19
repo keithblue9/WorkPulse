@@ -1,6 +1,7 @@
 'use client'
 import { picArray } from '@/lib/defaults'
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import RichTextarea from '@/components/RichTextarea'
 import { calcInitiativeProgress } from '@/lib/defaults'
@@ -270,6 +271,10 @@ function InitiativeForm({ editing, onClose, onSave, members }: { editing?:any; o
 }
 
 export default function ProgressPage() {
+  const { data:session } = useSession(); const user = session?.user as any
+  // Guest/external (only 'guest' role) = view only: no create/edit affordances
+  const userRoles: string[] = (user?.roles && user.roles.length) ? user.roles : (user?.role ? [user.role] : ['guest'])
+  const isInternal = userRoles.some((r:string) => r !== 'guest')
   const [initiatives, setInitiatives] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -290,14 +295,14 @@ export default function ProgressPage() {
       <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', flexShrink:0 }}>
         <div>
           <div style={{ fontSize:14, fontWeight:600 }}>Progress Initiatives</div>
-          <div style={{ fontSize:11, color:'var(--text3)' }}>{initiatives.length} initiative · Detail per phase (week-level) · klik card untuk edit</div>
+          <div style={{ fontSize:11, color:'var(--text3)' }}>{initiatives.length} initiative · Detail per phase (week-level){isInternal ? ' · klik card untuk edit' : ''}</div>
         </div>
-        <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Initiative Baru</button>
+        {isInternal && <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Initiative Baru</button>}
       </div>
 
       <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
-         initiatives.length === 0 ? <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>Belum ada initiative · klik <b>+ Initiative Baru</b></div> : (
+         initiatives.length === 0 ? <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>{isInternal ? <>Belum ada initiative · klik <b>+ Initiative Baru</b></> : 'Belum ada initiative'}</div> : (
           <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
             {initiatives.map(i => {
               const calc = calcInitiativeProgress(i.phases || [])
@@ -312,7 +317,7 @@ export default function ProgressPage() {
                           <div style={{ fontSize:15, fontWeight:700 }}>{i.title}</div>
                           {picArray(i.pic).length > 0 && <div style={{ fontSize:10, color:'var(--text3)', marginTop:2 }}>👤 {picArray(i.pic).join(', ')}</div>}
                         </div>
-                        <button onClick={()=>setEditing(i)} className="btn btn-sm">✏️ Edit / Update</button>
+                        {isInternal && <button onClick={()=>setEditing(i)} className="btn btn-sm">✏️ Edit / Update</button>}
                       </div>
                       {i.progressNotes && <div style={{ fontSize:11, color:'var(--text2)', whiteSpace:'pre-wrap', marginBottom:10, padding:'8px 10px', background:'var(--bg3)', borderRadius:6, lineHeight:1.5 }}>{i.progressNotes}</div>}
                       {/* Phases breakdown */}
