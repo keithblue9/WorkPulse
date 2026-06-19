@@ -4,6 +4,7 @@ import { picArray, calcInitiativeProgress } from '@/lib/defaults'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import ExportMenu from '@/components/ExportMenu'
 import { format, subDays } from 'date-fns'
 
 const PRIORITY_CFG: Record<string,{label:string;color:string;bg:string}> = {
@@ -163,6 +164,7 @@ export default function DashboardPage() {
   const [statDetail, setStatDetail] = useState<{title:string; items:any[]}|null>(null)
   const [showHidden, setShowHidden] = useState(false)
   const autoRan = useRef(false)
+  const issuesRef = useRef<HTMLDivElement>(null)
 
   // Guest/external users (only 'guest' role, no internal role) get a reduced dashboard
   const userRoles: string[] = (user?.roles && user.roles.length) ? user.roles : (user?.role ? [user.role] : ['guest'])
@@ -481,6 +483,10 @@ export default function DashboardPage() {
             {/* ============ ISSUES TAB (inline detail, compact) ============ */}
             {tab === 'issues' && (
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ display:'flex', justifyContent:'flex-end' }} data-export-hide>
+                  <ExportMenu targetRef={issuesRef} filename="issues-report" title="Issues — WinS" />
+                </div>
+                <div ref={issuesRef} style={{ display:'flex', flexDirection:'column', gap:12 }}>
                 {/* Compact summary row */}
                 <div className="dash-2col" style={{ display:'grid', gridTemplateColumns:'minmax(220px, 0.6fr) 1fr', gap:10 }}>
                   <div className="card" style={{ padding:12 }}>
@@ -520,7 +526,7 @@ export default function DashboardPage() {
                       Detail Issues <span style={{ color:'var(--text3)', fontWeight:400 }}>({visibleActivities.length}{hiddenCount>0 ? ` · ${hiddenCount} disembunyikan` : ''})</span>
                     </div>
                     {isInternal && hiddenCount > 0 && (
-                      <button onClick={()=>setShowHidden(v=>!v)} className="btn btn-sm">{showHidden ? '🙈 Sembunyikan yg hidden' : `👁 Tampilkan ${hiddenCount} hidden`}</button>
+                      <button data-export-hide onClick={()=>setShowHidden(v=>!v)} className="btn btn-sm">{showHidden ? '🙈 Sembunyikan yg hidden' : `👁 Tampilkan ${hiddenCount} hidden`}</button>
                     )}
                   </div>
                   <div style={{ maxHeight:'calc(100vh - 420px)', minHeight:200, overflowY:'auto' }}>
@@ -547,7 +553,7 @@ export default function DashboardPage() {
                               <td>
                                 <div style={{ display:'flex', alignItems:'flex-start', gap:6 }}>
                                   {isInternal && (
-                                    <button onClick={()=>toggleHidden(a)} className="btn btn-icon btn-sm" style={{ flexShrink:0 }}
+                                    <button data-export-hide onClick={()=>toggleHidden(a)} className="btn btn-icon btn-sm" style={{ flexShrink:0 }}
                                       title={a.hidden ? 'Tampilkan di dashboard' : 'Sembunyikan dari dashboard'}>{a.hidden ? '🙈' : '👁'}</button>
                                   )}
                                   <div>
@@ -571,6 +577,7 @@ export default function DashboardPage() {
                       </tbody>
                     </table>
                   </div>
+                </div>
                 </div>
               </div>
             )}

@@ -1,9 +1,10 @@
 'use client'
 import { picArray } from '@/lib/defaults'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import RichTextarea from '@/components/RichTextarea'
+import ExportMenu from '@/components/ExportMenu'
 import { calcInitiativeProgress } from '@/lib/defaults'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
@@ -280,6 +281,7 @@ export default function ProgressPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
+  const exportRef = useRef<HTMLDivElement>(null)
 
   async function load() {
     setLoading(true)
@@ -297,10 +299,13 @@ export default function ProgressPage() {
           <div style={{ fontSize:14, fontWeight:600 }}>Progress Initiatives</div>
           <div style={{ fontSize:11, color:'var(--text3)' }}>{initiatives.length} initiative · Detail per phase (week-level){isInternal ? ' · klik card untuk edit' : ''}</div>
         </div>
-        {isInternal && <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Initiative Baru</button>}
+        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+          <ExportMenu targetRef={exportRef} filename="progress-initiatives" title="Progress Initiatives — WinS" />
+          {isInternal && <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Initiative Baru</button>}
+        </div>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
+      <div ref={exportRef} style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
          initiatives.length === 0 ? <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>{isInternal ? <>Belum ada initiative · klik <b>+ Initiative Baru</b></> : 'Belum ada initiative'}</div> : (
           <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
