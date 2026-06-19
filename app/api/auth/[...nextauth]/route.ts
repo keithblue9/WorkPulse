@@ -22,9 +22,22 @@ const handler = NextAuth({
         const pin = String(credentials.password).trim()
         console.log('[AUTH] Login attempt:', { email, pinLength: pin.length })
 
-        const user = await UserModel.findOne({ email }).lean() as any
+        // Try lowercase match first; if missed, fall back to case-insensitive (legacy users with mixed-case emails)
+        let user = await UserModel.findOne({ email }).lean() as any
+        if (!user) {
+          const escaped = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          user = await UserModel.findOne({ email: { $regex: new RegExp(`^${escaped}$`, 'i') } }).lean() as any
+          if (user) {
+            console.log('[AUTH] Found via case-insensitive match, normalizing email:', user.email, '→', email)
+            await UserModel.updateOne({ _id: user._id }, { $set: { email } })
+          }
+        }
         if (!user) {
           console.log('[AUTH] User not found:', email)
+          return null
+        }
+        if (user.active === false) {
+          console.log('[AUTH] User is inactive:', email)
           return null
         }
         if (!user.password) {

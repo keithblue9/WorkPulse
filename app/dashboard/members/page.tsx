@@ -145,6 +145,16 @@ export default function MembersPage() {
     } catch { toast.error('Gagal simpan urutan') }
   }
 
+  async function resetPin(u:any, e:any) {
+    e.stopPropagation()
+    if (!confirm(`Reset PIN milik ${u.name} ke default 123456? Member harus login pakai PIN baru.`)) return
+    try {
+      const r = await fetch(`/api/users/${u._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ password: '123456' }) })
+      if (!r.ok) { toast.error('Gagal reset PIN'); return }
+      toast.success(`PIN ${u.name} di-reset ke 123456`)
+    } catch { toast.error('Gagal reset PIN') }
+  }
+
   const allRoles = (config?.roleDefs && config.roleDefs.length > 0) ? config.roleDefs : DEFAULT_ROLES
   const filtered = users.filter(u => !search || u.name?.toLowerCase().includes(search.toLowerCase()))
 
@@ -199,7 +209,10 @@ export default function MembersPage() {
                           <button onClick={(e)=>{e.stopPropagation(); moveMember(idx, 1)}} disabled={!canReorder || idx===filtered.length-1} className="btn btn-icon btn-sm" title="Turun" style={{ opacity:(!canReorder||idx===filtered.length-1)?0.3:1 }}>▼</button>
                         </div>
                       </td>
-                      <td onClick={()=>setEditing(u)}><button className="btn btn-icon btn-sm">✏️</button></td>
+                      <td style={{ display:'flex', gap:4, justifyContent:'flex-end' }} onClick={e=>e.stopPropagation()}>
+                          <button title="Reset PIN ke 123456" onClick={(e)=>resetPin(u,e)} className="btn btn-icon btn-sm">🔑</button>
+                          <button title="Edit" onClick={()=>setEditing(u)} className="btn btn-icon btn-sm">✏️</button>
+                        </td>
                     </tr>
                   )
                 })}

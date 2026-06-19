@@ -7,10 +7,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const { id } = await params; await connectDB()
     const body = await req.json()
+    if (body.email) body.email = String(body.email).toLowerCase().trim()
     if (body.password) body.password = await bcrypt.hash(body.password, 10)
     const user = await UserModel.findByIdAndUpdate(id, body, { new: true }).select('-password').lean()
     return NextResponse.json({ data: user })
-  } catch { return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
+  } catch (e:any) {
+    console.error('[USERS PATCH]', e?.message)
+    return NextResponse.json({ error: e?.message || 'Failed' }, { status: 500 })
+  }
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {

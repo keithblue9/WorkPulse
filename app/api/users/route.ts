@@ -17,11 +17,14 @@ export async function POST(req: NextRequest) {
   try {
     await connectDB()
     const body = await req.json()
+    // Normalize email to lowercase to avoid case-mismatch on login
+    if (body.email) body.email = String(body.email).toLowerCase().trim()
     const hashed = await bcrypt.hash(body.password, 10)
     const user = await UserModel.create({ ...body, password: hashed })
     const { password: _, ...safe } = user.toObject()
     return NextResponse.json({ data: safe }, { status: 201 })
-  } catch {
-    return NextResponse.json({ error: 'Failed' }, { status: 500 })
+  } catch (e:any) {
+    console.error('[USERS POST]', e?.message)
+    return NextResponse.json({ error: e?.message || 'Failed' }, { status: 500 })
   }
 }
