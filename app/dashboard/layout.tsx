@@ -51,6 +51,10 @@ function getAllowedMenus(roleDefs:any[], userRoles:string[], configLoaded:boolea
   const allowed = new Set<string>()
   // Try from roleDefs first
   for (const role of userRoles) {
+    // Admin is a superuser: always sees every menu the app defines, even if the
+    // saved config in DB predates a newly added menu (e.g. settlementcc). This
+    // future-proofs new menus so they appear for admins without re-saving roles.
+    if (role === 'admin') { FALLBACK_MENUS.admin.forEach(m => allowed.add(m)); continue }
     const def = roleDefs?.find((r:any)=>r.key===role)
     if (def?.allowedMenus) def.allowedMenus.forEach((m:string)=>allowed.add(m))
   }
