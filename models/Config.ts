@@ -6,7 +6,7 @@ const AttendanceTypeSchema = new Schema({ key:String, label:String, color:String
 
 // NEW: role with menu permissions
 const RoleSchema = new Schema({
-  key: String,             // 'admin' | 'manager' | 'member' | 'finance' | 'cashier' | 'guest' | custom
+  key: String,             // 'admin' | 'manager' | 'member' | 'finance' | 'cashier' | 'ccholder' | 'guest' | custom
   label: String,
   builtin: { type: Boolean, default: false },
   allowedMenus: { type: [String], default: [] }, // ['dashboard','activities','calendar','issues',...]
@@ -127,12 +127,13 @@ const ConfigSchema = new Schema({
   roleDefs: {
     type: [RoleSchema],
     default: [
-      { key:'admin',   label:'Admin',   builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members','config'] },
-      { key:'manager', label:'Manager', builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members'] },
-      { key:'member',  label:'Member',  builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','reimbursement'] },
-      { key:'finance', label:'Finance', builtin:true,  allowedMenus:['dashboard','attendance','biodata','links','budget','reimbursement','cashcard','cashier'] },
-      { key:'cashier', label:'Cashier', builtin:true,  allowedMenus:['dashboard','reimbursement','cashier','cashcard','biodata'] },
-      { key:'guest',   label:'Guest',   builtin:true,  allowedMenus:['dashboard','links'] },
+      { key:'admin',    label:'Admin',     builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','settlementcc','members','config'] },
+      { key:'manager',  label:'Manager',   builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members'] },
+      { key:'member',   label:'Member',    builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','reimbursement'] },
+      { key:'finance',  label:'Finance',   builtin:true,  allowedMenus:['dashboard','attendance','biodata','links','budget','reimbursement','cashcard','cashier'] },
+      { key:'cashier',  label:'Cashier',   builtin:true,  allowedMenus:['dashboard','reimbursement','cashier','cashcard','biodata'] },
+      { key:'ccholder', label:'CC Holder', builtin:true,  allowedMenus:['dashboard','reimbursement','cashcard','settlementcc'] },
+      { key:'guest',    label:'Guest',     builtin:true,  allowedMenus:['dashboard','links'] },
     ],
   },
 

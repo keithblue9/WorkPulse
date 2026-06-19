@@ -30,6 +30,7 @@ const NAV_GROUPS = [
     { href:'/dashboard/cashcard',       label:'Cash Card', permKey:'cashcard' },
     { href:'/dashboard/reimbursements', label:'Reimbursement', permKey:'reimbursement' },
     { href:'/dashboard/cashier',        label:'Cashier', permKey:'cashier' },
+    { href:'/dashboard/settlementcc',   label:'Settlement CC', permKey:'settlementcc' },
   ]},
   { key:'admin', label:'Admin', items:[
     { href:'/dashboard/members', label:'Member', permKey:'members' },
@@ -38,12 +39,13 @@ const NAV_GROUPS = [
 ]
 
 const FALLBACK_MENUS: Record<string,string[]> = {
-  admin:   ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members','config'],
-  manager: ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members'],
-  member:  ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','reimbursement'],
-  finance: ['dashboard','attendance','biodata','links','budget','reimbursement','cashcard','cashier'],
-  cashier: ['dashboard','reimbursement','cashier','cashcard','biodata'],
-  guest:   ['dashboard','links'],
+  admin:    ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','settlementcc','members','config'],
+  manager:  ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members'],
+  member:   ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','reimbursement'],
+  finance:  ['dashboard','attendance','biodata','links','budget','reimbursement','cashcard','cashier'],
+  cashier:  ['dashboard','reimbursement','cashier','cashcard','biodata'],
+  ccholder: ['dashboard','reimbursement','cashcard','settlementcc'],
+  guest:    ['dashboard','links'],
 }
 function getAllowedMenus(roleDefs:any[], userRoles:string[], configLoaded:boolean):Set<string> {
   const allowed = new Set<string>()

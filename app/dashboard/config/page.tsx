@@ -144,12 +144,22 @@ function ResetSection() {
 }
 
 
-const MENU_KEYS = ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members','config']
+const MENU_KEYS = ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','settlementcc','members','config']
 const MENU_LABELS: Record<string,string> = {
   dashboard:'Dashboard', activities:'Activities', calendar:'Calendar', issues:'Issues', progress:'Progress',
   attendance:'Presensi', biodata:'Biodata', links:'Link Hub', meetings:'Meeting Reports', notes:'Notes',
-  budget:'Anggaran', reimbursement:'Reimbursement', cashcard:'Cash Card', cashier:'Cashier',
+  budget:'Anggaran', reimbursement:'Reimbursement', cashcard:'Cash Card', cashier:'Cashier', settlementcc:'Settlement CC',
   members:'Member', config:'Configuration'
+}
+
+// Ensure newly-added builtin roles (e.g. ccholder) show up in the editor even when
+// the DB config was seeded before they existed. Existing roles and any custom menu
+// edits are preserved untouched; only missing builtins are appended.
+function withBuiltins(roles:any[]):any[] {
+  const list = (roles && roles.length) ? [...roles] : [...DEFAULT_ROLES]
+  const have = new Set(list.map((r:any)=>r.key))
+  for (const def of DEFAULT_ROLES) if (!have.has(def.key)) list.push({ ...def })
+  return list
 }
 
 function RolesEditor({ roles, onChange }: { roles:any[]; onChange:(roles:any[])=>void }) {
@@ -570,9 +580,9 @@ export default function ConfigPage() {
 
         {tab === 'roles' && (
           <Section title="🔐 Roles & Permissions" sub="Atur role dan menu apa saja yang bisa diakses per role" action={
-            <button className="btn btn-sm btn-primary" onClick={()=>save({ roleDefs: (config.roleDefs && config.roleDefs.length) ? config.roleDefs : DEFAULT_ROLES })}>💾 Simpan Roles</button>
+            <button className="btn btn-sm btn-primary" onClick={()=>save({ roleDefs: withBuiltins(config.roleDefs) })}>💾 Simpan Roles</button>
           }>
-            <RolesEditor roles={(config.roleDefs && config.roleDefs.length) ? config.roleDefs : DEFAULT_ROLES} onChange={(v:any)=>setConfig((c:any)=>({...c, roleDefs:v}))} />
+            <RolesEditor roles={withBuiltins(config.roleDefs)} onChange={(v:any)=>setConfig((c:any)=>({...c, roleDefs:v}))} />
           </Section>
         )}
         {tab === 'widgets' && (

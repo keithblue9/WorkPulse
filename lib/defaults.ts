@@ -1,22 +1,24 @@
 // Shared default values used as fallback when config in DB is missing fields.
 // These match the Mongoose schema defaults in models/Config.ts
 
-export const ALL_MENU_KEYS = ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members','config']
+export const ALL_MENU_KEYS = ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','settlementcc','members','config']
 
 export const MENU_LABELS: Record<string,string> = {
   dashboard:'Dashboard', activities:'Activities', calendar:'Calendar', issues:'Issues', progress:'Progress',
   attendance:'Presensi', biodata:'Biodata', links:'Link Hub', meetings:'Meeting Reports', notes:'Notes',
-  budget:'Anggaran', reimbursement:'Reimbursement', cashcard:'Cash Card', cashier:'Cashier',
+  budget:'Anggaran', reimbursement:'Reimbursement', cashcard:'Cash Card', cashier:'Cashier', settlementcc:'Settlement CC',
   members:'Member', config:'Configuration'
 }
 
 export const DEFAULT_ROLES = [
-  { key:'admin',   label:'Admin',   builtin:true,  allowedMenus:[...ALL_MENU_KEYS] },
-  { key:'manager', label:'Manager', builtin:true,  allowedMenus:ALL_MENU_KEYS.filter(m=>m!=='config') },
-  { key:'member',  label:'Member',  builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','reimbursement'] },
-  { key:'finance', label:'Finance', builtin:true,  allowedMenus:['dashboard','attendance','biodata','links','budget','reimbursement','cashcard','cashier'] },
-  { key:'cashier', label:'Cashier', builtin:true,  allowedMenus:['dashboard','reimbursement','cashier','cashcard','biodata'] },
-  { key:'guest',   label:'Guest',   builtin:true,  allowedMenus:['dashboard','links'] },
+  { key:'admin',    label:'Admin',     builtin:true,  allowedMenus:[...ALL_MENU_KEYS] },
+  // manager broad access but NOT the CC Holder report by default (settlementcc is opt-in per role)
+  { key:'manager',  label:'Manager',   builtin:true,  allowedMenus:ALL_MENU_KEYS.filter(m=>m!=='config' && m!=='settlementcc') },
+  { key:'member',   label:'Member',    builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','reimbursement'] },
+  { key:'finance',  label:'Finance',   builtin:true,  allowedMenus:['dashboard','attendance','biodata','links','budget','reimbursement','cashcard','cashier'] },
+  { key:'cashier',  label:'Cashier',   builtin:true,  allowedMenus:['dashboard','reimbursement','cashier','cashcard','biodata'] },
+  { key:'ccholder', label:'CC Holder', builtin:true,  allowedMenus:['dashboard','reimbursement','cashcard','settlementcc'] },
+  { key:'guest',    label:'Guest',     builtin:true,  allowedMenus:['dashboard','links'] },
 ]
 
 export const DEFAULT_WIDGETS = [
