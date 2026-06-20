@@ -8,7 +8,7 @@ import { useTheme, THEMES } from '@/lib/theme'
 import AppPopups from '@/components/AppPopups'
 import BirthdayPopup from '@/components/BirthdayPopup'
 import OnlinePresence from '@/components/OnlinePresence'
-import AIChat from '@/components/AIChat'
+import Siera from '@/components/Siera'
 
 // Menu definitions with permission keys (matches config.roleDefs[].allowedMenus)
 const NAV_GROUPS = [
@@ -244,7 +244,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
         <AppPopups />
         <BirthdayPopup />
-        <AIChat />
+        <Siera />
       </div>
     </div>
   )

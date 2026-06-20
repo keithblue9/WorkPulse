@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
-import { useRouter } from 'next/navigation'
 
 // ─── PWA Install Prompt ─────────────────────────────────────
 function PWAInstallPrompt({ config }: { config:any }) {
@@ -57,15 +56,20 @@ function PWAInstallPrompt({ config }: { config:any }) {
 }
 
 // ─── Presensi Daily Popup ───────────────────────────────────
+// Shows once per day. Gate is a localStorage per-day key (robust, independent of the
+// profile API), so: pick "Sudah"/submit → hidden the rest of today → reappears next day.
+function localDateStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 function PresensiPopup() {
   const { data:session } = useSession(); const user = session?.user as any
-  const router = useRouter()
   const [show, setShow] = useState(false)
   const [step, setStep] = useState<'ask'|'choose'>('ask')
   const [attendanceTypes, setAttendanceTypes] = useState<any[]>([])
   const [profile, setProfile] = useState<any>(null)
 
-  // Roles that should NOT get the daily attendance popup (e.g. external collaborators)
+  // Roles that should NOT get the daily attendance popup (external collaborators)
   const NO_PRESENSI_ROLES = ['external', 'guest']
   const userRoles = (user?.roles && user.roles.length) ? user.roles : (user?.role ? [user.role] : [])
   const skipPresensi = userRoles.some((r:string) => NO_PRESENSI_ROLES.includes(String(r).toLowerCase()))
@@ -73,45 +77,55 @@ function PresensiPopup() {
   useEffect(() => {
     if (!session?.user?.email) return
     if (skipPresensi) return  // external/guest: no daily attendance prompt
+    let cancelled = false
     async function check() {
-      const [pr, cfg] = await Promise.all([
-        fetch('/api/profile').then(r=>r.json()),
-        fetch('/api/config').then(r=>r.json()),
-      ])
-      setProfile(pr.data)
-      setAttendanceTypes((cfg.data?.attendanceTypes||[]).filter((t:any)=>t.active))
-      // Double-check role from fresh profile too (in case session is stale)
-      const prRoles = (pr.data?.roles && pr.data.roles.length) ? pr.data.roles : (pr.data?.role ? [pr.data.role] : [])
-      if (prRoles.some((r:string) => NO_PRESENSI_ROLES.includes(String(r).toLowerCase()))) return
-      const today = new Date().toISOString().split('T')[0]
-      if (pr.data?.lastAttendanceCheck !== today) {
-        // also check if attendance record exists for today
-        const att = await fetch(`/api/attendance?userId=${pr.data._id}&date=${today}`).then(r=>r.json())
-        if (!att.data?.length) setShow(true)
-      }
+      const today = localDateStr()
+      const doneKey = `presensi-check-${today}`
+      try { if (localStorage.getItem(doneKey)) return } catch {}
+      // Load attendance types (needed for the "choose" step)
+      try {
+        const cfg = await fetch('/api/config').then(r=>r.json())
+        if (!cancelled) setAttendanceTypes((cfg.data?.attendanceTypes||[]).filter((t:any)=>t.active))
+      } catch {}
+      // Best-effort: if profile resolves AND attendance already recorded today, auto-suppress.
+      try {
+        const pr = await fetch('/api/profile').then(r=>r.json())
+        if (pr?.data) {
+          if (!cancelled) setProfile(pr.data)
+          const prRoles = (pr.data?.roles && pr.data.roles.length) ? pr.data.roles : (pr.data?.role ? [pr.data.role] : [])
+          if (prRoles.some((r:string) => NO_PRESENSI_ROLES.includes(String(r).toLowerCase()))) return
+          const att = await fetch(`/api/attendance?userId=${pr.data._id}&date=${today}`).then(r=>r.json())
+          if (att?.data?.length) { try { localStorage.setItem(doneKey, '1') } catch {} ; return }
+        }
+      } catch {}
+      if (!cancelled) setShow(true)
     }
     check()
-    // Schedule midnight re-check
+    // Re-check just after midnight so the popup returns on a new day without a reload
     const now = new Date()
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 0, 0, 5)
-    const msToMidnight = tomorrow.getTime() - now.getTime()
-    const tid = setTimeout(check, msToMidnight)
-    return () => clearTimeout(tid)
-  }, [session])
+    const tid = setTimeout(check, tomorrow.getTime() - now.getTime())
+    return () => { cancelled = true; clearTimeout(tid) }
+  }, [session, skipPresensi])
 
-  async function markChecked() {
-    const today = new Date().toISOString().split('T')[0]
-    await fetch('/api/profile', { method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ lastAttendanceCheck: today }) })
-    setShow(false)
+  function gateToday() {
+    try { localStorage.setItem(`presensi-check-${localDateStr()}`, '1') } catch {}
   }
-
+  async function markChecked() {
+    gateToday()
+    setShow(false)
+    // Best-effort persist to profile (non-blocking; popup already gated locally)
+    fetch('/api/profile', { method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ lastAttendanceCheck: localDateStr() }) }).catch(()=>{})
+  }
   async function submitAttendance(type:string) {
-    const today = new Date().toISOString().split('T')[0]
-    await fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ userId: profile._id, userName: user?.name, date: today, type, slots:[{ from:'08:00', to:'17:00', type }] }) })
-    await markChecked()
-    toast.success('Presensi tercatat!')
+    const today = localDateStr()
+    try {
+      await fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ userId: profile?._id, userName: user?.name, date: today, type, slots:[{ from:'08:00', to:'17:00', type }] }) })
+      toast.success('Presensi tercatat!')
+    } catch { toast.error('Gagal mencatat presensi') }
+    markChecked()
   }
 
   if (!show) return null
