@@ -1,13 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const API_KEY = process.env.ANTHROPIC_API_KEY
-// Default to the cheapest model (Haiku). Overridable via env without a redeploy of code.
+// Default to the cheapest model (Haiku). Overridable via env without a code redeploy.
 const MODEL = process.env.CHAT_MODEL || 'claude-haiku-4-5'
 
-const SYSTEM = 'Namamu SIERA — asisten AI yang ramah di aplikasi WinS. ' +
-  'Selalu perkenalkan diri sebagai SIERA. JANGAN pernah menyebut nama lain seperti "WorkPulse", "WinS Assistant", atau menyebut-nyebut nama perusahaan/organisasi kecuali user yang menanyakannya. ' +
-  'Jawab ringkas, jelas, dan ramah. Ikuti bahasa user (default Bahasa Indonesia santai). ' +
-  'Kalau tidak tahu atau butuh data internal yang tidak kamu punya, katakan jujur dan sarankan cek menu terkait.'
+const SYSTEM =
+  'Namamu SIERA — asisten AI yang ramah, cerdas, dan serba bisa. ' +
+  'Kamu tinggal di dalam aplikasi WinS, TAPI pengetahuanmu LUAS: kamu boleh dan bisa membantu pertanyaan apa pun, ' +
+  'baik soal aplikasi maupun di luar aplikasi (rekomendasi tempat makan, info umum, tips, hitung-hitungan, ' +
+  'penjelasan, ide, dll). Jangan membatasi diri hanya ke aplikasi. ' +
+  'Selalu perkenalkan diri sebagai SIERA dan jangan menyebut nama lain (seperti "WorkPulse" atau "WinS Assistant") kecuali ditanya. ' +
+  'Jawab dengan ramah, jelas, dan to the point. Ikuti bahasa user (default Bahasa Indonesia santai). ' +
+  'Untuk hal yang butuh info terkini (harga, kurs, tempat, berita, jadwal), gunakan pencarian web bila tersedia; ' +
+  'kalau tidak tersedia, beri jawaban terbaik dari pengetahuanmu dan tandai sebagai perkiraan. Jujur kalau memang tidak tahu.'
+
+async function callOnce(messages: any[], useTools: boolean) {
+  const payload: any = { model: MODEL, max_tokens: 1500, system: SYSTEM, messages }
+  if (useTools) payload.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }]
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY as string, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify(payload),
+  })
+  return r
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,16 +35,16 @@ export async function POST(req: NextRequest) {
       .map((m: any) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content).slice(0, 4000) }))
     if (!messages.length) return NextResponse.json({ error: 'no messages' }, { status: 400 })
 
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 1024, system: SYSTEM, messages }),
-    })
+    // First try with web search enabled (for current info). If the model/plan rejects
+    // the tool, transparently retry without tools so the chat still answers.
+    let r = await callOnce(messages, true)
+    if (!r.ok) r = await callOnce(messages, false)
     if (!r.ok) {
       const e = await r.text()
       return NextResponse.json({ error: `API ${r.status}: ${e.substring(0, 200)}` }, { status: 200 })
     }
     const d = await r.json()
+    // Web search interleaves multiple text blocks — concatenate them all
     const reply = (d?.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('').trim()
     return NextResponse.json({ reply: reply || '(tidak ada respons)' })
   } catch (e: any) {
