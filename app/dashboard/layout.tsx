@@ -7,6 +7,8 @@ import Link from 'next/link'
 import { useTheme, THEMES } from '@/lib/theme'
 import AppPopups from '@/components/AppPopups'
 import BirthdayPopup from '@/components/BirthdayPopup'
+import OnlinePresence from '@/components/OnlinePresence'
+import AIChat from '@/components/AIChat'
 
 // Menu definitions with permission keys (matches config.roleDefs[].allowedMenus)
 const NAV_GROUPS = [
@@ -198,6 +200,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span style={{ color:'var(--border2)' }}>›</span>
             <span style={{ color:'var(--text)', fontWeight:500 }}>{currentPage}</span>
           </div>
+          <OnlinePresence />
           <div ref={themeRef} style={{ position:'relative' }}>
             <button className="btn btn-sm" onClick={()=>setShowThemePicker(!showThemePicker)}>
               {THEMES.find((t:any)=>t.key===theme)?.emoji} {THEMES.find((t:any)=>t.key===theme)?.label}
@@ -241,6 +244,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
         <AppPopups />
         <BirthdayPopup />
+        <AIChat />
       </div>
     </div>
   )
