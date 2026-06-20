@@ -4,10 +4,8 @@ import { useSession } from 'next-auth/react'
 
 type Msg = { role: 'user' | 'assistant'; content: string }
 
-const IDLE = ['/siera/siera-03.png', '/siera/siera-08.png', '/siera/siera-10.png']
+const FACE = '/siera/siera-08.png' // framed to face via objectPosition
 const WAVE = '/siera/siera-01.png'
-const TALK = '/siera/siera-05.png'
-const HEAD = '/siera/siera-08.png' // header avatar (face framed via objectPosition)
 
 function localToday() {
   const d = new Date()
@@ -22,18 +20,11 @@ export default function Siera() {
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [idlePose, setIdlePose] = useState(IDLE[0])
   const [greeting, setGreeting] = useState(false)
   const [greetText, setGreetText] = useState('')
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-
-  // Idle pose cycling — subtle weight shift so she feels alive
-  useEffect(() => {
-    const id = setInterval(() => setIdlePose(IDLE[Math.floor(Math.random() * IDLE.length)]), 7000)
-    return () => clearInterval(id)
-  }, [])
 
   // Greet the member once per day when they open the app
   useEffect(() => {
@@ -45,8 +36,8 @@ export default function Siera() {
     const first = isGuest ? '' : (user.name?.split(' ')[0] || '')
     const t = setTimeout(() => {
       setGreetText(isGuest
-        ? 'Halo! 👋 Selamat datang, aku SIERA. Klik aku kalau butuh bantuan ya!'
-        : `Halo ${first}! 👋 Aku SIERA, asisten kamu. Ada yang bisa dibantu hari ini?`)
+        ? 'Halo! 👋 Aku SIERA. Klik aku kalau butuh bantuan ya!'
+        : `Halo ${first}! 👋 Aku SIERA. Ada yang bisa dibantu hari ini?`)
       setGreeting(true)
       try { localStorage.setItem(key, '1') } catch {}
       setTimeout(() => setGreeting(false), 9000)
@@ -58,8 +49,6 @@ export default function Siera() {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages, loading, open])
-
-  const pose = greeting ? WAVE : (open || loading) ? TALK : idlePose
 
   function toggleOpen() {
     setGreeting(false)
@@ -87,13 +76,13 @@ export default function Siera() {
   }
 
   return (
-    <div style={{ position: 'fixed', right: 16, bottom: 12, zIndex: 300, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+    <div style={{ position: 'fixed', right: 18, bottom: 18, zIndex: 300, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
       {/* Chat panel */}
       {open && (
-        <div className="card scale-in" style={{ width: 340, maxWidth: 'calc(100vw - 32px)', height: 460, maxHeight: 'calc(100vh - 150px)', display: 'flex', flexDirection: 'column', borderRadius: 16, overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.25)', padding: 0 }}>
+        <div className="card scale-in" style={{ width: 340, maxWidth: 'calc(100vw - 32px)', height: 460, maxHeight: 'calc(100vh - 130px)', display: 'flex', flexDirection: 'column', borderRadius: 16, overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.25)', padding: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
-            <div style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', background: 'var(--brand-soft)', flexShrink: 0 }}>
-              <img src={HEAD} alt="SIERA" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% 6%' }} />
+            <div style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', background: 'var(--brand-soft)', flexShrink: 0 }}>
+              <img src={FACE} alt="SIERA" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% 0%', pointerEvents: 'none' }} />
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>SIERA</div>
@@ -106,7 +95,7 @@ export default function Siera() {
           <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--bg)' }}>
             {messages.length === 0 && (
               <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text3)', fontSize: 12, padding: 10 }}>
-                <img src={WAVE} alt="SIERA" style={{ height: 110, marginBottom: 6 }} />
+                <img src={WAVE} alt="SIERA" style={{ height: 120, marginBottom: 6 }} />
                 <div style={{ fontWeight: 600, color: 'var(--text2)', marginBottom: 2 }}>Hai, aku SIERA 👋</div>
                 Tanya apa aja, aku bantu jawab.
               </div>
@@ -132,21 +121,17 @@ export default function Siera() {
 
       {/* Greeting speech bubble */}
       {greeting && !open && (
-        <div onClick={toggleOpen} style={{ maxWidth: 230, marginRight: 6, padding: '10px 13px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, borderBottomRightRadius: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.18)', fontSize: 12.5, lineHeight: 1.5, color: 'var(--text)', cursor: 'pointer', animation: 'siera-bubble-in 0.4s ease' }}>
+        <div onClick={toggleOpen} style={{ maxWidth: 230, padding: '10px 13px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, borderBottomRightRadius: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.18)', fontSize: 12.5, lineHeight: 1.5, color: 'var(--text)', cursor: 'pointer', animation: 'siera-bubble-in 0.4s ease' }}>
           {greetText}
         </div>
       )}
 
-      {/* SIERA character (launcher) */}
-      <div onClick={toggleOpen} title="Chat dengan SIERA" className="siera-float"
-        style={{ cursor: 'pointer', position: 'relative', lineHeight: 0, filter: 'drop-shadow(0 10px 14px rgba(0,0,0,0.22))' }}
-        onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.05)')}
-        onMouseLeave={e => (e.currentTarget.style.transform = '')}>
-        <img src={pose} alt="SIERA" className="siera-img-swap" style={{ height: 118, width: 'auto', pointerEvents: 'none', userSelect: 'none' }} />
-        {!open && (
-          <span style={{ position: 'absolute', top: 4, right: -2, width: 12, height: 12, borderRadius: '50%', background: 'var(--green)', border: '2px solid var(--bg)' }} />
-        )}
-      </div>
+      {/* SIERA avatar button (clean circular face) */}
+      <button onClick={toggleOpen} title="Chat dengan SIERA" className="siera-float"
+        style={{ position: 'relative', width: 58, height: 58, borderRadius: '50%', border: '2px solid var(--bg2)', background: 'linear-gradient(135deg, var(--brand), #8b7adc)', cursor: 'pointer', padding: 0, overflow: 'hidden', boxShadow: '0 8px 22px rgba(0,0,0,0.28)' }}>
+        <img src={FACE} alt="SIERA" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% 0%', pointerEvents: 'none', userSelect: 'none' }} />
+        {!open && <span style={{ position: 'absolute', top: 3, right: 3, width: 11, height: 11, borderRadius: '50%', background: 'var(--green)', border: '2px solid var(--bg2)' }} />}
+      </button>
     </div>
   )
 }
