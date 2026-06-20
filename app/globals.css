@@ -526,9 +526,9 @@ html { scroll-behavior:smooth }
   .login-card { padding-left: 20px !important; padding-right: 20px !important; }
 }
 
-/* ── SIERA assistant avatar animations ── */
-@keyframes siera-float { 0%,100%{ transform: translateY(0) rotate(-1.2deg) } 50%{ transform: translateY(-9px) rotate(1.2deg) } }
-@keyframes siera-pop { 0%{ transform: scale(0.5) translateY(20px); opacity:0 } 60%{ transform: scale(1.06) translateY(-2px); opacity:1 } 100%{ transform: scale(1) translateY(0); opacity:1 } }
-@keyframes siera-bubble-in { 0%{ transform: translateY(8px) scale(0.92); opacity:0 } 100%{ transform: translateY(0) scale(1); opacity:1 } }
-.siera-float { animation: siera-float 3.6s ease-in-out infinite; }
-.siera-img-swap { transition: opacity 0.35s ease; }
+/* ── Wibi assistant avatar animations ── */
+@keyframes wibi-float { 0%,100%{ transform: translateY(0) rotate(-1.2deg) } 50%{ transform: translateY(-9px) rotate(1.2deg) } }
+@keyframes wibi-pop { 0%{ transform: scale(0.5) translateY(20px); opacity:0 } 60%{ transform: scale(1.06) translateY(-2px); opacity:1 } 100%{ transform: scale(1) translateY(0); opacity:1 } }
+@keyframes wibi-bubble-in { 0%{ transform: translateY(8px) scale(0.92); opacity:0 } 100%{ transform: translateY(0) scale(1); opacity:1 } }
+.wibi-float { animation: wibi-float 3.6s ease-in-out infinite; }
+.wibi-img-swap { transition: opacity 0.35s ease; }
