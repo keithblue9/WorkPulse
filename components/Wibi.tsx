@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 type AttBubble = { kind: 'attendance-ask' } | { kind: 'attendance-choose'; types: any[] } | { kind: 'attendance-done' }
 type Msg = { role: 'user' | 'assistant'; content: string; bubble?: AttBubble }
 
-const AVATAR = '/wibi/wibi-face.png'
+const AVATAR = '/wibi/wibi-avatar.png'
 
 function localToday() {
   const d = new Date()
@@ -148,7 +148,7 @@ export default function Wibi() {
         <div className="card scale-in" style={{ width: 340, maxWidth: 'calc(100vw - 32px)', height: 480, maxHeight: 'calc(100vh - 130px)', display: 'flex', flexDirection: 'column', borderRadius: 16, overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.25)', padding: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg2)' }}>
             <div style={{ width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', background: 'var(--brand-soft)', flexShrink: 0 }}>
-              <img src={AVATAR} alt="Wibi" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+              <img src={AVATAR} alt="Wibi" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% 18%', pointerEvents: 'none' }} />
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>Wibi</div>
@@ -162,7 +162,7 @@ export default function Wibi() {
             {messages.length === 0 && (
               <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text3)', fontSize: 12, padding: 10 }}>
                 <div style={{ width: 88, height: 88, borderRadius: '50%', overflow: 'hidden', margin: '0 auto 10px', background: 'var(--brand-soft)' }}>
-                  <img src={AVATAR} alt="Wibi" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={AVATAR} alt="Wibi" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% 18%' }} />
                 </div>
                 <div style={{ fontWeight: 600, color: 'var(--text2)', marginBottom: 2 }}>Hai, aku Wibi 👋</div>
                 Tanya apa aja, aku bantu jawab.
@@ -213,7 +213,7 @@ export default function Wibi() {
       {/* Wibi avatar button (clean circular face, no photo background) */}
       <button onClick={toggleOpen} title="Chat dengan Wibi" className="wibi-float"
         style={{ position: 'relative', width: 58, height: 58, borderRadius: '50%', border: '2px solid var(--bg2)', background: 'linear-gradient(135deg, var(--brand), #8b7adc)', cursor: 'pointer', padding: 0, overflow: 'hidden', boxShadow: '0 8px 22px rgba(0,0,0,0.28)' }}>
-        <img src={AVATAR} alt="Wibi" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', userSelect: 'none' }} />
+        <img src={AVATAR} alt="Wibi" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% 18%', pointerEvents: 'none', userSelect: 'none' }} />
         {!open && <span style={{ position: 'absolute', top: 3, right: 3, width: 11, height: 11, borderRadius: '50%', background: 'var(--green)', border: '2px solid var(--bg2)' }} />}
         {hasUnread && !open && <span style={{ position: 'absolute', top: -2, left: -2, width: 14, height: 14, borderRadius: '50%', background: 'var(--red)', border: '2px solid var(--bg2)' }} />}
       </button>
