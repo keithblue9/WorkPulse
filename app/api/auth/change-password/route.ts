@@ -3,11 +3,12 @@ import bcrypt from 'bcryptjs'
 import { connectDB } from '@/lib/db'
 import { UserModel } from '@/models/User'
 import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/authOptions'
 
 export async function POST(req: NextRequest) {
   try {
     await connectDB()
-    const session = await getServerSession()
+    const session = await getServerSession(authOptions)
     if (!session?.user?.email) return NextResponse.json({ error:'Tidak terautentikasi' }, { status:401 })
 
     const { currentPassword, newPassword } = await req.json()

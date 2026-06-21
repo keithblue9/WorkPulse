@@ -20,6 +20,7 @@ const NAV_GROUPS = [
     { href:'/dashboard/activities', label:'Activities',  permKey:'activities' },
     { href:'/dashboard/meetings',   label:'Meeting Reports', permKey:'meetings' },
     { href:'/dashboard/notes',      label:'Notes', permKey:'notes' },
+    { href:'/dashboard/quicknotes', label:'Quick Note', permKey:'quicknotes' },
   ]},
   { key:'team', label:'Team', items:[
     { href:'/dashboard/attendance', label:'Presensi', permKey:'attendance' },
@@ -41,12 +42,12 @@ const NAV_GROUPS = [
 ]
 
 const FALLBACK_MENUS: Record<string,string[]> = {
-  admin:    ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','settlementcc','members','config'],
-  manager:  ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','budget','reimbursement','cashcard','cashier','members'],
-  member:   ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','reimbursement'],
-  finance:  ['dashboard','attendance','biodata','links','budget','reimbursement','cashcard','cashier'],
-  cashier:  ['dashboard','reimbursement','cashier','cashcard','biodata'],
-  ccholder: ['dashboard','reimbursement','cashcard','settlementcc'],
+  admin:    ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','reimbursement','cashcard','cashier','settlementcc','members','config'],
+  manager:  ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','reimbursement','cashcard','cashier','members'],
+  member:   ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','reimbursement'],
+  finance:  ['dashboard','attendance','biodata','links','quicknotes','budget','reimbursement','cashcard','cashier'],
+  cashier:  ['dashboard','reimbursement','cashier','cashcard','biodata','quicknotes'],
+  ccholder: ['dashboard','reimbursement','cashcard','settlementcc','quicknotes'],
   guest:    ['dashboard','links'],
 }
 function getAllowedMenus(roleDefs:any[], userRoles:string[], configLoaded:boolean):Set<string> {
