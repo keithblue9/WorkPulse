@@ -5,7 +5,7 @@ export const ALL_MENU_KEYS = ['dashboard','activities','calendar','issues','prog
 
 export const MENU_LABELS: Record<string,string> = {
   dashboard:'Dashboard', activities:'Activities', calendar:'Calendar', issues:'Issues', progress:'Progress',
-  attendance:'Presensi', biodata:'Biodata', links:'Link Hub', meetings:'Meeting Reports', notes:'Notes', quicknotes:'Quick Note',
+  attendance:'Presensi', biodata:'Biodata', links:'Link Hub', meetings:'Meeting Reports', notes:'[Team] Notes', quicknotes:'[Personal] Notes',
   budget:'Anggaran', reimbursement:'Reimbursement', cashcard:'Cash Card', cashier:'Cashier', settlementcc:'Settlement CC',
   members:'Member', config:'Configuration'
 }

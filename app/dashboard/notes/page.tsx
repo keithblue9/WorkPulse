@@ -192,7 +192,7 @@ export default function NotesPage() {
 
       <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
         <div>
-          <div style={{ fontSize:14, fontWeight:600 }}>Notes — Kanban</div>
+          <div style={{ fontSize:14, fontWeight:600 }}>[Team] Notes — Kanban</div>
           <div style={{ fontSize:11, color:'var(--text3)' }}>{notes.length} note · Kolom = kategori dari Activities</div>
         </div>
         <div style={{ display:'flex', gap:8 }}>

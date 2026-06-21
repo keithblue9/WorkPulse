@@ -19,8 +19,8 @@ const NAV_GROUPS = [
   { key:'activities', label:'Activities', items:[
     { href:'/dashboard/activities', label:'Activities',  permKey:'activities' },
     { href:'/dashboard/meetings',   label:'Meeting Reports', permKey:'meetings' },
-    { href:'/dashboard/notes',      label:'Notes', permKey:'notes' },
-    { href:'/dashboard/quicknotes', label:'Quick Note', permKey:'quicknotes' },
+    { href:'/dashboard/notes',      label:'[Team] Notes', permKey:'notes' },
+    { href:'/dashboard/quicknotes', label:'[Personal] Notes', permKey:'quicknotes' },
   ]},
   { key:'team', label:'Team', items:[
     { href:'/dashboard/attendance', label:'Presensi', permKey:'attendance' },

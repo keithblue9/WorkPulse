@@ -35,7 +35,7 @@ export default function QuickNotesPage() {
       ])
       setNotes(n.data || [])
       setMembers((u.data || []).filter((m: any) => m.email !== myEmail && m.active !== false))
-    } catch { toast.error('Gagal memuat Quick Note') }
+    } catch { toast.error('Gagal memuat catatan personal') }
     setLoading(false)
   }
   useEffect(() => { load() }, [])
@@ -120,7 +120,7 @@ export default function QuickNotesPage() {
     <div style={{ padding: '20px 24px', maxWidth: 980, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
         <div>
-          <h1 style={{ fontSize: 19, fontWeight: 700, color: 'var(--text)', margin: 0 }}>📝 Quick Note</h1>
+          <h1 style={{ fontSize: 19, fontWeight: 700, color: 'var(--text)', margin: 0 }}>📝 [Personal] Notes</h1>
           <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>Catatan & to-do pribadi kamu. Tidak terlihat oleh member lain kecuali kamu share.</div>
         </div>
         <button className="btn btn-primary" onClick={createNote}>+ Catatan Baru</button>
