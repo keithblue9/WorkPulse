@@ -244,10 +244,15 @@ export default function QuickNotesPage() {
                             }}>
                               {item.checked ? '✓' : (item.type === 'number' ? numberCounter : '')}
                             </button>
-                            <input value={item.text} onChange={e => setItemText(note, item.id, e.target.value)} onBlur={() => commitItemText(note)}
+                            <textarea
+                              value={item.text}
+                              onChange={e => { setItemText(note, item.id, e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                              onBlur={e => { commitItemText(note); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                              onFocus={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                              rows={1}
                               placeholder="Tulis catatan…"
-                              style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 12.5, color: item.checked ? 'var(--text3)' : 'var(--text)', textDecoration: item.checked ? 'line-through' : 'none', outline: 'none', padding: '2px 0' }} />
-                            <button onClick={() => removeItem(note, item.id)} style={{ background: 'transparent', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 12, padding: '0 2px', opacity: 0.6 }}>✕</button>
+                              style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 12.5, color: item.checked ? 'var(--text3)' : 'var(--text)', textDecoration: item.checked ? 'line-through' : 'none', outline: 'none', padding: '2px 0', resize: 'none', overflow: 'hidden', lineHeight: '1.5', fontFamily: 'inherit', minHeight: '1.5em' }} />
+                            <button onClick={() => removeItem(note, item.id)} style={{ background: 'transparent', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 12, padding: '0 2px', opacity: 0.6, marginTop: 2 }}>✕</button>
                           </div>
                         )
                       })}
