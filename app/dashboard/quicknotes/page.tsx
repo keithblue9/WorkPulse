@@ -111,10 +111,10 @@ export default function QuickNotesPage() {
     toast.success('Daftar share diperbarui')
   }
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Memuat…</div>
+  if (loading) return <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color: 'var(--text3)' }}>Memuat…</div>
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }} className="safe-bottom page-pad">
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
@@ -132,7 +132,7 @@ export default function QuickNotesPage() {
       )}
 
       {/* Card Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
         {notes.map(note => {
           const isOwner = note.ownerEmail === myEmail
           const isShared = note.sharedWith?.length > 0
