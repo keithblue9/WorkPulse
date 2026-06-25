@@ -215,7 +215,7 @@ export default function NotesPage() {
                   <div style={{ fontSize:11, color:'var(--text3)', fontWeight:600, background:'var(--bg3)', padding:'2px 8px', borderRadius:10 }}>{col.items.length}</div>
                 </div>
                 {/* Cards */}
-                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 220px)', display:'flex', flexDirection:'column', gap:6, paddingBottom: 4 }}>
                   {col.items.length === 0 ? (
                     <div style={{ padding:'18px 10px', textAlign:'center', color:'var(--text3)', fontSize:10, border:'1px dashed var(--border)', borderRadius:7, background:'var(--bg)' }}>Belum ada note</div>
                   ) : col.items.map((n:any) => (

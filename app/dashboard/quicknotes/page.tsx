@@ -164,7 +164,8 @@ export default function QuickNotesPage() {
               </div>
 
               {/* Checklist items */}
-              <div style={{ padding: '8px 14px', display: 'flex', flexDirection: 'column', gap: 5, flex: 1 }}>
+              <div style={{ padding: '8px 14px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5, paddingRight: 2 }}>
                 {note.items.map(item => {
                   if (item.type === 'number') numberCounter++
                   return (
@@ -182,7 +183,8 @@ export default function QuickNotesPage() {
                     </div>
                   )
                 })}
-                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 4, paddingBottom: 8 }}>
                   <button onClick={() => addItem(note, 'bullet')} className="btn btn-sm" style={{ fontSize: 11 }}>• Bullet</button>
                   <button onClick={() => addItem(note, 'number')} className="btn btn-sm" style={{ fontSize: 11 }}>1. Nomor</button>
                 </div>
