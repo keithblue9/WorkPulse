@@ -40,9 +40,6 @@ export default function QuickNotesPage() {
   }
   useEffect(() => { load() }, [])
 
-  // Real-time-ish reminder check while the page is open (server cron is a once-daily
-  // safety net only). Also ask for push permission once, proactively, the first time
-  // this page loads — so reminders set here can actually notify.
   useEffect(() => {
     if (checkedOnce.current) return
     checkedOnce.current = true
@@ -117,8 +114,9 @@ export default function QuickNotesPage() {
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>Memuat…</div>
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 980, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+    <div style={{ padding: '20px 24px', maxWidth: 1100, margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 19, fontWeight: 700, color: 'var(--text)', margin: 0 }}>📝 [Personal] Notes</h1>
           <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>Catatan & to-do pribadi kamu. Tidak terlihat oleh member lain kecuali kamu share.</div>
@@ -133,80 +131,152 @@ export default function QuickNotesPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+      {/* Card Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
         {notes.map(note => {
           const isOwner = note.ownerEmail === myEmail
           const isShared = note.sharedWith?.length > 0
           const isOpen = openId === note._id
           const doneCount = note.items.filter(i => i.checked).length
+          const total = note.items.length
+          const progress = total > 0 ? Math.round((doneCount / total) * 100) : 0
           let numberCounter = 0
 
           return (
-            <div key={note._id} className="card" style={{ padding: 0, overflow: 'visible', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ padding: '12px 14px 8px', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                  <input value={note.title} onChange={e => setNotes(n => n.map(x => x._id === note._id ? { ...x, title: e.target.value } : x))}
-                    onBlur={e => patchNote(note._id, { title: e.target.value }, false)}
-                    placeholder="Judul catatan" disabled={!isOwner && !note.sharedWith.includes(myEmail)}
-                    style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 14, fontWeight: 700, color: 'var(--text)', outline: 'none', padding: 0 }} />
-                  {isOwner && <button onClick={() => deleteNote(note._id)} title="Hapus" className="btn btn-icon btn-sm">🗑️</button>}
+            <div key={note._id} className="card" style={{
+              padding: 0, overflow: 'visible', display: 'flex', flexDirection: 'column',
+              border: isOpen ? '1.5px solid var(--brand)' : '1px solid var(--border)',
+              transition: 'border-color 0.15s, box-shadow 0.15s',
+              boxShadow: isOpen ? '0 4px 16px rgba(0,0,0,0.10)' : '0 1px 4px rgba(0,0,0,0.05)',
+            }}>
+
+              {/* === CARD HEADER (always visible) === */}
+              <div
+                onClick={() => { setOpenId(isOpen ? null : note._id); setShareOpenId(null); setReminderOpenId(null) }}
+                style={{ padding: '12px 14px 10px', cursor: 'pointer', userSelect: 'none' }}
+              >
+                {/* Title row */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3, flex: 1 }}>
+                    {note.title || <span style={{ color: 'var(--text3)', fontStyle: 'italic' }}>Tanpa judul</span>}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    {isOwner && (
+                      <button
+                        onClick={e => { e.stopPropagation(); deleteNote(note._id) }}
+                        title="Hapus" className="btn btn-icon btn-sm"
+                        style={{ opacity: 0.5, fontSize: 12 }}
+                      >🗑️</button>
+                    )}
+                    <span style={{
+                      fontSize: 11, color: 'var(--text3)', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s', display: 'inline-block', lineHeight: 1
+                    }}>▾</span>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
-                  {!isOwner && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--brand-soft)', color: 'var(--brand)', fontWeight: 600 }}>Dibagikan oleh {note.ownerEmail.split('@')[0]}</span>}
-                  {isOwner && isShared && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--bg3)', color: 'var(--text3)' }}>👥 Dibagikan ke {note.sharedWith.length}</span>}
-                  {note.reminder?.enabled && (
-                    <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--amberbg)', color: 'var(--amber)', fontWeight: 600 }}>
-                      🔔 {note.reminder.mode === 'daily' ? `Tiap hari ${note.reminder.time}` : note.reminder.datetime ? new Date(note.reminder.datetime).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Aktif'}
+
+                {/* Badges row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 7, flexWrap: 'wrap' }}>
+                  {!isOwner && (
+                    <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--brand-soft)', color: 'var(--brand)', fontWeight: 600 }}>
+                      👤 {note.ownerEmail.split('@')[0]}
                     </span>
                   )}
-                  {note.items.length > 0 && <span style={{ fontSize: 10, color: 'var(--text3)' }}>{doneCount}/{note.items.length} selesai</span>}
+                  {isOwner && isShared && (
+                    <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--bg3)', color: 'var(--text3)' }}>
+                      👥 {note.sharedWith.length} orang
+                    </span>
+                  )}
+                  {note.reminder?.enabled && (
+                    <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--amberbg)', color: 'var(--amber)', fontWeight: 600 }}>
+                      🔔 {note.reminder.mode === 'daily' ? note.reminder.time : note.reminder.datetime ? new Date(note.reminder.datetime).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : 'Aktif'}
+                    </span>
+                  )}
                 </div>
-              </div>
 
-              {/* Checklist items */}
-              <div style={{ padding: '8px 14px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5, paddingRight: 2 }}>
-                {note.items.map(item => {
-                  if (item.type === 'number') numberCounter++
-                  return (
-                    <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
-                      <button onClick={() => toggleItemChecked(note, item.id)} style={{
-                        marginTop: 2, width: 16, height: 16, borderRadius: item.type === 'number' ? 4 : '50%', border: `1.5px solid ${item.checked ? 'var(--brand)' : 'var(--border)'}`,
-                        background: item.checked ? 'var(--brand)' : 'transparent', color: '#fff', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', padding: 0,
-                      }}>
-                        {item.checked ? '✓' : (item.type === 'number' ? numberCounter : '')}
-                      </button>
-                      <input value={item.text} onChange={e => setItemText(note, item.id, e.target.value)} onBlur={() => commitItemText(note)}
-                        placeholder="Tulis catatan…"
-                        style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 12.5, color: item.checked ? 'var(--text3)' : 'var(--text)', textDecoration: item.checked ? 'line-through' : 'none', outline: 'none', padding: '2px 0' }} />
-                      <button onClick={() => removeItem(note, item.id)} style={{ background: 'transparent', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 12, padding: '0 2px', opacity: 0.6 }}>✕</button>
+                {/* Progress bar */}
+                {total > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, color: 'var(--text3)' }}>{doneCount}/{total} selesai</span>
+                      <span style={{ fontSize: 10, color: doneCount === total ? 'var(--green)' : 'var(--text3)', fontWeight: doneCount === total ? 700 : 400 }}>
+                        {doneCount === total ? '✓ Done!' : `${progress}%`}
+                      </span>
                     </div>
-                  )
-                })}
-                </div>
-                <div style={{ display: 'flex', gap: 6, marginTop: 4, paddingBottom: 8 }}>
-                  <button onClick={() => addItem(note, 'bullet')} className="btn btn-sm" style={{ fontSize: 11 }}>• Bullet</button>
-                  <button onClick={() => addItem(note, 'number')} className="btn btn-sm" style={{ fontSize: 11 }}>1. Nomor</button>
-                </div>
-              </div>
-
-              {/* Footer actions */}
-              <div style={{ display: 'flex', gap: 6, padding: '8px 14px 12px', borderTop: '1px solid var(--border)', position: 'relative' }}>
-                <div style={{ position: 'relative' }}>
-                  <button onClick={() => { setReminderOpenId(reminderOpenId === note._id ? null : note._id); setShareOpenId(null) }} className="btn btn-sm" style={{ fontSize: 11 }}>
-                    🔔 {note.reminder?.enabled ? 'Reminder aktif' : 'Reminder'}
-                  </button>
-                  {reminderOpenId === note._id && <ReminderEditor note={note} onSave={r => saveReminder(note, r)} onClose={() => setReminderOpenId(null)} />}
-                </div>
-                {isOwner && (
-                  <div style={{ position: 'relative' }}>
-                    <button onClick={() => { setShareOpenId(shareOpenId === note._id ? null : note._id); setReminderOpenId(null) }} className="btn btn-sm" style={{ fontSize: 11 }}>
-                      📤 Share
-                    </button>
-                    {shareOpenId === note._id && <ShareEditor note={note} members={members} onSave={list => saveShare(note, list)} onClose={() => setShareOpenId(null)} />}
+                    <div style={{ height: 4, borderRadius: 4, background: 'var(--bg3)', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', borderRadius: 4, transition: 'width 0.3s',
+                        width: `${progress}%`,
+                        background: doneCount === total ? 'var(--green)' : 'var(--brand)'
+                      }} />
+                    </div>
                   </div>
                 )}
               </div>
+
+              {/* === EXPANDED CONTENT === */}
+              {isOpen && (
+                <>
+                  {/* Title editor */}
+                  <div style={{ padding: '4px 14px 8px', borderTop: '1px solid var(--border)' }}>
+                    <input
+                      value={note.title}
+                      onChange={e => setNotes(n => n.map(x => x._id === note._id ? { ...x, title: e.target.value } : x))}
+                      onBlur={e => patchNote(note._id, { title: e.target.value }, false)}
+                      placeholder="Judul catatan"
+                      disabled={!isOwner && !note.sharedWith.includes(myEmail)}
+                      style={{ width: '100%', border: 'none', background: 'var(--bg2)', borderRadius: 6, padding: '6px 10px', fontSize: 13, fontWeight: 700, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                  </div>
+
+                  {/* Checklist items */}
+                  <div style={{ padding: '4px 14px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5, paddingRight: 2 }}>
+                      {note.items.map(item => {
+                        if (item.type === 'number') numberCounter++
+                        return (
+                          <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                            <button onClick={() => toggleItemChecked(note, item.id)} style={{
+                              marginTop: 2, width: 16, height: 16, borderRadius: item.type === 'number' ? 4 : '50%',
+                              border: `1.5px solid ${item.checked ? 'var(--brand)' : 'var(--border)'}`,
+                              background: item.checked ? 'var(--brand)' : 'transparent', color: '#fff', fontSize: 10,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', padding: 0,
+                            }}>
+                              {item.checked ? '✓' : (item.type === 'number' ? numberCounter : '')}
+                            </button>
+                            <input value={item.text} onChange={e => setItemText(note, item.id, e.target.value)} onBlur={() => commitItemText(note)}
+                              placeholder="Tulis catatan…"
+                              style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 12.5, color: item.checked ? 'var(--text3)' : 'var(--text)', textDecoration: item.checked ? 'line-through' : 'none', outline: 'none', padding: '2px 0' }} />
+                            <button onClick={() => removeItem(note, item.id)} style={{ background: 'transparent', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 12, padding: '0 2px', opacity: 0.6 }}>✕</button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 4, paddingBottom: 8 }}>
+                      <button onClick={() => addItem(note, 'bullet')} className="btn btn-sm" style={{ fontSize: 11 }}>• Bullet</button>
+                      <button onClick={() => addItem(note, 'number')} className="btn btn-sm" style={{ fontSize: 11 }}>1. Nomor</button>
+                    </div>
+                  </div>
+
+                  {/* Footer actions */}
+                  <div style={{ display: 'flex', gap: 6, padding: '8px 14px 12px', borderTop: '1px solid var(--border)', position: 'relative' }}>
+                    <div style={{ position: 'relative' }}>
+                      <button onClick={() => { setReminderOpenId(reminderOpenId === note._id ? null : note._id); setShareOpenId(null) }} className="btn btn-sm" style={{ fontSize: 11 }}>
+                        🔔 {note.reminder?.enabled ? 'Reminder aktif' : 'Reminder'}
+                      </button>
+                      {reminderOpenId === note._id && <ReminderEditor note={note} onSave={r => saveReminder(note, r)} onClose={() => setReminderOpenId(null)} />}
+                    </div>
+                    {isOwner && (
+                      <div style={{ position: 'relative' }}>
+                        <button onClick={() => { setShareOpenId(shareOpenId === note._id ? null : note._id); setReminderOpenId(null) }} className="btn btn-sm" style={{ fontSize: 11 }}>
+                          📤 Share
+                        </button>
+                        {shareOpenId === note._id && <ShareEditor note={note} members={members} onSave={list => saveShare(note, list)} onClose={() => setShareOpenId(null)} />}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )
         })}
