@@ -93,6 +93,9 @@ function SettlementTab({ user }: { user:any }) {
   const allVerified = periodItems.length>0 && periodItems.every(r => r.status==='verified')
   const anyVerified = periodItems.some(r => r.status==='verified')
   const exportsEnabled = anyVerified  // aktif begitu minimal 1 item sudah diverify (slide 4)
+  // Isi export HANYA item yang sudah diverify (yang dicentang lalu di-Verify), bukan semua periode.
+  const exportItems = periodItems.filter(r => r.status === 'verified')
+  const exportTotal = exportItems.reduce((s,r)=>s+(r.amount||0),0)
 
   function toggleSel(id:string) { setSelected(s => { const n = new Set(s); n.has(id)?n.delete(id):n.add(id); return n }) }
   function selectAll() { setSelected(new Set(verifiableIds)) }
@@ -166,13 +169,13 @@ function SettlementTab({ user }: { user:any }) {
       ws.getCell('A16').value = 'Klasifikasi/Jenis Kegiatan'; ws.mergeCells('A16:E16'); ws.getCell('A16').font = { italic:true }
 
       let row = 17
-      periodItems.forEach((r,i) => {
+      exportItems.forEach((r,i) => {
         const d = periodDate(r)
         const rr = ws.getRow(row)
         rr.getCell(1).value = i+1
         rr.getCell(2).value = oeExcelCode(r.category)
         rr.getCell(3).value = oeLookup(r.category).name
-        rr.getCell(4).value = r.description || r.bank || '-'
+        rr.getCell(4).value = r.description || '-'
         rr.getCell(5).value = d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : ''
         rr.getCell(5).numFmt = 'dd/mm/yyyy'
         rr.getCell(6).value = r.amount || 0; rr.getCell(6).numFmt = '#,##0'
@@ -228,7 +231,7 @@ function SettlementTab({ user }: { user:any }) {
       y += 7
       doc.setTextColor(20,20,20); doc.setFont('helvetica','normal')
       const lineH = 6
-      periodItems.forEach((r,i) => {
+      exportItems.forEach((r,i) => {
         if (y > 185) { doc.addPage(); y = 16 }
         const d = periodDate(r)
         const cells = [ String(i+1), oeExcelCode(r.category), (oeLookup(r.category).name||'').slice(0,42), (r.description||'-').slice(0,34),
@@ -241,7 +244,7 @@ function SettlementTab({ user }: { user:any }) {
       if (y > 185) { doc.addPage(); y = 16 }
       const totalW = cols.slice(0,5).reduce((s,c)=>s+c.w,0)
       doc.setFont('helvetica','bold'); doc.rect(x0, y, totalW, lineH); doc.text('Total', x0+totalW-12, y+4)
-      doc.rect(x0+totalW, y, cols[5].w, lineH); doc.text(fmt(totalNominal), x0+totalW+1.5, y+4)
+      doc.rect(x0+totalW, y, cols[5].w, lineH); doc.text(fmt(exportTotal), x0+totalW+1.5, y+4)
       doc.save(`Rincian_Settlement_${MONTHS[month]}_${year}.pdf`)
       toast.success('PDF settlement diunduh')
     } catch (e:any) { toast.error('Gagal export PDF: '+(e?.message||'')) }
@@ -249,7 +252,7 @@ function SettlementTab({ user }: { user:any }) {
 
   async function exportZIP() {
     if (!exportsEnabled) { toast.error('Export aktif setelah minimal 1 item diverify dulu'); return }
-    const withDocs = periodItems.filter(hasEvidence)
+    const withDocs = exportItems.filter(hasEvidence)
     if (withDocs.length === 0) { toast.error('Tidak ada evidence untuk di-ZIP'); return }
     setZipping(true)
     try {
@@ -305,7 +308,7 @@ function SettlementTab({ user }: { user:any }) {
       </div>
 
       <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
-        <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8 }}>{periodItems.length} transaksi · Total Rp {fmt(totalNominal)}</div>
+        <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8 }}>{periodItems.length} transaksi · Total Rp {fmt(totalNominal)} · <span style={{ color:'var(--brand)' }}>Export: {exportItems.length} item verified (Rp {fmt(exportTotal)})</span></div>
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
          periodItems.length === 0 ? (
           <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>🧾</div><div>Tidak ada transaksi pada {MONTHS[month]} {year}</div></div>
