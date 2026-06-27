@@ -91,7 +91,8 @@ function SettlementTab({ user }: { user:any }) {
 
   const verifiableIds = periodItems.filter(r => r.status==='done'||r.status==='paid').map(r=>r._id)
   const allVerified = periodItems.length>0 && periodItems.every(r => r.status==='verified')
-  const exportsEnabled = allVerified  // disabled sampai CC Holder verify (slide 4)
+  const anyVerified = periodItems.some(r => r.status==='verified')
+  const exportsEnabled = anyVerified  // aktif begitu minimal 1 item sudah diverify (slide 4)
 
   function toggleSel(id:string) { setSelected(s => { const n = new Set(s); n.has(id)?n.delete(id):n.add(id); return n }) }
   function selectAll() { setSelected(new Set(verifiableIds)) }
@@ -124,10 +125,10 @@ function SettlementTab({ user }: { user:any }) {
   }
 
   async function exportXLSX() {
-    if (!exportsEnabled) return
+    if (!exportsEnabled) { toast.error('Export aktif setelah minimal 1 item diverify dulu'); return }
     setExporting(true)
     try {
-      const ExcelJS = (await import('exceljs')).default
+      const _xlmod:any = await import('exceljs'); const ExcelJS = _xlmod.default || _xlmod
       const wb = new ExcelJS.Workbook()
       const ws = wb.addWorksheet('Rekapan Excel')
       ws.columns = [{width:6.5},{width:9.3},{width:72},{width:31},{width:29.5},{width:20},{width:17.8},{width:86.5}]
@@ -203,7 +204,7 @@ function SettlementTab({ user }: { user:any }) {
   }
 
   async function exportPDF() {
-    if (!exportsEnabled) return
+    if (!exportsEnabled) { toast.error('Export aktif setelah minimal 1 item diverify dulu'); return }
     try {
       const mod:any = await import('jspdf'); const JsPDF = mod.jsPDF || mod.default
       const doc = new JsPDF({ orientation:'landscape', unit:'mm', format:'a4' })
@@ -247,7 +248,7 @@ function SettlementTab({ user }: { user:any }) {
   }
 
   async function exportZIP() {
-    if (!exportsEnabled) return
+    if (!exportsEnabled) { toast.error('Export aktif setelah minimal 1 item diverify dulu'); return }
     const withDocs = periodItems.filter(hasEvidence)
     if (withDocs.length === 0) { toast.error('Tidak ada evidence untuk di-ZIP'); return }
     setZipping(true)
@@ -274,11 +275,11 @@ function SettlementTab({ user }: { user:any }) {
       {viewing && <DetailModal item={viewing} onClose={()=>setViewing(null)} />}
 
       <div style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', flexShrink:0 }}>
-        <div style={{ fontSize:11, color:'var(--text3)', maxWidth:420 }}>Pilih item (status Done) lalu <b>Verify</b> untuk mengunci & menghitung Settlement Cash Card. Export aktif setelah semua item periode ini verified.</div>
+        <div style={{ fontSize:11, color:'var(--text3)', maxWidth:440 }}>Pilih item (status Done) lalu <b>Verify</b> untuk mengunci & menghitung Settlement Cash Card. Export aktif setelah <b>minimal 1 item</b> periode ini diverify.</div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-          <button onClick={exportXLSX} className="btn btn-sm btn-primary" disabled={!exportsEnabled||exporting}>{exporting?'...':'📗 Export Excel'}</button>
-          <button onClick={exportPDF} className="btn btn-sm" disabled={!exportsEnabled}>📄 Export PDF</button>
-          <button onClick={exportZIP} className="btn btn-sm" disabled={!exportsEnabled||zipping}>{zipping?'...':'🗜 Evidence (ZIP)'}</button>
+          <button onClick={exportXLSX} className="btn btn-sm btn-primary" disabled={exporting} style={{ opacity: exportsEnabled?1:0.55 }}>{exporting?'...':'📗 Export Excel'}</button>
+          <button onClick={exportPDF} className="btn btn-sm" style={{ opacity: exportsEnabled?1:0.55 }}>📄 Export PDF</button>
+          <button onClick={exportZIP} className="btn btn-sm" disabled={zipping} style={{ opacity: exportsEnabled?1:0.55 }}>{zipping?'...':'🗜 Evidence (ZIP)'}</button>
         </div>
       </div>
 
