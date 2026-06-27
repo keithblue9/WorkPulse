@@ -137,11 +137,19 @@ function SettlementTab({ user }: { user:any }) {
       let cc:any = null
       try { const ccr = await fetch('/api/cashcard').then(r=>r.json()); cc = (ccr.data||[]).find((x:any)=>x.year===year && x.month===(month+1)) } catch {}
 
+      // Nama di header = user dengan role 'manager' (mis. Erly). Fallback ke user yg export.
+      let managerName = user?.name || '-'
+      try {
+        const ur = await fetch('/api/users').then(r=>r.json())
+        const mgr = (ur.data||[]).find((u:any)=> (u.roles||[]).includes('manager') || u.role==='manager')
+        if (mgr?.name) managerName = mgr.name
+      } catch {}
+
       const title = (t:string)=>({ font:{ bold:true }, alignment:{ horizontal:'center' as const } })
       ws.mergeCells('A1:H1'); ws.getCell('A1').value = 'RINCIAN KUITANSI/NOTA SETTLEMENT CASH CARD'; Object.assign(ws.getCell('A1'), title(''))
       ws.mergeCells('A2:H2'); ws.getCell('A2').value = `REALISASI BIAYA OPERATIONAL FUNGSI BPD PROCUREMENT PERIODE ${periodeStr}`; Object.assign(ws.getCell('A2'), title(''))
       ws.mergeCells('A3:H3'); ws.getCell('A3').value = 'Lokasi : Gedung Sopo Del Office Tower A Lt. 52'; ws.getCell('A3').alignment = { horizontal:'center' }
-      ws.getCell('A5').value = 'Nama'; ws.getCell('B5').value = `: ${user?.name||'-'}`
+      ws.getCell('A5').value = 'Nama'; ws.getCell('B5').value = `: ${managerName}`
       ws.getCell('A6').value = 'Ref id'; ws.getCell('B6').value = cc?.jojonomicId || ''
       ws.getCell('A8').value = 'Total Penarikan cash card :'; ws.getCell('D8').value = cc?.topUpAmount || 0
       ws.getCell('E8').value = 'Periode Pengambilan Cash Card '; ws.getCell('F8').value = `${MONTHS[month]} ${year}`
@@ -204,7 +212,9 @@ function SettlementTab({ user }: { user:any }) {
       doc.text('RINCIAN KUITANSI/NOTA SETTLEMENT CASH CARD', pageW/2, 12, { align:'center' })
       doc.setFontSize(8); doc.setFont('helvetica','normal')
       doc.text(`REALISASI BIAYA OPERATIONAL FUNGSI BPD PROCUREMENT PERIODE ${MONTHS[month].toUpperCase()} ${year}`, pageW/2, 18, { align:'center' })
-      doc.text(`Nama: ${user?.name||'-'}`, 12, 26)
+      let managerName = user?.name || '-'
+      try { const ur = await fetch('/api/users').then(r=>r.json()); const mgr=(ur.data||[]).find((u:any)=>(u.roles||[]).includes('manager')||u.role==='manager'); if (mgr?.name) managerName = mgr.name } catch {}
+      doc.text(`Nama: ${managerName}`, 12, 26)
 
       const cols = [
         { h:'NO', w:10 }, { h:'Kat', w:14 }, { h:'Keterangan Transaksi', w:55 }, { h:'Nama Toko/Penerima', w:45 },
@@ -351,7 +361,7 @@ function PettyCashTab() {
   }, [year, month])
   useEffect(() => { load() }, [load])
 
-  const s = data?.summary || { pemasukan:0, pettyReimburse:0, ccSelisih:0, pengeluaran:0, saldo:0 }
+  const s = data?.summary || { pemasukan:0, nonCCAmount:0, bankFees:0, ccSelisih:0, pengeluaran:0, saldo:0 }
 
   return (
     <>
@@ -377,7 +387,8 @@ function PettyCashTab() {
             </div>
             <div className="card" style={{ padding:'14px 16px', marginBottom:16 }}>
               <div style={{ fontSize:12, fontWeight:600, marginBottom:10 }}>Rincian Pengeluaran s/d {MONTHS[month]} {year}</div>
-              <Row label="Reimburse non-Cash Card (done/verified, + biaya antar bank)" value={s.pettyReimburse} />
+              <Row label="Reimburse non-Cash Card (nominal, done/verified)" value={s.nonCCAmount} />
+              <Row label="Biaya antar bank (semua reimburse: CC + Petty)" value={s.bankFees} />
               <Row label="Selisih Cash Card |Pengembalian − (Top Up − Settlement)|" value={s.ccSelisih} />
               <div style={{ borderTop:'1px solid var(--border)', marginTop:8, paddingTop:8 }}><Row label="Total Pengeluaran" value={s.pengeluaran} bold /></div>
             </div>

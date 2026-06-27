@@ -31,24 +31,25 @@ export async function GET(req:NextRequest) {
       return (y===year && m<=month) ? s + (f.amount||0) : s
     }, 0)
 
-    // Pengeluaran 1: reimburse NON cash card yang sudah dibayar (done/verified), kumulatif s/d bulan
-    const reimburses = await ReimbursementModel.find({ status:{ $in:['done','verified'] }, isCashCard:{ $ne:true } }).lean() as any[]
-    const pettyReimburse = reimburses.reduce((s,r)=>{
-      const d = periodOf(r); if (!d) return s
-      if (d.getFullYear()!==year || (d.getMonth()+1) > month) return s
-      return s + (r.totalTransfer || ((r.amount||0) + (r.biayaAntarBank||0)))
-    }, 0)
+    // Pengeluaran Petty Cash (slide 5), kumulatif s/d bulan:
+    //  a) nominal reimburse NON cash card yang sudah dibayar (done/verified)
+    //  b) biaya antar bank dari SEMUA reimburse (cash card maupun petty) — bank fee selalu dari petty
+    //  c) selisih Cash Card |Pengembalian − (TopUp − Settlement)|
+    const reimburses = await ReimbursementModel.find({ status:{ $in:['done','verified'] } }).lean() as any[]
+    const inThisPeriod = (r:any) => { const d = periodOf(r); return !!d && d.getFullYear()===year && (d.getMonth()+1) <= month }
 
-    // Pengeluaran 2: selisih Cash Card |Pengembalian − (TopUp − Settlement)|, kumulatif s/d bulan
+    const nonCCAmount = reimburses.reduce((s,r)=> (!r.isCashCard && inThisPeriod(r)) ? s + (r.amount||0) : s, 0)
+    const bankFees   = reimburses.reduce((s,r)=> inThisPeriod(r) ? s + (r.biayaAntarBank||0) : s, 0)
+
     const ccRows = await CashCardModel.find({ year, month:{ $lte:month } }).lean() as any[]
     const ccSelisih = ccRows.reduce((s,c)=> s + Math.abs((c.refundAmount||0) - ((c.topUpAmount||0) - (c.settlementAmount||0))), 0)
 
-    const pengeluaran = pettyReimburse + ccSelisih
+    const pengeluaran = nonCCAmount + bankFees + ccSelisih
     const saldo = pemasukan - pengeluaran
 
     return NextResponse.json({ data: {
       year, month, inflows,
-      summary: { pemasukan, pettyReimburse, ccSelisih, pengeluaran, saldo },
+      summary: { pemasukan, nonCCAmount, bankFees, ccSelisih, pengeluaran, saldo },
     } })
   } catch (e:any) { return NextResponse.json({ error:e.message }, { status:500 }) }
 }
