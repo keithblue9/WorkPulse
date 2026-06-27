@@ -11,6 +11,7 @@ const CashCardSchema = new Schema({
   poNo: String,
   settlementAmount: { type:Number, default:0 },
   refundAmount: { type:Number, default:0 },   // Pengembalian Dana — sisa yang dikembalikan ke kantor
+  locked: { type:Boolean, default:false },     // kalau true, settlement TIDAK ikut berubah saat verify reimburse
   notes: String,
   createdBy: String,
 }, { timestamps:true })

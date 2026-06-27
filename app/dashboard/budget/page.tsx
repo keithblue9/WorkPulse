@@ -17,116 +17,151 @@ export default function BudgetReportPage() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [cur, setCur] = useState<any[]>([])
-  const [prev, setPrev] = useState<any[]>([])
   const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [c, b, pb] = await Promise.all([
+    const [c, b] = await Promise.all([
       getConfig(),
       fetch(`/api/budget?year=${year}`).then(r=>r.json()),
-      fetch(`/api/budget?year=${year-1}`).then(r=>r.json()),
     ])
-    setConfig(c); setCur(b.data||[]); setPrev(pb.data||[]); setLoading(false)
+    setConfig(c); setCur(b.data||[]); setLoading(false)
   }, [year])
   useEffect(()=>{ load() }, [load])
 
   function rowFor(list:any[], key:string){ return list.find(x=>x.category===key) || {} }
   const realIDRof = (r:any)=> r.annualRealIDR || (r.monthly||[]).reduce((s:number,m:any)=>s+(m.realisasiIDR||0),0)
-  const realUSDof = (r:any)=> r.annualRealUSD || (r.monthly||[]).reduce((s:number,m:any)=>s+(m.realisasiUSD||0),0)
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <div style={{ padding:'12px 20px 0', borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div style={{ fontSize:14, fontWeight:600 }}>Budget Report</div>
-          <select className="input input-sm" style={{ width:100 }} value={year} onChange={e=>setYear(Number(e.target.value))}>
-            {[now.getFullYear()+1, now.getFullYear(), now.getFullYear()-1, now.getFullYear()-2].map(y=><option key={y} value={y}>{y}</option>)}
-          </select>
+          {tab==='realisasi' && (
+            <select className="input input-sm" style={{ width:100 }} value={year} onChange={e=>setYear(Number(e.target.value))}>
+              {[now.getFullYear()+1, now.getFullYear(), now.getFullYear()-1, now.getFullYear()-2].map(y=><option key={y} value={y}>{y}</option>)}
+            </select>
+          )}
         </div>
         <div style={{ display:'flex', gap:4, marginTop:10 }}>
           <button onClick={()=>setTab('yield')} style={subtab(tab==='yield')}>Yield</button>
           <button onClick={()=>setTab('realisasi')} style={subtab(tab==='realisasi')}>Realisasi</button>
         </div>
       </div>
-      {loading ? <div style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>Memuat...</div> :
-       tab==='yield'
-        ? <YieldTab year={year} cur={cur} prev={prev} rowFor={rowFor} realIDRof={realIDRof} realUSDof={realUSDof} reload={load} />
-        : <RealisasiTab year={year} cur={cur} config={config} setConfig={setConfig} rowFor={rowFor} realIDRof={realIDRof} reload={load} />}
+      {tab==='yield'
+        ? <YieldTab />
+        : (loading ? <div style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>Memuat...</div>
+            : <RealisasiTab year={year} cur={cur} config={config} setConfig={setConfig} rowFor={rowFor} realIDRof={realIDRof} reload={load} />)}
     </div>
   )
 }
 
-// =====================  YIELD  =====================
-function YieldTab({ year, cur, prev, rowFor, realIDRof, realUSDof, reload }: any) {
-  const [draft, setDraft] = useState<Record<string,any>>({})
+// =====================  YIELD (multi-tahun)  =====================
+function YieldTab() {
+  const now = new Date()
+  const [years, setYears] = useState<number[]>([])
+  const [byYear, setByYear] = useState<Record<number, Record<string, any>>>({})
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  useEffect(()=>{
-    const d:Record<string,any> = {}
-    COST_ELEMENTS.forEach(ce => { const r = rowFor(cur, ce.key)
-      d[ce.key] = { planIDR:r.annualBudgetIDR||0, planUSD:r.annualBudgetUSD||0, realIDR:realIDRof(r), realUSD:realUSDof(r) } })
-    setDraft(d)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cur])
 
-  const set = (k:string,f:string,v:number)=>setDraft(p=>({...p,[k]:{...p[k],[f]:v}}))
-  const yoy = (now:number, before:number)=> before>0 ? ((now-before)/before*100) : 0
+  const emptyCE = ()=> Object.fromEntries(COST_ELEMENTS.map(ce=>[ce.key,{ planIDR:0, planUSD:0, realIDR:0, realUSD:0, monthly:[] }]))
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const start = 2024
+    const end = Math.max(now.getFullYear(), start)
+    const yrs:number[] = []; for (let y=start; y<=end; y++) yrs.push(y)
+    const results = await Promise.all(yrs.map(y => fetch(`/api/budget?year=${y}`).then(r=>r.json()).then(j=>({ y, data:j.data||[] }))))
+    const map:Record<number, any> = {}
+    results.forEach(({y,data}) => {
+      const d:any = {}
+      COST_ELEMENTS.forEach(ce => { const r = (data as any[]).find(x=>x.category===ce.key)||{}
+        d[ce.key] = { planIDR:r.annualBudgetIDR||0, planUSD:r.annualBudgetUSD||0, realIDR:r.annualRealIDR||0, realUSD:r.annualRealUSD||0, monthly:r.monthly||[] } })
+      map[y] = d
+    })
+    setYears(yrs); setByYear(map); setLoading(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(()=>{ load() }, [load])
+
+  function addYear() {
+    const next = (years.length ? Math.max(...years) : 2023) + 1
+    setYears(ys => [...ys, next]); setByYear(m => ({ ...m, [next]: emptyCE() }))
+  }
+  const setVal = (year:number, ce:string, f:string, v:number) =>
+    setByYear(m => ({ ...m, [year]: { ...m[year], [ce]: { ...m[year][ce], [f]: v } } }))
+  const yoy = (cur:number, before:number)=> before>0 ? ((cur-before)/before*100) : 0
 
   async function saveAll() {
     setSaving(true)
     try {
-      for (const ce of COST_ELEMENTS) {
-        const d = draft[ce.key]||{}
-        await fetch('/api/budget', { method:'PUT', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ year, category:ce.key, budget:{ annualBudgetIDR:d.planIDR||0, annualBudgetUSD:d.planUSD||0, annualRealIDR:d.realIDR||0, annualRealUSD:d.realUSD||0, monthly:(rowFor(cur,ce.key).monthly||[]) } }) })
+      for (const y of years) {
+        for (const ce of COST_ELEMENTS) {
+          const d = byYear[y]?.[ce.key] || {}
+          await fetch('/api/budget', { method:'PUT', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ year:y, category:ce.key, budget:{ annualBudgetIDR:d.planIDR||0, annualBudgetUSD:d.planUSD||0, annualRealIDR:d.realIDR||0, annualRealUSD:d.realUSD||0, monthly:d.monthly||[] } }) })
+        }
       }
-      toast.success('Yield tersimpan'); reload()
+      toast.success('Yield tersimpan'); load()
     } finally { setSaving(false) }
   }
 
   return (
     <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }} className="safe-bottom page-pad">
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-        <div style={{ fontSize:12, color:'var(--text3)' }}>Plan &amp; Realisasi per cost element (USD &amp; IDR). Yield = pertumbuhan year-to-year vs {year-1}.</div>
-        <button onClick={saveAll} disabled={saving} className="btn btn-sm btn-primary">{saving?'...':'Simpan'}</button>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10, gap:8, flexWrap:'wrap' }}>
+        <div style={{ fontSize:12, color:'var(--text3)' }}>Plan &amp; Realisasi per cost element (USD &amp; IDR) dari tahun ke tahun. Yield YoY = pertumbuhan vs tahun sebelumnya.</div>
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={addYear} className="btn btn-sm">+ Tahun</button>
+          <button onClick={saveAll} disabled={saving} className="btn btn-sm btn-primary">{saving?'...':'Simpan'}</button>
+        </div>
       </div>
-      <div className="card" style={{ overflow:'auto' }}>
-        <table className="wp-table" style={{ minWidth:1040 }}>
-          <thead>
-            <tr>
-              <th rowSpan={2}>Cost Element</th>
-              <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>USD</th>
-              <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>IDR</th>
-              <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>Yield YoY (%)</th>
-            </tr>
-            <tr>
-              <th style={{ borderLeft:'1px solid var(--border)' }}>Plan</th><th>Realisasi</th>
-              <th style={{ borderLeft:'1px solid var(--border)' }}>Plan</th><th>Realisasi</th>
-              <th style={{ borderLeft:'1px solid var(--border)' }}>Plan</th><th>Realisasi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {COST_ELEMENTS.map(ce => {
-              const d = draft[ce.key]||{}; const p = rowFor(prev, ce.key)
-              const yPlan = yoy(d.planIDR||0, p.annualBudgetIDR||0)
-              const yReal = yoy(d.realIDR||0, realIDRof(p))
-              return (
-                <tr key={ce.key}>
-                  <td style={{ fontSize:11 }}><div style={{ fontWeight:600 }}>{ce.short}</div><div style={{ color:'var(--text3)', fontSize:10 }}>{ce.code} · {ce.name}</div></td>
-                  <td style={{ borderLeft:'1px solid var(--border)' }}><input type="number" className="input input-sm" style={{ width:110 }} value={d.planUSD||0} onChange={e=>set(ce.key,'planUSD',Number(e.target.value))} /></td>
-                  <td><input type="number" className="input input-sm" style={{ width:110 }} value={d.realUSD||0} onChange={e=>set(ce.key,'realUSD',Number(e.target.value))} /></td>
-                  <td style={{ borderLeft:'1px solid var(--border)' }}><input type="number" className="input input-sm" style={{ width:130 }} value={d.planIDR||0} onChange={e=>set(ce.key,'planIDR',Number(e.target.value))} /></td>
-                  <td><input type="number" className="input input-sm" style={{ width:130 }} value={d.realIDR||0} onChange={e=>set(ce.key,'realIDR',Number(e.target.value))} /></td>
-                  <td style={{ borderLeft:'1px solid var(--border)', color: yPlan>=0?'var(--green)':'var(--red)', fontWeight:600 }}>{yPlan>=0?'+':''}{pct(yPlan)}</td>
-                  <td style={{ color: yReal>=0?'var(--green)':'var(--red)', fontWeight:600 }}>{yReal>=0?'+':''}{pct(yReal)}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-      <div style={{ fontSize:10, color:'var(--text3)', marginTop:8 }}>Yield YoY membandingkan nilai {year} terhadap {year-1}. Jika data {year-1} belum ada, yield 0%.</div>
+
+      {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
+       years.map(y => {
+        const d = byYear[y] || emptyCE(); const prevD = byYear[y-1]
+        return (
+          <div key={y} style={{ marginBottom:18 }}>
+            <div style={{ fontSize:13, fontWeight:700, marginBottom:6 }}>Tahun {y}</div>
+            <div className="card" style={{ overflow:'auto' }}>
+              <table className="wp-table" style={{ minWidth:1040 }}>
+                <thead>
+                  <tr>
+                    <th rowSpan={2}>Cost Element</th>
+                    <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>USD</th>
+                    <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>IDR</th>
+                    <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>Yield YoY (%)</th>
+                  </tr>
+                  <tr>
+                    <th style={{ borderLeft:'1px solid var(--border)' }}>Plan</th><th>Realisasi</th>
+                    <th style={{ borderLeft:'1px solid var(--border)' }}>Plan</th><th>Realisasi</th>
+                    <th style={{ borderLeft:'1px solid var(--border)' }}>Plan</th><th>Realisasi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {COST_ELEMENTS.map(ce => {
+                    const v = d[ce.key]||{}; const pv = prevD?.[ce.key]
+                    const yPlan = pv ? yoy(v.planIDR||0, pv.planIDR||0) : 0
+                    const yReal = pv ? yoy(v.realIDR||0, pv.realIDR||0) : 0
+                    return (
+                      <tr key={ce.key}>
+                        <td style={{ fontSize:11 }}><div style={{ fontWeight:600 }}>{ce.short}</div><div style={{ color:'var(--text3)', fontSize:10 }}>{ce.code} · {ce.name}</div></td>
+                        <td style={{ borderLeft:'1px solid var(--border)' }}><input type="number" className="input input-sm" style={{ width:100 }} value={v.planUSD||0} onChange={e=>setVal(y,ce.key,'planUSD',Number(e.target.value))} /></td>
+                        <td><input type="number" className="input input-sm" style={{ width:100 }} value={v.realUSD||0} onChange={e=>setVal(y,ce.key,'realUSD',Number(e.target.value))} /></td>
+                        <td style={{ borderLeft:'1px solid var(--border)' }}><input type="number" className="input input-sm" style={{ width:120 }} value={v.planIDR||0} onChange={e=>setVal(y,ce.key,'planIDR',Number(e.target.value))} /></td>
+                        <td><input type="number" className="input input-sm" style={{ width:120 }} value={v.realIDR||0} onChange={e=>setVal(y,ce.key,'realIDR',Number(e.target.value))} /></td>
+                        <td style={{ borderLeft:'1px solid var(--border)', color: !pv?'var(--text3)':yPlan>=0?'var(--green)':'var(--red)', fontWeight:600 }}>{!pv?'—':`${yPlan>=0?'+':''}${pct(yPlan)}`}</td>
+                        <td style={{ color: !pv?'var(--text3)':yReal>=0?'var(--green)':'var(--red)', fontWeight:600 }}>{!pv?'—':`${yReal>=0?'+':''}${pct(yReal)}`}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      })}
+      <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Yield YoY membandingkan tiap tahun dengan tahun sebelumnya. Tahun paling awal (2024) tidak punya pembanding (—). Klik &quot;+ Tahun&quot; untuk menambah tahun.</div>
     </div>
   )
 }
@@ -146,10 +181,7 @@ function RealisasiTab({ year, cur, config, setConfig, rowFor, realIDRof, reload 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cur, config])
 
-  // Total% diubah -> External otomatis = Total - Travel (boleh diedit lagi)
-  function onTotal(v:number){ setTotalPct(v); setExternalPct(Math.max(0, v - travelPct)) }
-  function onTravel(v:number){ setTravelPct(v); setExternalPct(Math.max(0, totalPct - v)) }
-
+  // Threshold diisi manual semua (tidak ada auto-derive)
   const thrFor = (key:string)=> key==='travel'?travelPct: externalPct
 
   async function saveAll() {
@@ -174,9 +206,9 @@ function RealisasiTab({ year, cur, config, setConfig, rowFor, realIDRof, reload 
       <div className="card" style={{ padding:'12px 16px', marginBottom:14 }}>
         <div style={{ fontSize:12, fontWeight:600, marginBottom:10 }}>Threshold Prognosa</div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
-          <div><label style={lbl}>Total %</label><input type="number" className="input input-sm" value={totalPct} onChange={e=>onTotal(Number(e.target.value))} /></div>
-          <div><label style={lbl}>Travel %</label><input type="number" className="input input-sm" value={travelPct} onChange={e=>onTravel(Number(e.target.value))} /></div>
-          <div><label style={lbl}>External % <span style={{ color:'var(--text3)', fontWeight:400 }}>(auto Total−Travel, editable)</span></label><input type="number" className="input input-sm" value={externalPct} onChange={e=>setExternalPct(Number(e.target.value))} /></div>
+          <div><label style={lbl}>Total %</label><input type="number" className="input input-sm" value={totalPct} onChange={e=>setTotalPct(Number(e.target.value))} /></div>
+          <div><label style={lbl}>Travel %</label><input type="number" className="input input-sm" value={travelPct} onChange={e=>setTravelPct(Number(e.target.value))} /></div>
+          <div><label style={lbl}>External %</label><input type="number" className="input input-sm" value={externalPct} onChange={e=>setExternalPct(Number(e.target.value))} /></div>
         </div>
       </div>
 

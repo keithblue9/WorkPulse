@@ -260,9 +260,10 @@ function SettlementTab({ user }: { user:any }) {
   }
 
   async function exportZIP() {
-    if (!exportsEnabled) { toast.error('Export aktif setelah minimal 1 item diverify dulu'); return }
-    const withDocs = exportItems.filter(hasEvidence)
-    if (withDocs.length === 0) { toast.error('Tidak ada evidence untuk di-ZIP'); return }
+    const selItems = periodItems.filter(r => selected.has(r._id))
+    if (selItems.length === 0) { toast.error('Centang dulu item yang mau diunduh evidence-nya'); return }
+    const withDocs = selItems.filter(hasEvidence)
+    if (withDocs.length === 0) { toast.error('Item yang dicentang belum ada evidence'); return }
     setZipping(true)
     try {
       const JSZip = (await import('jszip')).default; const zip = new JSZip()
@@ -289,11 +290,10 @@ function SettlementTab({ user }: { user:any }) {
         onReverse={reverseItem} />}
 
       <div style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', flexShrink:0 }}>
-        <div style={{ fontSize:11, color:'var(--text3)', maxWidth:440 }}>Pilih item (status Done) lalu <b>Verify</b> untuk mengunci & menghitung Settlement Cash Card. Export aktif setelah <b>minimal 1 item</b> periode ini diverify.</div>
+        <div style={{ fontSize:11, color:'var(--text3)', maxWidth:520 }}>Alur: <b>centang</b> item Done → <b>Evidence</b> (unduh lampiran yg dicentang, cek manual) → <b>Verify</b> (status jadi Verified) → baru <b>Export Excel/PDF</b> aktif.</div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
           <button onClick={exportXLSX} className="btn btn-sm btn-primary" disabled={exporting} style={{ opacity: exportsEnabled?1:0.55 }}>{exporting?'...':'📗 Export Excel'}</button>
           <button onClick={exportPDF} className="btn btn-sm" style={{ opacity: exportsEnabled?1:0.55 }}>📄 Export PDF</button>
-          <button onClick={exportZIP} className="btn btn-sm" disabled={zipping} style={{ opacity: exportsEnabled?1:0.55 }}>{zipping?'...':'🗜 Evidence (ZIP)'}</button>
         </div>
       </div>
 
@@ -313,6 +313,7 @@ function SettlementTab({ user }: { user:any }) {
             ? <span className="badge" style={{ background:'var(--brand-soft)', color:'var(--brand)', fontSize:10 }}>✓ Semua Verified</span>
             : <>
                 <button onClick={selectAll} className="btn btn-sm">Select All ({verifiableIds.length})</button>
+                <button onClick={exportZIP} disabled={zipping} className="btn btn-sm" title="Unduh evidence item yang dicentang">{zipping?'...':`🗜 Evidence (${selected.size})`}</button>
                 <button onClick={doVerify} disabled={verifying||selected.size===0} className="btn btn-sm btn-primary">{verifying?'...':`✓ Verify (${selected.size})`}</button>
               </>}
         </div>

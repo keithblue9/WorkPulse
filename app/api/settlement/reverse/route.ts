@@ -37,7 +37,7 @@ export async function POST(req:NextRequest) {
         return (dd.getFullYear()===year && (dd.getMonth()+1)===month) ? s + (r.amount||0) : s
       }, 0)
       const ccRow = await CashCardModel.findOne({ year, month }).lean() as any
-      if (ccRow) await CashCardModel.findByIdAndUpdate(ccRow._id, { settlementAmount: settlementTotal })
+      if (ccRow && !ccRow.locked) await CashCardModel.findByIdAndUpdate(ccRow._id, { settlementAmount: settlementTotal })
     }
 
     return NextResponse.json({ data:{ reversed:id } })

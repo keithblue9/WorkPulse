@@ -33,10 +33,10 @@ export async function POST(req:NextRequest) {
       return (d.getFullYear()===year && (d.getMonth()+1)===month) ? s + (r.amount||0) : s
     }, 0)
 
-    // Update/insert baris Cash Card bulan ini
+    // Update/insert baris Cash Card bulan ini — TAPI kalau baris itu di-lock, jangan ubah settlement-nya
     const ccRow = await CashCardModel.findOne({ year, month }).lean() as any
     if (ccRow) {
-      await CashCardModel.findByIdAndUpdate(ccRow._id, { settlementAmount: settlementTotal })
+      if (!ccRow.locked) await CashCardModel.findByIdAndUpdate(ccRow._id, { settlementAmount: settlementTotal })
     } else {
       await CashCardModel.create({ year, month, settlementAmount: settlementTotal, topUpAmount:0, refundAmount:0, notes:'(auto dari Settlement)', createdBy: verifiedBy||'-' })
     }

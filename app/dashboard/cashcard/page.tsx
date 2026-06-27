@@ -101,6 +101,12 @@ export default function CashCardPage() {
     await fetch(`/api/cashcard/${id}`, { method:'DELETE' })
     toast.success('Dihapus'); load()
   }
+  async function toggleLock(i:any) {
+    const next = !i.locked
+    if (next && !confirm(`Kunci angka ${MONTHS[i.month]} ${i.year}? Settlement bulan ini TIDAK akan berubah lagi walaupun ada reimburse baru. (Masih bisa di-Edit manual)`)) return
+    await fetch(`/api/cashcard/${i._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ locked: next }) })
+    toast.success(next?'Terkunci 🔒':'Kunci dibuka'); load()
+  }
 
   // Pengeluaran Operasional per row = |Pengembalian − (Top Up − Settlement)|, selalu positif (slide 6).
   // null (—) kalau settlement & pengembalian dua-duanya belum diisi (belum ada yg direkonsiliasi).
@@ -145,13 +151,14 @@ export default function CashCardPage() {
                    <tr key={i._id}>
                      <td>{i.year}</td><td>{MONTHS[i.month]}</td>
                      <td>{i.prNo||'—'}</td><td style={{ textAlign:'right', fontWeight:600 }}>{fmt(i.topUpAmount)}</td>
-                     <td>{i.jojonomicId||'—'}</td><td>{i.poNo||'—'}</td><td style={{ textAlign:'right', fontWeight:600 }}>{fmt(i.settlementAmount)}</td>
+                     <td>{i.jojonomicId||'—'}</td><td>{i.poNo||'—'}</td><td style={{ textAlign:'right', fontWeight:600 }}>{fmt(i.settlementAmount)}{i.locked && <span title="Terkunci" style={{ marginLeft:4 }}>🔒</span>}</td>
                      <td style={{ fontWeight:600, color: pct>=100?'var(--green)':pct>0?'var(--brand)':'var(--text3)' }}>{pct.toFixed(1)}%</td>
                      <td style={{ textAlign:'right', fontWeight:600, color:'var(--green)' }}>{fmt(i.refundAmount||0)}</td>
                      <td style={{ textAlign:'right', fontWeight:600, color: rowOperasional(i) === null ? 'var(--text3)' : (rowOperasional(i) as number) < 0 ? 'var(--amber)' : 'var(--red)' }}>{rowOperasional(i) !== null ? fmt(rowOperasional(i) as number) : '—'}</td>
                      <td style={{ display:'flex', gap:4 }}>
-                       <button onClick={()=>setEditing(i)} className="btn btn-icon btn-sm">✏️</button>
-                       <button onClick={()=>del(i._id)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>🗑</button>
+                       <button onClick={()=>toggleLock(i)} className="btn btn-icon btn-sm" title={i.locked?'Buka kunci':'Simpan & kunci angka'}>{i.locked?'🔓':'💾'}</button>
+                       <button onClick={()=>setEditing(i)} className="btn btn-icon btn-sm" title="Edit manual">✏️</button>
+                       <button onClick={()=>del(i._id)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }} title="Hapus">🗑</button>
                      </td>
                    </tr>
                  )

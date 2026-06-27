@@ -155,7 +155,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
             </div>
           )}
           {/* Baris 1: CC/Petty | Bill Date | Kategori */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1.4fr', gap:10 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1.4fr', gap:10, alignItems:'end' }}>
             <div><label style={lbl}>CC/Petty *</label>
               <select className="input" style={missing('Sumber (Cash Card / Petty Cash)')?errInput:undefined} value={form.source} onChange={e=>set('source',e.target.value)}>
                 <option value="">— Pilih —</option>
@@ -171,15 +171,15 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
               </select></div>
           </div>
           {/* Baris 2: Bank | No. Rekening | Nominal */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Bank * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(otomatis dari biodata)</span></label><input className="input" style={missing('Bank')?errInput:undefined} value={form.bank} onChange={e=>set('bank',e.target.value)} placeholder="BCA, Mandiri..." /></div>
-            <div><label style={lbl}>No. Rekening * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(otomatis dari biodata)</span></label><input className="input" style={missing('No. Rekening')?errInput:undefined} value={form.noRekening} onChange={e=>set('noRekening',e.target.value)} placeholder="Isi di Biodata" /></div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, alignItems:'end' }}>
+            <div><label style={lbl}>Bank * <span style={hintS}>(auto)</span></label><input className="input" style={missing('Bank')?errInput:undefined} value={form.bank} onChange={e=>set('bank',e.target.value)} placeholder="BCA, Mandiri..." /></div>
+            <div><label style={lbl}>No. Rekening * <span style={hintS}>(auto)</span></label><input className="input" style={missing('No. Rekening')?errInput:undefined} value={form.noRekening} onChange={e=>set('noRekening',e.target.value)} placeholder="dari Biodata" /></div>
             <div><label style={lbl}>Nominal (Rp) *</label><input type="number" className="input" style={missing('Nominal')?errInput:undefined} value={form.amount} onChange={e=>set('amount',Number(e.target.value))} /></div>
           </div>
           {/* Baris 3: Toko/Penjual | Keperluan */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1.6fr', gap:10 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1.6fr', gap:10, alignItems:'end' }}>
             <div><label style={lbl}>Toko/Penjual *</label><input className="input" style={missing('Toko/Penjual')?errInput:undefined} value={form.tokoPenjual} onChange={e=>set('tokoPenjual',e.target.value)} placeholder="Nama toko/penjual/penerima" /></div>
-            <div><label style={lbl}>Keperluan * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(Isi judul meeting/event jika memilih &apos;Cash Card&apos;)</span></label>
+            <div><label style={lbl}>Keperluan * <span style={hintS}>(judul meeting/event jika &apos;Cash Card&apos;)</span></label>
               <input className="input" style={missing('Keperluan')?errInput:undefined} value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Misal: Konsumsi meeting BPD Procurement" /></div>
           </div>
           <div>
@@ -210,7 +210,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
 }
 
 // =====================  Detail viewer  =====================
-function DetailModal({ item, onClose }: { item:any; onClose:()=>void }) {
+function DetailModal({ item, onClose, onDelete }: { item:any; onClose:()=>void; onDelete?:()=>void }) {
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal" style={{ width:520 }}>
@@ -224,8 +224,10 @@ function DetailModal({ item, onClose }: { item:any; onClose:()=>void }) {
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:11 }}>
             <div><span style={{ color:'var(--text3)' }}>Pengaju:</span> {item.userName}</div>
             <div><span style={{ color:'var(--text3)' }}>Nominal:</span> Rp {fmt(item.amount)}</div>
-            <div><span style={{ color:'var(--text3)' }}>Kategori:</span> {oeLookup(item.category).code}</div>
+            <div><span style={{ color:'var(--text3)' }}>Kategori:</span> {oeLookup(item.category).code} · {oeLookup(item.category).name}</div>
             <div><span style={{ color:'var(--text3)' }}>Bill Date:</span> {item.billDate ? new Date(item.billDate).toLocaleDateString('id-ID') : '—'}</div>
+            <div><span style={{ color:'var(--text3)' }}>Toko/Penjual:</span> {item.tokoPenjual||'—'}</div>
+            <div><span style={{ color:'var(--text3)' }}>Keperluan:</span> {item.title}</div>
             <div><span style={{ color:'var(--text3)' }}>Bank:</span> {item.bank}</div>
             <div><span style={{ color:'var(--text3)' }}>No. Rek:</span> {item.noRekening}</div>
             <div><span style={{ color:'var(--text3)' }}>Sumber:</span> {item.isCashCard?'Cash Card':'Petty Cash'}</div>
@@ -233,6 +235,7 @@ function DetailModal({ item, onClose }: { item:any; onClose:()=>void }) {
             {item.biayaAntarBank > 0 && <div><span style={{ color:'var(--text3)' }}>Biaya antar bank:</span> Rp {fmt(item.biayaAntarBank)}</div>}
             {item.totalTransfer && <div><span style={{ color:'var(--text3)' }}>Total transfer:</span> Rp {fmt(item.totalTransfer)}</div>}
           </div>
+          {item.rejectReason && <div style={{ fontSize:11, color:'var(--red)' }}>Alasan ditolak: {item.rejectReason}</div>}
           {item.documents?.length > 0 && (
             <div>
               <div style={{ fontSize:11, color:'var(--text3)', marginBottom:5 }}>Dokumen:</div>
@@ -244,6 +247,12 @@ function DetailModal({ item, onClose }: { item:any; onClose:()=>void }) {
             </div>
           )}
         </div>
+        {onDelete && (
+          <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
+            <button onClick={onDelete} className="btn btn-sm btn-danger">🗑 Hapus Reimburse</button>
+            <button onClick={onClose} className="btn btn-sm">Tutup</button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -453,12 +462,18 @@ function PengajuanTab({ items, loading, reload, user, isAdminish }: { items:any[
     await fetch(`/api/reimbursements/${item._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status:'reversal_approved', reversalApprovedAt: new Date().toISOString() }) })
     toast.success('Pembatalan disetujui.'); reload()
   }
+  async function deleteItem(item:any, e?:any) {
+    e?.stopPropagation?.()
+    if (!confirm(`Hapus reimburse "${item.title}" yang ditolak?`)) return
+    await fetch(`/api/reimbursements/${item._id}`, { method:'DELETE' })
+    toast.success('Reimburse dihapus'); setViewing(null); reload()
+  }
 
   return (
     <>
       {showPerhatian && <PerhatianPopup onClose={()=>setShowPerhatian(false)} onOk={()=>{ setShowPerhatian(false); setShowForm(true) }} />}
       {(showForm||editing) && <ReimburseForm editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={reload} />}
-      {viewing && <DetailModal item={viewing} onClose={()=>setViewing(null)} />}
+      {viewing && <DetailModal item={viewing} onClose={()=>setViewing(null)} onDelete={viewing.status==='rejected'?()=>deleteItem(viewing):undefined} />}
 
       <div style={{ display:'flex', gap:8, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, alignItems:'center', flexWrap:'wrap' }}>
         <button onClick={()=>setStatusTab('all')} style={chip(statusTab==='all')}>Semua ({stats.all})</button>
@@ -507,7 +522,9 @@ function PengajuanTab({ items, loading, reload, user, isAdminish }: { items:any[
                     <td>{statusBadge(r.status)}</td>
                     <td style={{ fontSize:11 }}>{r.userName||'—'}</td>
                     <td onClick={e=>e.stopPropagation()}>
-                      {r.status === 'reversal_requested' && (r.userName === user?.name || r.userId === user?.id || r.userId === user?.email || isAdminish) ? (
+                      {r.status === 'rejected' ? (
+                        <button onClick={(e)=>deleteItem(r,e)} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑 Hapus</button>
+                      ) : r.status === 'reversal_requested' && (r.userName === user?.name || r.userId === user?.id || r.userId === user?.email || isAdminish) ? (
                         <button onClick={(e)=>approveReversal(r,e)} className="btn btn-sm btn-primary" style={{ fontSize:10 }}>✓ Setujui Pembatalan</button>
                       ) : r.documents?.length > 0 ? <span style={{ fontSize:10, color:'var(--text3)' }}>📎 {r.documents.length}</span> : null}
                     </td>
@@ -683,5 +700,6 @@ function statusBadge(s:string) {
 }
 function chip(active:boolean, color:string='var(--brand)'):React.CSSProperties { return { padding:'4px 11px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${active?color:'var(--border)'}`, background:active?color+'1a':'var(--bg3)', color:active?color:'var(--text2)' } }
 function subtab(active:boolean):React.CSSProperties { return { padding:'8px 16px', fontSize:12.5, fontWeight:600, cursor:'pointer', border:'none', borderBottom:`2px solid ${active?'var(--brand)':'transparent'}`, background:'transparent', color:active?'var(--brand)':'var(--text3)' } }
-const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }
+const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }
+const hintS: React.CSSProperties = { fontWeight:400, color:'var(--text3)', fontSize:9 }
 const errInput: React.CSSProperties = { borderColor:'var(--red)' }

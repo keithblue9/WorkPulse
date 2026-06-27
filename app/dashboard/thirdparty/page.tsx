@@ -70,25 +70,67 @@ function RencanaTab() {
       <div style={{ flex:1, overflowY:'auto', padding:'14px 20px', display:'flex', flexDirection:'column', gap:12 }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
          items.length===0 ? <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>🎪</div><div>Belum ada rencana event</div></div> :
-         items.map(it => (
-          <div key={it._id} className="card" style={{ padding:'14px 16px' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10 }}>
-              <div>
-                <div style={{ fontSize:13, fontWeight:700 }}>{it.judulKegiatan||'(tanpa judul)'}</div>
-                <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>EO: <b>{it.namaEO||'—'}</b> · {it.kota||'—'} · {it.venue||'—'}</div>
-                <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{it.tanggalKegiatan?new Date(it.tanggalKegiatan).toLocaleDateString('id-ID'):'—'} · {it.jumlahPeserta||0} peserta</div>
-              </div>
-              <div style={{ textAlign:'right' }}>
-                <div style={{ fontSize:9, color:'var(--text3)', textTransform:'uppercase' }}>Estimasi Biaya</div>
-                <div style={{ fontSize:18, fontWeight:800, color:'var(--brand)' }}>Rp {fmt(it.estimasiBiaya||estimasiOf(it))}</div>
-                <div style={{ fontSize:9, color:'var(--amber)' }}>Belum termasuk fee 10%</div>
-                <button onClick={()=>setEditing(it)} className="btn btn-sm" style={{ marginTop:6, fontSize:10 }}>Edit</button>
-              </div>
-            </div>
-          </div>
-         ))}
+         items.map(it => <RABCard key={it._id} it={it} onEdit={()=>setEditing(it)} />)}
       </div>
     </>
+  )
+}
+
+// Kartu RAB (Rencana Anggaran Biaya) — format tabel detail ke samping + subtotal & total
+function RABCard({ it, onEdit }: { it:any; onEdit:()=>void }) {
+  const mr = (Number(it.mrPax)||0)*(Number(it.mrDays)||0)*(Number(it.mrPrice)||0)
+  const br = (Number(it.brRooms)||0)*(Number(it.brNights)||0)*(Number(it.brPrice)||0)
+  const others = (it.others||[]).map((o:any)=>({ ...o, jumlah: otherTotal(o) }))
+  const othersTotal = others.reduce((s:number,o:any)=>s+o.jumlah,0)
+  const subtotal = mr + br + othersTotal
+  const fee = subtotal * 0.1
+  const grand = subtotal + fee
+
+  const Line = ({ no, uraian, vol, sat, harga, jumlah, bold }: any) => (
+    <tr style={{ fontWeight: bold?700:400 }}>
+      <td style={{ fontSize:11, textAlign:'center' }}>{no}</td>
+      <td style={{ fontSize:11 }}>{uraian}</td>
+      <td style={{ fontSize:11, textAlign:'center' }}>{vol??''}</td>
+      <td style={{ fontSize:11, textAlign:'center' }}>{sat??''}</td>
+      <td style={{ fontSize:11, textAlign:'right' }}>{harga!=null?`Rp ${fmt(harga)}`:''}</td>
+      <td style={{ fontSize:11, textAlign:'right' }}>{jumlah!=null?`Rp ${fmt(jumlah)}`:''}</td>
+    </tr>
+  )
+
+  return (
+    <div className="card" style={{ padding:'14px 16px' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, marginBottom:10 }}>
+        <div>
+          <div style={{ fontSize:13, fontWeight:700 }}>{it.judulKegiatan||'(tanpa judul)'}</div>
+          <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>EO: <b>{it.namaEO||'—'}</b> · {it.kota||'—'} · {it.venue||'—'}</div>
+          <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{it.tanggalKegiatan?new Date(it.tanggalKegiatan).toLocaleDateString('id-ID'):'—'} · {it.jumlahPeserta||0} peserta</div>
+        </div>
+        <button onClick={onEdit} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>
+      </div>
+      <div style={{ overflow:'auto' }}>
+        <table className="wp-table" style={{ minWidth:680 }}>
+          <thead><tr>
+            <th style={{ width:34, textAlign:'center' }}>No</th><th>Uraian</th>
+            <th style={{ textAlign:'center' }}>Volume</th><th style={{ textAlign:'center' }}>Satuan</th>
+            <th style={{ textAlign:'right' }}>Harga Satuan</th><th style={{ textAlign:'right' }}>Jumlah</th>
+          </tr></thead>
+          <tbody>
+            <Line no="1" uraian={<b>Meeting Room</b>} />
+            <Line no="" uraian={`${it.mrPax||0} pax × ${it.mrDays||0} hari`} vol={(Number(it.mrPax)||0)*(Number(it.mrDays)||0)} sat="pax·hari" harga={it.mrPrice||0} jumlah={mr} />
+            <Line no="2" uraian={<b>Bedroom</b>} />
+            <Line no="" uraian={`${it.brRooms||0} kamar × ${it.brNights||0} malam`} vol={(Number(it.brRooms)||0)*(Number(it.brNights)||0)} sat="kamar·malam" harga={it.brPrice||0} jumlah={br} />
+            <Line no="3" uraian={<b>Others</b>} />
+            {others.map((o:any,i:number)=>(
+              <Line key={i} no="" uraian={o.label||o.key} vol={`${o.pax||0}×${o.times||1}`} sat="pax·kali" harga={o.price||0} jumlah={o.jumlah} />
+            ))}
+            <tr style={{ borderTop:'2px solid var(--border)' }}><td/><td colSpan={4} style={{ textAlign:'right', fontWeight:700, fontSize:11 }}>Subtotal</td><td style={{ textAlign:'right', fontWeight:700 }}>Rp {fmt(subtotal)}</td></tr>
+            <tr><td/><td colSpan={4} style={{ textAlign:'right', fontSize:11, color:'var(--amber)' }}>EO Handling &amp; Management Fee (10%)</td><td style={{ textAlign:'right', color:'var(--amber)' }}>Rp {fmt(fee)}</td></tr>
+            <tr style={{ background:'var(--brand-soft)' }}><td/><td colSpan={4} style={{ textAlign:'right', fontWeight:800, fontSize:12, color:'var(--brand)' }}>TOTAL (termasuk fee)</td><td style={{ textAlign:'right', fontWeight:800, color:'var(--brand)' }}>Rp {fmt(grand)}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style={{ fontSize:9, color:'var(--text3)', marginTop:6 }}>Estimasi Biaya (sebelum fee): <b>Rp {fmt(subtotal)}</b> · Belum termasuk EO Handling &amp; Management Fee (10%).</div>
+    </div>
   )
 }
 
