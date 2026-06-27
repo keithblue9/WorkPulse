@@ -1,6 +1,7 @@
 'use client'
 import { getConfig } from '@/lib/configCache'
 import { OE_CATEGORIES, oeLookup } from '@/lib/defaults'
+import { useSort, sortRows, SortTh } from '@/lib/useSort'
 import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -48,6 +49,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
   const [form, setForm] = useState({
     title: editing?.title || '',
     description: editing?.description || '',
+    tokoPenjual: editing?.tokoPenjual || '',
     amount: editing?.amount || 0,
     category: editing?.category || '',
     source: editing?.source || (editing?.isCashCard ? 'cash_card' : ''),
@@ -96,6 +98,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
     if (!form.source) e.push('Sumber (Cash Card / Petty Cash)')
     if (!form.bank.trim()) e.push('Bank')
     if (!form.noRekening.trim()) e.push('No. Rekening')
+    if (!form.tokoPenjual.trim()) e.push('Toko/Penjual')
     if (!form.documents || form.documents.length===0) e.push('Evidence / Bukti (minimal 1 file)')
     return e
   }
@@ -151,32 +154,36 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
               <b>Belum lengkap:</b> {errors.join(', ')}
             </div>
           )}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Sumber * (CC / Petty)</label>
+          {/* Baris 1: CC/Petty | Bill Date | Kategori */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1.4fr', gap:10 }}>
+            <div><label style={lbl}>CC/Petty *</label>
               <select className="input" style={missing('Sumber (Cash Card / Petty Cash)')?errInput:undefined} value={form.source} onChange={e=>set('source',e.target.value)}>
                 <option value="">— Pilih —</option>
                 <option value="cash_card">Cash Card</option>
                 <option value="petty_cash">Petty Cash</option>
               </select></div>
-            <div><label style={lbl}>Tgl Bukti / Bill Date *</label><input type="date" className="input" style={missing('Tgl Bukti / Bill Date')?errInput:undefined} value={form.billDate} onChange={e=>set('billDate',e.target.value)} /></div>
-          </div>
-          <div><label style={lbl}>Keperluan * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(Judul Agenda/Calmet untuk Cash Card)</span></label>
-            <input className="input" style={missing('Keperluan')?errInput:undefined} value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Misal: Konsumsi meeting BPD Procurement" /></div>
-          <div><label style={lbl}>Keterangan</label><textarea className="input" rows={2} value={form.description} onChange={e=>set('description',e.target.value)} /></div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Nominal (Rp) *</label><input type="number" className="input" style={missing('Nominal')?errInput:undefined} value={form.amount} onChange={e=>set('amount',Number(e.target.value))} /></div>
+            <div><label style={lbl}>Bill Date *</label><input type="date" className="input" style={missing('Tgl Bukti / Bill Date')?errInput:undefined} value={form.billDate} onChange={e=>set('billDate',e.target.value)} /></div>
             <div><label style={lbl}>Kategori *</label>
               <select className="input" style={missing('Kategori')?errInput:undefined} value={form.category} onChange={e=>set('category',e.target.value)}>
                 <option value="">— Pilih kategori —</option>
-                {OE_CATEGORIES.map(c=><option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
+                {OE_CATEGORIES.map(c=><option key={c.code} value={c.code}>{c.name}</option>)}
+                <option value="lainnya">Lainnya</option>
               </select></div>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Bank * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(otomatis dari biodata)</span></label><input className="input" style={missing('Bank')?errInput:undefined} value={form.bank} onChange={e=>set('bank',e.target.value)} placeholder="BCA, Mandiri, BRI..." /></div>
-            <div><label style={lbl}>No. Rekening *</label><input className="input" style={missing('No. Rekening')?errInput:undefined} value={form.noRekening} onChange={e=>set('noRekening',e.target.value)} placeholder="Isi di Biodata agar otomatis" /></div>
+          {/* Baris 2: Bank | No. Rekening | Nominal */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+            <div><label style={lbl}>Bank * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(otomatis dari biodata)</span></label><input className="input" style={missing('Bank')?errInput:undefined} value={form.bank} onChange={e=>set('bank',e.target.value)} placeholder="BCA, Mandiri..." /></div>
+            <div><label style={lbl}>No. Rekening * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(otomatis dari biodata)</span></label><input className="input" style={missing('No. Rekening')?errInput:undefined} value={form.noRekening} onChange={e=>set('noRekening',e.target.value)} placeholder="Isi di Biodata" /></div>
+            <div><label style={lbl}>Nominal (Rp) *</label><input type="number" className="input" style={missing('Nominal')?errInput:undefined} value={form.amount} onChange={e=>set('amount',Number(e.target.value))} /></div>
+          </div>
+          {/* Baris 3: Toko/Penjual | Keperluan */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1.6fr', gap:10 }}>
+            <div><label style={lbl}>Toko/Penjual *</label><input className="input" style={missing('Toko/Penjual')?errInput:undefined} value={form.tokoPenjual} onChange={e=>set('tokoPenjual',e.target.value)} placeholder="Nama toko/penjual/penerima" /></div>
+            <div><label style={lbl}>Keperluan * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(Isi judul meeting/event jika memilih &apos;Cash Card&apos;)</span></label>
+              <input className="input" style={missing('Keperluan')?errInput:undefined} value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Misal: Konsumsi meeting BPD Procurement" /></div>
           </div>
           <div>
-            <label style={lbl}>Bukti / Evidence * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(bill/nota/struk + agenda)</span></label>
+            <label style={lbl}>Bukti / Dokumen Pendukung * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(bill/nota/struk + agenda)</span></label>
             <label style={{ display:'block', padding:'18px', borderRadius:8, border:`2px dashed ${missing('Evidence / Bukti (minimal 1 file)')?'var(--red)':'var(--border2)'}`, background:'var(--bg3)', cursor:'pointer', textAlign:'center', fontSize:11, color:'var(--text2)' }}>
               <input type="file" multiple accept="image/*,application/pdf" onChange={e=>handleFileUpload(e.target.files)} style={{ display:'none' }} />
               {uploading ? 'Mengupload...' : '📎 Klik untuk upload (multi file, max 5MB/file)'}
@@ -247,15 +254,19 @@ function TransferModal({ item, onClose, onSave }: { item:any; onClose:()=>void; 
   const { data:session } = useSession(); const user = session?.user as any
   const [hasBiaya, setHasBiaya] = useState(item.hasBiayaAntarBank || false)
   const [biaya, setBiaya] = useState(item.biayaAntarBank || 0)
+  const [source, setSource] = useState<'cash_card'|'petty_cash'>(item.isCashCard ? 'cash_card' : 'petty_cash')
   const [processing, setProcessing] = useState(false)
   const total = (item.amount || 0) + (hasBiaya ? biaya : 0)
+  const billStr = item.billDate ? new Date(item.billDate).toLocaleDateString('id-ID') : '—'
+  const submitStr = item.submittedAt ? new Date(item.submittedAt).toLocaleDateString('id-ID') : '—'
 
   async function doTransfer() {
     setProcessing(true)
     try {
+      const isCC = source === 'cash_card'
       const updateRes = await fetch(`/api/reimbursements/${item._id}`, {
         method:'PATCH', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ status:'done', hasBiayaAntarBank: hasBiaya, biayaAntarBank: hasBiaya ? biaya : 0, totalTransfer: total, transferredAt: new Date().toISOString(), transferredBy: user?.name, whatsappSent: true })
+        body: JSON.stringify({ status:'done', isCashCard:isCC, source, hasBiayaAntarBank: hasBiaya, biayaAntarBank: hasBiaya ? biaya : 0, totalTransfer: total, transferredAt: new Date().toISOString(), transferredBy: user?.name, whatsappSent: true })
       })
       if (!updateRes.ok) { toast.error('Gagal update'); return }
       try {
@@ -273,33 +284,78 @@ function TransferModal({ item, onClose, onSave }: { item:any; onClose:()=>void; 
       toast.success('Transferred & notified via WhatsApp'); onSave(); onClose()
     } finally { setProcessing(false) }
   }
+
+  async function doReject() {
+    const reason = prompt('Alasan reject reimburse ini? (opsional)')
+    if (reason === null) return
+    setProcessing(true)
+    try {
+      const r = await fetch(`/api/reimbursements/${item._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ status:'rejected', rejectReason: reason||'', rejectedAt: new Date().toISOString(), rejectedBy: user?.name }) })
+      if (!r.ok) { toast.error('Gagal reject'); return }
+      toast.success('Reimburse ditolak'); onSave(); onClose()
+    } finally { setProcessing(false) }
+  }
+
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:480 }}>
+      <div className="modal" style={{ width:520 }}>
         <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
           <span style={{ fontSize:14, fontWeight:600 }}>Transfer Reimburse</span>
           <button onClick={onClose} className="btn btn-icon">×</button>
         </div>
         <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:11 }}>
+          {/* Header: {Nama} | {Kategori} | {CC/Petty}        {Submit Date} */}
           <div className="card" style={{ padding:'10px 12px', background:'var(--bg3)', fontSize:12 }}>
-            <div style={{ marginBottom:5 }}><b>{item.userName}</b> · {item.title}</div>
-            <div style={{ color:'var(--text2)', fontSize:11 }}>Bank: {item.bank} · No. Rek: {item.noRekening}</div>
-            <div style={{ color:'var(--text2)', fontSize:11 }}>Nominal: Rp {fmt(item.amount)}</div>
+            <div style={{ display:'flex', justifyContent:'space-between' }}>
+              <div><b>{item.userName}</b> · {oeLookup(item.category).name} · <span style={{ color:'var(--brand)' }}>{source==='cash_card'?'Cash Card':'Petty Cash'}</span></div>
+              <div style={{ color:'var(--text3)', fontSize:10 }}>Submit: {submitStr}</div>
+            </div>
+            <div style={{ color:'var(--text2)', fontSize:11, marginTop:4 }}>Bank: {item.bank} · No. Rek: {item.noRekening}</div>
+            <div style={{ color:'var(--text2)', fontSize:11 }}>Keperluan: {item.title} · Toko: {item.tokoPenjual||'—'}</div>
+            <div style={{ color:'var(--text2)', fontSize:11 }}>Nominal: <b>Rp {fmt(item.amount)}</b></div>
           </div>
+
+          {/* Evidence + Bill date */}
+          <div>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text3)', marginBottom:4 }}><span>Evidence ({(item.documents||[]).length} file)</span><span>Bill Date: {billStr}</span></div>
+            {(item.documents||[]).length>0 ? (
+              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                {item.documents.map((d:any,i:number)=>(
+                  <a key={i} href={d.url} download={d.name} className="btn btn-sm" style={{ justifyContent:'space-between', textDecoration:'none', fontSize:11 }}>
+                    <span>📄 {d.name||`evidence_${i+1}`}</span><span style={{ color:'var(--text3)' }}>{billStr}</span>
+                  </a>
+                ))}
+              </div>
+            ) : <div style={{ fontSize:11, color:'var(--red)' }}>Belum ada evidence.</div>}
+          </div>
+
           <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, cursor:'pointer' }}>
-            <input type="checkbox" checked={hasBiaya} onChange={e=>setHasBiaya(e.target.checked)} /> Ada biaya antar bank
+            <input type="checkbox" checked={hasBiaya} onChange={e=>setHasBiaya(e.target.checked)} /> Biaya Antar Bank
+            {hasBiaya && <input type="number" className="input input-sm" style={{ width:130, marginLeft:'auto' }} value={biaya} onChange={e=>setBiaya(Number(e.target.value))} placeholder="6500" />}
           </label>
-          {hasBiaya && (
-            <div><label style={lbl}>Biaya Antar Bank (Rp)</label><input type="number" className="input" value={biaya} onChange={e=>setBiaya(Number(e.target.value))} placeholder="6500" /></div>
-          )}
+
           <div style={{ padding:'14px 16px', background:'var(--brand-soft)', borderRadius:10, border:'1px solid var(--brand)' }}>
             <div style={{ fontSize:10, color:'var(--brand)', textTransform:'uppercase', fontWeight:600, letterSpacing:'0.06em' }}>Total Transfer</div>
             <div style={{ fontSize:22, fontWeight:800, color:'var(--brand)' }}>Rp {fmt(total)}</div>
           </div>
+
+          {/* Sumber: Cash Card / Petty Cash (cashier bisa ganti saat transfer) */}
+          <div style={{ display:'flex', gap:16, fontSize:12 }}>
+            <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer' }}>
+              <input type="radio" name="src" checked={source==='cash_card'} onChange={()=>setSource('cash_card')} /> Cash Card
+            </label>
+            <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer' }}>
+              <input type="radio" name="src" checked={source==='petty_cash'} onChange={()=>setSource('petty_cash')} /> Petty Cash
+            </label>
+          </div>
         </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
-          <button onClick={onClose} className="btn">Batal</button>
-          <button onClick={doTransfer} disabled={processing} className="btn btn-primary">{processing?'Transferring...':'💸 Transfer & Notify'}</button>
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', gap:8 }}>
+          <button onClick={doReject} disabled={processing} className="btn btn-danger">Reject</button>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={onClose} className="btn">Batal</button>
+            <button onClick={doTransfer} disabled={processing} className="btn btn-primary">{processing?'...':'💸 Submit Transfer'}</button>
+          </div>
         </div>
       </div>
     </div>
@@ -380,6 +436,17 @@ function PengajuanTab({ items, loading, reload, user, isAdminish }: { items:any[
     return i.status==='verified'
   }), [byPeriod, statusTab])
 
+  const sort = useSort('billDate','desc')
+  const sorted = useMemo(()=>sortRows(filtered, sort.sortKey, sort.sortDir, {
+    source:    (r:any)=>r.isCashCard?'Cash Card':'Petty Cash',
+    billDate:  (r:any)=>periodDate(r)?.getTime() ?? 0,
+    kategori:  (r:any)=>oeLookup(r.category).name,
+    bank:      (r:any)=>r.bank||'',
+    amount:    (r:any)=>r.amount||0,
+    status:    (r:any)=>r.status||'',
+    pengaju:   (r:any)=>r.userName||'',
+  }), [filtered, sort.sortKey, sort.sortDir])
+
   async function approveReversal(item:any, e:any) {
     e.stopPropagation()
     if (!confirm(`Setujui pembatalan reimburse "${item.title}"?`)) return
@@ -417,16 +484,24 @@ function PengajuanTab({ items, loading, reload, user, isAdminish }: { items:any[
          ) : (
           <div className="card" style={{ overflow:'auto' }}>
             <table className="wp-table" style={{ minWidth:980 }}>
-              <thead><tr><th>CC/Petty</th><th>Bill Date</th><th>Keperluan</th><th>Bank / Rek</th><th>Nominal</th><th>Status</th><th>Pengaju</th><th></th></tr></thead>
+              <thead><tr>
+                {(()=>{ const sp={ sortKey:sort.sortKey, sortDir:sort.sortDir, onSort:sort.toggle }; return <>
+                  <SortTh label="CC/Petty" k="source" {...sp} />
+                  <SortTh label="Bill Date" k="billDate" {...sp} />
+                  <SortTh label="Keperluan" k="kategori" {...sp} />
+                  <SortTh label="Bank / Rek" k="bank" {...sp} />
+                  <SortTh label="Nominal" k="amount" {...sp} />
+                  <SortTh label="Status" k="status" {...sp} />
+                  <SortTh label="Pengaju" k="pengaju" {...sp} />
+                  <th></th>
+                </> })()}
+              </tr></thead>
               <tbody>
-                {filtered.map(r => (
+                {sorted.map(r => (
                   <tr key={r._id} style={{ cursor:'pointer' }} onClick={()=>setViewing(r)}>
                     <td><span className="badge" style={{ background:r.isCashCard?'var(--brand-soft)':'var(--bg3)', color:r.isCashCard?'var(--brand)':'var(--text2)', fontSize:9 }}>{r.isCashCard?'Cash Card':'Petty Cash'}</span></td>
                     <td style={{ fontSize:11, color:'var(--text2)' }}>{r.billDate ? new Date(r.billDate).toLocaleDateString('id-ID') : '—'}</td>
-                    <td style={{ fontSize:11 }}>
-                      <div style={{ fontWeight:600 }}>{r.title}</div>
-                      <div style={{ color:'var(--text3)', fontSize:10 }}>{oeLookup(r.category).code}</div>
-                    </td>
+                    <td style={{ fontSize:11 }}>{oeLookup(r.category).name}</td>
                     <td style={{ fontSize:11 }}>{r.bank}<br/><span style={{ color:'var(--text3)', fontSize:10 }}>{r.noRekening}</span></td>
                     <td style={{ fontWeight:600 }}>Rp {fmt(r.amount)}</td>
                     <td>{statusBadge(r.status)}</td>
@@ -466,6 +541,19 @@ function CashierTab({ items, loading, reload }: { items:any[]; loading:boolean; 
   const pending = items.filter(r => ['submitted','approved','draft'].includes(r.status)).filter(inPeriod)
   const done = items.filter(r => ['done','paid','verified','reversal_requested','reversal_approved'].includes(r.status)).filter(inPeriod)
 
+  const sortP = useSort('submittedAt','desc')
+  const pendingSorted = useMemo(()=>sortRows(pending, sortP.sortKey, sortP.sortDir, {
+    pengaju:(r:any)=>r.userName||'', kategori:(r:any)=>oeLookup(r.category).name, bank:(r:any)=>r.bank||'',
+    amount:(r:any)=>r.amount||0, source:(r:any)=>r.isCashCard?'Cash Card':'Petty Cash', submittedAt:(r:any)=>new Date(r.submittedAt||0).getTime(),
+  }), [pending, sortP.sortKey, sortP.sortDir])
+
+  const sortD = useSort('transferredAt','desc')
+  const doneSorted = useMemo(()=>sortRows(done, sortD.sortKey, sortD.sortDir, {
+    pengaju:(r:any)=>r.userName||'', kategori:(r:any)=>oeLookup(r.category).name, amount:(r:any)=>r.amount||0,
+    biaya:(r:any)=>r.biayaAntarBank||0, total:(r:any)=>r.totalTransfer||r.amount||0, source:(r:any)=>r.isCashCard?'Cash Card':'Petty Cash',
+    transferredAt:(r:any)=>new Date(r.transferredAt||0).getTime(),
+  }), [done, sortD.sortKey, sortD.sortDir])
+
   async function delReversed(item:any) {
     if (!confirm(`Hapus reimburse "${item.title}" yang sudah disetujui pembatalannya?`)) return
     await fetch(`/api/reimbursements/${item._id}`, { method:'DELETE' }); toast.success('Dihapus. Kas diperbarui.'); reload()
@@ -498,12 +586,22 @@ function CashierTab({ items, loading, reload }: { items:any[]; loading:boolean; 
            pending.length === 0 ? <div className="card" style={{ padding:20, textAlign:'center', color:'var(--text3)', fontSize:12 }}>Tidak ada antrian</div> : (
             <div className="card" style={{ overflow:'auto' }}>
               <table className="wp-table" style={{ minWidth:900 }}>
-                <thead><tr><th>Pengaju</th><th>Keperluan</th><th>Bank / Rek</th><th>Nominal</th><th>Sumber</th><th>Submit</th><th></th></tr></thead>
+                <thead><tr>
+                  {(()=>{ const sp={ sortKey:sortP.sortKey, sortDir:sortP.sortDir, onSort:sortP.toggle }; return <>
+                    <SortTh label="Pengaju" k="pengaju" {...sp} />
+                    <SortTh label="Keperluan" k="kategori" {...sp} />
+                    <SortTh label="Bank / Rek" k="bank" {...sp} />
+                    <SortTh label="Nominal" k="amount" {...sp} />
+                    <SortTh label="Sumber" k="source" {...sp} />
+                    <SortTh label="Submit" k="submittedAt" {...sp} />
+                    <th></th>
+                  </> })()}
+                </tr></thead>
                 <tbody>
-                  {pending.map(r => (
+                  {pendingSorted.map(r => (
                     <tr key={r._id}>
                       <td style={{ fontSize:11, fontWeight:600 }}>{r.userName}</td>
-                      <td style={{ fontSize:11 }}>{r.title}<div style={{ color:'var(--text3)', fontSize:10 }}>{oeLookup(r.category).code}</div></td>
+                      <td style={{ fontSize:11 }}>{oeLookup(r.category).name}</td>
                       <td style={{ fontSize:11 }}>{r.bank}<br/><span style={{ color:'var(--text3)', fontSize:10 }}>{r.noRekening}</span></td>
                       <td style={{ fontWeight:700 }}>Rp {fmt(r.amount)}</td>
                       <td><span className="badge" style={{ background:r.isCashCard?'var(--brand-soft)':'var(--bg3)', color:r.isCashCard?'var(--brand)':'var(--text2)', fontSize:9 }}>{r.isCashCard?'Cash Card':'Petty Cash'}</span></td>
@@ -522,12 +620,23 @@ function CashierTab({ items, loading, reload }: { items:any[]; loading:boolean; 
           {done.length === 0 ? <div className="card" style={{ padding:20, textAlign:'center', color:'var(--text3)', fontSize:12 }}>Belum ada riwayat transfer</div> : (
             <div className="card" style={{ overflow:'auto' }}>
               <table className="wp-table" style={{ minWidth:900 }}>
-                <thead><tr><th>Pengaju</th><th>Keperluan</th><th>Nominal</th><th>Biaya</th><th>Total</th><th>Sumber</th><th>Transferred</th><th>Aksi</th></tr></thead>
+                <thead><tr>
+                  {(()=>{ const sp={ sortKey:sortD.sortKey, sortDir:sortD.sortDir, onSort:sortD.toggle }; return <>
+                    <SortTh label="Pengaju" k="pengaju" {...sp} />
+                    <SortTh label="Keperluan" k="kategori" {...sp} />
+                    <SortTh label="Nominal" k="amount" {...sp} />
+                    <SortTh label="Biaya" k="biaya" {...sp} />
+                    <SortTh label="Total" k="total" {...sp} />
+                    <SortTh label="Sumber" k="source" {...sp} />
+                    <SortTh label="Transferred" k="transferredAt" {...sp} />
+                    <th>Aksi</th>
+                  </> })()}
+                </tr></thead>
                 <tbody>
-                  {done.map(r => (
+                  {doneSorted.map(r => (
                     <tr key={r._id}>
                       <td style={{ fontSize:11 }}>{r.userName}</td>
-                      <td style={{ fontSize:11 }}>{r.title}</td>
+                      <td style={{ fontSize:11 }}>{oeLookup(r.category).name}</td>
                       <td>Rp {fmt(r.amount)}</td>
                       <td style={{ fontSize:10 }}>{r.biayaAntarBank>0?`Rp ${fmt(r.biayaAntarBank)}`:'—'}</td>
                       <td style={{ fontWeight:700, color:'var(--brand)' }}>Rp {fmt(r.totalTransfer||r.amount)}</td>

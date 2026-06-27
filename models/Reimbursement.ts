@@ -12,7 +12,7 @@ const ReimbursementSchema = new Schema({
   category: { type:String, default:'general' },
   source: { type:String, enum:['cash_card','petty_cash'], default:'petty_cash' },
   isCashCard: { type:Boolean, default:false },
-  bank: String, noRekening: String,
+  bank: String, noRekening: String, tokoPenjual: String,
   billDate: String,   // tanggal bukti/nota/invoice (YYYY-MM-DD)
   documents: { type:[DocumentSchema], default:[] },
   receiptUrl: String,

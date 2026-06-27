@@ -184,7 +184,7 @@ function SettlementTab({ user }: { user:any }) {
         rr.getCell(1).value = i+1
         rr.getCell(2).value = oeExcelCode(r.category)
         rr.getCell(3).value = oeLookup(r.category).name
-        rr.getCell(4).value = r.description || '-'
+        rr.getCell(4).value = r.tokoPenjual || r.description || '-'
         rr.getCell(5).value = d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : ''
         rr.getCell(5).numFmt = 'dd/mm/yyyy'
         rr.getCell(6).value = r.amount || 0; rr.getCell(6).numFmt = '#,##0'
@@ -243,7 +243,7 @@ function SettlementTab({ user }: { user:any }) {
       exportItems.forEach((r,i) => {
         if (y > 185) { doc.addPage(); y = 16 }
         const d = periodDate(r)
-        const cells = [ String(i+1), oeExcelCode(r.category), (oeLookup(r.category).name||'').slice(0,42), (r.description||'-').slice(0,34),
+        const cells = [ String(i+1), oeExcelCode(r.category), (oeLookup(r.category).name||'').slice(0,42), (r.tokoPenjual||r.description||'-').slice(0,34),
           d?d.toLocaleDateString('id-ID'):'-', fmt(r.amount), '6001016170', (r.title||'-').slice(0,58) ]
         cx = x0
         cols.forEach((c,ci) => { doc.rect(cx, y, c.w, lineH); doc.text(String(cells[ci]), cx+1.5, y+4); cx += c.w })
