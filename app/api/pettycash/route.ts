@@ -41,15 +41,22 @@ export async function GET(req:NextRequest) {
     const nonCCAmount = reimburses.reduce((s,r)=> (!r.isCashCard && inThisPeriod(r)) ? s + (r.amount||0) : s, 0)
     const bankFees   = reimburses.reduce((s,r)=> inThisPeriod(r) ? s + (r.biayaAntarBank||0) : s, 0)
 
+    // c) Selisih Biaya Settlement Cash Card = TOTAL Pengeluaran Operasional di menu Cash Card.
+    //    Per row: kalau settlement & pengembalian dua-duanya 0 -> 0 (belum direkonsiliasi, tidak dihitung),
+    //    selain itu |Pengembalian − (TopUp − Settlement)|. Identik dengan kolom di menu Cash Card.
     const ccRows = await CashCardModel.find({ year, month:{ $lte:month } }).lean() as any[]
-    const ccSelisih = ccRows.reduce((s,c)=> s + Math.abs((c.refundAmount||0) - ((c.topUpAmount||0) - (c.settlementAmount||0))), 0)
+    const ccOperasional = ccRows.reduce((s,c)=>{
+      const settlement = c.settlementAmount||0, refund = c.refundAmount||0, topUp = c.topUpAmount||0
+      if (settlement===0 && refund===0) return s
+      return s + Math.abs(refund - (topUp - settlement))
+    }, 0)
 
-    const pengeluaran = nonCCAmount + bankFees + ccSelisih
+    const pengeluaran = nonCCAmount + bankFees + ccOperasional
     const saldo = pemasukan - pengeluaran
 
     return NextResponse.json({ data: {
       year, month, inflows,
-      summary: { pemasukan, nonCCAmount, bankFees, ccSelisih, pengeluaran, saldo },
+      summary: { pemasukan, nonCCAmount, bankFees, ccOperasional, pengeluaran, saldo },
     } })
   } catch (e:any) { return NextResponse.json({ error:e.message }, { status:500 }) }
 }

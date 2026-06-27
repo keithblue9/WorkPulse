@@ -117,14 +117,23 @@ function SettlementTab({ user }: { user:any }) {
   }
 
   // pindah sumber Petty <-> CC (propagasi ke reimburse + cashier + settlement)
-  async function toggleSource(r:any, e:any) {
-    e.stopPropagation()
-    if (r.status==='verified') { toast.error('Sudah verified, tidak bisa diubah'); return }
+  async function toggleSource(r:any, e?:any) {
+    e?.stopPropagation?.()
+    if (r.status==='verified') { toast.error('Sudah verified — reverse dulu ke Done sebelum ganti sumber'); return }
     const toCC = !r.isCashCard
     if (!confirm(`Ubah sumber "${r.title}" ke ${toCC?'Cash Card':'Petty Cash'}?`)) return
     await fetch(`/api/reimbursements/${r._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ isCashCard: toCC, source: toCC?'cash_card':'petty_cash' }) })
     toast.success('Sumber diperbarui'); await load()
+  }
+
+  async function reverseItem(r:any) {
+    if (r.status!=='verified') return
+    if (!confirm(`Reverse "${r.title}" dari Verified kembali ke Done? Settlement Cash Card bulan itu akan dihitung ulang.`)) return
+    const res = await fetch('/api/settlement/reverse', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: r._id }) })
+    const j = await res.json()
+    if (!res.ok) { toast.error(j.error||'Gagal reverse'); return }
+    toast.success('Reverse berhasil — status kembali Done'); setViewing(null); await load()
   }
 
   async function exportXLSX() {
@@ -275,7 +284,9 @@ function SettlementTab({ user }: { user:any }) {
 
   return (
     <>
-      {viewing && <DetailModal item={viewing} onClose={()=>setViewing(null)} />}
+      {viewing && <DetailModal item={viewing} onClose={()=>setViewing(null)}
+        onToggleSource={async (r:any)=>{ await toggleSource(r); setViewing(null) }}
+        onReverse={reverseItem} />}
 
       <div style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', flexShrink:0 }}>
         <div style={{ fontSize:11, color:'var(--text3)', maxWidth:440 }}>Pilih item (status Done) lalu <b>Verify</b> untuk mengunci & menghitung Settlement Cash Card. Export aktif setelah <b>minimal 1 item</b> periode ini diverify.</div>
@@ -365,7 +376,7 @@ function PettyCashTab() {
   }, [year, month])
   useEffect(() => { load() }, [load])
 
-  const s = data?.summary || { pemasukan:0, nonCCAmount:0, bankFees:0, ccSelisih:0, pengeluaran:0, saldo:0 }
+  const s = data?.summary || { pemasukan:0, nonCCAmount:0, bankFees:0, ccOperasional:0, pengeluaran:0, saldo:0 }
 
   return (
     <>
@@ -393,7 +404,7 @@ function PettyCashTab() {
               <div style={{ fontSize:12, fontWeight:600, marginBottom:10 }}>Rincian Pengeluaran s/d {MONTHS[month]} {year}</div>
               <Row label="Reimburse non-Cash Card (nominal, done/verified)" value={s.nonCCAmount} />
               <Row label="Biaya antar bank (semua reimburse: CC + Petty)" value={s.bankFees} />
-              <Row label="Selisih Cash Card |Pengembalian − (Top Up − Settlement)|" value={s.ccSelisih} />
+              <Row label="Selisih Biaya Settlement Cash Card (total Pengeluaran Operasional)" value={s.ccOperasional} />
               <div style={{ borderTop:'1px solid var(--border)', marginTop:8, paddingTop:8 }}><Row label="Total Pengeluaran" value={s.pengeluaran} bold /></div>
             </div>
             <div className="card" style={{ padding:'14px 16px' }}>
@@ -460,7 +471,8 @@ function InflowEditor({ year, initial, onClose, onSaved }: { year:number; initia
 }
 
 // =====================  shared  =====================
-function DetailModal({ item, onClose }: { item:any; onClose:()=>void }) {
+function DetailModal({ item, onClose, onToggleSource, onReverse }: { item:any; onClose:()=>void; onToggleSource?:(r:any)=>void; onReverse?:(r:any)=>void }) {
+  const isVerified = item.status==='verified'
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal" style={{ width:520 }}>
@@ -487,6 +499,16 @@ function DetailModal({ item, onClose }: { item:any; onClose:()=>void }) {
               </div>
             ) : <div style={{ fontSize:11, color:'var(--red)' }}>Belum ada evidence diupload.</div>}
           </div>
+        </div>
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+          <div style={{ display:'flex', gap:8 }}>
+            {isVerified ? (
+              onReverse && <button onClick={()=>onReverse(item)} className="btn btn-sm" style={{ color:'var(--amber)' }} title="Mundurkan status ke Done">↩️ Reverse ke Done</button>
+            ) : (
+              onToggleSource && <button onClick={()=>onToggleSource(item)} className="btn btn-sm" title="Pindah sumber dana">⇄ Ubah ke {item.isCashCard?'Petty Cash':'Cash Card'}</button>
+            )}
+          </div>
+          <button onClick={onClose} className="btn btn-sm">Tutup</button>
         </div>
       </div>
     </div>
