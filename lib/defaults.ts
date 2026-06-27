@@ -1,12 +1,27 @@
 // Shared default values used as fallback when config in DB is missing fields.
 // These match the Mongoose schema defaults in models/Config.ts
 
-export const ALL_MENU_KEYS = ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','reimbursement','cashcard','cashier','settlementcc','members','config']
+export const ALL_MENU_KEYS = ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','settlementcc','thirdparty','members','config']
+
+// Kategori OE untuk Reimbursement + lookup Settlement XLSX (slide 4).
+// code = kolom "Kategori" di Excel, name = kolom "Keterangan Transaksi".
+export const OE_CATEGORIES: { code:string; name:string }[] = [
+  { code:'OE-01',  name:'Transportasi (Tol/Parkir/Taksi Online/Bluebird)' },
+  { code:'OE-02',  name:'ATK/Pengiriman Dokumen' },
+  { code:'OE-07',  name:'Meal, Drink & Snack' },
+  { code:'OE-08',  name:'Relationship (Karangan bunga, ucapan selamat)' },
+  { code:'OE-10',  name:'Extraordinary & Emergency (Bencana alam, lakalantas, dll)' },
+  { code:'OE-11',  name:'Sertifikasi Profesi' },
+  { code:'NOE-07', name:'Fit Up/Olahraga' },
+]
+export function oeLookup(code:string):{ code:string; name:string } {
+  return OE_CATEGORIES.find(c=>c.code===code) || { code: code||'-', name: code||'-' }
+}
 
 export const MENU_LABELS: Record<string,string> = {
   dashboard:'Dashboard', activities:'Activities', calendar:'Calendar', issues:'Issues', progress:'Progress',
   attendance:'Presensi', biodata:'Biodata', links:'Link Hub', meetings:'Meeting Reports', notes:'[Team] Notes', quicknotes:'[Personal] Notes',
-  budget:'Anggaran', reimbursement:'Reimbursement', cashcard:'Cash Card', cashier:'Cashier', settlementcc:'Settlement CC',
+  budget:'Budget Report', budgetreport:'Budget Report', reimbursement:'Reimbursement', operasional:'Operasional', cashcard:'Cash Card', cashier:'Cashier', settlementcc:'Settlement CC', thirdparty:'[3rd Party] Event',
   members:'Member', config:'Configuration'
 }
 
@@ -15,9 +30,9 @@ export const DEFAULT_ROLES = [
   // manager broad access but NOT the CC Holder report by default (settlementcc is opt-in per role)
   { key:'manager',  label:'Manager',   builtin:true,  allowedMenus:ALL_MENU_KEYS.filter(m=>m!=='config' && m!=='settlementcc') },
   { key:'member',   label:'Member',    builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','reimbursement'] },
-  { key:'finance',  label:'Finance',   builtin:true,  allowedMenus:['dashboard','attendance','biodata','links','quicknotes','budget','reimbursement','cashcard','cashier'] },
-  { key:'cashier',  label:'Cashier',   builtin:true,  allowedMenus:['dashboard','reimbursement','cashier','cashcard','biodata','quicknotes'] },
-  { key:'ccholder', label:'CC Holder', builtin:true,  allowedMenus:['dashboard','reimbursement','cashcard','settlementcc','quicknotes'] },
+  { key:'finance',  label:'Finance',   builtin:true,  allowedMenus:['dashboard','attendance','biodata','links','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','thirdparty'] },
+  { key:'cashier',  label:'Cashier',   builtin:true,  allowedMenus:['dashboard','reimbursement','operasional','cashier','cashcard','biodata','quicknotes'] },
+  { key:'ccholder', label:'CC Holder', builtin:true,  allowedMenus:['dashboard','reimbursement','operasional','cashcard','settlementcc','quicknotes'] },
   { key:'guest',    label:'Guest',     builtin:true,  allowedMenus:['dashboard','links'] },
 ]
 

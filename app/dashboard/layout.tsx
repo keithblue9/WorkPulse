@@ -29,11 +29,11 @@ const NAV_GROUPS = [
     { href:'/dashboard/biodata',    label:'Member Biodata', permKey:'biodata' },
   ]},
   { key:'finance', label:'Finance', items:[
-    { href:'/dashboard/budget',         label:'Anggaran', permKey:'budget' },
-    { href:'/dashboard/cashcard',       label:'Cash Card', permKey:'cashcard' },
-    { href:'/dashboard/reimbursements', label:'Reimbursement', permKey:'reimbursement' },
-    { href:'/dashboard/cashier',        label:'Cashier', permKey:'cashier' },
-    { href:'/dashboard/settlementcc',   label:'Settlement CC', permKey:'settlementcc' },
+    { href:'/dashboard/reimbursements', label:'Reimbursement', permKey:'reimbursement', perms:['reimbursement','cashier'] },
+    { href:'/dashboard/operasional',    label:'Operasional', permKey:'operasional', perms:['operasional','settlementcc','cashier'] },
+    { href:'/dashboard/cashcard',       label:'Cash Card', permKey:'cashcard', perms:['cashcard'] },
+    { href:'/dashboard/thirdparty',     label:'[3rd Party] Event', permKey:'thirdparty', perms:['thirdparty','budget','cashier'], abbr:'3P' },
+    { href:'/dashboard/budget',         label:'Budget Report', permKey:'budget', perms:['budgetreport','budget'] },
   ]},
   { key:'admin', label:'Admin', items:[
     { href:'/dashboard/members', label:'Member', permKey:'members' },
@@ -42,12 +42,12 @@ const NAV_GROUPS = [
 ]
 
 const FALLBACK_MENUS: Record<string,string[]> = {
-  admin:    ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','reimbursement','cashcard','cashier','settlementcc','members','config'],
-  manager:  ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','reimbursement','cashcard','cashier','members'],
+  admin:    ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','settlementcc','thirdparty','members','config'],
+  manager:  ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','thirdparty','members'],
   member:   ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','reimbursement'],
-  finance:  ['dashboard','attendance','biodata','links','quicknotes','budget','reimbursement','cashcard','cashier'],
-  cashier:  ['dashboard','reimbursement','cashier','cashcard','biodata','quicknotes'],
-  ccholder: ['dashboard','reimbursement','cashcard','settlementcc','quicknotes'],
+  finance:  ['dashboard','attendance','biodata','links','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','thirdparty'],
+  cashier:  ['dashboard','reimbursement','operasional','cashier','cashcard','biodata','quicknotes'],
+  ccholder: ['dashboard','reimbursement','operasional','cashcard','settlementcc','quicknotes'],
   guest:    ['dashboard','links'],
 }
 function getAllowedMenus(roleDefs:any[], userRoles:string[], configLoaded:boolean):Set<string> {
@@ -149,7 +149,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
         <nav style={{ padding:'10px 8px', flex:1, overflowY:'auto' }}>
           {NAV_GROUPS.map(group=>{
-            const visibleItems = group.items.filter(item => allowedMenus.has(item.permKey))
+            const visibleItems = group.items.filter((item:any) => item.perms ? item.perms.some((p:string)=>allowedMenus.has(p)) : allowedMenus.has(item.permKey))
             if (visibleItems.length === 0) return null
             const isExpanded = expanded.has(group.key)
             const hasActive = visibleItems.some(i => pathname===i.href||(i.href!=='/dashboard'&&pathname.startsWith(i.href)))
@@ -161,7 +161,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     return (
                       <Link key={item.href} href={item.href} style={{ textDecoration:'none' }}>
                         <div className={`sidebar-link${active?' active':''}`} style={{ justifyContent:'center', padding:'10px' }} title={item.label}>
-                          <span style={{ fontSize:11, fontWeight:600 }}>{item.label[0]}</span>
+                          <span style={{ fontSize:11, fontWeight:600 }}>{(item as any).abbr || item.label[0]}</span>
                         </div>
                       </Link>
                     )

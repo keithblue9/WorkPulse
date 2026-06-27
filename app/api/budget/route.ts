@@ -17,10 +17,11 @@ export async function PUT(req: NextRequest) {
   try {
     await connectDB()
     const { year, category, budget } = await req.json()
+    const set:any = { year, category, annualBudgetIDR: budget?.annualBudgetIDR||0, annualBudgetUSD: budget?.annualBudgetUSD||0, monthly: budget?.monthly||[] }
+    if (budget?.annualRealIDR !== undefined) set.annualRealIDR = budget.annualRealIDR||0
+    if (budget?.annualRealUSD !== undefined) set.annualRealUSD = budget.annualRealUSD||0
     const entry = await BudgetModel.findOneAndUpdate(
-      { year, category },
-      { year, category, annualBudgetIDR: budget?.annualBudgetIDR||0, annualBudgetUSD: budget?.annualBudgetUSD||0, monthly: budget?.monthly||[] },
-      { upsert: true, new: true }
+      { year, category }, set, { upsert: true, new: true }
     ).lean()
     return NextResponse.json({ data: entry })
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }

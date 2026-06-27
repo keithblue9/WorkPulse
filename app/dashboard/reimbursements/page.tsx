@@ -1,19 +1,56 @@
 'use client'
 import { getConfig } from '@/lib/configCache'
-import { useEffect, useState } from 'react'
+import { OE_CATEGORIES, oeLookup } from '@/lib/defaults'
+import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
+const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 
+function periodDate(r:any):Date|null {
+  const raw = r.billDate || r.submittedAt || r.createdAt
+  if (!raw) return null
+  const d = new Date(raw)
+  return isNaN(d.getTime()) ? null : d
+}
+
+// =====================  PERHATIAN popup  =====================
+function PerhatianPopup({ onOk, onClose }: { onOk:()=>void; onClose:()=>void }) {
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{ width:480 }}>
+        <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:20 }}>⚠️</span>
+          <span style={{ fontSize:15, fontWeight:700, color:'var(--amber)' }}>PERHATIAN!</span>
+        </div>
+        <div style={{ padding:'16px 20px', fontSize:12.5, lineHeight:1.7, color:'var(--text2)' }}>
+          <div style={{ marginBottom:10 }}>Jika memilih Reimbursement <b>&apos;Cash Card&apos;</b>, pastikan:</div>
+          <ol style={{ margin:'0 0 12px 18px', padding:0, display:'flex', flexDirection:'column', gap:5 }}>
+            <li>Mengisi Judul Agenda/Calmet pada field <b>&apos;Keperluan&apos;</b></li>
+            <li><i>Upload evidence</i> Agenda/Calmet beserta bill/nota/struk</li>
+          </ol>
+          <div style={{ padding:'10px 12px', background:'var(--amberbg)', borderRadius:8, color:'var(--text)' }}>
+            Pengajuan Reimbursement adalah <b>per transaksi / per toko</b>. Pengajuan multi-transaksi akan <b>direject</b>.
+          </div>
+        </div>
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end' }}>
+          <button onClick={onOk} className="btn btn-primary">Ok, saya mengerti!</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =====================  Form Pengajuan  =====================
 function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=>void; onSave:()=>void }) {
   const { data:session } = useSession(); const user = session?.user as any
   const [form, setForm] = useState({
     title: editing?.title || '',
     description: editing?.description || '',
     amount: editing?.amount || 0,
-    category: editing?.category || 'general',
-    isCashCard: editing?.isCashCard || false,
+    category: editing?.category || '',
+    source: editing?.source || (editing?.isCashCard ? 'cash_card' : ''),
     bank: editing?.bank || '',
     noRekening: editing?.noRekening || '',
     billDate: editing?.billDate || '',
@@ -21,19 +58,17 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
   })
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [profileLoaded, setProfileLoaded] = useState(false)
+  const [errors, setErrors] = useState<string[]>([])
   const set = (k:string,v:any) => setForm(f=>({...f,[k]:v}))
 
-  // Auto-fill bank & no rekening from the user's biodata (only for a NEW reimburse,
-  // and only if not already filled, so editing an existing one is untouched)
   useEffect(() => {
-    if (editing) { setProfileLoaded(true); return }
+    if (editing) return
     let cancelled = false
     fetch('/api/profile').then(r=>r.json()).then(pr => {
       if (cancelled) return
       const p = pr?.data
       if (p) setForm(f => ({ ...f, bank: f.bank || p.bank || '', noRekening: f.noRekening || p.noRekening || '' }))
-    }).catch(()=>{}).finally(()=>{ if(!cancelled) setProfileLoaded(true) })
+    }).catch(()=>{})
     return () => { cancelled = true }
   }, [editing])
 
@@ -48,85 +83,101 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
       newDocs.push({ url: dataUrl, name: file.name, type: file.type, size: file.size })
     }
     setForm(f=>({...f, documents: [...f.documents, ...newDocs] })); setUploading(false)
-    toast.success(`${newDocs.length} file diupload`)
+    if (newDocs.length) toast.success(`${newDocs.length} file diupload`)
   }
-
   function removeDoc(i:number) { setForm(f=>({...f, documents: f.documents.filter((_:any,idx:number)=>idx!==i) })) }
 
+  function validate():string[] {
+    const e:string[] = []
+    if (!form.title.trim()) e.push('Keperluan')
+    if (!form.amount || form.amount<=0) e.push('Nominal')
+    if (!form.billDate) e.push('Tgl Bukti / Bill Date')
+    if (!form.category) e.push('Kategori')
+    if (!form.source) e.push('Sumber (Cash Card / Petty Cash)')
+    if (!form.bank.trim()) e.push('Bank')
+    if (!form.noRekening.trim()) e.push('No. Rekening')
+    if (!form.documents || form.documents.length===0) e.push('Evidence / Bukti (minimal 1 file)')
+    return e
+  }
+
   async function save() {
-    if (!form.title || !form.amount) { toast.error('Title & nominal wajib'); return }
-    if (!form.bank || !form.noRekening) { toast.error('Bank & no rekening wajib (untuk transfer)'); return }
+    const e = validate()
+    setErrors(e)
+    if (e.length) { toast.error('Ada field yang belum diisi'); return }
     setSaving(true)
     try {
+      const isCC = form.source === 'cash_card'
       const url = editing ? `/api/reimbursements/${editing._id}` : '/api/reimbursements'
       const body: any = {
-        ...form,
+        ...form, isCashCard: isCC,
         userId: user?.id||user?.email, userName: user?.name,
-        source: form.isCashCard ? 'cash_card' : 'petty_cash',
-        status: 'submitted',
-        submittedAt: new Date().toISOString(),
+        status: editing ? editing.status : 'submitted',
+        submittedAt: editing?.submittedAt || new Date().toISOString(),
       }
       const r = await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
-      if (!r.ok) { toast.error('Gagal'); return }
-
-      // Auto WA to cashier on new submit
+      if (!r.ok) { toast.error('Gagal menyimpan'); return }
       if (!editing) {
         try {
-          const cfgR = await getConfig().then((data:any)=>({ data }))
-          const cfg = cfgR.data
+          const cfg = await getConfig()
           if (cfg?.fonnte?.cashierUserId) {
             const usersR = await fetch('/api/users').then(r=>r.json())
             const cashier = (usersR.data||[]).find((u:any)=>u._id===cfg.fonnte.cashierUserId || u.roles?.includes('cashier'))
             if (cashier?.phone) {
               const tpl = cfg.fonnte.messageToCashier || ''
-              const msg = tpl.replace(/{memberName}/g, user?.name||'-')
-                            .replace(/{purpose}/g, form.title)
-                            .replace(/{amount}/g, 'Rp ' + fmt(form.amount))
-                            .replace(/{category}/g, form.category)
-                            .replace(/{bank}/g, form.bank)
-                            .replace(/{noRekening}/g, form.noRekening)
+              const msg = tpl.replace(/{memberName}/g, user?.name||'-').replace(/{purpose}/g, form.title)
+                            .replace(/{amount}/g, 'Rp ' + fmt(form.amount)).replace(/{category}/g, oeLookup(form.category).name)
+                            .replace(/{bank}/g, form.bank).replace(/{noRekening}/g, form.noRekening)
               await fetch('/api/fonnte', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ target: cashier.phone, message: msg }) })
             }
           }
         } catch { /* non-blocking */ }
       }
-
       toast.success(editing?'Diperbarui':'Pengajuan terkirim ke Cashier'); onSave(); onClose()
     } finally { setSaving(false) }
   }
+
+  const missing = (f:string) => errors.includes(f)
 
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal" style={{ width:560 }}>
         <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit Reimburse':'+ Pengajuan Reimburse'}</span>
+          <span style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit Reimburse':'+ Pengajuan Reimbursement'}</span>
           <button onClick={onClose} className="btn btn-icon">×</button>
         </div>
         <div style={{ padding:'14px 20px', overflowY:'auto', maxHeight:'72vh', display:'flex', flexDirection:'column', gap:11 }}>
-          <div><label style={lbl}>Keperluan *</label><input className="input" value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Misal: Beli ATK kantor" /></div>
+          {errors.length>0 && (
+            <div style={{ padding:'10px 12px', background:'var(--redbg)', border:'1px solid var(--red)', borderRadius:8, fontSize:12, color:'var(--red)' }}>
+              <b>Belum lengkap:</b> {errors.join(', ')}
+            </div>
+          )}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div><label style={lbl}>Sumber * (CC / Petty)</label>
+              <select className="input" style={missing('Sumber (Cash Card / Petty Cash)')?errInput:undefined} value={form.source} onChange={e=>set('source',e.target.value)}>
+                <option value="">— Pilih —</option>
+                <option value="cash_card">Cash Card</option>
+                <option value="petty_cash">Petty Cash</option>
+              </select></div>
+            <div><label style={lbl}>Tgl Bukti / Bill Date *</label><input type="date" className="input" style={missing('Tgl Bukti / Bill Date')?errInput:undefined} value={form.billDate} onChange={e=>set('billDate',e.target.value)} /></div>
+          </div>
+          <div><label style={lbl}>Keperluan * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(Judul Agenda/Calmet untuk Cash Card)</span></label>
+            <input className="input" style={missing('Keperluan')?errInput:undefined} value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Misal: Konsumsi meeting BPD Procurement" /></div>
           <div><label style={lbl}>Keterangan</label><textarea className="input" rows={2} value={form.description} onChange={e=>set('description',e.target.value)} /></div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Nominal (Rp) *</label><input type="number" className="input" value={form.amount} onChange={e=>set('amount',Number(e.target.value))} /></div>
-            <div><label style={lbl}>Tgl Bukti / Bill Date</label><input type="date" className="input" value={form.billDate} onChange={e=>set('billDate',e.target.value)} /></div>
-            <div><label style={lbl}>Kategori</label>
-              <select className="input" value={form.category} onChange={e=>set('category',e.target.value)}>
-                <option value="petty_cash">Petty Cash / Operasional</option>
-                <option value="travel">Travel</option>
-                <option value="general">General</option>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div><label style={lbl}>Nominal (Rp) *</label><input type="number" className="input" style={missing('Nominal')?errInput:undefined} value={form.amount} onChange={e=>set('amount',Number(e.target.value))} /></div>
+            <div><label style={lbl}>Kategori *</label>
+              <select className="input" style={missing('Kategori')?errInput:undefined} value={form.category} onChange={e=>set('category',e.target.value)}>
+                <option value="">— Pilih kategori —</option>
+                {OE_CATEGORIES.map(c=><option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
               </select></div>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Bank * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(otomatis dari biodata)</span></label><input className="input" value={form.bank} onChange={e=>set('bank',e.target.value)} placeholder="BCA, Mandiri, BRI..." /></div>
-            <div><label style={lbl}>No. Rekening * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(otomatis dari biodata)</span></label><input className="input" value={form.noRekening} onChange={e=>set('noRekening',e.target.value)} placeholder="Isi di Member Biodata agar otomatis" /></div>
+            <div><label style={lbl}>Bank * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(otomatis dari biodata)</span></label><input className="input" style={missing('Bank')?errInput:undefined} value={form.bank} onChange={e=>set('bank',e.target.value)} placeholder="BCA, Mandiri, BRI..." /></div>
+            <div><label style={lbl}>No. Rekening *</label><input className="input" style={missing('No. Rekening')?errInput:undefined} value={form.noRekening} onChange={e=>set('noRekening',e.target.value)} placeholder="Isi di Biodata agar otomatis" /></div>
           </div>
-          <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, cursor:'pointer' }}>
-            <input type="checkbox" checked={form.isCashCard} onChange={e=>set('isCashCard',e.target.checked)} />
-            Dibayar pakai Cash Card (sumber dari Cash Card)
-          </label>
-
           <div>
-            <label style={lbl}>Bukti / Dokumen Pendukung</label>
-            <label style={{ display:'block', padding:'18px', borderRadius:8, border:'2px dashed var(--border2)', background:'var(--bg3)', cursor:'pointer', textAlign:'center', fontSize:11, color:'var(--text2)' }}>
+            <label style={lbl}>Bukti / Evidence * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(bill/nota/struk + agenda)</span></label>
+            <label style={{ display:'block', padding:'18px', borderRadius:8, border:`2px dashed ${missing('Evidence / Bukti (minimal 1 file)')?'var(--red)':'var(--border2)'}`, background:'var(--bg3)', cursor:'pointer', textAlign:'center', fontSize:11, color:'var(--text2)' }}>
               <input type="file" multiple accept="image/*,application/pdf" onChange={e=>handleFileUpload(e.target.files)} style={{ display:'none' }} />
               {uploading ? 'Mengupload...' : '📎 Klik untuk upload (multi file, max 5MB/file)'}
             </label>
@@ -151,14 +202,119 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
   )
 }
 
-export default function ReimbursementsPage() {
+// =====================  Detail viewer  =====================
+function DetailModal({ item, onClose }: { item:any; onClose:()=>void }) {
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{ width:520 }}>
+        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
+          <span style={{ fontSize:14, fontWeight:600 }}>Detail Reimburse</span>
+          <button onClick={onClose} className="btn btn-icon">×</button>
+        </div>
+        <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:10, fontSize:12 }}>
+          <div><b>{item.title}</b></div>
+          {item.description && <div style={{ color:'var(--text2)' }}>{item.description}</div>}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:11 }}>
+            <div><span style={{ color:'var(--text3)' }}>Pengaju:</span> {item.userName}</div>
+            <div><span style={{ color:'var(--text3)' }}>Nominal:</span> Rp {fmt(item.amount)}</div>
+            <div><span style={{ color:'var(--text3)' }}>Kategori:</span> {oeLookup(item.category).code}</div>
+            <div><span style={{ color:'var(--text3)' }}>Bill Date:</span> {item.billDate ? new Date(item.billDate).toLocaleDateString('id-ID') : '—'}</div>
+            <div><span style={{ color:'var(--text3)' }}>Bank:</span> {item.bank}</div>
+            <div><span style={{ color:'var(--text3)' }}>No. Rek:</span> {item.noRekening}</div>
+            <div><span style={{ color:'var(--text3)' }}>Sumber:</span> {item.isCashCard?'Cash Card':'Petty Cash'}</div>
+            <div><span style={{ color:'var(--text3)' }}>Status:</span> {statusBadge(item.status)}</div>
+            {item.biayaAntarBank > 0 && <div><span style={{ color:'var(--text3)' }}>Biaya antar bank:</span> Rp {fmt(item.biayaAntarBank)}</div>}
+            {item.totalTransfer && <div><span style={{ color:'var(--text3)' }}>Total transfer:</span> Rp {fmt(item.totalTransfer)}</div>}
+          </div>
+          {item.documents?.length > 0 && (
+            <div>
+              <div style={{ fontSize:11, color:'var(--text3)', marginBottom:5 }}>Dokumen:</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                {item.documents.map((d:any, i:number) => (
+                  <a key={i} href={d.url} download={d.name} className="btn btn-sm" style={{ justifyContent:'flex-start', textDecoration:'none' }}>📄 {d.name}</a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =====================  Transfer modal (Cashier)  =====================
+function TransferModal({ item, onClose, onSave }: { item:any; onClose:()=>void; onSave:()=>void }) {
   const { data:session } = useSession(); const user = session?.user as any
+  const [hasBiaya, setHasBiaya] = useState(item.hasBiayaAntarBank || false)
+  const [biaya, setBiaya] = useState(item.biayaAntarBank || 0)
+  const [processing, setProcessing] = useState(false)
+  const total = (item.amount || 0) + (hasBiaya ? biaya : 0)
+
+  async function doTransfer() {
+    setProcessing(true)
+    try {
+      const updateRes = await fetch(`/api/reimbursements/${item._id}`, {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ status:'done', hasBiayaAntarBank: hasBiaya, biayaAntarBank: hasBiaya ? biaya : 0, totalTransfer: total, transferredAt: new Date().toISOString(), transferredBy: user?.name, whatsappSent: true })
+      })
+      if (!updateRes.ok) { toast.error('Gagal update'); return }
+      try {
+        const cfg = await getConfig()
+        const usersR = await fetch('/api/users').then(r=>r.json())
+        const member = (usersR.data||[]).find((u:any)=>u.name===item.userName || u.email===item.userId)
+        if (member?.phone) {
+          const tpl = cfg?.fonnte?.messageToMember || ''
+          const msg = tpl.replace(/{memberName}/g, item.userName||'-').replace(/{purpose}/g, item.title)
+                        .replace(/{amount}/g, 'Rp ' + fmt(total)).replace(/{category}/g, oeLookup(item.category).name)
+                        .replace(/{bank}/g, item.bank).replace(/{noRekening}/g, item.noRekening)
+          await fetch('/api/fonnte', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ target: member.phone, message: msg }) })
+        }
+      } catch { /* non-blocking */ }
+      toast.success('Transferred & notified via WhatsApp'); onSave(); onClose()
+    } finally { setProcessing(false) }
+  }
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{ width:480 }}>
+        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
+          <span style={{ fontSize:14, fontWeight:600 }}>Transfer Reimburse</span>
+          <button onClick={onClose} className="btn btn-icon">×</button>
+        </div>
+        <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:11 }}>
+          <div className="card" style={{ padding:'10px 12px', background:'var(--bg3)', fontSize:12 }}>
+            <div style={{ marginBottom:5 }}><b>{item.userName}</b> · {item.title}</div>
+            <div style={{ color:'var(--text2)', fontSize:11 }}>Bank: {item.bank} · No. Rek: {item.noRekening}</div>
+            <div style={{ color:'var(--text2)', fontSize:11 }}>Nominal: Rp {fmt(item.amount)}</div>
+          </div>
+          <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, cursor:'pointer' }}>
+            <input type="checkbox" checked={hasBiaya} onChange={e=>setHasBiaya(e.target.checked)} /> Ada biaya antar bank
+          </label>
+          {hasBiaya && (
+            <div><label style={lbl}>Biaya Antar Bank (Rp)</label><input type="number" className="input" value={biaya} onChange={e=>setBiaya(Number(e.target.value))} placeholder="6500" /></div>
+          )}
+          <div style={{ padding:'14px 16px', background:'var(--brand-soft)', borderRadius:10, border:'1px solid var(--brand)' }}>
+            <div style={{ fontSize:10, color:'var(--brand)', textTransform:'uppercase', fontWeight:600, letterSpacing:'0.06em' }}>Total Transfer</div>
+            <div style={{ fontSize:22, fontWeight:800, color:'var(--brand)' }}>Rp {fmt(total)}</div>
+          </div>
+        </div>
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
+          <button onClick={onClose} className="btn">Batal</button>
+          <button onClick={doTransfer} disabled={processing} className="btn btn-primary">{processing?'Transferring...':'💸 Transfer & Notify'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =====================  PAGE  =====================
+export default function ReimbursementPage() {
+  const { data:session } = useSession(); const user = session?.user as any
+  const userRoles = user?.roles || (user?.role ? [user.role] : [])
+  const isCashierish = userRoles.includes('admin') || userRoles.includes('manager') || userRoles.includes('finance') || userRoles.includes('cashier')
+
+  const [tab, setTab] = useState<'pengajuan'|'cashier'>('pengajuan')
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState<any>(null)
-  const [tab, setTab] = useState<'all'|'submitted'|'done'>('all')
-  const [viewing, setViewing] = useState<any>(null)
 
   async function load() {
     setLoading(true)
@@ -167,102 +323,114 @@ export default function ReimbursementsPage() {
   }
   useEffect(() => { load() }, [])
 
-  const userRoles = user?.roles || (user?.role ? [user.role] : [])
-  async function approveReversal(item:any, e:any) {
-    e.stopPropagation()
-    if (!confirm(`Setujui pembatalan reimburse "${item.title}"? Setelah disetujui, kasir bisa menghapusnya.`)) return
-    try {
-      await fetch(`/api/reimbursements/${item._id}`, {
-        method:'PATCH', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ status:'reversal_approved', reversalApprovedAt: new Date().toISOString() })
-      })
-      toast.success('Pembatalan disetujui. Kasir dapat menghapus reimburse ini.')
-      load()
-    } catch { toast.error('Gagal menyetujui') }
-  }
-
-  const isAdminish = userRoles.includes('admin') || userRoles.includes('manager') || userRoles.includes('finance') || userRoles.includes('cashier')
-
-  const visible = isAdminish ? items : items.filter(i => i.userName === user?.name || i.userId === user?.id || i.userId === user?.email)
-  const filtered = tab === 'all' ? visible : visible.filter(i => tab === 'submitted' ? (i.status === 'submitted' || i.status === 'approved' || i.status === 'draft') : i.status === 'done')
-  const stats = { submitted: visible.filter(i=>i.status==='submitted').length, done: visible.filter(i=>i.status==='done').length }
-
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      {(showForm||editing) && <ReimburseForm editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} />}
-
-      {viewing && (
-        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setViewing(null)}>
-          <div className="modal" style={{ width:520 }}>
-            <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-              <span style={{ fontSize:14, fontWeight:600 }}>Detail Reimburse</span>
-              <button onClick={()=>setViewing(null)} className="btn btn-icon">×</button>
-            </div>
-            <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:10, fontSize:12 }}>
-              <div><b>{viewing.title}</b></div>
-              <div style={{ color:'var(--text2)' }}>{viewing.description}</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:11 }}>
-                <div><span style={{ color:'var(--text3)' }}>Pengaju:</span> {viewing.userName}</div>
-                <div><span style={{ color:'var(--text3)' }}>Nominal:</span> Rp {fmt(viewing.amount)}</div>
-                {viewing.billDate && <div><span style={{ color:'var(--text3)' }}>Tgl Bukti:</span> {new Date(viewing.billDate).toLocaleDateString('id-ID')}</div>}
-                <div><span style={{ color:'var(--text3)' }}>Bank:</span> {viewing.bank}</div>
-                <div><span style={{ color:'var(--text3)' }}>No. Rek:</span> {viewing.noRekening}</div>
-                <div><span style={{ color:'var(--text3)' }}>Sumber:</span> {viewing.isCashCard?'Cash Card':'Petty Cash'}</div>
-                <div><span style={{ color:'var(--text3)' }}>Status:</span> {viewing.status}</div>
-                {viewing.biayaAntarBank > 0 && <div><span style={{ color:'var(--text3)' }}>Biaya antar bank:</span> Rp {fmt(viewing.biayaAntarBank)}</div>}
-                {viewing.totalTransfer && <div><span style={{ color:'var(--text3)' }}>Total transfer:</span> Rp {fmt(viewing.totalTransfer)}</div>}
-              </div>
-              {viewing.documents?.length > 0 && (
-                <div>
-                  <div style={{ fontSize:11, color:'var(--text3)', marginBottom:5 }}>Dokumen:</div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-                    {viewing.documents.map((d:any, i:number) => (
-                      <a key={i} href={d.url} download={d.name} className="btn btn-sm" style={{ justifyContent:'flex-start', textDecoration:'none' }}>📄 {d.name}</a>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+      <div style={{ padding:'12px 20px 0', borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
+        <div style={{ fontSize:14, fontWeight:600 }}>Reimbursement</div>
+        <div style={{ display:'flex', gap:4, marginTop:10 }}>
+          <button onClick={()=>setTab('pengajuan')} style={subtab(tab==='pengajuan')}>Pengajuan</button>
+          {isCashierish && <button onClick={()=>setTab('cashier')} style={subtab(tab==='cashier')}>Cashier</button>}
         </div>
-      )}
-
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', flexShrink:0 }}>
-        <div>
-          <div style={{ fontSize:14, fontWeight:600 }}>Reimbursement</div>
-          <div style={{ fontSize:11, color:'var(--text3)' }}>{isAdminish ? `Admin view · ${visible.length} pengajuan` : `Pengajuan saya · ${visible.length} reimburse`}</div>
-        </div>
-        <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Pengajuan Baru</button>
       </div>
+      {tab==='pengajuan'
+        ? <PengajuanTab items={items} loading={loading} reload={load} user={user} isAdminish={isCashierish} />
+        : <CashierTab items={items} loading={loading} reload={load} />}
+    </div>
+  )
+}
 
-      <div style={{ display:'flex', gap:5, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
-        <button onClick={()=>setTab('all')} style={chip(tab==='all')}>Semua ({visible.length})</button>
-        <button onClick={()=>setTab('submitted')} style={chip(tab==='submitted', 'var(--amber)')}>Menunggu ({stats.submitted})</button>
-        <button onClick={()=>setTab('done')} style={chip(tab==='done', 'var(--green)')}>Done ({stats.done})</button>
+// ---------------------  TAB: Pengajuan  ---------------------
+function PengajuanTab({ items, loading, reload, user, isAdminish }: { items:any[]; loading:boolean; reload:()=>void; user:any; isAdminish:boolean }) {
+  const [showPerhatian, setShowPerhatian] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<any>(null)
+  const [viewing, setViewing] = useState<any>(null)
+  const [statusTab, setStatusTab] = useState<'all'|'submitted'|'done'|'verified'>('all')
+  const now = new Date()
+  const [year, setYear] = useState(now.getFullYear())
+  const [month, setMonth] = useState<number>(-1)
+
+  const visible = isAdminish ? items : items.filter(i => i.userName === user?.name || i.userId === user?.id || i.userId === user?.email)
+
+  const yearOptions = useMemo(() => {
+    const ys = new Set<number>([now.getFullYear(), now.getFullYear()-1, now.getFullYear()+1])
+    visible.forEach(r => { const d = periodDate(r); if (d) ys.add(d.getFullYear()) })
+    return Array.from(ys).sort((a,b)=>b-a)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible])
+
+  const byPeriod = useMemo(() => visible.filter(r => {
+    const d = periodDate(r); if (!d) return false
+    if (d.getFullYear() !== year) return false
+    if (month >= 0 && d.getMonth() !== month) return false
+    return true
+  }), [visible, year, month])
+
+  const stats = useMemo(() => ({
+    all: byPeriod.length,
+    submitted: byPeriod.filter(i=>['submitted','approved','draft'].includes(i.status)).length,
+    done: byPeriod.filter(i=>i.status==='done'||i.status==='paid').length,
+    verified: byPeriod.filter(i=>i.status==='verified').length,
+  }), [byPeriod])
+
+  const filtered = useMemo(() => byPeriod.filter(i => {
+    if (statusTab==='all') return true
+    if (statusTab==='submitted') return ['submitted','approved','draft'].includes(i.status)
+    if (statusTab==='done') return i.status==='done'||i.status==='paid'
+    return i.status==='verified'
+  }), [byPeriod, statusTab])
+
+  async function approveReversal(item:any, e:any) {
+    e.stopPropagation()
+    if (!confirm(`Setujui pembatalan reimburse "${item.title}"?`)) return
+    await fetch(`/api/reimbursements/${item._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status:'reversal_approved', reversalApprovedAt: new Date().toISOString() }) })
+    toast.success('Pembatalan disetujui.'); reload()
+  }
+
+  return (
+    <>
+      {showPerhatian && <PerhatianPopup onClose={()=>setShowPerhatian(false)} onOk={()=>{ setShowPerhatian(false); setShowForm(true) }} />}
+      {(showForm||editing) && <ReimburseForm editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={reload} />}
+      {viewing && <DetailModal item={viewing} onClose={()=>setViewing(null)} />}
+
+      <div style={{ display:'flex', gap:8, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, alignItems:'center', flexWrap:'wrap' }}>
+        <button onClick={()=>setStatusTab('all')} style={chip(statusTab==='all')}>Semua ({stats.all})</button>
+        <button onClick={()=>setStatusTab('submitted')} style={chip(statusTab==='submitted','var(--amber)')}>Menunggu ({stats.submitted})</button>
+        <button onClick={()=>setStatusTab('done')} style={chip(statusTab==='done','var(--green)')}>Done ({stats.done})</button>
+        <button onClick={()=>setStatusTab('verified')} style={chip(statusTab==='verified','var(--brand)')}>Verified ({stats.verified})</button>
+        <div style={{ marginLeft:'auto', display:'flex', gap:6, alignItems:'center' }}>
+          <select className="input input-sm" style={{ width:120 }} value={month} onChange={e=>setMonth(Number(e.target.value))}>
+            <option value={-1}>Semua Bulan</option>
+            {MONTHS.map((m,i)=><option key={i} value={i}>{m}</option>)}
+          </select>
+          <select className="input input-sm" style={{ width:90 }} value={year} onChange={e=>setYear(Number(e.target.value))}>
+            {yearOptions.map(y=><option key={y} value={y}>{y}</option>)}
+          </select>
+          <button onClick={()=>setShowPerhatian(true)} className="btn btn-primary btn-sm">+ Pengajuan Baru</button>
+        </div>
       </div>
 
       <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
          filtered.length === 0 ? (
-          <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>💸</div><div>Belum ada reimburse</div></div>
+          <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>💸</div><div>Belum ada reimburse pada periode ini</div></div>
          ) : (
           <div className="card" style={{ overflow:'auto' }}>
-            <table className="wp-table" style={{ minWidth:900 }}>
-              <thead><tr><th>Pengaju</th><th>Keperluan</th><th>Nominal</th><th>Tgl Bukti</th><th>Bank / Rek</th><th>Sumber</th><th>Status</th><th>Tgl Submit</th><th></th></tr></thead>
+            <table className="wp-table" style={{ minWidth:980 }}>
+              <thead><tr><th>CC/Petty</th><th>Bill Date</th><th>Keperluan</th><th>Bank / Rek</th><th>Nominal</th><th>Status</th><th>Pengaju</th><th></th></tr></thead>
               <tbody>
                 {filtered.map(r => (
                   <tr key={r._id} style={{ cursor:'pointer' }} onClick={()=>setViewing(r)}>
-                    <td style={{ fontSize:11 }}>{r.userName||'—'}</td>
+                    <td><span className="badge" style={{ background:r.isCashCard?'var(--brand-soft)':'var(--bg3)', color:r.isCashCard?'var(--brand)':'var(--text2)', fontSize:9 }}>{r.isCashCard?'Cash Card':'Petty Cash'}</span></td>
+                    <td style={{ fontSize:11, color:'var(--text2)' }}>{r.billDate ? new Date(r.billDate).toLocaleDateString('id-ID') : '—'}</td>
                     <td style={{ fontSize:11 }}>
                       <div style={{ fontWeight:600 }}>{r.title}</div>
-                      {r.description && <div style={{ color:'var(--text3)', fontSize:10 }}>{r.description.substring(0,60)}</div>}
+                      <div style={{ color:'var(--text3)', fontSize:10 }}>{oeLookup(r.category).code}</div>
                     </td>
-                    <td style={{ fontWeight:600 }}>Rp {fmt(r.amount)}</td>
-                    <td style={{ fontSize:11, color:'var(--text2)' }}>{r.billDate ? new Date(r.billDate).toLocaleDateString('id-ID') : '—'}</td>
                     <td style={{ fontSize:11 }}>{r.bank}<br/><span style={{ color:'var(--text3)', fontSize:10 }}>{r.noRekening}</span></td>
-                    <td><span className="badge" style={{ background:r.isCashCard?'var(--brand-soft)':'var(--bg3)', color:r.isCashCard?'var(--brand)':'var(--text2)', fontSize:9 }}>{r.isCashCard?'Cash Card':'Petty Cash'}</span></td>
+                    <td style={{ fontWeight:600 }}>Rp {fmt(r.amount)}</td>
                     <td>{statusBadge(r.status)}</td>
-                    <td style={{ fontSize:10 }}>{r.submittedAt?new Date(r.submittedAt).toLocaleDateString('id-ID'):'—'}</td>
+                    <td style={{ fontSize:11 }}>{r.userName||'—'}</td>
                     <td onClick={e=>e.stopPropagation()}>
                       {r.status === 'reversal_requested' && (r.userName === user?.name || r.userId === user?.id || r.userId === user?.email || isAdminish) ? (
                         <button onClick={(e)=>approveReversal(r,e)} className="btn btn-sm btn-primary" style={{ fontSize:10 }}>✓ Setujui Pembatalan</button>
@@ -275,21 +443,136 @@ export default function ReimbursementsPage() {
           </div>
          )}
       </div>
-    </div>
+    </>
   )
 }
+
+// ---------------------  TAB: Cashier  ---------------------
+function CashierTab({ items, loading, reload }: { items:any[]; loading:boolean; reload:()=>void }) {
+  const [transferring, setTransferring] = useState<any>(null)
+  const now = new Date()
+  const [year, setYear] = useState(now.getFullYear())
+  const [month, setMonth] = useState<number>(-1)
+
+  const inPeriod = (r:any) => { const d = periodDate(r); if (!d) return false; if (d.getFullYear()!==year) return false; if (month>=0 && d.getMonth()!==month) return false; return true }
+
+  const yearOptions = useMemo(() => {
+    const ys = new Set<number>([now.getFullYear(), now.getFullYear()-1, now.getFullYear()+1])
+    items.forEach(r => { const d = periodDate(r); if (d) ys.add(d.getFullYear()) })
+    return Array.from(ys).sort((a,b)=>b-a)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items])
+
+  const pending = items.filter(r => ['submitted','approved','draft'].includes(r.status)).filter(inPeriod)
+  const done = items.filter(r => ['done','paid','verified','reversal_requested','reversal_approved'].includes(r.status)).filter(inPeriod)
+
+  async function delReversed(item:any) {
+    if (!confirm(`Hapus reimburse "${item.title}" yang sudah disetujui pembatalannya?`)) return
+    await fetch(`/api/reimbursements/${item._id}`, { method:'DELETE' }); toast.success('Dihapus. Kas diperbarui.'); reload()
+  }
+  async function requestReversal(item:any) {
+    const reason = prompt('Alasan pembatalan reimburse ini?')
+    if (reason === null) return
+    await fetch(`/api/reimbursements/${item._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status:'reversal_requested', reversalReason: reason, reversalRequestedAt: new Date().toISOString() }) })
+    toast.success('Permintaan pembatalan dikirim'); reload()
+  }
+
+  return (
+    <>
+      {transferring && <TransferModal item={transferring} onClose={()=>setTransferring(null)} onSave={reload} />}
+      <div style={{ display:'flex', gap:8, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, alignItems:'center' }}>
+        <span style={{ fontSize:11, color:'var(--text3)' }}>Filter (Bill Date):</span>
+        <select className="input input-sm" style={{ width:120 }} value={month} onChange={e=>setMonth(Number(e.target.value))}>
+          <option value={-1}>Semua Bulan</option>
+          {MONTHS.map((m,i)=><option key={i} value={i}>{m}</option>)}
+        </select>
+        <select className="input input-sm" style={{ width:90 }} value={year} onChange={e=>setYear(Number(e.target.value))}>
+          {yearOptions.map(y=><option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px', display:'flex', flexDirection:'column', gap:14 }} className="safe-bottom page-pad">
+        <div>
+          <div style={{ fontSize:13, fontWeight:600, marginBottom:8 }}>📥 Antrian ({pending.length})</div>
+          {loading ? <div style={{ color:'var(--text3)', fontSize:12 }}>Memuat...</div> :
+           pending.length === 0 ? <div className="card" style={{ padding:20, textAlign:'center', color:'var(--text3)', fontSize:12 }}>Tidak ada antrian</div> : (
+            <div className="card" style={{ overflow:'auto' }}>
+              <table className="wp-table" style={{ minWidth:900 }}>
+                <thead><tr><th>Pengaju</th><th>Keperluan</th><th>Bank / Rek</th><th>Nominal</th><th>Sumber</th><th>Submit</th><th></th></tr></thead>
+                <tbody>
+                  {pending.map(r => (
+                    <tr key={r._id}>
+                      <td style={{ fontSize:11, fontWeight:600 }}>{r.userName}</td>
+                      <td style={{ fontSize:11 }}>{r.title}<div style={{ color:'var(--text3)', fontSize:10 }}>{oeLookup(r.category).code}</div></td>
+                      <td style={{ fontSize:11 }}>{r.bank}<br/><span style={{ color:'var(--text3)', fontSize:10 }}>{r.noRekening}</span></td>
+                      <td style={{ fontWeight:700 }}>Rp {fmt(r.amount)}</td>
+                      <td><span className="badge" style={{ background:r.isCashCard?'var(--brand-soft)':'var(--bg3)', color:r.isCashCard?'var(--brand)':'var(--text2)', fontSize:9 }}>{r.isCashCard?'Cash Card':'Petty Cash'}</span></td>
+                      <td style={{ fontSize:10 }}>{r.submittedAt?new Date(r.submittedAt).toLocaleDateString('id-ID'):'—'}</td>
+                      <td><button onClick={()=>setTransferring(r)} className="btn btn-primary btn-sm">💸 Transfer</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+           )}
+        </div>
+
+        <div>
+          <div style={{ fontSize:13, fontWeight:600, marginBottom:8 }}>✅ Done ({done.length})</div>
+          {done.length === 0 ? <div className="card" style={{ padding:20, textAlign:'center', color:'var(--text3)', fontSize:12 }}>Belum ada riwayat transfer</div> : (
+            <div className="card" style={{ overflow:'auto' }}>
+              <table className="wp-table" style={{ minWidth:900 }}>
+                <thead><tr><th>Pengaju</th><th>Keperluan</th><th>Nominal</th><th>Biaya</th><th>Total</th><th>Sumber</th><th>Transferred</th><th>Aksi</th></tr></thead>
+                <tbody>
+                  {done.map(r => (
+                    <tr key={r._id}>
+                      <td style={{ fontSize:11 }}>{r.userName}</td>
+                      <td style={{ fontSize:11 }}>{r.title}</td>
+                      <td>Rp {fmt(r.amount)}</td>
+                      <td style={{ fontSize:10 }}>{r.biayaAntarBank>0?`Rp ${fmt(r.biayaAntarBank)}`:'—'}</td>
+                      <td style={{ fontWeight:700, color:'var(--brand)' }}>Rp {fmt(r.totalTransfer||r.amount)}</td>
+                      <td><span className="badge" style={{ background:r.isCashCard?'var(--brand-soft)':'var(--bg3)', color:r.isCashCard?'var(--brand)':'var(--text2)', fontSize:9 }}>{r.isCashCard?'Cash Card':'Petty Cash'}</span></td>
+                      <td style={{ fontSize:10 }}>{r.transferredAt?new Date(r.transferredAt).toLocaleDateString('id-ID'):'—'}</td>
+                      <td>
+                        {r.status === 'done' || r.status === 'paid' ? (
+                          <button onClick={()=>requestReversal(r)} className="btn btn-sm" style={{ fontSize:10 }}>↩️ Reverse</button>
+                        ) : r.status === 'verified' ? (
+                          <span className="badge" style={{ background:'var(--brand-soft)', color:'var(--brand)', fontSize:9 }}>🔒 Verified</span>
+                        ) : r.status === 'reversal_requested' ? (
+                          <span className="badge" style={{ background:'var(--amberbg)', color:'var(--amber)', fontSize:9 }}>⏳ Menunggu persetujuan</span>
+                        ) : r.status === 'reversal_approved' ? (
+                          <button onClick={()=>delReversed(r)} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑 Hapus</button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// =====================  shared bits  =====================
 function statusBadge(s:string) {
   const cfg: Record<string,{label:string;color:string;bg:string}> = {
     submitted: { label:'Menunggu', color:'var(--amber)', bg:'var(--amberbg)' },
+    approved: { label:'Menunggu', color:'var(--amber)', bg:'var(--amberbg)' },
+    draft: { label:'Draft', color:'var(--text3)', bg:'var(--bg3)' },
     reversal_requested: { label:'Pembatalan Diminta', color:'var(--amber)', bg:'var(--amberbg)' },
     reversal_approved: { label:'Pembatalan Disetujui', color:'var(--red)', bg:'var(--redbg)' },
-    approved: { label:'Menunggu', color:'var(--amber)', bg:'var(--amberbg)' },
     done: { label:'Done', color:'var(--green)', bg:'var(--greenbg)' },
     paid: { label:'Done', color:'var(--green)', bg:'var(--greenbg)' },
+    verified: { label:'Verified', color:'var(--brand)', bg:'var(--brand-soft)' },
     rejected: { label:'Ditolak', color:'var(--red)', bg:'var(--redbg)' },
   }
   const c = cfg[s] || { label:s, color:'var(--text3)', bg:'var(--bg3)' }
   return <span className="badge" style={{ background:c.bg, color:c.color, fontSize:9 }}>{c.label}</span>
 }
 function chip(active:boolean, color:string='var(--brand)'):React.CSSProperties { return { padding:'4px 11px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${active?color:'var(--border)'}`, background:active?color+'1a':'var(--bg3)', color:active?color:'var(--text2)' } }
+function subtab(active:boolean):React.CSSProperties { return { padding:'8px 16px', fontSize:12.5, fontWeight:600, cursor:'pointer', border:'none', borderBottom:`2px solid ${active?'var(--brand)':'transparent'}`, background:'transparent', color:active?'var(--brand)':'var(--text3)' } }
 const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }
+const errInput: React.CSSProperties = { borderColor:'var(--red)' }

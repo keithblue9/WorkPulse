@@ -102,24 +102,11 @@ export default function CashCardPage() {
     toast.success('Dihapus'); load()
   }
 
-  const totalTopUp = items.reduce((s,i)=>s+(i.topUpAmount||0),0)
-  const totalSettlement = items.reduce((s,i)=>s+(i.settlementAmount||0),0)
-  const totalRefund = items.reduce((s,i)=>s+(i.refundAmount||0),0)
-  // Pengeluaran Operasional per row: only counts when Settlement has been entered.
-  // Until settlement is recorded, that month's top up is still part of Saldo Kas (in hand, not yet used).
-  // Floor at 0 (small negative selisih from bank fees/rounding shows as 0).
-  // Operasional = selisih dari (Top Up − Settlement) vs Pengembalian Dana.
-  // Bisa negatif (kalau pengembalian melebihi sisa setelah settle — mis. biaya bank, pembulatan).
-  // Tampilkan apa adanya, jangan di-floor.
-  const rowOperasional = (i:any) => (i.settlementAmount||0) > 0
-    ? ((i.topUpAmount||0)-(i.settlementAmount||0)-(i.refundAmount||0))
-    : null   // null = '—' in the UI (settlement belum diisi)
-  const totalOperasional = items.reduce((s,i)=> s + (rowOperasional(i) ?? 0), 0)
-  // Saldo Kas = Top Up dari row yang BELUM di-settle, dikurangi total operasional.
-  // Rasionalnya: top up yang belum di-settle masih utuh di tangan tim; total operasional sudah
-  // 'kepakai' jadi mengurangi saldo (kalau ada).
-  const topUpUnsettled = items.reduce((s,i)=> s + ((i.settlementAmount||0) === 0 ? (i.topUpAmount||0) : 0), 0)
-  const saldoKasCC = topUpUnsettled - Math.abs(totalOperasional)
+  // Pengeluaran Operasional per row = |Pengembalian − (Top Up − Settlement)|, selalu positif (slide 6).
+  // null (—) kalau settlement & pengembalian dua-duanya belum diisi (belum ada yg direkonsiliasi).
+  const rowOperasional = (i:any) => ((i.settlementAmount||0) === 0 && (i.refundAmount||0) === 0)
+    ? null
+    : Math.abs((i.refundAmount||0) - ((i.topUpAmount||0)-(i.settlementAmount||0)))
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -135,34 +122,6 @@ export default function CashCardPage() {
             {[year-2, year-1, year, year+1].map(y=><option key={y} value={y}>{y}</option>)}
           </select>
           <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Tambah</button>
-        </div>
-      </div>
-
-      <div className="stat-grid" style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:10, padding:'12px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
-        <div className="card" style={{ padding:'10px 14px' }}>
-          <div style={{ fontSize:10, color:'var(--text3)' }}>Total Top Up</div>
-          <div style={{ fontSize:17, fontWeight:700, color:'var(--brand)' }}>Rp {fmt(totalTopUp)}</div>
-          <div style={{ fontSize:9, color:'var(--text3)', marginTop:2 }}>Ditarik dari kantor</div>
-        </div>
-        <div className="card" style={{ padding:'10px 14px' }}>
-          <div style={{ fontSize:10, color:'var(--text3)' }}>Total Settlement</div>
-          <div style={{ fontSize:17, fontWeight:700, color:'var(--amber)' }}>Rp {fmt(totalSettlement)}</div>
-          <div style={{ fontSize:9, color:'var(--text3)', marginTop:2 }}>Terpakai (PO resmi)</div>
-        </div>
-        <div className="card" style={{ padding:'10px 14px' }}>
-          <div style={{ fontSize:10, color:'var(--text3)' }}>Pengembalian Dana</div>
-          <div style={{ fontSize:17, fontWeight:700, color:'var(--green)' }}>Rp {fmt(totalRefund)}</div>
-          <div style={{ fontSize:9, color:'var(--text3)', marginTop:2 }}>Dikembalikan ke kantor</div>
-        </div>
-        <div className="card" style={{ padding:'10px 14px' }}>
-          <div style={{ fontSize:10, color:'var(--text3)' }}>Pengeluaran Operasional</div>
-          <div style={{ fontSize:17, fontWeight:700, color:'var(--red)' }}>Rp {fmt(totalOperasional)}</div>
-          <div style={{ fontSize:9, color:'var(--text3)', marginTop:2 }}>Total selisih row yang sdh settle</div>
-        </div>
-        <div className="card" style={{ padding:'10px 14px', background:'var(--brand-soft)', border:'1px solid var(--brand)' }}>
-          <div style={{ fontSize:10, color:'var(--brand)' }}>Saldo Kas</div>
-          <div style={{ fontSize:17, fontWeight:800, color:'var(--brand)' }}>Rp {fmt(saldoKasCC)}</div>
-          <div style={{ fontSize:9, color:'var(--brand)', marginTop:2 }}>Top Up belum settle − Operasional</div>
         </div>
       </div>
 
