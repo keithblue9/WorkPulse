@@ -52,7 +52,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
-              navigator.serviceWorker.register('/sw.js').catch(function(){});
+              navigator.serviceWorker.register('/sw.js').then(function(reg){
+                // Cek update tiap kali tab difokuskan + tiap 60 detik
+                try { reg.update(); } catch(e){}
+                setInterval(function(){ try { reg.update(); } catch(e){} }, 60000);
+                document.addEventListener('visibilitychange', function(){ if (!document.hidden) { try { reg.update(); } catch(e){} } });
+              }).catch(function(){});
+              // Begitu SW baru ambil alih, reload sekali biar dapet versi terbaru
+              var refreshing = false;
+              navigator.serviceWorker.addEventListener('controllerchange', function(){
+                if (refreshing) return; refreshing = true; window.location.reload();
+              });
             });
           }
         `}} />
