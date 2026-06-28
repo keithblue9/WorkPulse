@@ -87,7 +87,7 @@ export async function GET() {
       try { await ConfigModel.updateOne({ _id: cfg._id }, { $set: updates }) } catch (e) { console.error('backfill update failed', e) }
     }
 
-    return NextResponse.json({ data: cfg }, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' } })
+    return NextResponse.json({ data: cfg }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (e:any) {
     console.error('GET /api/config error', e)
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -99,7 +99,7 @@ export async function PATCH(req: NextRequest) {
     await connectDB()
     const body = await req.json()
     const cfg = await ConfigModel.findOneAndUpdate({}, body, { new:true, upsert:true })
-    return NextResponse.json({ data: cfg }, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' } })
+    return NextResponse.json({ data: cfg }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (e:any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

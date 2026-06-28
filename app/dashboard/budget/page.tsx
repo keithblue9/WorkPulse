@@ -126,17 +126,19 @@ function YieldTab() {
           <div key={y} style={{ marginBottom:18 }}>
             <div style={{ fontSize:13, fontWeight:700, marginBottom:6 }}>Tahun {y}</div>
             <div className="card" style={{ overflow:'auto' }}>
-              <table className="wp-table" style={{ minWidth:1180 }}>
+              <table className="wp-table" style={{ minWidth:1360 }}>
                 <thead>
                   <tr>
                     <th rowSpan={2}>Cost Element</th>
                     <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>USD</th>
                     <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>IDR</th>
+                    <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>% Realisasi<br/><span style={{ fontWeight:400, fontSize:9, color:'var(--text3)' }}>(Real ÷ Plan)</span></th>
                     <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>Yield YoY (%)</th>
                   </tr>
                   <tr>
                     <th style={{ borderLeft:'1px solid var(--border)' }}>Plan</th><th>Realisasi</th>
                     <th style={{ borderLeft:'1px solid var(--border)' }}>Plan</th><th>Realisasi</th>
+                    <th style={{ borderLeft:'1px solid var(--border)' }}>USD</th><th>IDR</th>
                     <th style={{ borderLeft:'1px solid var(--border)' }}>Plan</th><th>Realisasi</th>
                   </tr>
                 </thead>
@@ -145,6 +147,8 @@ function YieldTab() {
                     const v = d[ce.key]||{}; const pv = prevD?.[ce.key]
                     const yPlan = pv ? yoy(v.planIDR||0, pv.planIDR||0) : 0
                     const yReal = pv ? yoy(v.realIDR||0, pv.realIDR||0) : 0
+                    const realPctUSD = (v.planUSD||0)>0 ? (v.realUSD||0)/(v.planUSD||0)*100 : 0
+                    const realPctIDR = (v.planIDR||0)>0 ? (v.realIDR||0)/(v.planIDR||0)*100 : 0
                     return (
                       <tr key={ce.key}>
                         <td style={{ fontSize:11 }}><div style={{ fontWeight:600 }}>{ce.short}</div><div style={{ color:'var(--text3)', fontSize:10 }}>{ce.code} · {ce.name}</div></td>
@@ -152,6 +156,8 @@ function YieldTab() {
                         <td><MoneyInput currency="USD" style={{ width:110 }} value={v.realUSD||0} onChange={n=>setVal(y,ce.key,'realUSD',n)} /></td>
                         <td style={{ borderLeft:'1px solid var(--border)' }}><MoneyInput currency="IDR" style={{ width:140 }} value={v.planIDR||0} onChange={n=>setVal(y,ce.key,'planIDR',n)} /></td>
                         <td><MoneyInput currency="IDR" style={{ width:140 }} value={v.realIDR||0} onChange={n=>setVal(y,ce.key,'realIDR',n)} /></td>
+                        <td style={{ borderLeft:'1px solid var(--border)', fontWeight:600, color: realPctUSD>=100?'var(--green)':'var(--text)' }}>{pct(realPctUSD)}</td>
+                        <td style={{ fontWeight:600, color: realPctIDR>=100?'var(--green)':'var(--text)' }}>{pct(realPctIDR)}</td>
                         <td style={{ borderLeft:'1px solid var(--border)', color: !pv?'var(--text3)':yPlan>=0?'var(--green)':'var(--red)', fontWeight:600 }}>{!pv?'—':`${yPlan>=0?'+':''}${pct(yPlan)}`}</td>
                         <td style={{ color: !pv?'var(--text3)':yReal>=0?'var(--green)':'var(--red)', fontWeight:600 }}>{!pv?'—':`${yReal>=0?'+':''}${pct(yReal)}`}</td>
                       </tr>
@@ -169,50 +175,43 @@ function YieldTab() {
 }
 
 // =====================  REALISASI  =====================
-function RealisasiTab({ year, cur, config, setConfig, rowFor, reload }: any) {
+function RealisasiTab({ year, cur, config, setConfig, rowFor }: any) {
   const getThr = (key:string)=> (config?.budgetCategories||[]).find((c:any)=>c.key===key)?.threshold ?? 80
   const [curr, setCurr] = useState<'IDR'|'USD'>('IDR')
   const [travelPct, setTravelPct] = useState<number>(getThr('travel'))
   const [externalPct, setExternalPct] = useState<number>(getThr('accommodation'))
   const [totalPct, setTotalPct] = useState<number>(config?.budgetThresholdTotal ?? 80)
-  const [real, setReal] = useState<Record<string,{idr:number;usd:number}>>({})
   const [savingThr, setSavingThr] = useState(false)
-  const [savingReal, setSavingReal] = useState(false)
 
   useEffect(()=>{
     setTravelPct(getThr('travel')); setExternalPct(getThr('accommodation')); setTotalPct(config?.budgetThresholdTotal ?? 80)
-    const d:Record<string,{idr:number;usd:number}> = {}
-    COST_ELEMENTS.forEach(ce=>{ const r=rowFor(cur,ce.key); d[ce.key]={ idr:r.annualRealIDR||0, usd:r.annualRealUSD||0 } }); setReal(d)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cur, config])
+  }, [config])
 
   const thrFor = (key:string)=> key==='travel'?travelPct: externalPct
   const money = (n:number)=> fmtMoney(n, curr)
   const planOf = (r:any)=> curr==='IDR' ? (r.annualBudgetIDR||0) : (r.annualBudgetUSD||0)
-  const realOf = (ce:string)=> curr==='IDR' ? (real[ce]?.idr||0) : (real[ce]?.usd||0)
-  const setRealVal = (ce:string,v:number)=> setReal(p=>({ ...p, [ce]: { ...(p[ce]||{idr:0,usd:0}), [curr==='IDR'?'idr':'usd']: v } }))
+  const realOf = (r:any)=> curr==='IDR' ? (r.annualRealIDR||0) : (r.annualRealUSD||0)
 
   async function saveThreshold() {
     setSavingThr(true)
     try {
       const newCats = (config?.budgetCategories||[]).map((c:any)=> c.key==='travel'?{...c,threshold:travelPct}: c.key==='accommodation'?{...c,threshold:externalPct}:c)
       await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ budgetCategories:newCats, budgetThresholdTotal: totalPct }) })
-      setConfig({ ...config, budgetCategories:newCats, budgetThresholdTotal: totalPct }); invalidateConfig()
+      invalidateConfig()
+      const fresh = await getConfig(true)   // ambil ulang dari server (no cache) biar ga balik
+      setConfig(fresh)
       toast.success('Threshold tersimpan')
     } finally { setSavingThr(false) }
   }
 
-  async function saveRealisasi() {
-    setSavingReal(true)
-    try {
-      for (const ce of COST_ELEMENTS) {
-        const r = rowFor(cur, ce.key)
-        await fetch('/api/budget', { method:'PUT', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ year, category:ce.key, budget:{ annualBudgetIDR:r.annualBudgetIDR||0, annualBudgetUSD:r.annualBudgetUSD||0, annualRealIDR:real[ce.key]?.idr||0, annualRealUSD:real[ce.key]?.usd||0, monthly:(r.monthly||[]) } }) })
-      }
-      toast.success('Realisasi tersimpan'); reload()
-    } finally { setSavingReal(false) }
-  }
+  // Hitung total per kolom
+  const rows = COST_ELEMENTS.map(ce => {
+    const r = rowFor(cur, ce.key); const plan = planOf(r); const rl = realOf(r)
+    return { ce, plan, rl, used: plan>0?rl/plan*100:0, available: plan-rl, prognosa: thrFor(ce.key)/100*plan, estAvail: plan - thrFor(ce.key)/100*plan }
+  })
+  const tot = rows.reduce((a,r)=>({ plan:a.plan+r.plan, rl:a.rl+r.rl, available:a.available+r.available, prognosa:a.prognosa+r.prognosa, estAvail:a.estAvail+r.estAvail }), { plan:0, rl:0, available:0, prognosa:0, estAvail:0 })
+  const totUsed = tot.plan>0 ? tot.rl/tot.plan*100 : 0
 
   return (
     <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }} className="safe-bottom page-pad">
@@ -228,44 +227,41 @@ function RealisasiTab({ year, cur, config, setConfig, rowFor, reload }: any) {
         </div>
       </div>
 
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10, gap:8 }}>
-        <div style={{ display:'flex', gap:5 }}>
-          <button onClick={()=>setCurr('IDR')} style={curChip(curr==='IDR')}>IDR</button>
-          <button onClick={()=>setCurr('USD')} style={curChip(curr==='USD')}>USD</button>
-        </div>
-        <button onClick={saveRealisasi} disabled={savingReal} className="btn btn-sm btn-primary">{savingReal?'...':'Simpan Realisasi'}</button>
+      <div style={{ display:'flex', gap:5, marginBottom:10 }}>
+        <button onClick={()=>setCurr('IDR')} style={curChip(curr==='IDR')}>IDR</button>
+        <button onClick={()=>setCurr('USD')} style={curChip(curr==='USD')}>USD</button>
       </div>
 
       <div className="card" style={{ overflow:'auto' }}>
-        <table className="wp-table" style={{ minWidth:1080 }}>
+        <table className="wp-table" style={{ minWidth:1040 }}>
           <thead><tr>
-            <th>Cost Element</th><th>Plan (RKAP) {curr}</th><th>Realisasi {curr}</th><th>% Used</th><th>Available</th><th>Prognosa<br/><span style={{ fontWeight:400, fontSize:9, color:'var(--text3)' }}>(threshold×RKAP)</span></th><th>Est. Available EoY</th>
+            <th>Cost Element</th><th style={{ textAlign:'right' }}>Plan (RKAP) {curr}</th><th style={{ textAlign:'right' }}>Realisasi {curr}</th><th>% Used</th><th style={{ textAlign:'right' }}>Available</th><th style={{ textAlign:'right' }}>Prognosa<br/><span style={{ fontWeight:400, fontSize:9, color:'var(--text3)' }}>(threshold×RKAP)</span></th><th style={{ textAlign:'right' }}>Est. Available EoY</th>
           </tr></thead>
           <tbody>
-            {COST_ELEMENTS.map(ce => {
-              const r = rowFor(cur, ce.key)
-              const plan = planOf(r)
-              const rl = realOf(ce.key)
-              const used = plan>0 ? rl/plan*100 : 0
-              const available = plan - rl
-              const prognosa = thrFor(ce.key)/100 * plan
-              const estAvail = plan - prognosa
-              return (
-                <tr key={ce.key}>
-                  <td style={{ fontSize:11 }}><div style={{ fontWeight:600 }}>{ce.short}</div><div style={{ color:'var(--text3)', fontSize:10 }}>{ce.code}</div></td>
-                  <td>{money(plan)}</td>
-                  <td><MoneyInput currency={curr} style={{ width:150 }} value={rl} onChange={n=>setRealVal(ce.key,n)} /></td>
-                  <td style={{ fontWeight:600, color: used>thrFor(ce.key)?'var(--red)':'var(--green)' }}>{pct(used)}</td>
-                  <td style={{ color: available<0?'var(--red)':'var(--text)' }}>{money(available)}</td>
-                  <td style={{ color:'var(--amber)' }}>{money(prognosa)}</td>
-                  <td style={{ fontWeight:600 }}>{money(estAvail)}</td>
-                </tr>
-              )
-            })}
+            {rows.map(({ce,plan,rl,used,available,prognosa,estAvail}) => (
+              <tr key={ce.key}>
+                <td style={{ fontSize:11 }}><div style={{ fontWeight:600 }}>{ce.short}</div><div style={{ color:'var(--text3)', fontSize:10 }}>{ce.code}</div></td>
+                <td style={{ textAlign:'right' }}>{money(plan)}</td>
+                <td style={{ textAlign:'right', fontWeight:600 }}>{money(rl)}</td>
+                <td style={{ fontWeight:600, color: used>thrFor(ce.key)?'var(--red)':'var(--green)' }}>{pct(used)}</td>
+                <td style={{ textAlign:'right', color: available<0?'var(--red)':'var(--text)' }}>{money(available)}</td>
+                <td style={{ textAlign:'right', color:'var(--amber)' }}>{money(prognosa)}</td>
+                <td style={{ textAlign:'right', fontWeight:600 }}>{money(estAvail)}</td>
+              </tr>
+            ))}
+            <tr style={{ borderTop:'2px solid var(--border)', background:'var(--bg3)' }}>
+              <td style={{ fontWeight:800 }}>TOTAL</td>
+              <td style={{ textAlign:'right', fontWeight:800 }}>{money(tot.plan)}</td>
+              <td style={{ textAlign:'right', fontWeight:800 }}>{money(tot.rl)}</td>
+              <td style={{ fontWeight:800, color: totUsed>totalPct?'var(--red)':'var(--green)' }}>{pct(totUsed)}</td>
+              <td style={{ textAlign:'right', fontWeight:800, color: tot.available<0?'var(--red)':'var(--text)' }}>{money(tot.available)}</td>
+              <td style={{ textAlign:'right', fontWeight:800, color:'var(--amber)' }}>{money(tot.prognosa)}</td>
+              <td style={{ textAlign:'right', fontWeight:800 }}>{money(tot.estAvail)}</td>
+            </tr>
           </tbody>
         </table>
       </div>
-      <div style={{ fontSize:10, color:'var(--text3)', marginTop:8 }}>Plan (RKAP) {curr} diambil dari Budget tahun {year} (set di tab Yield). Realisasi diinput manual per mata uang. Prognosa = threshold × RKAP. Est. Available EoY = RKAP − Prognosa.</div>
+      <div style={{ fontSize:10, color:'var(--text3)', marginTop:8 }}>Plan (RKAP) &amp; Realisasi {curr} <b>otomatis dari tab Yield</b> tahun {year} (tidak diinput ulang). % Used = Realisasi ÷ Plan. Prognosa = threshold × RKAP. Est. Available EoY = RKAP − Prognosa.</div>
     </div>
   )
 }

@@ -18,7 +18,7 @@ export async function getConfig(force=false): Promise<any> {
     } catch {}
   }
   // Fetch fresh
-  const r = await fetch('/api/config')
+  const r = await fetch('/api/config', force ? { cache: 'no-store' } : {})
   const j = await r.json()
   const data = j.data
   if (typeof window !== 'undefined' && data) {
