@@ -1,6 +1,7 @@
 'use client'
 import { getConfig } from '@/lib/configCache'
 import { oeLookup } from '@/lib/defaults'
+import { EvidenceList } from '@/components/EvidenceList'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -493,12 +494,7 @@ function DetailModal({ item, onClose, onToggleSource, onReverse }: { item:any; o
             <div><span style={{ color:'var(--text3)' }}>Status:</span> {statusBadge(item.status)}</div>
           </div>
           <div>
-            <div style={{ fontSize:11, color:'var(--text3)', marginBottom:5 }}>Evidence ({evidenceCount(item)} file):</div>
-            {hasEvidence(item) ? (
-              <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-                {item.documents.map((d:any, i:number) => <a key={i} href={d.url} download={d.name} className="btn btn-sm" style={{ justifyContent:'flex-start', textDecoration:'none' }}>📄 {d.name||`evidence_${i+1}`}</a>)}
-              </div>
-            ) : <div style={{ fontSize:11, color:'var(--red)' }}>Belum ada evidence diupload.</div>}
+            <EvidenceList documents={item.documents||[]} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
           </div>
         </div>
         <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, flexWrap:'wrap' }}>

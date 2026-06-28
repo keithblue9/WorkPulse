@@ -167,44 +167,58 @@ function YieldTab() {
 }
 
 // =====================  REALISASI  =====================
-function RealisasiTab({ year, cur, config, setConfig, rowFor, realIDRof, reload }: any) {
+function RealisasiTab({ year, cur, config, setConfig, rowFor, reload }: any) {
   const getThr = (key:string)=> (config?.budgetCategories||[]).find((c:any)=>c.key===key)?.threshold ?? 80
+  const [curr, setCurr] = useState<'IDR'|'USD'>('IDR')
   const [travelPct, setTravelPct] = useState<number>(getThr('travel'))
   const [externalPct, setExternalPct] = useState<number>(getThr('accommodation'))
-  const [totalPct, setTotalPct] = useState<number>(Math.round((getThr('travel')+getThr('accommodation'))/2))
-  const [realDraft, setRealDraft] = useState<Record<string,number>>({})
-  const [saving, setSaving] = useState(false)
+  const [totalPct, setTotalPct] = useState<number>(config?.budgetThresholdTotal ?? 80)
+  const [real, setReal] = useState<Record<string,{idr:number;usd:number}>>({})
+  const [savingThr, setSavingThr] = useState(false)
+  const [savingReal, setSavingReal] = useState(false)
 
   useEffect(()=>{
-    setTravelPct(getThr('travel')); setExternalPct(getThr('accommodation'))
-    const d:Record<string,number> = {}; COST_ELEMENTS.forEach(ce=>{ d[ce.key]=realIDRof(rowFor(cur,ce.key)) }); setRealDraft(d)
+    setTravelPct(getThr('travel')); setExternalPct(getThr('accommodation')); setTotalPct(config?.budgetThresholdTotal ?? 80)
+    const d:Record<string,{idr:number;usd:number}> = {}
+    COST_ELEMENTS.forEach(ce=>{ const r=rowFor(cur,ce.key); d[ce.key]={ idr:r.annualRealIDR||0, usd:r.annualRealUSD||0 } }); setReal(d)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cur, config])
 
-  // Threshold diisi manual semua (tidak ada auto-derive)
   const thrFor = (key:string)=> key==='travel'?travelPct: externalPct
+  const money = (n:number)=> curr==='IDR' ? `Rp ${fmt(n)}` : `$ ${fmt(n)}`
+  const planOf = (r:any)=> curr==='IDR' ? (r.annualBudgetIDR||0) : (r.annualBudgetUSD||0)
+  const realOf = (ce:string)=> curr==='IDR' ? (real[ce]?.idr||0) : (real[ce]?.usd||0)
+  const setRealVal = (ce:string,v:number)=> setReal(p=>({ ...p, [ce]: { ...(p[ce]||{idr:0,usd:0}), [curr==='IDR'?'idr':'usd']: v } }))
 
-  async function saveAll() {
-    setSaving(true)
+  async function saveThreshold() {
+    setSavingThr(true)
     try {
-      // simpan threshold ke config
       const newCats = (config?.budgetCategories||[]).map((c:any)=> c.key==='travel'?{...c,threshold:travelPct}: c.key==='accommodation'?{...c,threshold:externalPct}:c)
-      await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ budgetCategories:newCats }) })
-      setConfig({ ...config, budgetCategories:newCats }); invalidateConfig()
-      // simpan realisasi manual
+      await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ budgetCategories:newCats, budgetThresholdTotal: totalPct }) })
+      setConfig({ ...config, budgetCategories:newCats, budgetThresholdTotal: totalPct }); invalidateConfig()
+      toast.success('Threshold tersimpan')
+    } finally { setSavingThr(false) }
+  }
+
+  async function saveRealisasi() {
+    setSavingReal(true)
+    try {
       for (const ce of COST_ELEMENTS) {
         const r = rowFor(cur, ce.key)
         await fetch('/api/budget', { method:'PUT', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ year, category:ce.key, budget:{ annualBudgetIDR:r.annualBudgetIDR||0, annualBudgetUSD:r.annualBudgetUSD||0, annualRealIDR:realDraft[ce.key]||0, annualRealUSD:r.annualRealUSD||0, monthly:(r.monthly||[]) } }) })
+          body: JSON.stringify({ year, category:ce.key, budget:{ annualBudgetIDR:r.annualBudgetIDR||0, annualBudgetUSD:r.annualBudgetUSD||0, annualRealIDR:real[ce.key]?.idr||0, annualRealUSD:real[ce.key]?.usd||0, monthly:(r.monthly||[]) } }) })
       }
-      toast.success('Realisasi & threshold tersimpan'); reload()
-    } finally { setSaving(false) }
+      toast.success('Realisasi tersimpan'); reload()
+    } finally { setSavingReal(false) }
   }
 
   return (
     <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }} className="safe-bottom page-pad">
       <div className="card" style={{ padding:'12px 16px', marginBottom:14 }}>
-        <div style={{ fontSize:12, fontWeight:600, marginBottom:10 }}>Threshold Prognosa</div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+          <div style={{ fontSize:12, fontWeight:600 }}>Threshold Prognosa</div>
+          <button onClick={saveThreshold} disabled={savingThr} className="btn btn-sm btn-primary">{savingThr?'...':'Simpan Threshold'}</button>
+        </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
           <div><label style={lbl}>Total %</label><input type="number" className="input input-sm" value={totalPct} onChange={e=>setTotalPct(Number(e.target.value))} /></div>
           <div><label style={lbl}>Travel %</label><input type="number" className="input input-sm" value={travelPct} onChange={e=>setTravelPct(Number(e.target.value))} /></div>
@@ -212,43 +226,48 @@ function RealisasiTab({ year, cur, config, setConfig, rowFor, realIDRof, reload 
         </div>
       </div>
 
-      <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:10 }}>
-        <button onClick={saveAll} disabled={saving} className="btn btn-sm btn-primary">{saving?'...':'Simpan'}</button>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10, gap:8 }}>
+        <div style={{ display:'flex', gap:5 }}>
+          <button onClick={()=>setCurr('IDR')} style={curChip(curr==='IDR')}>IDR</button>
+          <button onClick={()=>setCurr('USD')} style={curChip(curr==='USD')}>USD</button>
+        </div>
+        <button onClick={saveRealisasi} disabled={savingReal} className="btn btn-sm btn-primary">{savingReal?'...':'Simpan Realisasi'}</button>
       </div>
 
       <div className="card" style={{ overflow:'auto' }}>
         <table className="wp-table" style={{ minWidth:1080 }}>
           <thead><tr>
-            <th>Cost Element</th><th>Plan (RKAP)</th><th>Realisasi</th><th>% Used</th><th>Available</th><th>Prognosa<br/><span style={{ fontWeight:400, fontSize:9, color:'var(--text3)' }}>(threshold×RKAP)</span></th><th>Est. Available EoY</th>
+            <th>Cost Element</th><th>Plan (RKAP) {curr}</th><th>Realisasi {curr}</th><th>% Used</th><th>Available</th><th>Prognosa<br/><span style={{ fontWeight:400, fontSize:9, color:'var(--text3)' }}>(threshold×RKAP)</span></th><th>Est. Available EoY</th>
           </tr></thead>
           <tbody>
             {COST_ELEMENTS.map(ce => {
               const r = rowFor(cur, ce.key)
-              const plan = r.annualBudgetIDR||0
-              const real = realDraft[ce.key]||0
-              const used = plan>0 ? real/plan*100 : 0
-              const available = plan - real
+              const plan = planOf(r)
+              const rl = realOf(ce.key)
+              const used = plan>0 ? rl/plan*100 : 0
+              const available = plan - rl
               const prognosa = thrFor(ce.key)/100 * plan
               const estAvail = plan - prognosa
               return (
                 <tr key={ce.key}>
                   <td style={{ fontSize:11 }}><div style={{ fontWeight:600 }}>{ce.short}</div><div style={{ color:'var(--text3)', fontSize:10 }}>{ce.code}</div></td>
-                  <td>Rp {fmt(plan)}</td>
-                  <td><input type="number" className="input input-sm" style={{ width:130 }} value={real} onChange={e=>setRealDraft(p=>({...p,[ce.key]:Number(e.target.value)}))} /></td>
+                  <td>{money(plan)}</td>
+                  <td><input type="number" className="input input-sm" style={{ width:130 }} value={rl} onChange={e=>setRealVal(ce.key,Number(e.target.value))} /></td>
                   <td style={{ fontWeight:600, color: used>thrFor(ce.key)?'var(--red)':'var(--green)' }}>{pct(used)}</td>
-                  <td style={{ color: available<0?'var(--red)':'var(--text)' }}>Rp {fmt(available)}</td>
-                  <td style={{ color:'var(--amber)' }}>Rp {fmt(prognosa)}</td>
-                  <td style={{ fontWeight:600 }}>Rp {fmt(estAvail)}</td>
+                  <td style={{ color: available<0?'var(--red)':'var(--text)' }}>{money(available)}</td>
+                  <td style={{ color:'var(--amber)' }}>{money(prognosa)}</td>
+                  <td style={{ fontWeight:600 }}>{money(estAvail)}</td>
                 </tr>
               )
             })}
           </tbody>
         </table>
       </div>
-      <div style={{ fontSize:10, color:'var(--text3)', marginTop:8 }}>Plan (RKAP) diambil dari Budget tahun {year} (set di tab Yield). Realisasi Travel diinput manual. Prognosa = threshold × RKAP. Est. Available EoY = RKAP − Prognosa.</div>
+      <div style={{ fontSize:10, color:'var(--text3)', marginTop:8 }}>Plan (RKAP) {curr} diambil dari Budget tahun {year} (set di tab Yield). Realisasi diinput manual per mata uang. Prognosa = threshold × RKAP. Est. Available EoY = RKAP − Prognosa.</div>
     </div>
   )
 }
+function curChip(active:boolean):React.CSSProperties { return { padding:'4px 14px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${active?'var(--brand)':'var(--border)'}`, background:active?'var(--brand-soft)':'var(--bg3)', color:active?'var(--brand)':'var(--text2)' } }
 
 const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }
 function subtab(active:boolean):React.CSSProperties { return { padding:'8px 16px', fontSize:12.5, fontWeight:600, cursor:'pointer', border:'none', borderBottom:`2px solid ${active?'var(--brand)':'transparent'}`, background:'transparent', color:active?'var(--brand)':'var(--text3)' } }

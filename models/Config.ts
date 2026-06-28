@@ -59,6 +59,7 @@ const ConfigSchema = new Schema({
       { key:'accommodation', label:'External Accommodation', annualBudget:0, annualBudgetUSD:0, pic:'', threshold:80 },
     ],
   },
+  budgetThresholdTotal: { type:Number, default:80 },
 
   activityCategories: {
     type: [TaxonomyItemSchema],

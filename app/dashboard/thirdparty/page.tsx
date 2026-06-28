@@ -70,14 +70,14 @@ function RencanaTab() {
       <div style={{ flex:1, overflowY:'auto', padding:'14px 20px', display:'flex', flexDirection:'column', gap:12 }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
          items.length===0 ? <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>🎪</div><div>Belum ada rencana event</div></div> :
-         items.map(it => <RABCard key={it._id} it={it} onEdit={()=>setEditing(it)} />)}
+         items.map(it => <RABCard key={it._id} it={it} onEdit={()=>setEditing(it)} onDelete={async()=>{ if(!confirm(`Hapus rencana "${it.judulKegiatan||it.namaEO||''}"?`))return; await fetch(`/api/thirdparty/${it._id}`,{method:'DELETE'}); toast.success('Rencana dihapus'); load() }} />)}
       </div>
     </>
   )
 }
 
 // Kartu RAB (Rencana Anggaran Biaya) — format tabel detail ke samping + subtotal & total
-function RABCard({ it, onEdit }: { it:any; onEdit:()=>void }) {
+function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:()=>void }) {
   const mr = (Number(it.mrPax)||0)*(Number(it.mrDays)||0)*(Number(it.mrPrice)||0)
   const br = (Number(it.brRooms)||0)*(Number(it.brNights)||0)*(Number(it.brPrice)||0)
   const others = (it.others||[]).map((o:any)=>({ ...o, jumlah: otherTotal(o) }))
@@ -105,7 +105,10 @@ function RABCard({ it, onEdit }: { it:any; onEdit:()=>void }) {
           <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>EO: <b>{it.namaEO||'—'}</b> · {it.kota||'—'} · {it.venue||'—'}</div>
           <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{it.tanggalKegiatan?new Date(it.tanggalKegiatan).toLocaleDateString('id-ID'):'—'} · {it.jumlahPeserta||0} peserta</div>
         </div>
-        <button onClick={onEdit} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>
+        <div style={{ display:'flex', gap:6 }}>
+          <button onClick={onEdit} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>
+          <button onClick={onDelete} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑 Hapus</button>
+        </div>
       </div>
       <div style={{ overflow:'auto' }}>
         <table className="wp-table" style={{ minWidth:680 }}>
@@ -296,7 +299,10 @@ function RealisasiTab() {
                   <td style={{ fontSize:11 }}>{it.tglApproveBAST?new Date(it.tglApproveBAST).toLocaleDateString('id-ID'):'—'}</td>
                   <td style={{ fontSize:11 }}>{it.nomorInvoice||'—'}</td>
                   <td style={{ fontSize:11 }}>{it.tglInvoice?new Date(it.tglInvoice).toLocaleDateString('id-ID'):'—'}</td>
-                  <td><button onClick={()=>setEditing(it)} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button></td>
+                  <td style={{ display:'flex', gap:5 }}>
+                    <button onClick={()=>setEditing(it)} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>
+                    <button onClick={async()=>{ if(!confirm(`Hapus realisasi "${it.namaEO||''}"?`))return; await fetch(`/api/thirdparty/${it._id}`,{method:'DELETE'}); toast.success('Realisasi dihapus'); load() }} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑</button>
+                  </td>
                 </tr>
               ))}</tbody>
             </table>

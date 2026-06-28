@@ -2,6 +2,7 @@
 import { getConfig } from '@/lib/configCache'
 import { OE_CATEGORIES, oeLookup } from '@/lib/defaults'
 import { useSort, sortRows, SortTh } from '@/lib/useSort'
+import { EvidenceList } from '@/components/EvidenceList'
 import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -237,14 +238,7 @@ function DetailModal({ item, onClose, onDelete }: { item:any; onClose:()=>void; 
           </div>
           {item.rejectReason && <div style={{ fontSize:11, color:'var(--red)' }}>Alasan ditolak: {item.rejectReason}</div>}
           {item.documents?.length > 0 && (
-            <div>
-              <div style={{ fontSize:11, color:'var(--text3)', marginBottom:5 }}>Dokumen:</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-                {item.documents.map((d:any, i:number) => (
-                  <a key={i} href={d.url} download={d.name} className="btn btn-sm" style={{ justifyContent:'flex-start', textDecoration:'none' }}>📄 {d.name}</a>
-                ))}
-              </div>
-            </div>
+            <EvidenceList documents={item.documents} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
           )}
         </div>
         {onDelete && (
