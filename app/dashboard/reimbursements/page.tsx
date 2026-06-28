@@ -3,6 +3,7 @@ import { getConfig } from '@/lib/configCache'
 import { OE_CATEGORIES, oeLookup } from '@/lib/defaults'
 import { useSort, sortRows, SortTh } from '@/lib/useSort'
 import { EvidenceList } from '@/components/EvidenceList'
+import { MoneyInput } from '@/components/MoneyInput'
 import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -175,7 +176,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, alignItems:'end' }}>
             <div><label style={lbl}>Bank * <span style={hintS}>(auto)</span></label><input className="input" style={missing('Bank')?errInput:undefined} value={form.bank} onChange={e=>set('bank',e.target.value)} placeholder="BCA, Mandiri..." /></div>
             <div><label style={lbl}>No. Rekening * <span style={hintS}>(auto)</span></label><input className="input" style={missing('No. Rekening')?errInput:undefined} value={form.noRekening} onChange={e=>set('noRekening',e.target.value)} placeholder="dari Biodata" /></div>
-            <div><label style={lbl}>Nominal (Rp) *</label><input type="number" className="input" style={missing('Nominal')?errInput:undefined} value={form.amount} onChange={e=>set('amount',Number(e.target.value))} /></div>
+            <div><label style={lbl}>Nominal (Rp) *</label><MoneyInput currency="IDR" className="input" style={missing('Nominal')?errInput:undefined} value={form.amount} onChange={n=>set('amount',n)} /></div>
           </div>
           {/* Baris 3: Toko/Penjual | Keperluan */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1.6fr', gap:10, alignItems:'end' }}>
@@ -335,7 +336,7 @@ function TransferModal({ item, onClose, onSave }: { item:any; onClose:()=>void; 
 
           <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, cursor:'pointer' }}>
             <input type="checkbox" checked={hasBiaya} onChange={e=>setHasBiaya(e.target.checked)} /> Biaya Antar Bank
-            {hasBiaya && <input type="number" className="input input-sm" style={{ width:130, marginLeft:'auto' }} value={biaya} onChange={e=>setBiaya(Number(e.target.value))} placeholder="6500" />}
+            {hasBiaya && <MoneyInput currency="IDR" className="input input-sm" style={{ width:150, marginLeft:'auto' }} value={biaya} onChange={n=>setBiaya(n)} placeholder="6.500" />}
           </label>
 
           <div style={{ padding:'14px 16px', background:'var(--brand-soft)', borderRadius:10, border:'1px solid var(--brand)' }}>

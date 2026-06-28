@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
+import { MoneyInput } from '@/components/MoneyInput'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
@@ -209,7 +210,7 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
                   <input className="input input-sm" placeholder="Label" value={o.label} onChange={e=>setOther(i,'label',e.target.value)} />
                   <input type="number" className="input input-sm" placeholder="Pax" value={o.pax} onChange={e=>setOther(i,'pax',Number(e.target.value))} />
                   <input type="number" className="input input-sm" placeholder="Times" value={o.times} onChange={e=>setOther(i,'times',Number(e.target.value))} />
-                  <input type="number" className="input input-sm" placeholder="Price" value={o.price} onChange={e=>setOther(i,'price',Number(e.target.value))} />
+                  <MoneyInput currency="IDR" className="input input-sm" placeholder="Price" value={o.price||0} onChange={n=>setOther(i,'price',n)} />
                   <span style={{ fontSize:10, color:'var(--text2)', textAlign:'right' }}>Rp {fmt(otherTotal(o))}</span>
                   <button onClick={()=>delOther(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
                 </div>
@@ -247,9 +248,10 @@ function Section({ title, total, children }: { title:string; total:number; child
 function Trio({ a, b, c, f, set }: { a:[string,string]; b:[string,string]; c:[string,string]; f:any; set:(k:string,v:any)=>void }) {
   return (
     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1.3fr', gap:8 }}>
-      {[a,b,c].map(([label,key])=>(
+      {[a,b].map(([label,key])=>(
         <div key={key}><label style={{ ...lbl, fontSize:10 }}>{label}</label><input type="number" className="input input-sm" value={f[key]} onChange={e=>set(key,Number(e.target.value))} /></div>
       ))}
+      <div><label style={{ ...lbl, fontSize:10 }}>{c[0]}</label><MoneyInput currency="IDR" className="input input-sm" value={f[c[1]]||0} onChange={n=>set(c[1],n)} /></div>
     </div>
   )
 }
@@ -340,7 +342,7 @@ function RealisasiForm({ editing, user, onClose, onSaved }: { editing?:any; user
         <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:11 }}>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
             <div><label style={lbl}>Nama EO</label><input className="input" value={f.namaEO} onChange={e=>set('namaEO',e.target.value)} /></div>
-            <div><label style={lbl}>Nominal Tagihan (Rp)</label><input type="number" className="input" value={f.nominalTagihan} onChange={e=>set('nominalTagihan',Number(e.target.value))} /></div>
+            <div><label style={lbl}>Nominal Tagihan (Rp)</label><MoneyInput currency="IDR" className="input" value={f.nominalTagihan||0} onChange={n=>set('nominalTagihan',n)} /></div>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
             <div><label style={lbl}>Nomor PO</label><input className="input" value={f.nomorPO} onChange={e=>set('nomorPO',e.target.value)} /></div>

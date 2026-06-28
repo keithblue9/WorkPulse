@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useSession } from 'next-auth/react'
+import { MoneyInput } from '@/components/MoneyInput'
 
 const MONTHS = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
@@ -54,16 +55,16 @@ function CashCardForm({ editing, onClose, onSave }: { editing?:any; onClose:()=>
           <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em', marginTop:6 }}>💳 Top Up</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
             <div><label style={lbl}>PR No.</label><input className="input" value={form.prNo} onChange={e=>set('prNo',e.target.value)} /></div>
-            <div><label style={lbl}>Nominal (Rp)</label><input type="number" className="input" value={form.topUpAmount} onChange={e=>set('topUpAmount',Number(e.target.value))} /></div>
+            <div><label style={lbl}>Nominal (Rp)</label><MoneyInput currency="IDR" className="input" value={form.topUpAmount} onChange={n=>set('topUpAmount',n)} /></div>
           </div>
           <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em', marginTop:6 }}>📋 Settlement</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
             <div><label style={lbl}>Ref ID Jojonomic</label><input className="input" value={form.jojonomicId} onChange={e=>set('jojonomicId',e.target.value)} /></div>
             <div><label style={lbl}>PO No.</label><input className="input" value={form.poNo} onChange={e=>set('poNo',e.target.value)} /></div>
-            <div><label style={lbl}>Nominal (Rp)</label><input type="number" className="input" value={form.settlementAmount} onChange={e=>set('settlementAmount',Number(e.target.value))} /></div>
+            <div><label style={lbl}>Nominal (Rp)</label><MoneyInput currency="IDR" className="input" value={form.settlementAmount} onChange={n=>set('settlementAmount',n)} /></div>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:10, alignItems:'end' }}>
-            <div><label style={lbl}>Pengembalian Dana (Rp)</label><input type="number" className="input" value={form.refundAmount} onChange={e=>set('refundAmount',Number(e.target.value))} placeholder="Sisa yang dikembalikan ke kantor" /></div>
+            <div><label style={lbl}>Pengembalian Dana (Rp)</label><MoneyInput currency="IDR" className="input" value={form.refundAmount} onChange={n=>set('refundAmount',n)} placeholder="Sisa yang dikembalikan ke kantor" /></div>
             <button type="button" className="btn btn-sm" onClick={()=>set('refundAmount', Math.max(0,(form.topUpAmount||0)-(form.settlementAmount||0)))}>= Semua sisa dikembalikan</button>
           </div>
           <div><label style={lbl}>Catatan</label><input className="input" value={form.notes} onChange={e=>set('notes',e.target.value)} /></div>
@@ -150,11 +151,11 @@ export default function CashCardPage() {
                  return (
                    <tr key={i._id}>
                      <td>{i.year}</td><td>{MONTHS[i.month]}</td>
-                     <td>{i.prNo||'—'}</td><td style={{ textAlign:'right', fontWeight:600 }}>{fmt(i.topUpAmount)}</td>
-                     <td>{i.jojonomicId||'—'}</td><td>{i.poNo||'—'}</td><td style={{ textAlign:'right', fontWeight:600 }}>{fmt(i.settlementAmount)}{i.locked && <span title="Terkunci" style={{ marginLeft:4 }}>🔒</span>}</td>
+                     <td>{i.prNo||'—'}</td><td style={{ textAlign:'right', fontWeight:600 }}>Rp {fmt(i.topUpAmount)}</td>
+                     <td>{i.jojonomicId||'—'}</td><td>{i.poNo||'—'}</td><td style={{ textAlign:'right', fontWeight:600 }}>Rp {fmt(i.settlementAmount)}{i.locked && <span title="Terkunci" style={{ marginLeft:4 }}>🔒</span>}</td>
                      <td style={{ fontWeight:600, color: pct>=100?'var(--green)':pct>0?'var(--brand)':'var(--text3)' }}>{pct.toFixed(1)}%</td>
-                     <td style={{ textAlign:'right', fontWeight:600, color:'var(--green)' }}>{fmt(i.refundAmount||0)}</td>
-                     <td style={{ textAlign:'right', fontWeight:600, color: rowOperasional(i) === null ? 'var(--text3)' : (rowOperasional(i) as number) < 0 ? 'var(--amber)' : 'var(--red)' }}>{rowOperasional(i) !== null ? fmt(rowOperasional(i) as number) : '—'}</td>
+                     <td style={{ textAlign:'right', fontWeight:600, color:'var(--green)' }}>Rp {fmt(i.refundAmount||0)}</td>
+                     <td style={{ textAlign:'right', fontWeight:600, color: rowOperasional(i) === null ? 'var(--text3)' : (rowOperasional(i) as number) < 0 ? 'var(--amber)' : 'var(--red)' }}>{rowOperasional(i) !== null ? 'Rp ' + fmt(rowOperasional(i) as number) : '—'}</td>
                      <td style={{ display:'flex', gap:4 }}>
                        <button onClick={()=>toggleLock(i)} className="btn btn-icon btn-sm" title={i.locked?'Buka kunci':'Simpan & kunci angka'}>{i.locked?'🔓':'💾'}</button>
                        <button onClick={()=>setEditing(i)} className="btn btn-icon btn-sm" title="Edit manual">✏️</button>

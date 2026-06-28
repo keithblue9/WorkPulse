@@ -1,5 +1,7 @@
 'use client'
 import { getConfig, invalidateConfig } from '@/lib/configCache'
+import { MoneyInput } from '@/components/MoneyInput'
+import { fmtMoney } from '@/lib/money'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import toast from 'react-hot-toast'
 
@@ -124,7 +126,7 @@ function YieldTab() {
           <div key={y} style={{ marginBottom:18 }}>
             <div style={{ fontSize:13, fontWeight:700, marginBottom:6 }}>Tahun {y}</div>
             <div className="card" style={{ overflow:'auto' }}>
-              <table className="wp-table" style={{ minWidth:1040 }}>
+              <table className="wp-table" style={{ minWidth:1180 }}>
                 <thead>
                   <tr>
                     <th rowSpan={2}>Cost Element</th>
@@ -146,10 +148,10 @@ function YieldTab() {
                     return (
                       <tr key={ce.key}>
                         <td style={{ fontSize:11 }}><div style={{ fontWeight:600 }}>{ce.short}</div><div style={{ color:'var(--text3)', fontSize:10 }}>{ce.code} · {ce.name}</div></td>
-                        <td style={{ borderLeft:'1px solid var(--border)' }}><input type="number" className="input input-sm" style={{ width:100 }} value={v.planUSD||0} onChange={e=>setVal(y,ce.key,'planUSD',Number(e.target.value))} /></td>
-                        <td><input type="number" className="input input-sm" style={{ width:100 }} value={v.realUSD||0} onChange={e=>setVal(y,ce.key,'realUSD',Number(e.target.value))} /></td>
-                        <td style={{ borderLeft:'1px solid var(--border)' }}><input type="number" className="input input-sm" style={{ width:120 }} value={v.planIDR||0} onChange={e=>setVal(y,ce.key,'planIDR',Number(e.target.value))} /></td>
-                        <td><input type="number" className="input input-sm" style={{ width:120 }} value={v.realIDR||0} onChange={e=>setVal(y,ce.key,'realIDR',Number(e.target.value))} /></td>
+                        <td style={{ borderLeft:'1px solid var(--border)' }}><MoneyInput currency="USD" style={{ width:110 }} value={v.planUSD||0} onChange={n=>setVal(y,ce.key,'planUSD',n)} /></td>
+                        <td><MoneyInput currency="USD" style={{ width:110 }} value={v.realUSD||0} onChange={n=>setVal(y,ce.key,'realUSD',n)} /></td>
+                        <td style={{ borderLeft:'1px solid var(--border)' }}><MoneyInput currency="IDR" style={{ width:140 }} value={v.planIDR||0} onChange={n=>setVal(y,ce.key,'planIDR',n)} /></td>
+                        <td><MoneyInput currency="IDR" style={{ width:140 }} value={v.realIDR||0} onChange={n=>setVal(y,ce.key,'realIDR',n)} /></td>
                         <td style={{ borderLeft:'1px solid var(--border)', color: !pv?'var(--text3)':yPlan>=0?'var(--green)':'var(--red)', fontWeight:600 }}>{!pv?'—':`${yPlan>=0?'+':''}${pct(yPlan)}`}</td>
                         <td style={{ color: !pv?'var(--text3)':yReal>=0?'var(--green)':'var(--red)', fontWeight:600 }}>{!pv?'—':`${yReal>=0?'+':''}${pct(yReal)}`}</td>
                       </tr>
@@ -185,7 +187,7 @@ function RealisasiTab({ year, cur, config, setConfig, rowFor, reload }: any) {
   }, [cur, config])
 
   const thrFor = (key:string)=> key==='travel'?travelPct: externalPct
-  const money = (n:number)=> curr==='IDR' ? `Rp ${fmt(n)}` : `$ ${fmt(n)}`
+  const money = (n:number)=> fmtMoney(n, curr)
   const planOf = (r:any)=> curr==='IDR' ? (r.annualBudgetIDR||0) : (r.annualBudgetUSD||0)
   const realOf = (ce:string)=> curr==='IDR' ? (real[ce]?.idr||0) : (real[ce]?.usd||0)
   const setRealVal = (ce:string,v:number)=> setReal(p=>({ ...p, [ce]: { ...(p[ce]||{idr:0,usd:0}), [curr==='IDR'?'idr':'usd']: v } }))
@@ -252,7 +254,7 @@ function RealisasiTab({ year, cur, config, setConfig, rowFor, reload }: any) {
                 <tr key={ce.key}>
                   <td style={{ fontSize:11 }}><div style={{ fontWeight:600 }}>{ce.short}</div><div style={{ color:'var(--text3)', fontSize:10 }}>{ce.code}</div></td>
                   <td>{money(plan)}</td>
-                  <td><input type="number" className="input input-sm" style={{ width:130 }} value={rl} onChange={e=>setRealVal(ce.key,Number(e.target.value))} /></td>
+                  <td><MoneyInput currency={curr} style={{ width:150 }} value={rl} onChange={n=>setRealVal(ce.key,n)} /></td>
                   <td style={{ fontWeight:600, color: used>thrFor(ce.key)?'var(--red)':'var(--green)' }}>{pct(used)}</td>
                   <td style={{ color: available<0?'var(--red)':'var(--text)' }}>{money(available)}</td>
                   <td style={{ color:'var(--amber)' }}>{money(prognosa)}</td>

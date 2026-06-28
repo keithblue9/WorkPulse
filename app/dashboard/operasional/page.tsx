@@ -3,6 +3,7 @@ import { getConfig } from '@/lib/configCache'
 import { oeLookup } from '@/lib/defaults'
 import { allowedMenusFor, userRolesOf } from '@/lib/perms'
 import { EvidenceList } from '@/components/EvidenceList'
+import { MoneyInput } from '@/components/MoneyInput'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -464,7 +465,7 @@ function InflowEditor({ year, initial, onClose, onSaved }: { year:number; initia
               <input type="date" className="input input-sm" value={r.date} onChange={e=>upd(i,'date',e.target.value)} />
               <input className="input input-sm" placeholder="Sumber (Saldo Awal/Top Up)" value={r.source} onChange={e=>upd(i,'source',e.target.value)} />
               <input className="input input-sm" placeholder="Catatan" value={r.notes} onChange={e=>upd(i,'notes',e.target.value)} />
-              <input type="number" className="input input-sm" placeholder="Jumlah" value={r.amount} onChange={e=>upd(i,'amount',e.target.value)} />
+              <MoneyInput currency="IDR" className="input input-sm" placeholder="Jumlah" value={Number(r.amount)||0} onChange={n=>upd(i,'amount',n)} />
               <button onClick={()=>del(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
             </div>
           ))}
