@@ -75,6 +75,7 @@ export default function PlaygroundPage() {
     const userMsg: Msg = { role: 'user', text, attachments: pending.length ? pending : undefined }
     const next = [...messages, userMsg]
     setMessages(next); setInput(''); setPending([]); setLoading(true)
+    if (inputRef.current) inputRef.current.style.height = 'auto'
 
     // Build API messages: attachments hanya untuk pesan terakhir (hindari kirim base64 berulang)
     const apiMsgs = next.map((m, i) => {
@@ -203,7 +204,7 @@ export default function PlaygroundPage() {
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
             <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple style={{ display: 'none' }} onChange={e => onFiles(e.target.files)} />
             <button onClick={() => fileRef.current?.click()} className="btn btn-icon" title="Upload gambar / dokumen" style={{ flexShrink: 0, height: 42, width: 42 }}>📎</button>
-            <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={onKey} rows={1}
+            <textarea ref={inputRef} value={input} onChange={e => { setInput(e.target.value); const t = e.target; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 140) + 'px' }} onKeyDown={onKey} rows={1}
               placeholder="Tanya apa aja ke Wibi… (Shift+Enter buat baris baru)"
               style={{ flex: 1, resize: 'none', minHeight: 42, maxHeight: 140, padding: '11px 14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13.5, lineHeight: 1.5, fontFamily: 'inherit' }} />
             <button onClick={send} disabled={loading || (!input.trim() && pending.length === 0)} className="btn btn-primary btn-icon" style={{ flexShrink: 0, height: 42, width: 42, opacity: loading || (!input.trim() && pending.length === 0) ? 0.5 : 1 }} title="Kirim">➤</button>

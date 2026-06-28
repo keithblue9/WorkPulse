@@ -8,6 +8,7 @@ import { ThirdPartyEventModel } from '@/models/ThirdPartyEvent'
 import { UserModel } from '@/models/User'
 import { ProjectModel } from '@/models/Project'
 import { MeetingReportModel } from '@/models/MeetingReport'
+import { ConfigModel } from '@/models/Config'
 
 const API_KEY = process.env.ANTHROPIC_API_KEY
 const PRIMARY = process.env.PLAYGROUND_MODEL || 'claude-sonnet-4-6'
@@ -18,17 +19,19 @@ const idr = (n:number)=> 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.roun
 const SYSTEM_BASE =
   'Namamu Wibi — "Work Intelligence Buddy, Your AI Assistant in WinS". ' +
   'Kamu asisten AI cerdas di dalam aplikasi WinS (Work Intelligence System) milik tim BPD & SS Procurement Pertamina. ' +
-  'Kamu PUNYA AKSES ke ringkasan data terkini aplikasi (budget, reimbursement, cash card, petty cash, 3rd party event, dll) yang diberikan di bawah. ' +
-  'Gunakan data itu untuk menjawab pertanyaan, memberi insight, analisa tren, cari anomali/root cause, dan rekomendasi yang actionable. ' +
-  'Kalau user tanya hal di luar data (umum, hitungan, ide), tetap bantu. Kalau ada gambar/dokumen yang diupload, baca & analisa juga. ' +
-  'Jawab ramah, jelas, to the point, ikut bahasa user (default Bahasa Indonesia santai). ' +
-  'Kalau data yang diminta tidak ada di ringkasan, katakan dengan jujur dan minta user paste detail spesifik. Jangan mengarang angka.'
+  'Kamu PUNYA AKSES ke ringkasan data terkini aplikasi (JSON di bawah: budget per tahun + % realisasi, threshold prognosa, reimbursement per status/sumber/bulan, cash card, petty cash, 3rd party event, tim, dll). ' +
+  'Saat menjawab soal data: SELALU rujuk angka asli dari JSON (sebutkan nominal/persentasenya), jangan mengira-ngira. ' +
+  'Untuk insight: bandingkan plan vs realisasi, soroti cost element yang mendekati/melebihi threshold, lihat tren antar tahun di budgetPerTahun, dan tandai anomali (mis. realisasi jauh di atas/bawah plan). ' +
+  'Beri jawaban yang ringkas tapi actionable — pakai poin bila perlu, dan tutup dengan rekomendasi singkat bila relevan. ' +
+  'Kalau user tanya hal di luar data (umum, hitungan, ide), tetap bantu. Kalau ada gambar/dokumen diupload, baca & analisa juga. ' +
+  'Jawab ramah, ikut bahasa user (default Bahasa Indonesia santai). ' +
+  'Kalau data yang diminta tidak ada di ringkasan (mis. rincian per transaksi lama), katakan jujur dan minta user paste detailnya. Jangan mengarang angka.'
 
 async function buildSnapshot(): Promise<string> {
   try {
     await connectDB()
     const now = new Date(); const year = now.getFullYear()
-    const [budgets, cashcards, reimburses, petty, tpe, users, projects, meetings] = await Promise.all([
+    const [budgets, cashcards, reimburses, petty, tpe, users, projects, meetings, config] = await Promise.all([
       BudgetModel.find({}).lean(),
       CashCardModel.find({ year }).sort({ month:1 }).lean(),
       ReimbursementModel.find({}).sort({ createdAt:-1 }).limit(800).lean(),
@@ -37,18 +40,26 @@ async function buildSnapshot(): Promise<string> {
       UserModel.find({}, 'name role roles division active').lean(),
       ProjectModel.countDocuments({}),
       MeetingReportModel.countDocuments({}),
+      ConfigModel.findOne({}).lean() as any,
     ]) as any[]
 
-    // Budget per tahun/cost element
+    const catName = (k:string)=> k==='travel' ? 'Travel Expense (6001008100)' : k==='accommodation' ? 'External Accommodation (6001016170)' : k
+    const pctStr = (real:number, plan:number)=> plan>0 ? (real/plan*100).toFixed(1)+'%' : '—'
+
+    // Budget per tahun/cost element (+ nominal terformat + % realisasi biar akurat)
     const budgetByYear: any = {}
     for (const b of budgets) {
       const y = b.year || '—'; budgetByYear[y] = budgetByYear[y] || []
-      budgetByYear[y].push({ cat:b.category, planIDR:b.annualBudgetIDR||0, realIDR:b.annualRealIDR||0, planUSD:b.annualBudgetUSD||0, realUSD:b.annualRealUSD||0 })
+      budgetByYear[y].push({
+        costElement: catName(b.category),
+        planIDR: idr(b.annualBudgetIDR||0), realIDR: idr(b.annualRealIDR||0), pctRealIDR: pctStr(b.annualRealIDR||0, b.annualBudgetIDR||0),
+        planUSD: b.annualBudgetUSD||0, realUSD: b.annualRealUSD||0, pctRealUSD: pctStr(b.annualRealUSD||0, b.annualBudgetUSD||0),
+      })
     }
 
     // Cash card tahun ini
     const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
-    const cc = cashcards.map((c:any)=>({ bulan:MONTHS[(c.month||1)-1], topUp:c.topUpAmount||0, settlement:c.settlementAmount||0, refund:c.refundAmount||0, locked:!!c.locked }))
+    const cc = cashcards.map((c:any)=>({ bulan:MONTHS[(c.month||1)-1], topUp:idr(c.topUpAmount||0), settlement:idr(c.settlementAmount||0), pctSettlement:pctStr(c.settlementAmount||0, c.topUpAmount||0), refund:idr(c.refundAmount||0), locked:!!c.locked }))
 
     // Reimburse ringkas: per status, per sumber, per bulan (tahun ini), total
     const byStatus:any = {}, bySource:any = { cashCard:0, pettyCash:0 }
@@ -63,16 +74,19 @@ async function buildSnapshot(): Promise<string> {
     }
     const recentReimburse = reimburses.slice(0,15).map((r:any)=>({ pengaju:r.userName, keperluan:r.title, kategori:r.category, nominal:r.amount||0, sumber:r.isCashCard?'Cash Card':'Petty Cash', status:r.status, tglBukti: r.billDate?new Date(r.billDate).toLocaleDateString('id-ID'):'-' }))
 
-    const pettySummary = petty ? { tahun:petty.year, jumlahPemasukan:(petty.inflows||[]).length, totalPemasukan:(petty.inflows||[]).reduce((s:number,i:any)=>s+(i.amount||0),0) } : null
-    const events = tpe.map((e:any)=>({ judul:e.judulKegiatan, eo:e.namaEO, kota:e.kota, kind:e.kind, estimasi:e.estimasiBiaya||0, nominalTagihan:e.nominalTagihan||0 }))
+    const pettySummary = petty ? { tahun:petty.year, jumlahPemasukan:(petty.inflows||[]).length, totalPemasukan:idr((petty.inflows||[]).reduce((s:number,i:any)=>s+(i.amount||0),0)) } : null
+    const events = tpe.map((e:any)=>({ judul:e.judulKegiatan, eo:e.namaEO, kota:e.kota, kind:e.kind, estimasi:idr(e.estimasiBiaya||0), nominalTagihan:idr(e.nominalTagihan||0) }))
     const team = users.filter((u:any)=>u.active!==false).map((u:any)=>({ nama:u.name, role:(u.roles&&u.roles[0])||u.role, divisi:u.division }))
+    const getThr = (k:string)=> (config?.budgetCategories||[]).find((c:any)=>c.key===k)?.threshold ?? 80
+    const thresholdPrognosa = { totalPct: config?.budgetThresholdTotal ?? 80, travelPct: getThr('travel'), externalPct: getThr('accommodation') }
 
     const snap = {
       tanggalSnapshot: now.toISOString().slice(0,10),
       tahunBerjalan: year,
       ringkasanReimbursement: { totalTransaksi: reimburses.length, totalNominalSemua: idr(totalAmount), perStatus: byStatus, perSumber: { cashCard: idr(bySource.cashCard), pettyCash: idr(bySource.pettyCash) }, perBulanTahunIni: Object.fromEntries(Object.entries(byMonth).map(([k,v]:any)=>[k, idr(v)])) },
-      reimburseTerbaru: recentReimburse,
+      reimburseTerbaru: recentReimburse.map((r:any)=>({ ...r, nominal: idr(r.nominal) })),
       budgetPerTahun: budgetByYear,
+      thresholdPrognosa,
       cashCardTahunIni: cc,
       pettyCash: pettySummary,
       thirdPartyEvent: events,
