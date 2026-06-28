@@ -6,6 +6,7 @@ import { MoneyInput } from '@/components/MoneyInput'
 
 const MONTHS = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
+const ccSub: React.CSSProperties = { fontWeight:400, fontSize:9, color:'var(--text3)', marginTop:2 }
 
 function CashCardForm({ editing, onClose, onSave }: { editing?:any; onClose:()=>void; onSave:()=>void }) {
   const { data:session } = useSession(); const user = session?.user as any
@@ -138,9 +139,11 @@ export default function CashCardPage() {
             <thead>
               <tr>
                 <th>Tahun</th><th>Bulan</th>
-                <th>PR No.</th><th>Top Up (Rp)</th>
-                <th>Ref ID Jojonomic</th><th>PO No.</th><th>Settlement (Rp)</th>
-                <th>%</th><th style={{ textAlign:'right' }}>PENGEMBALIAN DANA</th><th style={{ textAlign:'right' }}>PENGELUARAN OPERASIONAL</th><th></th>
+                <th>PR No.</th><th style={{ textAlign:'right' }}>Top Up (Rp)<div style={ccSub}>(a)</div></th>
+                <th>Ref ID Jojonomic</th><th>PO No.</th><th style={{ textAlign:'right' }}>Settlement (Rp)<div style={ccSub}>(b)</div></th>
+                <th style={{ textAlign:'center' }}>%<div style={ccSub}>(c)=(b)/(a)</div></th>
+                <th style={{ textAlign:'right' }}>Pengembalian Dana<div style={ccSub}>(d)</div></th>
+                <th style={{ textAlign:'right' }}>Pengeluaran Operasional<div style={ccSub}>(e)=|(d)-((a)-(b))|</div></th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -153,7 +156,7 @@ export default function CashCardPage() {
                      <td>{i.year}</td><td>{MONTHS[i.month]}</td>
                      <td>{i.prNo||'—'}</td><td style={{ textAlign:'right', fontWeight:600 }}>Rp {fmt(i.topUpAmount)}</td>
                      <td>{i.jojonomicId||'—'}</td><td>{i.poNo||'—'}</td><td style={{ textAlign:'right', fontWeight:600 }}>Rp {fmt(i.settlementAmount)}{i.locked && <span title="Terkunci" style={{ marginLeft:4 }}>🔒</span>}</td>
-                     <td style={{ fontWeight:600, color: pct>=100?'var(--green)':pct>0?'var(--brand)':'var(--text3)' }}>{pct.toFixed(1)}%</td>
+                     <td style={{ textAlign:'center', fontWeight:600, color: pct>=100?'var(--green)':pct>0?'var(--brand)':'var(--text3)' }}>{pct.toFixed(1)}%</td>
                      <td style={{ textAlign:'right', fontWeight:600, color:'var(--green)' }}>Rp {fmt(i.refundAmount||0)}</td>
                      <td style={{ textAlign:'right', fontWeight:600, color: rowOperasional(i) === null ? 'var(--text3)' : (rowOperasional(i) as number) < 0 ? 'var(--amber)' : 'var(--red)' }}>{rowOperasional(i) !== null ? 'Rp ' + fmt(rowOperasional(i) as number) : '—'}</td>
                      <td style={{ display:'flex', gap:4 }}>
