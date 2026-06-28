@@ -1,6 +1,7 @@
 'use client'
 import { getConfig } from '@/lib/configCache'
 import { oeLookup } from '@/lib/defaults'
+import { allowedMenusFor, userRolesOf } from '@/lib/perms'
 import { EvidenceList } from '@/components/EvidenceList'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
@@ -41,16 +42,20 @@ function oeExcelCode(code:string):string {
 export default function OperasionalPage() {
   const { data:session } = useSession(); const user = session?.user as any
   const [tab, setTab] = useState<'settlement'|'petty'>('settlement')
+  const [canPetty, setCanPetty] = useState(false)
+  useEffect(()=>{ let on=true; getConfig().then(c=>{ if(!on)return; const allowed=allowedMenusFor(c?.roleDefs||[], userRolesOf(user)); setCanPetty(allowed.has('pettycash')) }).catch(()=>{}) }, [user])
+  // kalau lagi di tab petty tapi ga punya akses, balik ke settlement
+  useEffect(()=>{ if(tab==='petty' && !canPetty) setTab('settlement') }, [tab, canPetty])
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <div style={{ padding:'12px 20px 0', borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
         <div style={{ fontSize:14, fontWeight:600 }}>Operasional</div>
         <div style={{ display:'flex', gap:4, marginTop:10 }}>
           <button onClick={()=>setTab('settlement')} style={subtab(tab==='settlement')}>Settlement CC</button>
-          <button onClick={()=>setTab('petty')} style={subtab(tab==='petty')}>Petty Cash</button>
+          {canPetty && <button onClick={()=>setTab('petty')} style={subtab(tab==='petty')}>Petty Cash</button>}
         </div>
       </div>
-      {tab==='settlement' ? <SettlementTab user={user} /> : <PettyCashTab />}
+      {tab==='petty' && canPetty ? <PettyCashTab /> : <SettlementTab user={user} />}
     </div>
   )
 }
