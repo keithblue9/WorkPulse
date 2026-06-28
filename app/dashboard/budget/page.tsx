@@ -2,7 +2,7 @@
 import { getConfig, invalidateConfig } from '@/lib/configCache'
 import { MoneyInput } from '@/components/MoneyInput'
 import { fmtMoney } from '@/lib/money'
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import toast from 'react-hot-toast'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(Math.round(n||0))
@@ -163,6 +163,28 @@ function YieldTab() {
                       </tr>
                     )
                   })}
+                  {(()=>{
+                    const sum = (k:string)=> COST_ELEMENTS.reduce((a,ce)=> a + ((d[ce.key]||{})[k]||0), 0)
+                    const psum = (k:string)=> COST_ELEMENTS.reduce((a,ce)=> a + ((prevD?.[ce.key]||{})[k]||0), 0)
+                    const tPlanUSD=sum('planUSD'), tRealUSD=sum('realUSD'), tPlanIDR=sum('planIDR'), tRealIDR=sum('realIDR')
+                    const tRealPctUSD = tPlanUSD>0 ? tRealUSD/tPlanUSD*100 : 0
+                    const tRealPctIDR = tPlanIDR>0 ? tRealIDR/tPlanIDR*100 : 0
+                    const tyPlan = prevD ? yoy(tPlanIDR, psum('planIDR')) : 0
+                    const tyReal = prevD ? yoy(tRealIDR, psum('realIDR')) : 0
+                    return (
+                      <tr style={{ borderTop:'2px solid var(--border)', background:'var(--bg3)', fontWeight:800 }}>
+                        <td>TOTAL</td>
+                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'right' }}>{fmtMoney(tPlanUSD,'USD')}</td>
+                        <td style={{ textAlign:'right' }}>{fmtMoney(tRealUSD,'USD')}</td>
+                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'right' }}>{fmtMoney(tPlanIDR,'IDR')}</td>
+                        <td style={{ textAlign:'right' }}>{fmtMoney(tRealIDR,'IDR')}</td>
+                        <td style={{ borderLeft:'1px solid var(--border)', color: tRealPctUSD>=100?'var(--green)':'var(--text)' }}>{pct(tRealPctUSD)}</td>
+                        <td style={{ color: tRealPctIDR>=100?'var(--green)':'var(--text)' }}>{pct(tRealPctIDR)}</td>
+                        <td style={{ borderLeft:'1px solid var(--border)', color: !prevD?'var(--text3)':tyPlan>=0?'var(--green)':'var(--red)' }}>{!prevD?'—':`${tyPlan>=0?'+':''}${pct(tyPlan)}`}</td>
+                        <td style={{ color: !prevD?'var(--text3)':tyReal>=0?'var(--green)':'var(--red)' }}>{!prevD?'—':`${tyReal>=0?'+':''}${pct(tyReal)}`}</td>
+                      </tr>
+                    )
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -182,8 +204,13 @@ function RealisasiTab({ year, cur, config, setConfig, rowFor }: any) {
   const [externalPct, setExternalPct] = useState<number>(getThr('accommodation'))
   const [totalPct, setTotalPct] = useState<number>(config?.budgetThresholdTotal ?? 80)
   const [savingThr, setSavingThr] = useState(false)
+  const initedRef = useRef(false)
 
+  // Init threshold SEKALI saja saat config pertama tersedia. Setelah itu jangan auto-reset
+  // (biar nilai yg user ketik/simpan ga ketiban config stale).
   useEffect(()=>{
+    if (initedRef.current || !config) return
+    initedRef.current = true
     setTravelPct(getThr('travel')); setExternalPct(getThr('accommodation')); setTotalPct(config?.budgetThresholdTotal ?? 80)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config])
@@ -196,11 +223,20 @@ function RealisasiTab({ year, cur, config, setConfig, rowFor }: any) {
   async function saveThreshold() {
     setSavingThr(true)
     try {
-      const newCats = (config?.budgetCategories||[]).map((c:any)=> c.key==='travel'?{...c,threshold:travelPct}: c.key==='accommodation'?{...c,threshold:externalPct}:c)
+      // Pastikan entry travel & accommodation SELALU ada (kalau DB-nya ga punya key-nya, threshold ga akan kesimpan)
+      const base = (config?.budgetCategories||[]) as any[]
+      const findOr = (key:string, label:string) => base.find(c=>c.key===key) || { key, label, annualBudget:0, annualBudgetUSD:0, pic:'' }
+      const others = base.filter(c=>c.key!=='travel' && c.key!=='accommodation')
+      const newCats = [
+        { ...findOr('travel','Dinas & Travel'), threshold: travelPct },
+        { ...findOr('accommodation','External Accommodation'), threshold: externalPct },
+        ...others,
+      ]
       await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ budgetCategories:newCats, budgetThresholdTotal: totalPct }) })
       invalidateConfig()
-      const fresh = await getConfig(true)   // ambil ulang dari server (no cache) biar ga balik
+      const fresh = await getConfig(true)
       setConfig(fresh)
+      // jangan reset input dari config — pertahankan nilai yg barusan disimpan
       toast.success('Threshold tersimpan')
     } finally { setSavingThr(false) }
   }
