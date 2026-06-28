@@ -8,7 +8,7 @@ import { useTheme, THEMES } from '@/lib/theme'
 import AppPopups from '@/components/AppPopups'
 import BirthdayPopup from '@/components/BirthdayPopup'
 import OnlinePresence from '@/components/OnlinePresence'
-import Wibi from '@/components/Wibi'
+import DailyCheckin from '@/components/DailyCheckin'
 
 // Menu definitions with permission keys (matches config.roleDefs[].allowedMenus)
 const NAV_GROUPS = [
@@ -21,6 +21,7 @@ const NAV_GROUPS = [
     { href:'/dashboard/meetings',   label:'Meeting Reports', permKey:'meetings' },
     { href:'/dashboard/notes',      label:'[Team] Notes', permKey:'notes' },
     { href:'/dashboard/quicknotes', label:'[Personal] Notes', permKey:'quicknotes' },
+    { href:'/dashboard/playground', label:'Playground', permKey:'playground', always:true },
   ]},
   { key:'team', label:'Team', items:[
     { href:'/dashboard/attendance', label:'Presensi', permKey:'attendance' },
@@ -149,7 +150,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
         <nav style={{ padding:'10px 8px', flex:1, overflowY:'auto' }}>
           {NAV_GROUPS.map(group=>{
-            const visibleItems = group.items.filter((item:any) => item.perms ? item.perms.some((p:string)=>allowedMenus.has(p)) : allowedMenus.has(item.permKey))
+            const visibleItems = group.items.filter((item:any) => item.always ? true : (item.perms ? item.perms.some((p:string)=>allowedMenus.has(p)) : allowedMenus.has(item.permKey)))
             if (visibleItems.length === 0) return null
             const isExpanded = expanded.has(group.key)
             const hasActive = visibleItems.some(i => pathname===i.href||(i.href!=='/dashboard'&&pathname.startsWith(i.href)))
@@ -245,7 +246,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
         <AppPopups />
         <BirthdayPopup />
-        <Wibi />
+        <DailyCheckin />
       </div>
     </div>
   )
