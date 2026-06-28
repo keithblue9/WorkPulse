@@ -123,6 +123,20 @@ function SettlementTab({ user }: { user:any }) {
     } finally { setVerifying(false) }
   }
 
+  async function verifyOne(item:any) {
+    if (!verifiableIds.includes(item._id)) { toast.error('Item ini belum bisa diverify (harus status Done)'); return }
+    if (!confirm(`Verify item "${item.title}"? Status Done → Verified & Settlement CC ${MONTHS[month]} ${year} dihitung ulang.`)) return
+    setVerifying(true)
+    try {
+      const r = await fetch('/api/settlement/verify', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ ids:[item._id], month: month+1, year, verifiedBy: user?.name||'-' }) })
+      const j = await r.json()
+      if (!r.ok) { toast.error(j.error||'Gagal verify'); return }
+      toast.success(`Verified · Settlement CC = Rp ${fmt(j.data.settlementTotal)}`)
+      setViewing(null); clearSel(); await load()
+    } finally { setVerifying(false) }
+  }
+
   // pindah sumber Petty <-> CC (propagasi ke reimburse + cashier + settlement)
   async function toggleSource(r:any, e?:any) {
     e?.stopPropagation?.()
@@ -294,6 +308,7 @@ function SettlementTab({ user }: { user:any }) {
     <>
       {viewing && <DetailModal item={viewing} onClose={()=>setViewing(null)}
         onToggleSource={async (r:any)=>{ await toggleSource(r); setViewing(null) }}
+        onVerify={verifyOne}
         onReverse={reverseItem} />}
 
       <div style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', flexShrink:0 }}>
@@ -481,7 +496,7 @@ function InflowEditor({ year, initial, onClose, onSaved }: { year:number; initia
 }
 
 // =====================  shared  =====================
-function DetailModal({ item, onClose, onToggleSource, onReverse }: { item:any; onClose:()=>void; onToggleSource?:(r:any)=>void; onReverse?:(r:any)=>void }) {
+function DetailModal({ item, onClose, onToggleSource, onVerify, onReverse }: { item:any; onClose:()=>void; onToggleSource?:(r:any)=>void; onVerify?:(r:any)=>void; onReverse?:(r:any)=>void }) {
   const isVerified = item.status==='verified'
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -505,15 +520,15 @@ function DetailModal({ item, onClose, onToggleSource, onReverse }: { item:any; o
             <EvidenceList documents={item.documents||[]} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
           </div>
         </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-          <div style={{ display:'flex', gap:8 }}>
-            {isVerified ? (
-              onReverse && <button onClick={()=>onReverse(item)} className="btn btn-sm" style={{ color:'var(--amber)' }} title="Mundurkan status ke Done">↩️ Reverse ke Done</button>
-            ) : (
-              onToggleSource && <button onClick={()=>onToggleSource(item)} className="btn btn-sm" title="Pindah sumber dana">⇄ Ubah ke {item.isCashCard?'Petty Cash':'Cash Card'}</button>
-            )}
-          </div>
-          <button onClick={onClose} className="btn btn-sm">Tutup</button>
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+          {isVerified ? (
+            onReverse && <button onClick={()=>onReverse(item)} className="btn btn-sm" style={{ color:'var(--amber)' }} title="Mundurkan status ke Done">↩️ Reverse ke Done</button>
+          ) : (
+            <>
+              {onToggleSource && <button onClick={()=>onToggleSource(item)} className="btn btn-sm" title="Pindah sumber dana">⇄ Ubah ke {item.isCashCard?'Petty Cash':'Cash Card'}</button>}
+              {onVerify && <button onClick={()=>onVerify(item)} className="btn btn-sm btn-primary" title="Verify item ini">✓ Verify</button>}
+            </>
+          )}
         </div>
       </div>
     </div>
