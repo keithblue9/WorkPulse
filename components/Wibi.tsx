@@ -29,6 +29,16 @@ export default function Wibi() {
   const [hasUnread, setHasUnread] = useState(false)
   const [profile, setProfile] = useState<any>(null)
   const [attendanceTypes, setAttendanceTypes] = useState<any[]>([])
+  const [modalOpen, setModalOpen] = useState(false)
+
+  // Sembunyikan Wibi saat ada modal/popup terbuka biar ga nabrak tombol (pojok kanan bawah)
+  useEffect(() => {
+    const check = () => setModalOpen(!!document.querySelector('.modal-overlay'))
+    check()
+    const obs = new MutationObserver(check)
+    obs.observe(document.body, { childList: true, subtree: true })
+    return () => obs.disconnect()
+  }, [])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -140,6 +150,8 @@ export default function Wibi() {
   function onKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
   }
+
+  if (modalOpen && !open) return null
 
   return (
     <div style={{ position: 'fixed', right: 18, bottom: 18, zIndex: 300, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
