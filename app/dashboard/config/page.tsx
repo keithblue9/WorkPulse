@@ -144,11 +144,12 @@ function ResetSection() {
 }
 
 
-const MENU_KEYS = ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','reimbursement','cashcard','cashier','settlementcc','members','config']
+const MENU_KEYS = ['dashboard','progress','activities','calendar','issues','attendance','biodata','links','meetings','notes','quicknotes','reimbursement','operasional','cashcard','thirdparty','budgetreport','cashier','settlementcc','members','config']
 const MENU_LABELS: Record<string,string> = {
-  dashboard:'Dashboard', activities:'Activities', calendar:'Calendar', issues:'Issues', progress:'Progress',
+  dashboard:'Dashboard', progress:'Progress Project', activities:'Activities', calendar:'Calendar', issues:'Issues',
   attendance:'Presensi', biodata:'Biodata', links:'Link Hub', meetings:'Meeting Reports', notes:'[Team] Notes', quicknotes:'[Personal] Notes',
-  budget:'Anggaran', reimbursement:'Reimbursement', cashcard:'Cash Card', cashier:'Cashier', settlementcc:'Settlement CC',
+  reimbursement:'Reimbursement', operasional:'Operasional', cashcard:'Cash Card', thirdparty:'[3rd Party] Event', budgetreport:'Budget Report',
+  cashier:'Akses Cashier (tab)', settlementcc:'Akses Settlement CC (CC Holder)',
   members:'Member', config:'Configuration'
 }
 
