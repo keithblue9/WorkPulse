@@ -41,15 +41,24 @@ export async function GET(req:NextRequest) {
     const nonCCAmount = reimburses.reduce((s,r)=> (!r.isCashCard && inThisPeriod(r)) ? s + (r.amount||0) : s, 0)
     const bankFees   = reimburses.reduce((s,r)=> inThisPeriod(r) ? s + (r.biayaAntarBank||0) : s, 0)
 
+    // detail rincian (buat popup di UI)
+    const nonCCItems = reimburses.filter(r=>!r.isCashCard && inThisPeriod(r))
+      .map(r=>({ date: periodOf(r), userName:r.userName||'-', title:r.title||'-', category:r.category||'', amount:r.amount||0 }))
+      .sort((a,b)=> (new Date(b.date||0).getTime()) - (new Date(a.date||0).getTime()))
+    const bankFeeItems = reimburses.filter(r=>inThisPeriod(r) && (r.biayaAntarBank||0)>0)
+      .map(r=>({ date: periodOf(r), userName:r.userName||'-', title:r.title||'-', isCashCard:!!r.isCashCard, fee:r.biayaAntarBank||0 }))
+      .sort((a,b)=> (new Date(b.date||0).getTime()) - (new Date(a.date||0).getTime()))
+
     // c) Selisih Biaya Settlement Cash Card = TOTAL Pengeluaran Operasional di menu Cash Card.
     //    Per row: kalau settlement & pengembalian dua-duanya 0 -> 0 (belum direkonsiliasi, tidak dihitung),
     //    selain itu |Pengembalian − (TopUp − Settlement)|. Identik dengan kolom di menu Cash Card.
     const ccRows = await CashCardModel.find({ year, month:{ $lte:month } }).lean() as any[]
-    const ccOperasional = ccRows.reduce((s,c)=>{
-      const settlement = c.settlementAmount||0, refund = c.refundAmount||0, topUp = c.topUpAmount||0
-      if (settlement===0 && refund===0) return s
-      return s + Math.abs(refund - (topUp - settlement))
-    }, 0)
+    const ccItems = ccRows
+      .filter(c=>{ const s=c.settlementAmount||0, rf=c.refundAmount||0; return !(s===0 && rf===0) })
+      .map(c=>{ const settlement=c.settlementAmount||0, refund=c.refundAmount||0, topUp=c.topUpAmount||0
+        return { month:c.month, topUp, settlement, refund, operasional: Math.abs(refund - (topUp - settlement)) } })
+      .sort((a,b)=>a.month-b.month)
+    const ccOperasional = ccItems.reduce((s,c)=> s + c.operasional, 0)
 
     const pengeluaran = nonCCAmount + bankFees + ccOperasional
     const saldo = pemasukan - pengeluaran
@@ -57,6 +66,7 @@ export async function GET(req:NextRequest) {
     return NextResponse.json({ data: {
       year, month, inflows,
       summary: { pemasukan, nonCCAmount, bankFees, ccOperasional, pengeluaran, saldo },
+      detail: { nonCCItems, bankFeeItems, ccItems },
     } })
   } catch (e:any) { return NextResponse.json({ error:e.message }, { status:500 }) }
 }

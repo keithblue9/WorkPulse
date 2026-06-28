@@ -375,6 +375,7 @@ function PettyCashTab() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
+  const [rincian, setRincian] = useState<null|'noncc'|'bankfee'|'cc'>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -388,6 +389,7 @@ function PettyCashTab() {
   return (
     <>
       {editing && <InflowEditor year={year} initial={data?.inflows||[]} onClose={()=>setEditing(false)} onSaved={()=>{setEditing(false);load()}} />}
+      {rincian && <RincianModal kind={rincian} detail={data?.detail} summary={s} month={month} year={year} onClose={()=>setRincian(null)} />}
       <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexWrap:'wrap', alignItems:'center', flexShrink:0 }}>
         <span style={{ fontSize:11, color:'var(--text3)' }}>Saldo kumulatif s/d:</span>
         <select className="input input-sm" style={{ width:130 }} value={month} onChange={e=>setMonth(Number(e.target.value))}>
@@ -408,10 +410,10 @@ function PettyCashTab() {
               <BigCard label="Saldo Petty Cash" value={`Rp ${fmt(s.saldo)}`} color="var(--brand)" big />
             </div>
             <div className="card" style={{ padding:'14px 16px', marginBottom:16 }}>
-              <div style={{ fontSize:12, fontWeight:600, marginBottom:10 }}>Rincian Pengeluaran s/d {MONTHS[month]} {year}</div>
-              <Row label="Reimburse non-Cash Card (nominal, done/verified)" value={s.nonCCAmount} />
-              <Row label="Biaya antar bank (semua reimburse: CC + Petty)" value={s.bankFees} />
-              <Row label="Selisih Biaya Settlement Cash Card (total Pengeluaran Operasional)" value={s.ccOperasional} />
+              <div style={{ fontSize:12, fontWeight:600, marginBottom:10 }}>Rincian Pengeluaran s/d {MONTHS[month]} {year} <span style={{ fontWeight:400, color:'var(--text3)', fontSize:10 }}>· klik baris untuk lihat rincian</span></div>
+              <Row label="Reimburse non-Cash Card (nominal, done/verified)" value={s.nonCCAmount} onClick={()=>setRincian('noncc')} />
+              <Row label="Biaya antar bank (semua reimburse: CC + Petty)" value={s.bankFees} onClick={()=>setRincian('bankfee')} />
+              <Row label="Selisih Biaya Settlement Cash Card (total Pengeluaran Operasional)" value={s.ccOperasional} onClick={()=>setRincian('cc')} />
               <div style={{ borderTop:'1px solid var(--border)', marginTop:8, paddingTop:8 }}><Row label="Total Pengeluaran" value={s.pengeluaran} bold /></div>
             </div>
             <div className="card" style={{ padding:'14px 16px' }}>
@@ -524,9 +526,80 @@ function BigCard({ label, value, color, big }: { label:string; value:string; col
     </div>
   )
 }
-function Row({ label, value, bold }: { label:string; value:number; bold?:boolean }) {
-  return <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, padding:'3px 0', fontWeight:bold?700:400 }}><span style={{ color:bold?'var(--text)':'var(--text2)' }}>{label}</span><span>Rp {fmt(value)}</span></div>
+function Row({ label, value, bold, onClick }: { label:string; value:number; bold?:boolean; onClick?:()=>void }) {
+  return (
+    <div onClick={onClick} style={{ display:'flex', justifyContent:'space-between', fontSize:12, padding:'5px 0', fontWeight:bold?700:400, cursor:onClick?'pointer':'default', borderRadius:6 }}
+      onMouseEnter={e=>{ if(onClick) (e.currentTarget as HTMLElement).style.background='var(--bg3)' }}
+      onMouseLeave={e=>{ (e.currentTarget as HTMLElement).style.background='transparent' }}>
+      <span style={{ color:bold?'var(--text)':'var(--text2)' }}>{onClick && <span style={{ color:'var(--brand)', marginRight:4 }}>🔍</span>}{label}</span>
+      <span>Rp {fmt(value)}</span>
+    </div>
+  )
 }
+function RincianModal({ kind, detail, summary, month, year, onClose }:
+  { kind:'noncc'|'bankfee'|'cc'; detail:any; summary:any; month:number; year:number; onClose:()=>void }) {
+  const d = detail || {}
+  const title = kind==='noncc' ? 'Reimburse non-Cash Card' : kind==='bankfee' ? 'Biaya Antar Bank' : 'Selisih Biaya Settlement Cash Card'
+  const total = kind==='noncc' ? summary.nonCCAmount : kind==='bankfee' ? summary.bankFees : summary.ccOperasional
+  const fmtDate = (x:any)=> x ? new Date(x).toLocaleDateString('id-ID') : '—'
+
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{ width:640, maxHeight:'82vh', display:'flex', flexDirection:'column' }}>
+        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div>
+            <div style={{ fontSize:14, fontWeight:600 }}>{title}</div>
+            <div style={{ fontSize:10, color:'var(--text3)' }}>Rincian s/d {MONTHS[month]} {year}</div>
+          </div>
+          <button onClick={onClose} className="btn btn-icon">×</button>
+        </div>
+        <div style={{ flex:1, overflow:'auto', padding:'8px 20px' }}>
+          {kind==='noncc' && (
+            <table className="wp-table" style={{ width:'100%' }}>
+              <thead><tr><th>Tanggal</th><th>Pengaju</th><th>Keperluan</th><th>Kategori</th><th style={{ textAlign:'right' }}>Nominal</th></tr></thead>
+              <tbody>
+                {(d.nonCCItems||[]).length===0 ? <tr><td colSpan={5} style={{ textAlign:'center', color:'var(--text3)', padding:20 }}>Tidak ada data</td></tr> :
+                 (d.nonCCItems||[]).map((it:any,i:number)=>(
+                  <tr key={i}><td style={{ fontSize:11 }}>{fmtDate(it.date)}</td><td style={{ fontSize:11 }}>{it.userName}</td><td style={{ fontSize:11 }}>{it.title}</td><td style={{ fontSize:11 }}>{oeLookup(it.category).name}</td><td style={{ textAlign:'right', fontWeight:600 }}>Rp {fmt(it.amount)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {kind==='bankfee' && (
+            <table className="wp-table" style={{ width:'100%' }}>
+              <thead><tr><th>Tanggal</th><th>Pengaju</th><th>Keperluan</th><th>Sumber</th><th style={{ textAlign:'right' }}>Biaya</th></tr></thead>
+              <tbody>
+                {(d.bankFeeItems||[]).length===0 ? <tr><td colSpan={5} style={{ textAlign:'center', color:'var(--text3)', padding:20 }}>Tidak ada data</td></tr> :
+                 (d.bankFeeItems||[]).map((it:any,i:number)=>(
+                  <tr key={i}><td style={{ fontSize:11 }}>{fmtDate(it.date)}</td><td style={{ fontSize:11 }}>{it.userName}</td><td style={{ fontSize:11 }}>{it.title}</td><td style={{ fontSize:11 }}>{it.isCashCard?'Cash Card':'Petty Cash'}</td><td style={{ textAlign:'right', fontWeight:600 }}>Rp {fmt(it.fee)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {kind==='cc' && (
+            <>
+              <div style={{ fontSize:10, color:'var(--text3)', margin:'6px 0 10px' }}>Per bulan: |Pengembalian − (Top Up − Settlement)|. Identik dengan kolom Pengeluaran Operasional di menu Cash Card.</div>
+              <table className="wp-table" style={{ width:'100%' }}>
+                <thead><tr><th>Bulan</th><th style={{ textAlign:'right' }}>Top Up</th><th style={{ textAlign:'right' }}>Settlement</th><th style={{ textAlign:'right' }}>Pengembalian</th><th style={{ textAlign:'right' }}>Operasional</th></tr></thead>
+                <tbody>
+                  {(d.ccItems||[]).length===0 ? <tr><td colSpan={5} style={{ textAlign:'center', color:'var(--text3)', padding:20 }}>Tidak ada data</td></tr> :
+                   (d.ccItems||[]).map((it:any,i:number)=>(
+                    <tr key={i}><td style={{ fontSize:11, fontWeight:600 }}>{MONTHS[it.month-1]}</td><td style={{ textAlign:'right' }}>Rp {fmt(it.topUp)}</td><td style={{ textAlign:'right' }}>Rp {fmt(it.settlement)}</td><td style={{ textAlign:'right' }}>Rp {fmt(it.refund)}</td><td style={{ textAlign:'right', fontWeight:600, color:'var(--red)' }}>Rp {fmt(it.operasional)}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span style={{ fontSize:12, fontWeight:700 }}>Total</span>
+          <span style={{ fontSize:14, fontWeight:800, color:'var(--brand)' }}>Rp {fmt(total)}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function boxBorder() { const s = { style:'thin' as const, color:{argb:'FFBFBFBF'} }; return { top:s, bottom:s, left:s, right:s } }
 function statusBadge(s:string) {
   const cfg: Record<string,{label:string;color:string;bg:string}> = {
