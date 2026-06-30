@@ -217,15 +217,18 @@ export default function DashboardPage() {
     )).length
   }, [attendance])
 
+  // Hanya hitung aktivitas yg BELUM selesai (outstanding). Status selesai = completed/done/finished/closed.
+  const isFinished = (a:any) => ['completed','done','finished','closed','selesai'].includes(String(a?.status||'').toLowerCase())
+  const outstandingActs = useMemo(() => activities.filter(a => !isFinished(a)), [activities])
   const stats = useMemo(() => {
-    const kpi = activities.filter(a => a.subType === 'KPI').length
-    const nonKpi = activities.filter(a => a.subType === 'Non-KPI').length
-    const goLive = activities.filter(a => a.subType === 'Go-Live').length
-    const anggaran = activities.filter(a => a.subType === 'Anggaran').length
-    const others = activities.filter(a => a.subType === 'Others').length
-    const highPriority = activities.filter(a => a.priority === 'high').length
-    return { kpi, nonKpi, goLive, anggaran, others, highPriority, total: activities.length }
-  }, [activities])
+    const kpi = outstandingActs.filter(a => a.subType === 'KPI').length
+    const nonKpi = outstandingActs.filter(a => a.subType === 'Non-KPI').length
+    const goLive = outstandingActs.filter(a => a.subType === 'Go-Live').length
+    const anggaran = outstandingActs.filter(a => a.subType === 'Anggaran').length
+    const others = outstandingActs.filter(a => a.subType === 'Others').length
+    const highPriority = outstandingActs.filter(a => a.priority === 'high').length
+    return { kpi, nonKpi, goLive, anggaran, others, highPriority, total: outstandingActs.length }
+  }, [outstandingActs])
 
   // Dashboard widgets toggle
   const widgets = config?.dashboardWidgets || []
@@ -310,14 +313,16 @@ export default function DashboardPage() {
               <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
                 {/* Stat cards row */}
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(155px, 1fr))', gap:10 }}>
-                  {isWidgetActive('stat-kpi') && <Stat icon="🎯" label="KPI" val={stats.kpi} color="var(--brand)" onClick={()=>setStatDetail({title:'Aktivitas KPI', items:activities.filter(a=>a.subType==='KPI')})} />}
-                  {isWidgetActive('stat-nonkpi') && <Stat icon="📋" label="Non KPI" val={stats.nonKpi} color="var(--purple)" onClick={()=>setStatDetail({title:'Aktivitas Non-KPI', items:activities.filter(a=>a.subType==='Non-KPI')})} />}
-                  {isWidgetActive('stat-golive') && <Stat icon="🚀" label="Go Live" val={stats.goLive} color="var(--green)" onClick={()=>setStatDetail({title:'Aktivitas Go-Live', items:activities.filter(a=>a.subType==='Go-Live')})} />}
-                  {isWidgetActive('stat-anggaran') && <Stat icon="💰" label="Anggaran" val={stats.anggaran} color="var(--amber)" onClick={()=>setStatDetail({title:'Aktivitas Anggaran', items:activities.filter(a=>a.subType==='Anggaran')})} />}
-                  {isWidgetActive('stat-others') && <Stat icon="📁" label="Others" val={stats.others} color="var(--text3)" onClick={()=>setStatDetail({title:'Aktivitas Others', items:activities.filter(a=>a.subType==='Others')})} />}
-                  {isWidgetActive('stat-highpriority') && <Stat icon="🔥" label="High Priority" val={stats.highPriority} color="var(--red)" onClick={()=>setStatDetail({title:'High Priority', items:activities.filter(a=>a.priority==='high')})} />}
+                  {isWidgetActive('stat-kpi') && <Stat icon="🎯" label="KPI" val={stats.kpi} color="var(--brand)" onClick={()=>setStatDetail({title:'Aktivitas KPI', items:outstandingActs.filter(a=>a.subType==='KPI')})} />}
+                  {isWidgetActive('stat-nonkpi') && <Stat icon="📋" label="Non KPI" val={stats.nonKpi} color="var(--purple)" onClick={()=>setStatDetail({title:'Aktivitas Non-KPI', items:outstandingActs.filter(a=>a.subType==='Non-KPI')})} />}
+                  {isWidgetActive('stat-golive') && <Stat icon="🚀" label="Go Live" val={stats.goLive} color="var(--green)" onClick={()=>setStatDetail({title:'Aktivitas Go-Live', items:outstandingActs.filter(a=>a.subType==='Go-Live')})} />}
+                  {isWidgetActive('stat-anggaran') && <Stat icon="💰" label="Anggaran" val={stats.anggaran} color="var(--amber)" onClick={()=>setStatDetail({title:'Aktivitas Anggaran', items:outstandingActs.filter(a=>a.subType==='Anggaran')})} />}
+                  {isWidgetActive('stat-others') && <Stat icon="📁" label="Others" val={stats.others} color="var(--text3)" onClick={()=>setStatDetail({title:'Aktivitas Others', items:outstandingActs.filter(a=>a.subType==='Others')})} />}
+                  {isWidgetActive('stat-highpriority') && <Stat icon="🔥" label="High Priority" val={stats.highPriority} color="var(--red)" onClick={()=>setStatDetail({title:'High Priority', items:outstandingActs.filter(a=>a.priority==='high')})} />}
                   {isWidgetActive('member-count') && <Stat icon="🏢" label="WFO Hari Ini" val={wfoToday} color="var(--green)" onClick={()=>{ const today=new Date().toISOString().slice(0,10); const ids=attendance.filter((r:any)=>r.date===today && ((r.slots&&r.slots.some((s:any)=>String(s.type).toLowerCase()==='wfo'))||String(r.type||'').toLowerCase()==='wfo')).map((r:any)=>r.userId); setStatDetail({title:'WFO Hari Ini', items: members.filter((m:any)=>ids.includes(m._id)||ids.includes(m.email)).map((m:any)=>({title:m.name, category:m.division||'', subType:'WFO'}))}) }} />}
                 </div>
+
+                {isInternal && <BudgetInsights />}
 
                 {/* AI Insights row */}
                 <div className="responsive-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:10 }}>
@@ -359,8 +364,6 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
-
-                {isInternal && <BudgetInsights />}
 
                 {/* Progress chart + upcoming */}
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>

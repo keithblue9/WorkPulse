@@ -1,7 +1,7 @@
 // Shared default values used as fallback when config in DB is missing fields.
 // These match the Mongoose schema defaults in models/Config.ts
 
-export const ALL_MENU_KEYS = ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','budgetreport','reimbursement','operasional','pettycash','cashcard','cashier','settlementcc','thirdparty','members','config']
+export const ALL_MENU_KEYS = ['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','playground','budget','budgetreport','reimbursement','operasional','pettycash','cashcard','cashier','settlementcc','thirdparty','members','config','biodata-export']
 
 // Kategori OE untuk Reimbursement + lookup Settlement XLSX (slide 4).
 // code = kolom "Kategori" di Excel, name = kolom "Keterangan Transaksi".
@@ -22,17 +22,17 @@ export const MENU_LABELS: Record<string,string> = {
   dashboard:'Dashboard', activities:'Activities', calendar:'Calendar', issues:'Issues', progress:'Progress',
   attendance:'Presensi', biodata:'Biodata', links:'Link Hub', meetings:'Meeting Reports', notes:'[Team] Notes', quicknotes:'[Personal] Notes',
   budget:'Budget Report', budgetreport:'Budget Report', reimbursement:'Reimbursement', operasional:'Operasional', pettycash:'Petty Cash', cashcard:'Cash Card', cashier:'Cashier', settlementcc:'Settlement CC', thirdparty:'[3rd Party] Event',
-  members:'Member', config:'Configuration'
+  members:'Member', config:'Configuration', playground:'Playground', 'biodata-export':'Export Biodata (Excel)'
 }
 
 export const DEFAULT_ROLES = [
   { key:'admin',    label:'Admin',     builtin:true,  allowedMenus:[...ALL_MENU_KEYS] },
-  // manager broad access but NOT the CC Holder report by default (settlementcc is opt-in per role)
-  { key:'manager',  label:'Manager',   builtin:true,  allowedMenus:ALL_MENU_KEYS.filter(m=>m!=='config' && m!=='settlementcc' && m!=='pettycash') },
-  { key:'member',   label:'Member',    builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','reimbursement'] },
-  { key:'finance',  label:'Finance',   builtin:true,  allowedMenus:['dashboard','attendance','biodata','links','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','thirdparty'] },
-  { key:'cashier',  label:'Cashier',   builtin:true,  allowedMenus:['dashboard','reimbursement','operasional','pettycash','cashier','cashcard','biodata','quicknotes'] },
-  { key:'ccholder', label:'CC Holder', builtin:true,  allowedMenus:['dashboard','reimbursement','operasional','cashcard','settlementcc','quicknotes'] },
+  // manager broad access but NOT the CC Holder report, config, pettycash, or biodata-export (admin-only)
+  { key:'manager',  label:'Manager',   builtin:true,  allowedMenus:ALL_MENU_KEYS.filter(m=>m!=='config' && m!=='settlementcc' && m!=='pettycash' && m!=='biodata-export') },
+  { key:'member',   label:'Member',    builtin:true,  allowedMenus:['dashboard','activities','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','playground','reimbursement'] },
+  { key:'finance',  label:'Finance',   builtin:true,  allowedMenus:['dashboard','attendance','biodata','links','quicknotes','playground','budget','budgetreport','reimbursement','operasional','cashcard','cashier','thirdparty'] },
+  { key:'cashier',  label:'Cashier',   builtin:true,  allowedMenus:['dashboard','reimbursement','operasional','pettycash','cashier','cashcard','biodata','quicknotes','playground'] },
+  { key:'ccholder', label:'CC Holder', builtin:true,  allowedMenus:['dashboard','reimbursement','operasional','cashcard','settlementcc','quicknotes','playground'] },
   { key:'guest',    label:'Guest',     builtin:true,  allowedMenus:['dashboard','links'] },
 ]
 
