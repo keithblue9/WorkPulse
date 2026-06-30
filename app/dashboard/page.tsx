@@ -2,6 +2,7 @@
 import { getConfig } from '@/lib/configCache'
 import { picArray, calcInitiativeProgress } from '@/lib/defaults'
 import { useEffect, useState, useMemo, useRef } from 'react'
+import BudgetInsights from '@/components/BudgetInsights'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import ExportMenu from '@/components/ExportMenu'
@@ -358,6 +359,8 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
+
+                {isInternal && <BudgetInsights />}
 
                 {/* Progress chart + upcoming */}
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>

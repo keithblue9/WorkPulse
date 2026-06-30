@@ -6,6 +6,10 @@ export async function GET(req: NextRequest) {
   try {
     await connectDB()
     const { searchParams } = new URL(req.url)
+    if (searchParams.get('all')) {
+      const all = await BudgetModel.find({}).sort({ year:1 }).lean()
+      return NextResponse.json({ data: all }, { headers: { 'Cache-Control': 'no-store' } })
+    }
     const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()))
     const entries = await BudgetModel.find({ year }).lean()
     return NextResponse.json({ data: entries })
