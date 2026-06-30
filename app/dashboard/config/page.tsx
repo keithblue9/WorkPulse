@@ -523,6 +523,25 @@ export default function ConfigPage() {
                 </div>
               </div>
             </Section>
+
+            <Section title="⏰ Pengingat Harian (Push Notification)" sub="Notifikasi otomatis ke HP semua member (iOS & Android) tiap pagi ±08:00 WIB">
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ fontSize:11.5, color:'var(--text2)', lineHeight:1.6 }}>
+                  Tiap pagi sistem otomatis kirim push ke semua member yang sudah mengaktifkan notifikasi: pengingat <b>isi presensi hari ini</b> + ringkasan <b>agenda hari ini</b> (agenda pribadi &amp; jumlah agenda tim di calendar). Berjalan otomatis 1×/hari via cron.
+                </div>
+                <div>
+                  <button onClick={async()=>{
+                    try {
+                      const r = await fetch('/api/cron/reminders', { method:'POST' })
+                      const j = await r.json()
+                      if (!r.ok) { toast.error(j.error||'Gagal'); return }
+                      toast.success(`Terkirim ke ${j.sent}/${j.recipients} member`)
+                    } catch { toast.error('Gagal kirim') }
+                  }} className="btn btn-sm btn-primary">🔔 Test Kirim Sekarang</button>
+                  <div style={{ fontSize:10, color:'var(--text3)', marginTop:6 }}>Kirim pengingat harian ke semua member saat ini juga (untuk tes). Hanya admin/manager.</div>
+                </div>
+              </div>
+            </Section>
           </>
         )}
 

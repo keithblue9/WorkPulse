@@ -172,6 +172,9 @@ const ConfigSchema = new Schema({
     waDueDateReminder: { type:Boolean, default:true },
     waWeeklyDigest: { type:Boolean, default:false },
   },
+
+  // Guard: tanggal terakhir broadcast pengingat harian (absen + agenda) dikirim — biar 1x/hari
+  lastDailyBroadcast: { type:String, default:'' },
 }, { timestamps:true })
 
 export const ConfigModel = models.Config || mongoose.model('Config', ConfigSchema)
