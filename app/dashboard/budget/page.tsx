@@ -109,12 +109,95 @@ function YieldTab() {
     } finally { setSaving(false) }
   }
 
+  const [exporting, setExporting] = useState(false)
+  async function exportXLSX() {
+    setExporting(true)
+    try {
+      const _xl:any = await import('exceljs'); const ExcelJS = _xl.default || _xl
+      const wb = new ExcelJS.Workbook()
+      wb.creator = 'WinS'; wb.created = new Date()
+      const ws = wb.addWorksheet('Budget Yield', { views:[{ showGridLines:false }] })
+      ws.columns = [{ width:34 },{ width:16 },{ width:16 },{ width:10 },{ width:20 },{ width:20 },{ width:10 },{ width:12 },{ width:12 }]
+      const box = () => ({ top:{style:'thin' as const, color:{argb:'FFD0D5DD'}}, left:{style:'thin' as const, color:{argb:'FFD0D5DD'}}, bottom:{style:'thin' as const, color:{argb:'FFD0D5DD'}}, right:{style:'thin' as const, color:{argb:'FFD0D5DD'}} })
+      const USDF = '"$"#,##0.00'; const IDRF = '"Rp"#,##0'; const PCTF = '0.0"%"'; const YOYF = '+0.0"%";-0.0"%";0"%"'
+
+      ws.mergeCells('A1:I1'); const t1 = ws.getCell('A1'); t1.value = 'BUDGET REPORT — YIELD'; t1.font = { bold:true, size:15, color:{argb:'FF1A3D7C'} }; t1.alignment = { horizontal:'center' }
+      ws.mergeCells('A2:I2'); const t2 = ws.getCell('A2'); t2.value = 'Fungsi BPD & SS Procurement Pertamina — Plan vs Realisasi per Cost Element (USD & IDR)'; t2.font = { size:10, color:{argb:'FF667085'} }; t2.alignment = { horizontal:'center' }
+      ws.mergeCells('A3:I3'); const t3 = ws.getCell('A3'); t3.value = `Diekspor: ${new Date().toLocaleString('id-ID')}`; t3.font = { size:9, italic:true, color:{argb:'FF98A2B3'} }; t3.alignment = { horizontal:'center' }
+
+      let row = 5
+      years.forEach(y => {
+        const d = byYear[y] || {}; const prevD = byYear[y-1]
+        ws.mergeCells(`A${row}:I${row}`); const yc = ws.getCell(`A${row}`); yc.value = `Tahun ${y}`; yc.font = { bold:true, size:12 }; row++
+
+        // group header
+        const gh = ws.getRow(row)
+        ;[['A','Cost Element'],['B','USD'],['D','% Real'],['E','IDR'],['G','% Real'],['H','Yield YoY (%)']].forEach(()=>{})
+        gh.getCell(1).value = 'Cost Element'
+        ws.mergeCells(`B${row}:C${row}`); gh.getCell(2).value = 'USD'
+        gh.getCell(4).value = '% Real'
+        ws.mergeCells(`E${row}:F${row}`); gh.getCell(5).value = 'IDR'
+        gh.getCell(7).value = '% Real'
+        ws.mergeCells(`H${row}:I${row}`); gh.getCell(8).value = 'Yield YoY (%)'
+        for (let c=1;c<=9;c++){ const cell=gh.getCell(c); cell.font={bold:true,color:{argb:'FFFFFFFF'}}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4F8EF7'}}; cell.alignment={horizontal:'center',vertical:'middle'}; cell.border=box() }
+        row++
+        // sub header
+        const sh = ws.getRow(row)
+        const subs = ['', 'Plan','Realisasi','USD','Plan','Realisasi','IDR','Plan','Realisasi']
+        subs.forEach((s,i)=>{ const cell=sh.getCell(i+1); cell.value=s; cell.font={bold:true,size:9,color:{argb:'FF475467'}}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEFF4FF'}}; cell.alignment={horizontal:'center'}; cell.border=box() })
+        row++
+
+        const startData = row
+        COST_ELEMENTS.forEach(ce => {
+          const v = d[ce.key]||{}; const pv = prevD?.[ce.key]
+          const pctU = (v.planUSD||0)>0 ? (v.realUSD||0)/(v.planUSD||0)*100 : 0
+          const pctI = (v.planIDR||0)>0 ? (v.realIDR||0)/(v.planIDR||0)*100 : 0
+          const yP = pv ? yoy(v.planIDR||0, pv.planIDR||0) : null
+          const yR = pv ? yoy(v.realIDR||0, pv.realIDR||0) : null
+          const rr = ws.getRow(row)
+          rr.getCell(1).value = `${ce.short} (${ce.code})`
+          rr.getCell(2).value = v.planUSD||0; rr.getCell(2).numFmt = USDF
+          rr.getCell(3).value = v.realUSD||0; rr.getCell(3).numFmt = USDF
+          rr.getCell(4).value = pctU; rr.getCell(4).numFmt = PCTF
+          rr.getCell(5).value = v.planIDR||0; rr.getCell(5).numFmt = IDRF
+          rr.getCell(6).value = v.realIDR||0; rr.getCell(6).numFmt = IDRF
+          rr.getCell(7).value = pctI; rr.getCell(7).numFmt = PCTF
+          if (yP===null){ rr.getCell(8).value='—' } else { rr.getCell(8).value=yP; rr.getCell(8).numFmt=YOYF; rr.getCell(8).font={color:{argb: yP>=0?'FF1A8754':'FFD13438'}} }
+          if (yR===null){ rr.getCell(9).value='—' } else { rr.getCell(9).value=yR; rr.getCell(9).numFmt=YOYF; rr.getCell(9).font={color:{argb: yR>=0?'FF1A8754':'FFD13438'}} }
+          for (let c=1;c<=9;c++){ rr.getCell(c).border=box(); if(c>=2&&c!==4&&c!==7) rr.getCell(c).alignment={horizontal:'right'}; if(c===4||c===7||c===8||c===9) rr.getCell(c).alignment={horizontal:'center'} }
+          row++
+        })
+        // TOTAL
+        const tr = ws.getRow(row)
+        tr.getCell(1).value = 'TOTAL'
+        tr.getCell(2).value = { formula:`SUM(B${startData}:B${row-1})` } as any; tr.getCell(2).numFmt = USDF
+        tr.getCell(3).value = { formula:`SUM(C${startData}:C${row-1})` } as any; tr.getCell(3).numFmt = USDF
+        tr.getCell(4).value = { formula:`IF(B${row}=0,0,C${row}/B${row}*100)` } as any; tr.getCell(4).numFmt = PCTF
+        tr.getCell(5).value = { formula:`SUM(E${startData}:E${row-1})` } as any; tr.getCell(5).numFmt = IDRF
+        tr.getCell(6).value = { formula:`SUM(F${startData}:F${row-1})` } as any; tr.getCell(6).numFmt = IDRF
+        tr.getCell(7).value = { formula:`IF(E${row}=0,0,F${row}/E${row}*100)` } as any; tr.getCell(7).numFmt = PCTF
+        const tyP = prevD ? yoy(COST_ELEMENTS.reduce((a,ce)=>a+((d[ce.key]||{}).planIDR||0),0), COST_ELEMENTS.reduce((a,ce)=>a+((prevD[ce.key]||{}).planIDR||0),0)) : null
+        const tyR = prevD ? yoy(COST_ELEMENTS.reduce((a,ce)=>a+((d[ce.key]||{}).realIDR||0),0), COST_ELEMENTS.reduce((a,ce)=>a+((prevD[ce.key]||{}).realIDR||0),0)) : null
+        if (tyP===null) tr.getCell(8).value='—'; else { tr.getCell(8).value=tyP; tr.getCell(8).numFmt=YOYF }
+        if (tyR===null) tr.getCell(9).value='—'; else { tr.getCell(9).value=tyR; tr.getCell(9).numFmt=YOYF }
+        for (let c=1;c<=9;c++){ const cell=tr.getCell(c); cell.font={bold:true}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF2F4F7'}}; cell.border=box(); if(c>=2&&c!==4&&c!==7) cell.alignment={horizontal:'right'}; if(c===4||c===7||c===8||c===9) cell.alignment={horizontal:'center'} }
+        row += 2
+      })
+
+      const buf = await wb.xlsx.writeBuffer()
+      const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Budget_Yield_BPD_Procurement_${new Date().toISOString().slice(0,10)}.xlsx`; a.click(); URL.revokeObjectURL(url)
+      toast.success('Excel Yield diunduh')
+    } catch (e:any) { toast.error('Gagal export: '+(e?.message||'')) } finally { setExporting(false) }
+  }
+
   return (
     <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }} className="safe-bottom page-pad">
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10, gap:8, flexWrap:'wrap' }}>
         <div style={{ fontSize:12, color:'var(--text3)' }}>Plan &amp; Realisasi per cost element (USD &amp; IDR) dari tahun ke tahun. Yield YoY = pertumbuhan vs tahun sebelumnya.</div>
         <div style={{ display:'flex', gap:8 }}>
           <button onClick={addYear} className="btn btn-sm">+ Tahun</button>
+          <button onClick={exportXLSX} disabled={exporting||loading} className="btn btn-sm">{exporting?'...':'⬇ Excel'}</button>
           <button onClick={saveAll} disabled={saving} className="btn btn-sm btn-primary">{saving?'...':'Simpan'}</button>
         </div>
       </div>
