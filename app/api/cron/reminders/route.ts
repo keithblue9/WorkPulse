@@ -124,9 +124,11 @@ export async function GET(req: NextRequest) {
     if (jamWIB >= 8) {
       const cfg = await ConfigModel.findOne({}, 'lastDailyBroadcast').lean() as any
       if (!cfg || cfg.lastDailyBroadcast !== jakartaToday) {
-        // set guard dulu (hindari dobel kalau request bersamaan), baru kirim
-        await ConfigModel.updateOne({}, { $set: { lastDailyBroadcast: jakartaToday } }, { upsert: true })
         broadcast = await dailyBroadcast(jakartaToday)
+        // Lock hanya kalau sudah ada penerima (biar hari pertama ga kelewat saat belum ada yg subscribe)
+        if (broadcast && broadcast.recipients > 0) {
+          await ConfigModel.updateOne({}, { $set: { lastDailyBroadcast: jakartaToday } }, { upsert: true })
+        }
       }
     }
 

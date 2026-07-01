@@ -9,6 +9,7 @@ import AppPopups from '@/components/AppPopups'
 import BirthdayPopup from '@/components/BirthdayPopup'
 import OnlinePresence from '@/components/OnlinePresence'
 import DailyCheckin from '@/components/DailyCheckin'
+import NotifyEnabler from '@/components/NotifyEnabler'
 
 // Menu definitions with permission keys (matches config.roleDefs[].allowedMenus)
 const NAV_GROUPS = [
@@ -247,6 +248,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <AppPopups />
         <BirthdayPopup />
         <DailyCheckin />
+        <NotifyEnabler />
       </div>
     </div>
   )
