@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/authOptions'
 import { connectDB } from '@/lib/db'
 import { QuickNoteModel } from '@/models/QuickNote'
 import { sendPushToUser } from '@/lib/push'
+import { computeReminderDue } from '@/lib/reminderDue'
 
 // Called by the client (poll) while the app is open/active, so reminders fire promptly
 // without needing a per-minute server cron (which Vercel Hobby plans don't allow —
@@ -16,8 +17,6 @@ export async function POST() {
     await connectDB()
     const email = session.user.email
     const now = new Date()
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 
     const notes = await QuickNoteModel.find({
       'reminder.enabled': true,
@@ -28,21 +27,14 @@ export async function POST() {
     let fired = 0
     for (const note of notes as any[]) {
       const r = note.reminder
-      let due = false
-      let fireKey = ''
-      if (r.mode === 'once' && r.datetime) {
-        const diffMs = now.getTime() - new Date(r.datetime).getTime()
-        if (diffMs >= 0 && diffMs < 180000) { due = true; fireKey = `once-${r.datetime}` }
-      } else if (r.mode === 'daily' && r.time) {
-        if (r.time === hhmm) { due = true; fireKey = `daily-${todayStr}-${r.time}` }
-      }
+      const { due, fireKey, disable } = computeReminderDue(r, now)
       if (due && fireKey && r.lastFiredKey !== fireKey) {
         const recipients = Array.from(new Set([note.ownerEmail, ...(note.sharedWith || [])]))
-        const firstItem = (note.items || []).find((i: any) => !i.checked)
+        const firstItem = (note.items || []).find((i: any) => !i.checked && i.text)
         const body = firstItem ? firstItem.text : `Kamu punya ${note.items?.length || 0} item di catatan ini`
-        for (const r2 of recipients) await sendPushToUser(r2, { title: `📝 ${note.title}`, body, url: '/dashboard/notes', tag: `quicknote-${note._id}` })
+        for (const r2 of recipients) await sendPushToUser(r2, { title: `📝 ${note.title}`, body, url: '/dashboard/quicknotes', tag: `quicknote-${note._id}` })
         note.reminder.lastFiredKey = fireKey
-        if (r.mode === 'once') note.reminder.enabled = false
+        if (disable) note.reminder.enabled = false
         await note.save()
         fired++
       }

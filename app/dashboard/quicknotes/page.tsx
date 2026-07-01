@@ -3,16 +3,18 @@ import { useEffect, useState, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { ensurePushSubscription } from '@/lib/pushClient'
+import { reminderLabel } from '@/lib/reminderDue'
 
-type Item = { id: string; text: string; checked: boolean; type: 'bullet' | 'number' }
-type Reminder = { enabled: boolean; mode: 'once' | 'daily'; datetime: string; time: string }
+type ItemType = 'bullet' | 'number' | 'text'
+type Item = { id: string; text: string; checked: boolean; type: ItemType }
+type Reminder = { enabled: boolean; mode: 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly'; datetime: string; time: string; weekday?: number | null; dayOfMonth?: number | null; anchorDate?: string }
 type QuickNote = {
   _id: string; title: string; items: Item[]; reminder: Reminder
   ownerEmail: string; sharedWith: string[]; lastEditedBy: string; updatedAt: string
 }
 
 function uid() { return Math.random().toString(36).slice(2, 9) }
-function emptyReminder(): Reminder { return { enabled: false, mode: 'once', datetime: '', time: '' } }
+function emptyReminder(): Reminder { return { enabled: false, mode: 'once', datetime: '', time: '', weekday: null, dayOfMonth: null, anchorDate: '' } }
 
 export default function QuickNotesPage() {
   const { data: session } = useSession()
@@ -22,7 +24,7 @@ export default function QuickNotesPage() {
   const [notes, setNotes] = useState<QuickNote[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(null)
   const [shareOpenId, setShareOpenId] = useState<string | null>(null)
   const [reminderOpenId, setReminderOpenId] = useState<string | null>(null)
   const checkedOnce = useRef(false)
@@ -52,7 +54,7 @@ export default function QuickNotesPage() {
   async function createNote() {
     const res = await fetch('/api/quicknotes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Catatan baru', items: [{ id: uid(), text: '', checked: false, type: 'bullet' }] }) })
     const d = await res.json()
-    if (d.data) { setNotes(n => [d.data, ...n]); setOpenId(d.data._id) }
+    if (d.data) { setNotes(n => [d.data, ...n]); setDetailId(d.data._id) }
     else toast.error(d.error || 'Gagal membuat catatan')
   }
 
@@ -73,7 +75,7 @@ export default function QuickNotesPage() {
   }
 
   function updateItems(note: QuickNote, items: Item[]) { patchNote(note._id, { items }) }
-  function addItem(note: QuickNote, type: 'bullet' | 'number') {
+  function addItem(note: QuickNote, type: ItemType) {
     updateItems(note, [...note.items, { id: uid(), text: '', checked: false, type }])
   }
   function setItemText(note: QuickNote, itemId: string, text: string) {
@@ -136,188 +138,224 @@ export default function QuickNotesPage() {
         {notes.map(note => {
           const isOwner = note.ownerEmail === myEmail
           const isShared = note.sharedWith?.length > 0
-          const isOpen = openId === note._id
-          const doneCount = note.items.filter(i => i.checked).length
-          const total = note.items.length
+          const checklist = note.items.filter(i => i.type !== 'text')
+          const textCount = note.items.filter(i => i.type === 'text' && i.text.trim()).length
+          const doneCount = checklist.filter(i => i.checked).length
+          const total = checklist.length
           const progress = total > 0 ? Math.round((doneCount / total) * 100) : 0
-          let numberCounter = 0
+          const preview = note.items.find(i => i.text.trim())?.text || ''
 
           return (
-            <div key={note._id} className="card" style={{
-              padding: 0, overflow: 'visible', display: 'flex', flexDirection: 'column',
-              border: isOpen ? '1.5px solid var(--brand)' : '1px solid var(--border)',
-              transition: 'border-color 0.15s, box-shadow 0.15s',
-              boxShadow: isOpen ? '0 4px 16px rgba(0,0,0,0.10)' : '0 1px 4px rgba(0,0,0,0.05)',
-            }}>
-
-              {/* === CARD HEADER (always visible) === */}
-              <div
-                onClick={() => { setOpenId(isOpen ? null : note._id); setShareOpenId(null); setReminderOpenId(null) }}
-                style={{ padding: '12px 14px 10px', cursor: 'pointer', userSelect: 'none' }}
-              >
-                {/* Title row */}
+            <div key={note._id} className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}
+              onClick={() => setDetailId(note._id)}>
+              <div style={{ padding: '12px 14px 12px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3, flex: 1 }}>
                     {note.title || <span style={{ color: 'var(--text3)', fontStyle: 'italic' }}>Tanpa judul</span>}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                    {isOwner && (
-                      <button
-                        onClick={e => { e.stopPropagation(); deleteNote(note._id) }}
-                        title="Hapus" className="btn btn-icon btn-sm"
-                        style={{ opacity: 0.5, fontSize: 12 }}
-                      >🗑️</button>
-                    )}
-                    <span style={{
-                      fontSize: 11, color: 'var(--text3)', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.2s', display: 'inline-block', lineHeight: 1
-                    }}>▾</span>
-                  </div>
-                </div>
-
-                {/* Badges row */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 7, flexWrap: 'wrap' }}>
-                  {!isOwner && (
-                    <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--brand-soft)', color: 'var(--brand)', fontWeight: 600 }}>
-                      👤 {note.ownerEmail.split('@')[0]}
-                    </span>
-                  )}
-                  {isOwner && isShared && (
-                    <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--bg3)', color: 'var(--text3)' }}>
-                      👥 {note.sharedWith.length} orang
-                    </span>
-                  )}
-                  {note.reminder?.enabled && (
-                    <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--amberbg)', color: 'var(--amber)', fontWeight: 600 }}>
-                      🔔 {note.reminder.mode === 'daily' ? note.reminder.time : note.reminder.datetime ? new Date(note.reminder.datetime).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : 'Aktif'}
-                    </span>
+                  {isOwner && (
+                    <button onClick={e => { e.stopPropagation(); deleteNote(note._id) }} title="Hapus" className="btn btn-icon btn-sm" style={{ opacity: 0.5, fontSize: 12 }}>🗑️</button>
                   )}
                 </div>
 
-                {/* Progress bar */}
+                {preview && <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 6, lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{preview}</div>}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
+                  {!isOwner && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--brand-soft)', color: 'var(--brand)', fontWeight: 600 }}>👤 {note.ownerEmail.split('@')[0]}</span>}
+                  {isOwner && isShared && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--bg3)', color: 'var(--text3)' }}>👥 {note.sharedWith.length} orang</span>}
+                  {textCount > 0 && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--bg3)', color: 'var(--text3)' }}>📄 {textCount} teks</span>}
+                  {note.reminder?.enabled && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: 'var(--amberbg)', color: 'var(--amber)', fontWeight: 600 }}>🔔 {reminderLabel(note.reminder)}</span>}
+                </div>
+
                 {total > 0 && (
                   <div style={{ marginTop: 8 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                       <span style={{ fontSize: 10, color: 'var(--text3)' }}>{doneCount}/{total} selesai</span>
-                      <span style={{ fontSize: 10, color: doneCount === total ? 'var(--green)' : 'var(--text3)', fontWeight: doneCount === total ? 700 : 400 }}>
-                        {doneCount === total ? '✓ Done!' : `${progress}%`}
-                      </span>
+                      <span style={{ fontSize: 10, color: doneCount === total ? 'var(--green)' : 'var(--text3)', fontWeight: doneCount === total ? 700 : 400 }}>{doneCount === total ? '✓ Done!' : `${progress}%`}</span>
                     </div>
                     <div style={{ height: 4, borderRadius: 4, background: 'var(--bg3)', overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%', borderRadius: 4, transition: 'width 0.3s',
-                        width: `${progress}%`,
-                        background: doneCount === total ? 'var(--green)' : 'var(--brand)'
-                      }} />
+                      <div style={{ height: '100%', borderRadius: 4, transition: 'width 0.3s', width: `${progress}%`, background: doneCount === total ? 'var(--green)' : 'var(--brand)' }} />
                     </div>
                   </div>
                 )}
               </div>
-
-              {/* === EXPANDED CONTENT === */}
-              {isOpen && (
-                <>
-                  {/* Title editor */}
-                  <div style={{ padding: '4px 14px 8px', borderTop: '1px solid var(--border)' }}>
-                    <input
-                      value={note.title}
-                      onChange={e => setNotes(n => n.map(x => x._id === note._id ? { ...x, title: e.target.value } : x))}
-                      onBlur={e => patchNote(note._id, { title: e.target.value }, false)}
-                      placeholder="Judul catatan"
-                      disabled={!isOwner && !note.sharedWith.includes(myEmail)}
-                      style={{ width: '100%', border: 'none', background: 'var(--bg2)', borderRadius: 6, padding: '6px 10px', fontSize: 13, fontWeight: 700, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' }}
-                    />
-                  </div>
-
-                  {/* Checklist items */}
-                  <div style={{ padding: '4px 14px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5, paddingRight: 2 }}>
-                      {note.items.map(item => {
-                        if (item.type === 'number') numberCounter++
-                        return (
-                          <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
-                            <button onClick={() => toggleItemChecked(note, item.id)} style={{
-                              marginTop: 2, width: 16, height: 16, borderRadius: item.type === 'number' ? 4 : '50%',
-                              border: `1.5px solid ${item.checked ? 'var(--brand)' : 'var(--border)'}`,
-                              background: item.checked ? 'var(--brand)' : 'transparent', color: '#fff', fontSize: 10,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', padding: 0,
-                            }}>
-                              {item.checked ? '✓' : (item.type === 'number' ? numberCounter : '')}
-                            </button>
-                            <textarea
-                              value={item.text}
-                              onChange={e => { setItemText(note, item.id, e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
-                              onBlur={e => { commitItemText(note); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
-                              onFocus={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
-                              rows={1}
-                              placeholder="Tulis catatan…"
-                              style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 12.5, color: item.checked ? 'var(--text3)' : 'var(--text)', textDecoration: item.checked ? 'line-through' : 'none', outline: 'none', padding: '2px 0', resize: 'none', overflow: 'hidden', lineHeight: '1.5', fontFamily: 'inherit', minHeight: '1.5em' }} />
-                            <button onClick={() => removeItem(note, item.id)} style={{ background: 'transparent', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 12, padding: '0 2px', opacity: 0.6, marginTop: 2 }}>✕</button>
-                          </div>
-                        )
-                      })}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 4, paddingBottom: 8 }}>
-                      <button onClick={() => addItem(note, 'bullet')} className="btn btn-sm" style={{ fontSize: 11 }}>• Bullet</button>
-                      <button onClick={() => addItem(note, 'number')} className="btn btn-sm" style={{ fontSize: 11 }}>1. Nomor</button>
-                    </div>
-                  </div>
-
-                  {/* Footer actions */}
-                  <div style={{ display: 'flex', gap: 6, padding: '8px 14px 12px', borderTop: '1px solid var(--border)', position: 'relative' }}>
-                    <div style={{ position: 'relative' }}>
-                      <button onClick={() => { setReminderOpenId(reminderOpenId === note._id ? null : note._id); setShareOpenId(null) }} className="btn btn-sm" style={{ fontSize: 11 }}>
-                        🔔 {note.reminder?.enabled ? 'Reminder aktif' : 'Reminder'}
-                      </button>
-                      {reminderOpenId === note._id && <ReminderEditor note={note} onSave={r => saveReminder(note, r)} onClose={() => setReminderOpenId(null)} />}
-                    </div>
-                    {isOwner && (
-                      <div style={{ position: 'relative' }}>
-                        <button onClick={() => { setShareOpenId(shareOpenId === note._id ? null : note._id); setReminderOpenId(null) }} className="btn btn-sm" style={{ fontSize: 11 }}>
-                          📤 Share
-                        </button>
-                        {shareOpenId === note._id && <ShareEditor note={note} members={members} onSave={list => saveShare(note, list)} onClose={() => setShareOpenId(null)} />}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
             </div>
           )
         })}
       </div>
+
+      {detailId && (() => {
+        const note = notes.find(n => n._id === detailId)
+        if (!note) return null
+        const isOwner = note.ownerEmail === myEmail
+        const canEdit = isOwner || note.sharedWith?.includes(myEmail)
+        let numberCounter = 0
+        return (
+          <div className="modal-overlay" onClick={() => { setDetailId(null); setReminderOpenId(null); setShareOpenId(null) }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div className="card scale-in" onClick={e => e.stopPropagation()} style={{ width: 560, maxWidth: '100%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+              {/* header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
+                <input value={note.title} disabled={!canEdit}
+                  onChange={e => setNotes(n => n.map(x => x._id === note._id ? { ...x, title: e.target.value } : x))}
+                  onBlur={e => patchNote(note._id, { title: e.target.value }, false)}
+                  placeholder="Judul catatan"
+                  style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, fontWeight: 700, color: 'var(--text)', outline: 'none' }} />
+                <button onClick={() => { setDetailId(null); setReminderOpenId(null); setShareOpenId(null) }} className="btn btn-icon btn-sm" style={{ marginLeft: 8 }}>✕</button>
+              </div>
+
+              {/* body */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {note.items.length === 0 && <div style={{ fontSize: 12, color: 'var(--text3)', padding: '20px 0', textAlign: 'center' }}>Belum ada isi. Tambah teks atau checklist di bawah.</div>}
+                {note.items.map(item => {
+                  if (item.type === 'number') numberCounter++
+                  if (item.type === 'text') {
+                    return (
+                      <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                        <textarea value={item.text} disabled={!canEdit}
+                          onChange={e => { setItemText(note, item.id, e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                          onBlur={e => { commitItemText(note); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                          onFocus={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                          rows={1} placeholder="Tulis paragraf / catatan bebas…"
+                          style={{ flex: 1, border: 'none', background: 'var(--bg2)', borderRadius: 8, padding: '9px 11px', fontSize: 13, color: 'var(--text)', outline: 'none', resize: 'none', overflow: 'hidden', lineHeight: 1.6, fontFamily: 'inherit', minHeight: '1.6em' }} />
+                        {canEdit && <button onClick={() => removeItem(note, item.id)} style={{ background: 'transparent', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 12, padding: '4px 2px', opacity: 0.6 }}>✕</button>}
+                      </div>
+                    )
+                  }
+                  return (
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <button onClick={() => canEdit && toggleItemChecked(note, item.id)} style={{
+                        marginTop: 3, width: 17, height: 17, borderRadius: item.type === 'number' ? 4 : '50%',
+                        border: `1.5px solid ${item.checked ? 'var(--brand)' : 'var(--border)'}`,
+                        background: item.checked ? 'var(--brand)' : 'transparent', color: '#fff', fontSize: 10,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: canEdit ? 'pointer' : 'default', padding: 0,
+                      }}>{item.checked ? '✓' : (item.type === 'number' ? numberCounter : '')}</button>
+                      <textarea value={item.text} disabled={!canEdit}
+                        onChange={e => { setItemText(note, item.id, e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                        onBlur={e => { commitItemText(note); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                        onFocus={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                        rows={1} placeholder="Item to-do…"
+                        style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 13, color: item.checked ? 'var(--text3)' : 'var(--text)', textDecoration: item.checked ? 'line-through' : 'none', outline: 'none', padding: '2px 0', resize: 'none', overflow: 'hidden', lineHeight: 1.5, fontFamily: 'inherit', minHeight: '1.5em' }} />
+                      {canEdit && <button onClick={() => removeItem(note, item.id)} style={{ background: 'transparent', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 12, padding: '2px', opacity: 0.6, marginTop: 2 }}>✕</button>}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* add buttons */}
+              {canEdit && (
+                <div style={{ display: 'flex', gap: 6, padding: '8px 18px', borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
+                  <button onClick={() => addItem(note, 'text')} className="btn btn-sm" style={{ fontSize: 11 }}>¶ Teks</button>
+                  <button onClick={() => addItem(note, 'bullet')} className="btn btn-sm" style={{ fontSize: 11 }}>• Bullet</button>
+                  <button onClick={() => addItem(note, 'number')} className="btn btn-sm" style={{ fontSize: 11 }}>1. Nomor</button>
+                </div>
+              )}
+
+              {/* footer: reminder + share */}
+              <div style={{ display: 'flex', gap: 6, padding: '10px 18px 14px', borderTop: '1px solid var(--border)', position: 'relative' }}>
+                <div style={{ position: 'relative' }}>
+                  <button onClick={() => { setReminderOpenId(reminderOpenId === note._id ? null : note._id); setShareOpenId(null) }} className="btn btn-sm" style={{ fontSize: 11 }}>
+                    🔔 {note.reminder?.enabled ? reminderLabel(note.reminder) : 'Reminder'}
+                  </button>
+                  {reminderOpenId === note._id && <ReminderEditor note={note} onSave={r => saveReminder(note, r)} onClose={() => setReminderOpenId(null)} />}
+                </div>
+                {isOwner && (
+                  <div style={{ position: 'relative' }}>
+                    <button onClick={() => { setShareOpenId(shareOpenId === note._id ? null : note._id); setReminderOpenId(null) }} className="btn btn-sm" style={{ fontSize: 11 }}>📤 Share</button>
+                    {shareOpenId === note._id && <ShareEditor note={note} members={members} onSave={list => saveShare(note, list)} onClose={() => setShareOpenId(null)} />}
+                  </div>
+                )}
+                {isOwner && <button onClick={() => { deleteNote(note._id); setDetailId(null) }} className="btn btn-sm" style={{ fontSize: 11, marginLeft: 'auto', color: 'var(--red)' }}>🗑️ Hapus</button>}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
 
 function ReminderEditor({ note, onSave, onClose }: { note: QuickNote; onSave: (r: Reminder) => void; onClose: () => void }) {
-  const [r, setR] = useState<Reminder>(note.reminder?.enabled ? { ...note.reminder } : { ...emptyReminder(), mode: 'once' })
+  const [r, setR] = useState<Reminder>(note.reminder?.enabled ? { ...note.reminder } : { ...emptyReminder(), mode: 'daily' })
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) onClose() }
     document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
   }, [onClose])
 
+  const DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+  const recurring = r.mode !== 'once'
+
+  function setMode(mode: Reminder['mode']) {
+    setR(x => {
+      const nx: Reminder = { ...x, mode }
+      const now = new Date()
+      if ((mode === 'weekly' || mode === 'biweekly') && (x.weekday === null || x.weekday === undefined)) nx.weekday = now.getDay()
+      if (mode === 'monthly' && !x.dayOfMonth) nx.dayOfMonth = now.getDate()
+      if (!x.time) nx.time = '08:00'
+      return nx
+    })
+  }
+
+  function save() {
+    const out = { ...r }
+    if (out.enabled && (out.mode === 'weekly' || out.mode === 'biweekly' || out.mode === 'monthly')) {
+      const d = new Date(); out.anchorDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+    onSave(out)
+  }
+
   return (
-    <div ref={ref} className="card scale-in" style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, width: 250, padding: 12, zIndex: 50, boxShadow: '0 12px 30px rgba(0,0,0,0.18)' }}>
+    <div ref={ref} className="card scale-in" style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, width: 270, padding: 12, zIndex: 60, boxShadow: '0 12px 30px rgba(0,0,0,0.18)' }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Atur Reminder</div>
       <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--text2)', marginBottom: 10, cursor: 'pointer' }}>
         <input type="checkbox" checked={r.enabled} onChange={e => setR(x => ({ ...x, enabled: e.target.checked }))} /> Aktifkan reminder
       </label>
       {r.enabled && (
-        <>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-            <button onClick={() => setR(x => ({ ...x, mode: 'once' }))} className="btn btn-sm" style={{ flex: 1, fontSize: 10.5, background: r.mode === 'once' ? 'var(--brand)' : undefined, color: r.mode === 'once' ? '#fff' : undefined }}>Sekali</button>
-            <button onClick={() => setR(x => ({ ...x, mode: 'daily' }))} className="btn btn-sm" style={{ flex: 1, fontSize: 10.5, background: r.mode === 'daily' ? 'var(--brand)' : undefined, color: r.mode === 'daily' ? '#fff' : undefined }}>Tiap hari</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div>
+            <label style={{ fontSize: 10.5, color: 'var(--text3)', display: 'block', marginBottom: 3 }}>Pengulangan</label>
+            <select value={r.mode} onChange={e => setMode(e.target.value as Reminder['mode'])} className="input" style={{ width: '100%', fontSize: 12 }}>
+              <option value="once">Sekali</option>
+              <option value="daily">Tiap hari</option>
+              <option value="weekly">Tiap pekan</option>
+              <option value="biweekly">Tiap 2 pekan sekali</option>
+              <option value="monthly">Tiap bulan</option>
+            </select>
           </div>
-          {r.mode === 'once' ? (
-            <input type="datetime-local" value={r.datetime} onChange={e => setR(x => ({ ...x, datetime: e.target.value }))} className="input" style={{ width: '100%', fontSize: 12 }} />
-          ) : (
-            <input type="time" value={r.time} onChange={e => setR(x => ({ ...x, time: e.target.value }))} className="input" style={{ width: '100%', fontSize: 12 }} />
+
+          {r.mode === 'once' && (
+            <div>
+              <label style={{ fontSize: 10.5, color: 'var(--text3)', display: 'block', marginBottom: 3 }}>Tanggal & jam</label>
+              <input type="datetime-local" value={r.datetime} onChange={e => setR(x => ({ ...x, datetime: e.target.value }))} className="input" style={{ width: '100%', fontSize: 12 }} />
+            </div>
           )}
-        </>
+
+          {(r.mode === 'weekly' || r.mode === 'biweekly') && (
+            <div>
+              <label style={{ fontSize: 10.5, color: 'var(--text3)', display: 'block', marginBottom: 3 }}>Hari</label>
+              <select value={r.weekday ?? new Date().getDay()} onChange={e => setR(x => ({ ...x, weekday: Number(e.target.value) }))} className="input" style={{ width: '100%', fontSize: 12 }}>
+                {DAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+              </select>
+            </div>
+          )}
+
+          {r.mode === 'monthly' && (
+            <div>
+              <label style={{ fontSize: 10.5, color: 'var(--text3)', display: 'block', marginBottom: 3 }}>Tanggal (1–31)</label>
+              <input type="number" min={1} max={31} value={r.dayOfMonth ?? new Date().getDate()} onChange={e => setR(x => ({ ...x, dayOfMonth: Math.min(31, Math.max(1, Number(e.target.value) || 1)) }))} className="input" style={{ width: '100%', fontSize: 12 }} />
+            </div>
+          )}
+
+          {recurring && (
+            <div>
+              <label style={{ fontSize: 10.5, color: 'var(--text3)', display: 'block', marginBottom: 3 }}>Jam</label>
+              <input type="time" value={r.time} onChange={e => setR(x => ({ ...x, time: e.target.value }))} className="input" style={{ width: '100%', fontSize: 12 }} />
+            </div>
+          )}
+        </div>
       )}
-      <button onClick={() => onSave(r)} className="btn btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}>Simpan</button>
+      <button onClick={save} className="btn btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}>Simpan</button>
     </div>
   )
 }

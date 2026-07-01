@@ -117,33 +117,32 @@ function YieldTab() {
       const wb = new ExcelJS.Workbook()
       wb.creator = 'WinS'; wb.created = new Date()
       const ws = wb.addWorksheet('Budget Yield', { views:[{ showGridLines:false }] })
-      ws.columns = [{ width:34 },{ width:16 },{ width:16 },{ width:10 },{ width:20 },{ width:20 },{ width:10 },{ width:12 },{ width:12 }]
+      ws.columns = [{ width:32 },{ width:15 },{ width:15 },{ width:19 },{ width:19 },{ width:11 },{ width:11 },{ width:11 },{ width:11 },{ width:11 },{ width:11 }]
       const box = () => ({ top:{style:'thin' as const, color:{argb:'FFD0D5DD'}}, left:{style:'thin' as const, color:{argb:'FFD0D5DD'}}, bottom:{style:'thin' as const, color:{argb:'FFD0D5DD'}}, right:{style:'thin' as const, color:{argb:'FFD0D5DD'}} })
       const USDF = '"$"#,##0.00'; const IDRF = '"Rp"#,##0'; const PCTF = '0.0"%"'; const YOYF = '+0.0"%";-0.0"%";0"%"'
+      const LAST = 'K'
 
-      ws.mergeCells('A1:I1'); const t1 = ws.getCell('A1'); t1.value = 'BUDGET REPORT — YIELD'; t1.font = { bold:true, size:15, color:{argb:'FF1A3D7C'} }; t1.alignment = { horizontal:'center' }
-      ws.mergeCells('A2:I2'); const t2 = ws.getCell('A2'); t2.value = 'Fungsi BPD Procurement Pertamina — Plan vs Realisasi per Cost Element (USD & IDR)'; t2.font = { size:10, color:{argb:'FF667085'} }; t2.alignment = { horizontal:'center' }
-      ws.mergeCells('A3:I3'); const t3 = ws.getCell('A3'); t3.value = `Diekspor: ${new Date().toLocaleString('id-ID')}`; t3.font = { size:9, italic:true, color:{argb:'FF98A2B3'} }; t3.alignment = { horizontal:'center' }
+      ws.mergeCells(`A1:${LAST}1`); const t1 = ws.getCell('A1'); t1.value = 'BUDGET REPORT — YIELD'; t1.font = { bold:true, size:15, color:{argb:'FF1A3D7C'} }; t1.alignment = { horizontal:'center' }
+      ws.mergeCells(`A2:${LAST}2`); const t2 = ws.getCell('A2'); t2.value = 'Fungsi BPD Procurement Pertamina — Plan vs Realisasi per Cost Element (USD & IDR)'; t2.font = { size:10, color:{argb:'FF667085'} }; t2.alignment = { horizontal:'center' }
+      ws.mergeCells(`A3:${LAST}3`); const t3 = ws.getCell('A3'); t3.value = `Diekspor: ${new Date().toLocaleString('id-ID')}`; t3.font = { size:9, italic:true, color:{argb:'FF98A2B3'} }; t3.alignment = { horizontal:'center' }
 
       let row = 5
       years.forEach(y => {
         const d = byYear[y] || {}; const prevD = byYear[y-1]
-        ws.mergeCells(`A${row}:I${row}`); const yc = ws.getCell(`A${row}`); yc.value = `Tahun ${y}`; yc.font = { bold:true, size:12 }; row++
+        ws.mergeCells(`A${row}:${LAST}${row}`); const yc = ws.getCell(`A${row}`); yc.value = `Tahun ${y}`; yc.font = { bold:true, size:12 }; row++
 
-        // group header
+        // group header (row r) + sub header (row r+1)
         const gh = ws.getRow(row)
-        ;[['A','Cost Element'],['B','USD'],['D','% Real'],['E','IDR'],['G','% Real'],['H','Yield YoY (%)']].forEach(()=>{})
-        gh.getCell(1).value = 'Cost Element'
+        ws.mergeCells(`A${row}:A${row+1}`); gh.getCell(1).value = 'Cost Element'
         ws.mergeCells(`B${row}:C${row}`); gh.getCell(2).value = 'USD'
-        gh.getCell(4).value = '% Real'
-        ws.mergeCells(`E${row}:F${row}`); gh.getCell(5).value = 'IDR'
-        gh.getCell(7).value = '% Real'
-        ws.mergeCells(`H${row}:I${row}`); gh.getCell(8).value = 'Yield YoY (%)'
-        for (let c=1;c<=9;c++){ const cell=gh.getCell(c); cell.font={bold:true,color:{argb:'FFFFFFFF'}}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4F8EF7'}}; cell.alignment={horizontal:'center',vertical:'middle'}; cell.border=box() }
+        ws.mergeCells(`D${row}:E${row}`); gh.getCell(4).value = 'IDR'
+        ws.mergeCells(`F${row}:G${row}`); gh.getCell(6).value = '% Realisasi (Real÷Plan)'
+        ws.mergeCells(`H${row}:I${row}`); gh.getCell(8).value = 'Yield YoY — Plan'
+        ws.mergeCells(`J${row}:K${row}`); gh.getCell(10).value = 'Yield YoY — Realisasi'
+        for (let c=1;c<=11;c++){ const cell=gh.getCell(c); cell.font={bold:true,color:{argb:'FFFFFFFF'}}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4F8EF7'}}; cell.alignment={horizontal:'center',vertical:'middle'}; cell.border=box() }
         row++
-        // sub header
         const sh = ws.getRow(row)
-        const subs = ['', 'Plan','Realisasi','USD','Plan','Realisasi','IDR','Plan','Realisasi']
+        const subs = ['', 'Plan','Realisasi','Plan','Realisasi','USD','IDR','IDR','USD','IDR','USD']
         subs.forEach((s,i)=>{ const cell=sh.getCell(i+1); cell.value=s; cell.font={bold:true,size:9,color:{argb:'FF475467'}}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEFF4FF'}}; cell.alignment={horizontal:'center'}; cell.border=box() })
         row++
 
@@ -152,19 +151,21 @@ function YieldTab() {
           const v = d[ce.key]||{}; const pv = prevD?.[ce.key]
           const pctU = (v.planUSD||0)>0 ? (v.realUSD||0)/(v.planUSD||0)*100 : 0
           const pctI = (v.planIDR||0)>0 ? (v.realIDR||0)/(v.planIDR||0)*100 : 0
-          const yP = pv ? yoy(v.planIDR||0, pv.planIDR||0) : null
-          const yR = pv ? yoy(v.realIDR||0, pv.realIDR||0) : null
+          const yPI = pv ? yoy(v.planIDR||0, pv.planIDR||0) : null
+          const yPU = pv ? yoy(v.planUSD||0, pv.planUSD||0) : null
+          const yRI = pv ? yoy(v.realIDR||0, pv.realIDR||0) : null
+          const yRU = pv ? yoy(v.realUSD||0, pv.realUSD||0) : null
           const rr = ws.getRow(row)
           rr.getCell(1).value = `${ce.short} (${ce.code})`
           rr.getCell(2).value = v.planUSD||0; rr.getCell(2).numFmt = USDF
           rr.getCell(3).value = v.realUSD||0; rr.getCell(3).numFmt = USDF
-          rr.getCell(4).value = pctU; rr.getCell(4).numFmt = PCTF
-          rr.getCell(5).value = v.planIDR||0; rr.getCell(5).numFmt = IDRF
-          rr.getCell(6).value = v.realIDR||0; rr.getCell(6).numFmt = IDRF
+          rr.getCell(4).value = v.planIDR||0; rr.getCell(4).numFmt = IDRF
+          rr.getCell(5).value = v.realIDR||0; rr.getCell(5).numFmt = IDRF
+          rr.getCell(6).value = pctU; rr.getCell(6).numFmt = PCTF
           rr.getCell(7).value = pctI; rr.getCell(7).numFmt = PCTF
-          if (yP===null){ rr.getCell(8).value='—' } else { rr.getCell(8).value=yP; rr.getCell(8).numFmt=YOYF; rr.getCell(8).font={color:{argb: yP>=0?'FF1A8754':'FFD13438'}} }
-          if (yR===null){ rr.getCell(9).value='—' } else { rr.getCell(9).value=yR; rr.getCell(9).numFmt=YOYF; rr.getCell(9).font={color:{argb: yR>=0?'FF1A8754':'FFD13438'}} }
-          for (let c=1;c<=9;c++){ rr.getCell(c).border=box(); if(c>=2&&c!==4&&c!==7) rr.getCell(c).alignment={horizontal:'right'}; if(c===4||c===7||c===8||c===9) rr.getCell(c).alignment={horizontal:'center'} }
+          const yc2 = (col:number, val:number|null) => { const cell=rr.getCell(col); if(val===null){cell.value='—'}else{cell.value=val;cell.numFmt=YOYF;cell.font={color:{argb: val>=0?'FF1A8754':'FFD13438'}}} }
+          yc2(8, yPI); yc2(9, yPU); yc2(10, yRI); yc2(11, yRU)
+          for (let c=1;c<=11;c++){ rr.getCell(c).border=box(); if(c>=2&&c<=5) rr.getCell(c).alignment={horizontal:'right'}; if(c>=6) rr.getCell(c).alignment={horizontal:'center'} }
           row++
         })
         // TOTAL
@@ -172,15 +173,16 @@ function YieldTab() {
         tr.getCell(1).value = 'TOTAL'
         tr.getCell(2).value = { formula:`SUM(B${startData}:B${row-1})` } as any; tr.getCell(2).numFmt = USDF
         tr.getCell(3).value = { formula:`SUM(C${startData}:C${row-1})` } as any; tr.getCell(3).numFmt = USDF
-        tr.getCell(4).value = { formula:`IF(B${row}=0,0,C${row}/B${row}*100)` } as any; tr.getCell(4).numFmt = PCTF
+        tr.getCell(4).value = { formula:`SUM(D${startData}:D${row-1})` } as any; tr.getCell(4).numFmt = IDRF
         tr.getCell(5).value = { formula:`SUM(E${startData}:E${row-1})` } as any; tr.getCell(5).numFmt = IDRF
-        tr.getCell(6).value = { formula:`SUM(F${startData}:F${row-1})` } as any; tr.getCell(6).numFmt = IDRF
-        tr.getCell(7).value = { formula:`IF(E${row}=0,0,F${row}/E${row}*100)` } as any; tr.getCell(7).numFmt = PCTF
-        const tyP = prevD ? yoy(COST_ELEMENTS.reduce((a,ce)=>a+((d[ce.key]||{}).planIDR||0),0), COST_ELEMENTS.reduce((a,ce)=>a+((prevD[ce.key]||{}).planIDR||0),0)) : null
-        const tyR = prevD ? yoy(COST_ELEMENTS.reduce((a,ce)=>a+((d[ce.key]||{}).realIDR||0),0), COST_ELEMENTS.reduce((a,ce)=>a+((prevD[ce.key]||{}).realIDR||0),0)) : null
-        if (tyP===null) tr.getCell(8).value='—'; else { tr.getCell(8).value=tyP; tr.getCell(8).numFmt=YOYF }
-        if (tyR===null) tr.getCell(9).value='—'; else { tr.getCell(9).value=tyR; tr.getCell(9).numFmt=YOYF }
-        for (let c=1;c<=9;c++){ const cell=tr.getCell(c); cell.font={bold:true}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF2F4F7'}}; cell.border=box(); if(c>=2&&c!==4&&c!==7) cell.alignment={horizontal:'right'}; if(c===4||c===7||c===8||c===9) cell.alignment={horizontal:'center'} }
+        tr.getCell(6).value = { formula:`IF(B${row}=0,0,C${row}/B${row}*100)` } as any; tr.getCell(6).numFmt = PCTF
+        tr.getCell(7).value = { formula:`IF(D${row}=0,0,E${row}/D${row}*100)` } as any; tr.getCell(7).numFmt = PCTF
+        const sy=(k:string)=>COST_ELEMENTS.reduce((a,ce)=>a+((d[ce.key]||{})[k]||0),0)
+        const py=(k:string)=>prevD?COST_ELEMENTS.reduce((a,ce)=>a+((prevD[ce.key]||{})[k]||0),0):0
+        const tYoy = (col:number, cur:number, prev:number) => { const cell=tr.getCell(col); if(!prevD){cell.value='—'}else{const val=yoy(cur,prev);cell.value=val;cell.numFmt=YOYF} }
+        tYoy(8, sy('planIDR'), py('planIDR')); tYoy(9, sy('planUSD'), py('planUSD'))
+        tYoy(10, sy('realIDR'), py('realIDR')); tYoy(11, sy('realUSD'), py('realUSD'))
+        for (let c=1;c<=11;c++){ const cell=tr.getCell(c); cell.font={bold:true}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF2F4F7'}}; cell.border=box(); if(c>=2&&c<=5) cell.alignment={horizontal:'right'}; if(c>=6) cell.alignment={horizontal:'center'} }
         row += 2
       })
 
@@ -228,10 +230,18 @@ function YieldTab() {
                 <tbody>
                   {COST_ELEMENTS.map(ce => {
                     const v = d[ce.key]||{}; const pv = prevD?.[ce.key]
-                    const yPlan = pv ? yoy(v.planIDR||0, pv.planIDR||0) : 0
-                    const yReal = pv ? yoy(v.realIDR||0, pv.realIDR||0) : 0
+                    const yPlanIDR = pv ? yoy(v.planIDR||0, pv.planIDR||0) : null
+                    const yRealIDR = pv ? yoy(v.realIDR||0, pv.realIDR||0) : null
+                    const yPlanUSD = pv ? yoy(v.planUSD||0, pv.planUSD||0) : null
+                    const yRealUSD = pv ? yoy(v.realUSD||0, pv.realUSD||0) : null
                     const realPctUSD = (v.planUSD||0)>0 ? (v.realUSD||0)/(v.planUSD||0)*100 : 0
                     const realPctIDR = (v.planIDR||0)>0 ? (v.realIDR||0)/(v.planIDR||0)*100 : 0
+                    const yoyCell = (idr:number|null, usd:number|null) => idr===null ? <span style={{ color:'var(--text3)' }}>—</span> : (
+                      <div style={{ lineHeight:1.25 }}>
+                        <div style={{ color: idr>=0?'var(--green)':'var(--red)', fontWeight:600 }}>IDR {idr>=0?'+':''}{pct(idr)}</div>
+                        <div style={{ color: (usd??0)>=0?'var(--green)':'var(--red)', fontSize:10, opacity:0.85 }}>USD {(usd??0)>=0?'+':''}{pct(usd??0)}</div>
+                      </div>
+                    )
                     return (
                       <tr key={ce.key}>
                         <td style={{ fontSize:11 }}><div style={{ fontWeight:600 }}>{ce.short}</div><div style={{ color:'var(--text3)', fontSize:10 }}>{ce.code} · {ce.name}</div></td>
@@ -241,8 +251,8 @@ function YieldTab() {
                         <td style={{ textAlign:'right' }}><MoneyInput currency="IDR" style={{ width:140, textAlign:'right' }} value={v.realIDR||0} onChange={n=>setVal(y,ce.key,'realIDR',n)} /></td>
                         <td style={{ borderLeft:'1px solid var(--border)', textAlign:'center', fontWeight:600, color: realPctUSD>=100?'var(--green)':'var(--text)' }}>{pct(realPctUSD)}</td>
                         <td style={{ textAlign:'center', fontWeight:600, color: realPctIDR>=100?'var(--green)':'var(--text)' }}>{pct(realPctIDR)}</td>
-                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'center', color: !pv?'var(--text3)':yPlan>=0?'var(--green)':'var(--red)', fontWeight:600 }}>{!pv?'—':`${yPlan>=0?'+':''}${pct(yPlan)}`}</td>
-                        <td style={{ textAlign:'center', color: !pv?'var(--text3)':yReal>=0?'var(--green)':'var(--red)', fontWeight:600 }}>{!pv?'—':`${yReal>=0?'+':''}${pct(yReal)}`}</td>
+                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'center' }}>{yoyCell(yPlanIDR, yPlanUSD)}</td>
+                        <td style={{ textAlign:'center' }}>{yoyCell(yRealIDR, yRealUSD)}</td>
                       </tr>
                     )
                   })}
@@ -252,8 +262,16 @@ function YieldTab() {
                     const tPlanUSD=sum('planUSD'), tRealUSD=sum('realUSD'), tPlanIDR=sum('planIDR'), tRealIDR=sum('realIDR')
                     const tRealPctUSD = tPlanUSD>0 ? tRealUSD/tPlanUSD*100 : 0
                     const tRealPctIDR = tPlanIDR>0 ? tRealIDR/tPlanIDR*100 : 0
-                    const tyPlan = prevD ? yoy(tPlanIDR, psum('planIDR')) : 0
-                    const tyReal = prevD ? yoy(tRealIDR, psum('realIDR')) : 0
+                    const tyPlanIDR = prevD ? yoy(tPlanIDR, psum('planIDR')) : null
+                    const tyRealIDR = prevD ? yoy(tRealIDR, psum('realIDR')) : null
+                    const tyPlanUSD = prevD ? yoy(tPlanUSD, psum('planUSD')) : null
+                    const tyRealUSD = prevD ? yoy(tRealUSD, psum('realUSD')) : null
+                    const tYoyCell = (idr:number|null, usd:number|null) => idr===null ? <span style={{ color:'var(--text3)' }}>—</span> : (
+                      <div style={{ lineHeight:1.25 }}>
+                        <div style={{ color: idr>=0?'var(--green)':'var(--red)' }}>IDR {idr>=0?'+':''}{pct(idr)}</div>
+                        <div style={{ color: (usd??0)>=0?'var(--green)':'var(--red)', fontSize:10, opacity:0.85 }}>USD {(usd??0)>=0?'+':''}{pct(usd??0)}</div>
+                      </div>
+                    )
                     return (
                       <tr style={{ borderTop:'2px solid var(--border)', background:'var(--bg3)', fontWeight:800 }}>
                         <td>TOTAL</td>
@@ -263,8 +281,8 @@ function YieldTab() {
                         <td style={{ textAlign:'right' }}>{fmtMoney(tRealIDR,'IDR')}</td>
                         <td style={{ borderLeft:'1px solid var(--border)', textAlign:'center', color: tRealPctUSD>=100?'var(--green)':'var(--text)' }}>{pct(tRealPctUSD)}</td>
                         <td style={{ textAlign:'center', color: tRealPctIDR>=100?'var(--green)':'var(--text)' }}>{pct(tRealPctIDR)}</td>
-                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'center', color: !prevD?'var(--text3)':tyPlan>=0?'var(--green)':'var(--red)' }}>{!prevD?'—':`${tyPlan>=0?'+':''}${pct(tyPlan)}`}</td>
-                        <td style={{ textAlign:'center', color: !prevD?'var(--text3)':tyReal>=0?'var(--green)':'var(--red)' }}>{!prevD?'—':`${tyReal>=0?'+':''}${pct(tyReal)}`}</td>
+                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'center' }}>{tYoyCell(tyPlanIDR, tyPlanUSD)}</td>
+                        <td style={{ textAlign:'center' }}>{tYoyCell(tyRealIDR, tyRealUSD)}</td>
                       </tr>
                     )
                   })()}
