@@ -83,6 +83,14 @@ export async function GET() {
     }
     if (!cfg.loginBackgrounds) cfg.loginBackgrounds = []
 
+    // One-time cleanup: WinS dedicated untuk BPD Procurement — buang sisa "& SS Procurement" di tagline lama
+    for (const k of ['appTagline','loginTagline']) {
+      if (typeof cfg[k] === 'string' && /SS Procurement/i.test(cfg[k])) {
+        cfg[k] = cfg[k].replace(/BPD\s*&\s*SS Procurement/gi, 'BPD Procurement').replace(/\s*&\s*SS Procurement/gi, '').replace(/SS Procurement/gi, 'BPD Procurement')
+        updates[k] = cfg[k]; needsUpdate = true
+      }
+    }
+
     if (needsUpdate) {
       try { await ConfigModel.updateOne({ _id: cfg._id }, { $set: updates }) } catch (e) { console.error('backfill update failed', e) }
     }

@@ -21,7 +21,7 @@ async function seed() {
   const pw = await bcrypt.hash('workpulse123', 10)
   const users = await UserModel.insertMany([
     { name: 'Mas E', email: 'mas.e@pertamina.com', password: pw, role: 'manager', division: 'BPD Proc' },
-    { name: 'Rina S', email: 'rina.s@pertamina.com', password: pw, role: 'member', division: 'SS Proc' },
+    { name: 'Rina S', email: 'rina.s@pertamina.com', password: pw, role: 'member', division: 'BPD Procurement' },
     { name: 'Budi H', email: 'budi.h@pertamina.com', password: pw, role: 'member', division: 'TnD' },
     { name: 'Dewi P', email: 'dewi.p@pertamina.com', password: pw, role: 'member', division: 'EIT' },
     { name: 'Adi K', email: 'adi.k@pertamina.com', password: pw, role: 'member', division: 'PMO' },
@@ -43,7 +43,7 @@ async function seed() {
       actualProgress: 42,
       status: 'on_track',
       year: 2026,
-      pics: ['BPD Proc', 'SS Proc', 'T&D'],
+      pics: ['BPD Proc', 'T&D'],
       milestones: [
         { title: 'Signed BRD v4 by Mgr TnD & Mgr BPD Proc', targetDate: '2026-05-29', actualDate: '2026-05-29', status: 'done' },
         { title: 'Business to Tech handover', targetDate: '2026-06-14', status: 'pending' },
@@ -68,7 +68,7 @@ async function seed() {
       actualProgress: 42,
       status: 'on_track',
       year: 2026,
-      pics: ['BPD Proc', 'TnD', 'SS Proc', 'EIT', 'PMO'],
+      pics: ['BPD Proc', 'TnD', 'EIT', 'PMO'],
       milestones: [
         { title: 'Assessment', targetDate: '2026-01-13', actualDate: '2026-01-13', status: 'done' },
         { title: 'Pengiriman BRD V00', targetDate: '2026-02-10', actualDate: '2026-02-10', status: 'done' },

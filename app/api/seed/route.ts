@@ -18,7 +18,7 @@ export async function POST() {
     const users = [
       { name:'Mas E',   email:'mas.e@workpulse.com',   password:defaultPin, role:'manager', roles:['manager'],          division:'BPD Procurement', active:true, noPekerja:'BPD-001', jabatan:'Manager', birthDate:'1985-04-15', phone:'08123456001', bank:'Mandiri', noRekening:'1234567890' },
       { name:'Admin',   email:'admin@workpulse.com',   password:defaultPin, role:'admin',   roles:['admin','manager'],  division:'IT', active:true, jabatan:'IT Admin', birthDate:'1988-06-20', phone:'08123456002' },
-      { name:'Rina S',  email:'rina.s@workpulse.com',  password:defaultPin, role:'member',  roles:['member'],           division:'SS Procurement', active:true, jabatan:'Senior Analyst', birthDate:'1990-09-12', phone:'08123456003' },
+      { name:'Rina S',  email:'rina.s@workpulse.com',  password:defaultPin, role:'member',  roles:['member'],           division:'BPD Procurement', active:true, jabatan:'Senior Analyst', birthDate:'1990-09-12', phone:'08123456003' },
       { name:'Budi H',  email:'budi.h@workpulse.com',  password:defaultPin, role:'member',  roles:['member'],           division:'TnD', active:true, birthDate:'1992-11-08', phone:'08123456004' },
       { name:'Dewi P',  email:'dewi.p@workpulse.com',  password:defaultPin, role:'member',  roles:['member'],           division:'EIT', active:true, birthDate: tdStr, phone:'08123456005' },
       { name:'Adi K',   email:'adi.k@workpulse.com',   password:defaultPin, role:'member',  roles:['member'],           division:'PMO', active:true, birthDate:'1989-03-22', phone:'08123456006' },
@@ -30,7 +30,7 @@ export async function POST() {
     }
 
     const existingCfg = await ConfigModel.findOne({})
-    if (!existingCfg) await ConfigModel.create({ appName:'WorkPulse', appTagline:'BPD & SS Procurement', appColor:'#4f8ef7', activeYear:2026 })
+    if (!existingCfg) await ConfigModel.create({ appName:'WorkPulse', appTagline:'BPD Procurement', appColor:'#4f8ef7', activeYear:2026 })
 
     const initCount = await InitiativeModel.countDocuments({})
     if (initCount === 0) {

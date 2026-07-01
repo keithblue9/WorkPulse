@@ -16,7 +16,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   return {
     name: appName,
     short_name: appName,
-    description: 'Team workspace untuk BPD & SS Procurement',
+    description: 'Team workspace untuk BPD Procurement',
     start_url: '/dashboard',
     display: 'standalone',
     orientation: 'portrait',

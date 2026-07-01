@@ -122,7 +122,7 @@ function YieldTab() {
       const USDF = '"$"#,##0.00'; const IDRF = '"Rp"#,##0'; const PCTF = '0.0"%"'; const YOYF = '+0.0"%";-0.0"%";0"%"'
 
       ws.mergeCells('A1:I1'); const t1 = ws.getCell('A1'); t1.value = 'BUDGET REPORT — YIELD'; t1.font = { bold:true, size:15, color:{argb:'FF1A3D7C'} }; t1.alignment = { horizontal:'center' }
-      ws.mergeCells('A2:I2'); const t2 = ws.getCell('A2'); t2.value = 'Fungsi BPD & SS Procurement Pertamina — Plan vs Realisasi per Cost Element (USD & IDR)'; t2.font = { size:10, color:{argb:'FF667085'} }; t2.alignment = { horizontal:'center' }
+      ws.mergeCells('A2:I2'); const t2 = ws.getCell('A2'); t2.value = 'Fungsi BPD Procurement Pertamina — Plan vs Realisasi per Cost Element (USD & IDR)'; t2.font = { size:10, color:{argb:'FF667085'} }; t2.alignment = { horizontal:'center' }
       ws.mergeCells('A3:I3'); const t3 = ws.getCell('A3'); t3.value = `Diekspor: ${new Date().toLocaleString('id-ID')}`; t3.font = { size:9, italic:true, color:{argb:'FF98A2B3'} }; t3.alignment = { horizontal:'center' }
 
       let row = 5

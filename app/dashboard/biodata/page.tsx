@@ -158,7 +158,7 @@ export default function BiodataPage() {
       // ===== Sheet Ringkasan (semua member) =====
       const sum = wb.addWorksheet('Ringkasan', { views:[{ showGridLines:false, state:'frozen', ySplit:2 }] })
       sum.columns = [{width:4},{width:24},{width:12},{width:20},{width:18},{width:20},{width:16},{width:14},{width:22}]
-      sum.mergeCells('A1:I1'); const st = sum.getCell('A1'); st.value = 'MEMBER BIODATA — BPD & SS Procurement'; st.font = { bold:true, size:14, color:{argb:'FF1A3D7C'} }; st.alignment = { horizontal:'center' }
+      sum.mergeCells('A1:I1'); const st = sum.getCell('A1'); st.value = 'MEMBER BIODATA — BPD Procurement'; st.font = { bold:true, size:14, color:{argb:'FF1A3D7C'} }; st.alignment = { horizontal:'center' }
       const sh = sum.getRow(2); ['No','Nama','No Pekerja','Jabatan','No KTP','Email','No HP','Bank','No Rekening'].forEach((h,i)=>{ const c=sh.getCell(i+1); c.value=h; c.font={bold:true,color:{argb:'FFFFFFFF'}}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF4F8EF7'}}; c.alignment={horizontal:'center'}; c.border=box() })
       users.forEach((u,i)=>{ const r=sum.getRow(3+i); const vals=[i+1,u.name,u.noPekerja||'-',u.jabatan||'-',u.noKtp||'-',u.email||'-',u.phone||'-',u.bank||'-',u.noRekening||'-']; vals.forEach((v,j)=>{ const c=r.getCell(j+1); c.value=v as any; c.border=box(); c.alignment={ vertical:'middle', horizontal:j===0?'center':'left' }; if(j===4||j===8) c.numFmt='@' }) })
 

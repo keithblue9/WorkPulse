@@ -24,11 +24,11 @@ const DashboardWidgetSchema = new Schema({
 
 const ConfigSchema = new Schema({
   appName: { type:String, default:'WorkPulse' },
-  appTagline: { type:String, default:'BPD & SS Procurement' },
+  appTagline: { type:String, default:'BPD Procurement' },
   appIcon: { type:String, default:'' },
   appColor: { type:String, default:'#4f8ef7' },
 
-  loginTagline: { type:String, default:'BPD & SS Procurement — Pertamina' },
+  loginTagline: { type:String, default:'BPD Procurement — Pertamina' },
   loginBackgrounds: { type:[String], default:[] },
   loginSlideInterval: { type:Number, default:5000 },
   loginBgMaxSize: { type:Number, default:5 },

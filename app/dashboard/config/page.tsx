@@ -433,7 +433,7 @@ export default function ConfigPage() {
                   <div><label style={lbl}>Nama Aplikasi</label>
                     <input className="input" defaultValue={config.appName} onBlur={e=>e.target.value!==config.appName && save({ appName: e.target.value })} placeholder="WorkPulse" /></div>
                   <div><label style={lbl}>Tagline / Subtitle</label>
-                    <input className="input" defaultValue={config.appTagline} onBlur={e=>e.target.value!==config.appTagline && save({ appTagline: e.target.value })} placeholder="BPD & SS Procurement" /></div>
+                    <input className="input" defaultValue={config.appTagline} onBlur={e=>e.target.value!==config.appTagline && save({ appTagline: e.target.value })} placeholder="BPD Procurement" /></div>
                   <div style={{ display:'flex', gap:10, alignItems:'flex-end' }}>
                     <div style={{ flex:1 }}><label style={lbl}>Warna Brand Utama</label>
                       <div style={{ display:'flex', gap:8, alignItems:'center' }}>
@@ -464,7 +464,7 @@ export default function ConfigPage() {
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                 <div>
                   <label style={lbl}>Tagline Login Page</label>
-                  <input className="input" defaultValue={config.loginTagline||''} onBlur={e=>e.target.value!==config.loginTagline && save({ loginTagline: e.target.value })} placeholder="BPD & SS Procurement — Pertamina" />
+                  <input className="input" defaultValue={config.loginTagline||''} onBlur={e=>e.target.value!==config.loginTagline && save({ loginTagline: e.target.value })} placeholder="BPD Procurement — Pertamina" />
                   <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Tulisan ini muncul di bawah nama aplikasi di halaman login.</div>
                 </div>
 

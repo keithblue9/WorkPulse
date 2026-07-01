@@ -19,7 +19,7 @@ export default function LoginPage() {
   const [showUserPicker, setShowUserPicker] = useState(false)
   const [pin, setPin] = useState<string[]>(['', '', '', '', '', ''])
   const [loading, setLoading] = useState(false)
-  const [config, setConfig] = useState<any>({ appName: 'WorkPulse', loginTagline: 'BPD & SS Procurement — Pertamina', appColor: '#4f8ef7', appIcon: '', loginBackgrounds: [], loginSlideInterval: 5000 })
+  const [config, setConfig] = useState<any>({ appName: 'WorkPulse', loginTagline: 'BPD Procurement — Pertamina', appColor: '#4f8ef7', appIcon: '', loginBackgrounds: [], loginSlideInterval: 5000 })
   const [currentSlide, setCurrentSlide] = useState(0)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
   const pickerRef = useRef<HTMLDivElement>(null)

@@ -131,7 +131,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const allItems = NAV_GROUPS.flatMap(g=>g.items)
   const currentPage = allItems.find(n=>pathname===n.href||(n.href!=='/dashboard'&&pathname.startsWith(n.href)))?.label || (pathname==='/dashboard/profile'?'My Profile':'Dashboard')
   const appName = appConfig?.appName || 'WorkPulse'
-  const appTagline = appConfig?.appTagline || 'BPD & SS Procurement'
+  const appTagline = appConfig?.appTagline || 'BPD Procurement'
 
   return (
     <div className="app-shell" style={{ display:'flex', overflow:'hidden', background:'var(--bg)' }}>
