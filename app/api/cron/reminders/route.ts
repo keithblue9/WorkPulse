@@ -45,7 +45,7 @@ async function dailyBroadcast(jakartaToday: string) {
     }
     body += teamLine
 
-    const r = await sendPushToUser(email, { title: '⏰ WinS — Pengingat Hari Ini', body, url: '/dashboard/presensi', tag: `daily-${jakartaToday}` })
+    const r = await sendPushToUser(email, { title: '⏰ WinS — Pengingat Hari Ini', body, url: '/dashboard/attendance', tag: `daily-${jakartaToday}` })
     if ((r as any)?.sent) sent++
   }
   return { recipients: emails.length, sent }
