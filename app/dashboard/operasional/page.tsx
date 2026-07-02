@@ -110,8 +110,8 @@ function SettlementTab({ user }: { user:any }) {
 
   async function doVerify() {
     const ids = Array.from(selected).filter(id => verifiableIds.includes(id))
-    if (ids.length===0) { toast.error('Pilih minimal 1 item (status Done) untuk diverify'); return }
-    if (!confirm(`Verify ${ids.length} item? Status berubah Done → Verified dan Settlement Cash Card bulan ${MONTHS[month]} ${year} akan dihitung otomatis.`)) return
+    if (ids.length===0) { toast.error('Pilih minimal 1 item (status Waiting for Verification) untuk diverify'); return }
+    if (!confirm(`Verify ${ids.length} item? Status berubah Waiting for Verification → Verified dan Settlement Cash Card bulan ${MONTHS[month]} ${year} akan dihitung otomatis.`)) return
     setVerifying(true)
     try {
       const r = await fetch('/api/settlement/verify', { method:'POST', headers:{'Content-Type':'application/json'},
@@ -124,8 +124,8 @@ function SettlementTab({ user }: { user:any }) {
   }
 
   async function verifyOne(item:any) {
-    if (!verifiableIds.includes(item._id)) { toast.error('Item ini belum bisa diverify (harus status Done)'); return }
-    if (!confirm(`Verify item "${item.title}"? Status Done → Verified & Settlement CC ${MONTHS[month]} ${year} dihitung ulang.`)) return
+    if (!verifiableIds.includes(item._id)) { toast.error('Item ini belum bisa diverify (harus status Waiting for Verification)'); return }
+    if (!confirm(`Verify item "${item.title}"? Status Waiting for Verification → Verified & Settlement CC ${MONTHS[month]} ${year} dihitung ulang.`)) return
     setVerifying(true)
     try {
       const r = await fetch('/api/settlement/verify', { method:'POST', headers:{'Content-Type':'application/json'},
@@ -152,7 +152,7 @@ function SettlementTab({ user }: { user:any }) {
   // pindah sumber Petty <-> CC (propagasi ke reimburse + cashier + settlement)
   async function toggleSource(r:any, e?:any) {
     e?.stopPropagation?.()
-    if (r.status==='verified') { toast.error('Sudah verified — reverse dulu ke Done sebelum ganti sumber'); return }
+    if (r.status==='verified') { toast.error('Sudah verified — reverse dulu ke Waiting for Verification sebelum ganti sumber'); return }
     const toCC = !r.isCashCard
     if (!confirm(`Ubah sumber "${r.title}" ke ${toCC?'Cash Card':'Petty Cash'}?`)) return
     await fetch(`/api/reimbursements/${r._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'},
@@ -162,11 +162,11 @@ function SettlementTab({ user }: { user:any }) {
 
   async function reverseItem(r:any) {
     if (r.status!=='verified') return
-    if (!confirm(`Reverse "${r.title}" dari Verified kembali ke Done? Settlement Cash Card bulan itu akan dihitung ulang.`)) return
+    if (!confirm(`Reverse "${r.title}" dari Verified kembali ke Waiting for Verification? Settlement Cash Card bulan itu akan dihitung ulang.`)) return
     const res = await fetch('/api/settlement/reverse', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: r._id }) })
     const j = await res.json()
     if (!res.ok) { toast.error(j.error||'Gagal reverse'); return }
-    toast.success('Reverse berhasil — status kembali Done'); setViewing(null); await load()
+    toast.success('Reverse berhasil — status kembali Waiting for Verification'); setViewing(null); await load()
   }
 
   async function exportXLSX() {
@@ -325,7 +325,7 @@ function SettlementTab({ user }: { user:any }) {
         onReverse={reverseItem} />}
 
       <div style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', flexShrink:0 }}>
-        <div style={{ fontSize:11, color:'var(--text3)', maxWidth:520 }}>Alur: <b>centang</b> item Done → <b>Evidence</b> (unduh lampiran yg dicentang, cek manual) → <b>Verify</b> (status jadi Verified) → baru <b>Export Excel/PDF</b> aktif.</div>
+        <div style={{ fontSize:11, color:'var(--text3)', maxWidth:520 }}>Alur: <b>centang</b> item Waiting for Verification → <b>Evidence</b> (unduh lampiran yg dicentang, cek manual) → <b>Verify</b> (status jadi Verified) → baru <b>Export Excel/PDF</b> aktif.</div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
           <button onClick={exportXLSX} className="btn btn-sm btn-primary" disabled={exporting} style={{ opacity: exportsEnabled?1:0.55 }}>{exporting?'...':'📗 Export Excel'}</button>
           <button onClick={exportPDF} className="btn btn-sm" style={{ opacity: exportsEnabled?1:0.55 }}>📄 Export PDF</button>
@@ -551,7 +551,7 @@ function DetailModal({ item, onClose, onToggleSource, onVerify, onReverse, onCla
         </div>
         <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', alignItems:'center', gap:8, flexWrap:'wrap' }}>
           {isVerified ? (
-            onReverse && <button onClick={()=>onReverse(item)} className="btn btn-sm" style={{ color:'var(--amber)' }} title="Mundurkan status ke Done">↩️ Reverse ke Done</button>
+            onReverse && <button onClick={()=>onReverse(item)} className="btn btn-sm" style={{ color:'var(--amber)' }} title="Mundurkan status ke Waiting for Verification">↩️ Reverse ke Waiting for Verification</button>
           ) : isClarification ? (
             <span style={{ fontSize:11, color:'var(--text3)' }}>Menunggu member merevisi & mengirim ulang.</span>
           ) : clarifyMode ? (
@@ -656,8 +656,8 @@ function RincianModal({ kind, detail, summary, month, year, onClose }:
 function boxBorder() { const s = { style:'thin' as const, color:{argb:'FFBFBFBF'} }; return { top:s, bottom:s, left:s, right:s } }
 function statusBadge(s:string) {
   const cfg: Record<string,{label:string;color:string;bg:string}> = {
-    submitted:{ label:'Menunggu', color:'var(--amber)', bg:'var(--amberbg)' }, approved:{ label:'Menunggu', color:'var(--amber)', bg:'var(--amberbg)' },
-    done:{ label:'Done', color:'var(--green)', bg:'var(--greenbg)' }, paid:{ label:'Done', color:'var(--green)', bg:'var(--greenbg)' },
+    submitted:{ label:'Waiting for Payment', color:'var(--amber)', bg:'var(--amberbg)' }, approved:{ label:'Waiting for Payment', color:'var(--amber)', bg:'var(--amberbg)' },
+    done:{ label:'Waiting for Verification', color:'var(--green)', bg:'var(--greenbg)' }, paid:{ label:'Waiting for Verification', color:'var(--green)', bg:'var(--greenbg)' },
     verified:{ label:'Verified', color:'var(--brand)', bg:'var(--brand-soft)' }, rejected:{ label:'Ditolak', color:'var(--red)', bg:'var(--redbg)' },
     clarification:{ label:'Clarification', color:'#b45309', bg:'#fff3e0' },
   }

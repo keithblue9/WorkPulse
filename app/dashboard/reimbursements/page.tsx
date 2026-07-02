@@ -490,8 +490,8 @@ function PengajuanTab({ items, loading, reload, user, isAdminish }: { items:any[
 
       <div style={{ display:'flex', gap:8, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, alignItems:'center', flexWrap:'wrap' }}>
         <button onClick={()=>setStatusTab('all')} style={chip(statusTab==='all')}>Semua ({stats.all})</button>
-        <button onClick={()=>setStatusTab('submitted')} style={chip(statusTab==='submitted','var(--amber)')}>Menunggu ({stats.submitted})</button>
-        <button onClick={()=>setStatusTab('done')} style={chip(statusTab==='done','var(--green)')}>Done ({stats.done})</button>
+        <button onClick={()=>setStatusTab('submitted')} style={chip(statusTab==='submitted','var(--amber)')}>Waiting for Payment ({stats.submitted})</button>
+        <button onClick={()=>setStatusTab('done')} style={chip(statusTab==='done','var(--green)')}>Waiting for Verification ({stats.done})</button>
         {stats.clarification>0 && <button onClick={()=>setStatusTab('clarification')} style={chip(statusTab==='clarification','#b45309')}>🔄 Klarifikasi ({stats.clarification})</button>}
         <button onClick={()=>setStatusTab('verified')} style={chip(statusTab==='verified','var(--brand)')}>Verified ({stats.verified})</button>
         <div style={{ marginLeft:'auto', display:'flex', gap:6, alignItems:'center' }}>
@@ -649,7 +649,7 @@ function CashierTab({ items, loading, reload }: { items:any[]; loading:boolean; 
         </div>
 
         <div>
-          <div style={{ fontSize:13, fontWeight:600, marginBottom:8 }}>✅ Done ({done.length})</div>
+          <div style={{ fontSize:13, fontWeight:600, marginBottom:8 }}>✅ Sudah Ditransfer ({done.length})</div>
           {done.length === 0 ? <div className="card" style={{ padding:20, textAlign:'center', color:'var(--text3)', fontSize:12 }}>Belum ada riwayat transfer</div> : (
             <div className="card" style={{ overflow:'auto' }}>
               <table className="wp-table" style={{ minWidth:900 }}>
@@ -701,13 +701,13 @@ function CashierTab({ items, loading, reload }: { items:any[]; loading:boolean; 
 // =====================  shared bits  =====================
 function statusBadge(s:string) {
   const cfg: Record<string,{label:string;color:string;bg:string}> = {
-    submitted: { label:'Menunggu', color:'var(--amber)', bg:'var(--amberbg)' },
-    approved: { label:'Menunggu', color:'var(--amber)', bg:'var(--amberbg)' },
+    submitted: { label:'Waiting for Payment', color:'var(--amber)', bg:'var(--amberbg)' },
+    approved: { label:'Waiting for Payment', color:'var(--amber)', bg:'var(--amberbg)' },
     draft: { label:'Draft', color:'var(--text3)', bg:'var(--bg3)' },
     reversal_requested: { label:'Pembatalan Diminta', color:'var(--amber)', bg:'var(--amberbg)' },
     reversal_approved: { label:'Pembatalan Disetujui', color:'var(--red)', bg:'var(--redbg)' },
-    done: { label:'Done', color:'var(--green)', bg:'var(--greenbg)' },
-    paid: { label:'Done', color:'var(--green)', bg:'var(--greenbg)' },
+    done: { label:'Waiting for Verification', color:'var(--green)', bg:'var(--greenbg)' },
+    paid: { label:'Waiting for Verification', color:'var(--green)', bg:'var(--greenbg)' },
     verified: { label:'Verified', color:'var(--brand)', bg:'var(--brand-soft)' },
     rejected: { label:'Ditolak', color:'var(--red)', bg:'var(--redbg)' },
     clarification: { label:'Clarification', color:'#b45309', bg:'#fff3e0' },
