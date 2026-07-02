@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  PieChart, Pie, Cell, BarChart, ReferenceLine,
+  PieChart, Pie, Cell,
 } from 'recharts'
 
 const C = { plan: '#4f8ef7', real: '#22c55e', realLow: '#f59e0b', used: '#ef4444', avail: '#4f8ef7', purple: '#8b7adc', amber: '#f59e0b' }
@@ -66,7 +66,7 @@ export default function BudgetInsights() {
     })()
   }, [])
 
-  const { years, trend, curYear, donut, waterfall, prognosaTotal, hasData } = useMemo(() => {
+  const { trend, donut3, budgetBars, catColors, legendCats, hasData } = useMemo(() => {
     const byYear: Record<number, any[]> = {}
     for (const r of rows) { (byYear[r.year] = byYear[r.year] || []).push(r) }
     const years = Object.keys(byYear).map(Number).sort((a, b) => a - b)
@@ -77,26 +77,37 @@ export default function BudgetInsights() {
       return { year: String(y), plan, real, pct: plan > 0 ? +(real / plan * 100).toFixed(1) : 0 }
     })
     const nowY = new Date().getFullYear()
-    const curYear = years.includes(nowY) ? nowY : (years.length ? years[years.length - 1] : nowY)
-    const curList = byYear[curYear] || []
-    const donut = curList.map(r => ({ name: catName(r.category), value: r.annualRealIDR || 0 })).filter(d => d.value > 0)
-    const planTot = curList.reduce((s, r) => s + (r.annualBudgetIDR || 0), 0)
-    const realTot = curList.reduce((s, r) => s + (r.annualRealIDR || 0), 0)
-    const availTot = planTot - realTot
-    const prognosaTotal = curList.reduce((s, r) => s + (r.annualBudgetIDR || 0) * ((r.category === 'travel' ? thr.travel : r.category === 'accommodation' ? thr.accommodation : 80) / 100), 0)
-    // 3 bar perbandingan dari 0 biar tinggi bar = nilainya (bukan floating waterfall yg bikin Terpakai mepet RKAP)
-    const waterfall = [
-      { name: 'RKAP', base: 0, val: planTot, fill: C.plan, label: rp(planTot) },
-      { name: 'Terpakai', base: 0, val: realTot, fill: C.used, label: rp(realTot) },
-      { name: 'Sisa', base: 0, val: Math.max(0, availTot), fill: C.real, label: rp(availTot) },
-    ]
-    return { years, trend, curYear, donut, waterfall, prognosaTotal, hasData: rows.length > 0 }
+    // rolling: 3 tahun terakhir yang ada datanya
+    const last3 = years.slice(-3)
+
+    // warna konsisten per cost element di semua tahun
+    const catKeys = Array.from(new Set(rows.map(r => r.category)))
+    const catColors: Record<string, string> = {}
+    catKeys.forEach((k, i) => { catColors[k] = PIE_COLORS[i % PIE_COLORS.length] })
+    const legendCats = catKeys.map(k => ({ key: k, name: catName(k) }))
+
+    const donut3 = last3.map(y => {
+      const list = byYear[y] || []
+      const data = list.map(r => ({ name: catName(r.category), value: r.annualRealIDR || 0, key: r.category })).filter(d => d.value > 0)
+      return { year: y, data, total: data.reduce((s, d) => s + d.value, 0) }
+    })
+
+    const thrOf = (cat: string) => (cat === 'travel' ? thr.travel : cat === 'accommodation' ? thr.accommodation : 80) / 100
+    const budgetBars = last3.map(y => {
+      const list = byYear[y] || []
+      const plan = list.reduce((s, r) => s + (r.annualBudgetIDR || 0), 0)
+      const real = list.reduce((s, r) => s + (r.annualRealIDR || 0), 0)
+      const prog = list.reduce((s, r) => s + (r.annualBudgetIDR || 0) * thrOf(r.category), 0)
+      return { year: String(y), RKAP: plan, Terpakai: real, Sisa: Math.max(0, plan - real), Prognosa: prog }
+    })
+
+    return { trend, donut3, budgetBars, catColors, legendCats, hasData: rows.length > 0 }
   }, [rows, thr])
 
   if (loading) return <div className="card" style={{ padding: 20, fontSize: 12.5, color: 'var(--text3)' }}>Memuat infografis budget…</div>
   if (!hasData) return null
 
-  const donutTotal = donut.reduce((s, d) => s + d.value, 0)
+  const yrLabel = donut3.length ? `${donut3[0].year}–${donut3[donut3.length - 1].year}` : ''
 
   return (
     <div style={{ marginBottom: 18 }}>
@@ -126,41 +137,62 @@ export default function BudgetInsights() {
           </ResponsiveContainer>
         </CardBox>
 
-        {/* 2. Donut: komposisi realisasi cost element */}
-        <CardBox title={`Komposisi Realisasi ${curYear}`} sub="Porsi realisasi per cost element (IDR)">
-          {donut.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--text3)', padding: '40px 0', textAlign: 'center' }}>Belum ada realisasi {curYear}.</div>
-          ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie data={donut} dataKey="value" nameKey="name" innerRadius={58} outerRadius={88} paddingAngle={2} stroke="none">
-                  {donut.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                </Pie>
-                <Tooltip content={({ active, payload }: any) => active && payload?.length ? (
-                  <TipBox rows={[
-                    { name: payload[0].name, val: rp(payload[0].value), color: payload[0].payload.fill },
-                    { name: 'Porsi', val: donutTotal > 0 ? (payload[0].value / donutTotal * 100).toFixed(1) + '%' : '—' },
-                  ]} />) : null} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
+        {/* 2. Donut per tahun: komposisi realisasi cost element (3 tahun terakhir) */}
+        <CardBox title={`Komposisi Realisasi ${yrLabel}`} sub="Porsi realisasi per cost element (IDR) · 3 tahun terakhir">
+          <div style={{ display: 'flex', gap: 6 }}>
+            {donut3.map(d => (
+              <div key={d.year} style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 2 }}>{d.year}</div>
+                {d.data.length === 0 ? (
+                  <div style={{ fontSize: 10, color: 'var(--text3)', padding: '58px 0' }}>Belum ada</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={150}>
+                    <PieChart>
+                      <Pie data={d.data} dataKey="value" nameKey="name" innerRadius={34} outerRadius={54} paddingAngle={2} stroke="none">
+                        {d.data.map((seg, i) => <Cell key={i} fill={catColors[seg.key] || PIE_COLORS[i % PIE_COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip content={({ active, payload }: any) => active && payload?.length ? (
+                        <TipBox rows={[
+                          { name: payload[0].name, val: rp(payload[0].value), color: payload[0].payload.fill },
+                          { name: 'Porsi', val: d.total > 0 ? (payload[0].value / d.total * 100).toFixed(1) + '%' : '—' },
+                        ]} />) : null} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+                <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{rpShort(d.total)}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+            {legendCats.map(c => (
+              <span key={c.key} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text2)' }}>
+                <span style={{ width: 9, height: 9, borderRadius: 2, background: catColors[c.key], display: 'inline-block' }} />{c.name}
+              </span>
+            ))}
+          </div>
         </CardBox>
 
-        {/* 3. Waterfall: RKAP -> terpakai -> sisa, garis prognosa */}
-        <CardBox title={`Prognosa & Sisa Budget ${curYear}`} sub="Perbandingan RKAP vs terpakai (realisasi) vs sisa · garis = prognosa (threshold)">
+        {/* 3. Grouped bar per tahun: RKAP / Terpakai / Sisa + garis Prognosa (3 tahun terakhir) */}
+        <CardBox title={`Prognosa & Sisa Budget ${yrLabel}`} sub="RKAP vs Terpakai vs Sisa per tahun · garis = Prognosa (threshold)">
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={waterfall} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <ComposedChart data={budgetBars} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text3)' }} />
+              <XAxis dataKey="year" tick={{ fontSize: 11, fill: 'var(--text3)' }} />
               <YAxis tickFormatter={rpShort} tick={{ fontSize: 10, fill: 'var(--text3)' }} width={48} />
-              <Tooltip cursor={{ fill: 'transparent' }} content={({ active, payload }: any) => active && payload?.length ? (
-                <TipBox rows={[{ name: payload[0].payload.name, val: payload[0].payload.label, color: payload[0].payload.fill }]} />) : null} />
-              <Bar dataKey="val" radius={[3, 3, 0, 0]} maxBarSize={60}>
-                {waterfall.map((d, i) => <Cell key={i} fill={d.fill} />)}
-              </Bar>
-              {prognosaTotal > 0 && <ReferenceLine y={prognosaTotal} stroke={C.purple} strokeDasharray="5 4" label={{ value: 'Prognosa ' + rpShort(prognosaTotal), position: 'insideTopRight', fontSize: 10, fill: C.purple }} />}
-            </BarChart>
+              <Tooltip cursor={{ fill: 'transparent' }} content={({ active, payload, label }: any) => active && payload?.length ? (
+                <TipBox rows={[
+                  { name: 'Tahun', val: label },
+                  { name: 'RKAP', val: rp(payload[0]?.payload.RKAP), color: C.plan },
+                  { name: 'Terpakai', val: rp(payload[0]?.payload.Terpakai), color: C.used },
+                  { name: 'Sisa', val: rp(payload[0]?.payload.Sisa), color: C.real },
+                  { name: 'Prognosa', val: rp(payload[0]?.payload.Prognosa), color: C.purple },
+                ]} />) : null} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="RKAP" fill={C.plan} radius={[3, 3, 0, 0]} maxBarSize={26} />
+              <Bar dataKey="Terpakai" fill={C.used} radius={[3, 3, 0, 0]} maxBarSize={26} />
+              <Bar dataKey="Sisa" fill={C.real} radius={[3, 3, 0, 0]} maxBarSize={26} />
+              <Line dataKey="Prognosa" stroke={C.purple} strokeWidth={2} strokeDasharray="5 4" dot={{ r: 3, fill: C.purple }} />
+            </ComposedChart>
           </ResponsiveContainer>
         </CardBox>
       </div>
