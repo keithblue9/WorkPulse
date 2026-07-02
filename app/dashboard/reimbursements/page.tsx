@@ -336,16 +336,10 @@ function TransferModal({ item, onClose, onSave }: { item:any; onClose:()=>void; 
 
           {/* Evidence + Bill date */}
           <div>
-            <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text3)', marginBottom:4 }}><span>Evidence ({(item.documents||[]).length} file)</span><span>Bill Date: {billStr}</span></div>
-            {(item.documents||[]).length>0 ? (
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                {item.documents.map((d:any,i:number)=>(
-                  <a key={i} href={d.url} download={d.name} className="btn btn-sm" style={{ justifyContent:'space-between', textDecoration:'none', fontSize:11 }}>
-                    <span>📄 {d.name||`evidence_${i+1}`}</span><span style={{ color:'var(--text3)' }}>{billStr}</span>
-                  </a>
-                ))}
-              </div>
-            ) : <div style={{ fontSize:11, color:'var(--red)' }}>Belum ada evidence.</div>}
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text3)', marginBottom:4 }}><span>Bill Date: {billStr}</span></div>
+            {(item.documents||[]).length>0
+              ? <EvidenceList documents={item.documents} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
+              : <div style={{ fontSize:11, color:'var(--red)' }}>Belum ada evidence.</div>}
           </div>
 
           <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, cursor:'pointer' }}>
