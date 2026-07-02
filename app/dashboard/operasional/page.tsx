@@ -155,9 +155,13 @@ function SettlementTab({ user }: { user:any }) {
     if (r.status==='verified') { toast.error('Sudah verified — reverse dulu ke Waiting for Verification sebelum ganti sumber'); return }
     const toCC = !r.isCashCard
     if (!confirm(`Ubah sumber "${r.title}" ke ${toCC?'Cash Card':'Petty Cash'}?`)) return
-    await fetch(`/api/reimbursements/${r._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ isCashCard: toCC, source: toCC?'cash_card':'petty_cash' }) })
-    toast.success('Sumber diperbarui'); await load()
+    const payload:any = { isCashCard: toCC, source: toCC?'cash_card':'petty_cash' }
+    // Pindah ke Petty Cash: item ga perlu verifikasi CC -> kalau masih Waiting for Verification, langsung verified
+    if (!toCC && (r.status==='done' || r.status==='paid')) {
+      payload.status = 'verified'; payload.verifiedAt = new Date().toISOString(); payload.verifiedBy = `${user?.name||'-'} (Petty Cash)`
+    }
+    await fetch(`/api/reimbursements/${r._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+    toast.success(!toCC && payload.status==='verified' ? 'Diubah ke Petty Cash & langsung selesai (verified)' : 'Sumber diperbarui'); await load()
   }
 
   async function reverseItem(r:any) {

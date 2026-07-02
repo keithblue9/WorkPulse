@@ -282,9 +282,15 @@ function TransferModal({ item, onClose, onSave }: { item:any; onClose:()=>void; 
     setProcessing(true)
     try {
       const isCC = source === 'cash_card'
+      // Petty Cash: setelah ditransfer cashier langsung SELESAI (verified), ga lewat settlement CC.
+      // Cash Card: masuk 'done' (Waiting for Verification) utk diverifikasi CC saat settlement.
+      const now = new Date().toISOString()
+      const statusPayload: any = isCC
+        ? { status:'done' }
+        : { status:'verified', verifiedAt: now, verifiedBy: `${user?.name||'Cashier'} (Petty Cash)` }
       const updateRes = await fetch(`/api/reimbursements/${item._id}`, {
         method:'PATCH', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ status:'done', isCashCard:isCC, source, hasBiayaAntarBank: hasBiaya, biayaAntarBank: hasBiaya ? biaya : 0, totalTransfer: total, transferredAt: new Date().toISOString(), transferredBy: user?.name, whatsappSent: true })
+        body: JSON.stringify({ ...statusPayload, isCashCard:isCC, source, hasBiayaAntarBank: hasBiaya, biayaAntarBank: hasBiaya ? biaya : 0, totalTransfer: total, transferredAt: now, transferredBy: user?.name, whatsappSent: true })
       })
       if (!updateRes.ok) { toast.error('Gagal update'); return }
       try {
