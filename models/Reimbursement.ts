@@ -16,10 +16,14 @@ const ReimbursementSchema = new Schema({
   billDate: String,   // tanggal bukti/nota/invoice (YYYY-MM-DD)
   documents: { type:[DocumentSchema], default:[] },
   receiptUrl: String,
-  // Status flow: submitted (Menunggu) -> done (dibayar cashier) -> verified (divalidasi CC Holder saat settlement)
-  status: { type:String, enum:['submitted','done','verified','rejected','draft','approved','paid','reversal_requested','reversal_approved'], default:'submitted' },
+  // Status flow: submitted (Waiting for Payment) -> done (dibayar cashier, Waiting for Verification)
+  //   -> verified (divalidasi CC Holder). Jika evidence kurang saat verifikasi: done -> clarification
+  //   (dibalikin ke member) -> member revisi & submit ulang -> done (langsung Waiting for Verification, skip cashier).
+  status: { type:String, enum:['submitted','done','verified','rejected','draft','approved','paid','clarification','reversal_requested','reversal_approved'], default:'submitted' },
   // Settlement verification (slide 4)
   verifiedAt: String, verifiedBy: String, settlementMonth: Number, settlementYear: Number,
+  // Clarification (CC Holder balikin ke member karena evidence kurang)
+  clarifyNote: String, clarifiedBy: String, clarifiedAt: String, clarifyCount: { type:Number, default:0 }, resubmittedAt: String,
   // Reversal / cancellation flow
   reversalRequestedBy: String, reversalRequestedAt: String, reversalReason: String,
   reversalApprovedBy: String, reversalApprovedAt: String,

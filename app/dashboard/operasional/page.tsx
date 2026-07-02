@@ -93,7 +93,7 @@ function SettlementTab({ user }: { user:any }) {
   const periodItems = useMemo(() => items.filter(r => {
     if (!allSources && !r.isCashCard) return false
     const d = periodDate(r); if (!d || d.getMonth()!==month || d.getFullYear()!==year) return false
-    return ['done','paid','verified'].includes(r.status)
+    return ['done','paid','verified','clarification'].includes(r.status)
   }).sort((a,b)=>(periodDate(a)?.getTime()||0)-(periodDate(b)?.getTime()||0)), [items, allSources, month, year])
 
   const verifiableIds = periodItems.filter(r => r.status==='done'||r.status==='paid').map(r=>r._id)
@@ -134,6 +134,18 @@ function SettlementTab({ user }: { user:any }) {
       if (!r.ok) { toast.error(j.error||'Gagal verify'); return }
       toast.success(`Verified · Settlement CC = Rp ${fmt(j.data.settlementTotal)}`)
       setViewing(null); clearSel(); await load()
+    } finally { setVerifying(false) }
+  }
+
+  async function clarifyItem(item:any, note:string) {
+    setVerifying(true)
+    try {
+      const r = await fetch('/api/reimbursements/clarify', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ id:item._id, note, clarifiedBy: user?.name||'-' }) })
+      const j = await r.json()
+      if (!r.ok) { toast.error(j.error||'Gagal clarify'); return }
+      toast.success(j.pushed ? 'Dibalikin ke member + notif terkirim' : 'Dibalikin ke member (member belum aktifkan notif)')
+      setViewing(null); await load()
     } finally { setVerifying(false) }
   }
 
@@ -309,6 +321,7 @@ function SettlementTab({ user }: { user:any }) {
       {viewing && <DetailModal item={viewing} onClose={()=>setViewing(null)}
         onToggleSource={async (r:any)=>{ await toggleSource(r); setViewing(null) }}
         onVerify={verifyOne}
+        onClarify={clarifyItem}
         onReverse={reverseItem} />}
 
       <div style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', flexShrink:0 }}>
@@ -496,8 +509,11 @@ function InflowEditor({ year, initial, onClose, onSaved }: { year:number; initia
 }
 
 // =====================  shared  =====================
-function DetailModal({ item, onClose, onToggleSource, onVerify, onReverse }: { item:any; onClose:()=>void; onToggleSource?:(r:any)=>void; onVerify?:(r:any)=>void; onReverse?:(r:any)=>void }) {
+function DetailModal({ item, onClose, onToggleSource, onVerify, onReverse, onClarify }: { item:any; onClose:()=>void; onToggleSource?:(r:any)=>void; onVerify?:(r:any)=>void; onReverse?:(r:any)=>void; onClarify?:(r:any, note:string)=>void }) {
   const isVerified = item.status==='verified'
+  const isClarification = item.status==='clarification'
+  const [clarifyMode, setClarifyMode] = useState(false)
+  const [note, setNote] = useState('')
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal" style={{ width:520 }}>
@@ -516,15 +532,36 @@ function DetailModal({ item, onClose, onToggleSource, onVerify, onReverse }: { i
             <div><span style={{ color:'var(--text3)' }}>Sumber:</span> {item.isCashCard?'Cash Card':'Petty Cash'}</div>
             <div><span style={{ color:'var(--text3)' }}>Status:</span> {statusBadge(item.status)}</div>
           </div>
+          {isClarification && item.clarifyNote && (
+            <div style={{ fontSize:11, background:'#fff3e0', border:'1px solid #f0c07a', borderRadius:8, padding:'8px 10px', color:'#8a5300' }}>
+              <b>Sedang menunggu revisi member.</b><br/>Catatan klarifikasi kamu: “{item.clarifyNote}”
+            </div>
+          )}
           <div>
             <EvidenceList documents={item.documents||[]} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
           </div>
+          {clarifyMode && (
+            <div>
+              <label style={{ fontSize:11, color:'var(--text3)', display:'block', marginBottom:4 }}>Catatan untuk member (info evidence yang kurang / perlu diperbaiki)</label>
+              <textarea value={note} onChange={e=>setNote(e.target.value)} rows={3} className="input" autoFocus
+                placeholder="Contoh: Invoice belum ada tanda tangan/stempel. Mohon lampirkan ulang."
+                style={{ width:'100%', fontSize:12, resize:'vertical', fontFamily:'inherit' }} />
+            </div>
+          )}
         </div>
         <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', alignItems:'center', gap:8, flexWrap:'wrap' }}>
           {isVerified ? (
             onReverse && <button onClick={()=>onReverse(item)} className="btn btn-sm" style={{ color:'var(--amber)' }} title="Mundurkan status ke Done">↩️ Reverse ke Done</button>
+          ) : isClarification ? (
+            <span style={{ fontSize:11, color:'var(--text3)' }}>Menunggu member merevisi & mengirim ulang.</span>
+          ) : clarifyMode ? (
+            <>
+              <button onClick={()=>{ setClarifyMode(false); setNote('') }} className="btn btn-sm">Batal</button>
+              <button onClick={()=>{ if(!note.trim()){ toast.error('Isi catatan klarifikasi dulu'); return } onClarify && onClarify(item, note.trim()) }} className="btn btn-sm btn-primary" title="Balikin ke member dengan catatan">↩️ Submit Klarifikasi</button>
+            </>
           ) : (
             <>
+              {onClarify && <button onClick={()=>setClarifyMode(true)} className="btn btn-sm" style={{ color:'#b45309' }} title="Balikin ke member karena evidence kurang">🔄 Clarify</button>}
               {onToggleSource && <button onClick={()=>onToggleSource(item)} className="btn btn-sm" title="Pindah sumber dana">⇄ Ubah ke {item.isCashCard?'Petty Cash':'Cash Card'}</button>}
               {onVerify && <button onClick={()=>onVerify(item)} className="btn btn-sm btn-primary" title="Verify item ini">✓ Verify</button>}
             </>
@@ -622,6 +659,7 @@ function statusBadge(s:string) {
     submitted:{ label:'Menunggu', color:'var(--amber)', bg:'var(--amberbg)' }, approved:{ label:'Menunggu', color:'var(--amber)', bg:'var(--amberbg)' },
     done:{ label:'Done', color:'var(--green)', bg:'var(--greenbg)' }, paid:{ label:'Done', color:'var(--green)', bg:'var(--greenbg)' },
     verified:{ label:'Verified', color:'var(--brand)', bg:'var(--brand-soft)' }, rejected:{ label:'Ditolak', color:'var(--red)', bg:'var(--redbg)' },
+    clarification:{ label:'Clarification', color:'#b45309', bg:'#fff3e0' },
   }
   const c = cfg[s] || { label:s, color:'var(--text3)', bg:'var(--bg3)' }
   return <span className="badge" style={{ background:c.bg, color:c.color, fontSize:9 }}>{c.label}</span>

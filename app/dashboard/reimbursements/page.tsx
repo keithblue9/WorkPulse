@@ -113,11 +113,14 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
     try {
       const isCC = form.source === 'cash_card'
       const url = editing ? `/api/reimbursements/${editing._id}` : '/api/reimbursements'
+      const isResubmit = editing?.status === 'clarification'
       const body: any = {
         ...form, isCashCard: isCC,
         userId: user?.id||user?.email, userName: user?.name,
-        status: editing ? editing.status : 'submitted',
+        // Revisi dari status Clarification -> langsung Waiting for Verification (done), tanpa lewat cashier lagi (sudah dibayar)
+        status: isResubmit ? 'done' : (editing ? editing.status : 'submitted'),
         submittedAt: editing?.submittedAt || new Date().toISOString(),
+        ...(isResubmit ? { resubmittedAt: new Date().toISOString() } : {}),
       }
       const r = await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
       if (!r.ok) { toast.error('Gagal menyimpan'); return }
@@ -137,7 +140,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
           }
         } catch { /* non-blocking */ }
       }
-      toast.success(editing?'Diperbarui':'Pengajuan terkirim ke Cashier'); onSave(); onClose()
+      toast.success(isResubmit ? 'Revisi terkirim — menunggu verifikasi CC Holder' : (editing?'Diperbarui':'Pengajuan terkirim ke Cashier')); onSave(); onClose()
     } finally { setSaving(false) }
   }
 
@@ -147,10 +150,16 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal" style={{ width:560 }}>
         <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit Reimburse':'+ Pengajuan Reimbursement'}</span>
+          <span style={{ fontSize:14, fontWeight:600 }}>{editing?.status==='clarification' ? '🔄 Revisi Reimburse (Klarifikasi)' : editing?'Edit Reimburse':'+ Pengajuan Reimbursement'}</span>
           <button onClick={onClose} className="btn btn-icon">×</button>
         </div>
         <div style={{ padding:'14px 20px', overflowY:'auto', maxHeight:'72vh', display:'flex', flexDirection:'column', gap:11 }}>
+          {editing?.status==='clarification' && editing?.clarifyNote && (
+            <div style={{ padding:'10px 12px', background:'#fff3e0', border:'1px solid #f0c07a', borderRadius:8, fontSize:12, color:'#8a5300' }}>
+              <b>Catatan dari CC Holder{editing.clarifiedBy?` (${editing.clarifiedBy})`:''}:</b><br/>{editing.clarifyNote}
+              <div style={{ marginTop:6, fontSize:11, color:'#a06a1e' }}>Perbaiki/lengkapi evidence sesuai catatan di atas, lalu klik <b>Kirim Ulang</b>. Prosesnya langsung ke verifikasi (tidak lewat cashier lagi).</div>
+            </div>
+          )}
           {errors.length>0 && (
             <div style={{ padding:'10px 12px', background:'var(--redbg)', border:'1px solid var(--red)', borderRadius:8, fontSize:12, color:'var(--red)' }}>
               <b>Belum lengkap:</b> {errors.join(', ')}
@@ -204,7 +213,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
         </div>
         <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
           <button onClick={onClose} className="btn">Batal</button>
-          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Submit'}</button>
+          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':(editing?.status==='clarification'?'🔄 Kirim Ulang':'Submit')}</button>
         </div>
       </div>
     </div>
@@ -212,7 +221,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
 }
 
 // =====================  Detail viewer  =====================
-function DetailModal({ item, onClose, onDelete }: { item:any; onClose:()=>void; onDelete?:()=>void }) {
+function DetailModal({ item, onClose, onDelete, onEdit }: { item:any; onClose:()=>void; onDelete?:()=>void; onEdit?:()=>void }) {
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal" style={{ width:520 }}>
@@ -238,14 +247,19 @@ function DetailModal({ item, onClose, onDelete }: { item:any; onClose:()=>void; 
             {item.totalTransfer && <div><span style={{ color:'var(--text3)' }}>Total transfer:</span> Rp {fmt(item.totalTransfer)}</div>}
           </div>
           {item.rejectReason && <div style={{ fontSize:11, color:'var(--red)' }}>Alasan ditolak: {item.rejectReason}</div>}
+          {item.status==='clarification' && item.clarifyNote && (
+            <div style={{ fontSize:11, background:'#fff3e0', border:'1px solid #f0c07a', borderRadius:8, padding:'8px 10px', color:'#8a5300' }}>
+              <b>Perlu klarifikasi{item.clarifiedBy?` (dari ${item.clarifiedBy})`:''}:</b><br/>{item.clarifyNote}
+            </div>
+          )}
           {item.documents?.length > 0 && (
             <EvidenceList documents={item.documents} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
           )}
         </div>
-        {onDelete && (
+        {(onDelete || onEdit) && (
           <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-            <button onClick={onDelete} className="btn btn-sm btn-danger">🗑 Hapus Reimburse</button>
-            <button onClick={onClose} className="btn btn-sm">Tutup</button>
+            {onDelete ? <button onClick={onDelete} className="btn btn-sm btn-danger">🗑 Hapus Reimburse</button> : <span />}
+            {onEdit ? <button onClick={onEdit} className="btn btn-sm btn-primary" style={{ background:'#b45309' }}>🔄 Revisi & Kirim Ulang</button> : <button onClick={onClose} className="btn btn-sm">Tutup</button>}
           </div>
         )}
       </div>
@@ -405,7 +419,7 @@ function PengajuanTab({ items, loading, reload, user, isAdminish }: { items:any[
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [viewing, setViewing] = useState<any>(null)
-  const [statusTab, setStatusTab] = useState<'all'|'submitted'|'done'|'verified'>('all')
+  const [statusTab, setStatusTab] = useState<'all'|'submitted'|'done'|'verified'|'clarification'>('all')
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState<number>(-1)
@@ -431,12 +445,14 @@ function PengajuanTab({ items, loading, reload, user, isAdminish }: { items:any[
     submitted: byPeriod.filter(i=>['submitted','approved','draft'].includes(i.status)).length,
     done: byPeriod.filter(i=>i.status==='done'||i.status==='paid').length,
     verified: byPeriod.filter(i=>i.status==='verified').length,
+    clarification: byPeriod.filter(i=>i.status==='clarification').length,
   }), [byPeriod])
 
   const filtered = useMemo(() => byPeriod.filter(i => {
     if (statusTab==='all') return true
     if (statusTab==='submitted') return ['submitted','approved','draft'].includes(i.status)
     if (statusTab==='done') return i.status==='done'||i.status==='paid'
+    if (statusTab==='clarification') return i.status==='clarification'
     return i.status==='verified'
   }), [byPeriod, statusTab])
 
@@ -468,12 +484,15 @@ function PengajuanTab({ items, loading, reload, user, isAdminish }: { items:any[
     <>
       {showPerhatian && <PerhatianPopup onClose={()=>setShowPerhatian(false)} onOk={()=>{ setShowPerhatian(false); setShowForm(true) }} />}
       {(showForm||editing) && <ReimburseForm editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={reload} />}
-      {viewing && <DetailModal item={viewing} onClose={()=>setViewing(null)} onDelete={viewing.status==='rejected'?()=>deleteItem(viewing):undefined} />}
+      {viewing && <DetailModal item={viewing} onClose={()=>setViewing(null)}
+        onDelete={viewing.status==='rejected'?()=>deleteItem(viewing):undefined}
+        onEdit={viewing.status==='clarification' && (viewing.userName===user?.name || viewing.userId===user?.id || viewing.userId===user?.email) ? ()=>{ setEditing(viewing); setViewing(null) } : undefined} />}
 
       <div style={{ display:'flex', gap:8, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, alignItems:'center', flexWrap:'wrap' }}>
         <button onClick={()=>setStatusTab('all')} style={chip(statusTab==='all')}>Semua ({stats.all})</button>
         <button onClick={()=>setStatusTab('submitted')} style={chip(statusTab==='submitted','var(--amber)')}>Menunggu ({stats.submitted})</button>
         <button onClick={()=>setStatusTab('done')} style={chip(statusTab==='done','var(--green)')}>Done ({stats.done})</button>
+        {stats.clarification>0 && <button onClick={()=>setStatusTab('clarification')} style={chip(statusTab==='clarification','#b45309')}>🔄 Klarifikasi ({stats.clarification})</button>}
         <button onClick={()=>setStatusTab('verified')} style={chip(statusTab==='verified','var(--brand)')}>Verified ({stats.verified})</button>
         <div style={{ marginLeft:'auto', display:'flex', gap:6, alignItems:'center' }}>
           <select className="input input-sm" style={{ width:120 }} value={month} onChange={e=>setMonth(Number(e.target.value))}>
@@ -517,7 +536,9 @@ function PengajuanTab({ items, loading, reload, user, isAdminish }: { items:any[
                     <td>{statusBadge(r.status)}</td>
                     <td style={{ fontSize:11 }}>{r.userName||'—'}</td>
                     <td onClick={e=>e.stopPropagation()}>
-                      {r.status === 'rejected' ? (
+                      {r.status === 'clarification' && (r.userName === user?.name || r.userId === user?.id || r.userId === user?.email) ? (
+                        <button onClick={(e)=>{ e.stopPropagation(); setEditing(r) }} className="btn btn-sm" style={{ fontSize:10, color:'#b45309', borderColor:'#f0c07a' }}>🔄 Revisi</button>
+                      ) : r.status === 'rejected' ? (
                         <button onClick={(e)=>deleteItem(r,e)} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑 Hapus</button>
                       ) : r.status === 'reversal_requested' && (r.userName === user?.name || r.userId === user?.id || r.userId === user?.email || isAdminish) ? (
                         <button onClick={(e)=>approveReversal(r,e)} className="btn btn-sm btn-primary" style={{ fontSize:10 }}>✓ Setujui Pembatalan</button>
@@ -689,6 +710,7 @@ function statusBadge(s:string) {
     paid: { label:'Done', color:'var(--green)', bg:'var(--greenbg)' },
     verified: { label:'Verified', color:'var(--brand)', bg:'var(--brand-soft)' },
     rejected: { label:'Ditolak', color:'var(--red)', bg:'var(--redbg)' },
+    clarification: { label:'Clarification', color:'#b45309', bg:'#fff3e0' },
   }
   const c = cfg[s] || { label:s, color:'var(--text3)', bg:'var(--bg3)' }
   return <span className="badge" style={{ background:c.bg, color:c.color, fontSize:9 }}>{c.label}</span>
