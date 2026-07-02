@@ -84,10 +84,10 @@ export default function BudgetInsights() {
     const realTot = curList.reduce((s, r) => s + (r.annualRealIDR || 0), 0)
     const availTot = planTot - realTot
     const prognosaTotal = curList.reduce((s, r) => s + (r.annualBudgetIDR || 0) * ((r.category === 'travel' ? thr.travel : r.category === 'accommodation' ? thr.accommodation : 80) / 100), 0)
-    // waterfall: RKAP (0->plan) | Terpakai (avail->plan) | Sisa (0->avail)
+    // 3 bar perbandingan dari 0 biar tinggi bar = nilainya (bukan floating waterfall yg bikin Terpakai mepet RKAP)
     const waterfall = [
       { name: 'RKAP', base: 0, val: planTot, fill: C.plan, label: rp(planTot) },
-      { name: 'Terpakai', base: Math.max(0, availTot), val: realTot, fill: C.used, label: rp(realTot) },
+      { name: 'Terpakai', base: 0, val: realTot, fill: C.used, label: rp(realTot) },
       { name: 'Sisa', base: 0, val: Math.max(0, availTot), fill: C.real, label: rp(availTot) },
     ]
     return { years, trend, curYear, donut, waterfall, prognosaTotal, hasData: rows.length > 0 }
@@ -148,7 +148,7 @@ export default function BudgetInsights() {
         </CardBox>
 
         {/* 3. Waterfall: RKAP -> terpakai -> sisa, garis prognosa */}
-        <CardBox title={`Prognosa & Sisa Budget ${curYear}`} sub="RKAP → terpakai (realisasi) → sisa · garis = prognosa (threshold)">
+        <CardBox title={`Prognosa & Sisa Budget ${curYear}`} sub="Perbandingan RKAP vs terpakai (realisasi) vs sisa · garis = prognosa (threshold)">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={waterfall} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -156,8 +156,7 @@ export default function BudgetInsights() {
               <YAxis tickFormatter={rpShort} tick={{ fontSize: 10, fill: 'var(--text3)' }} width={48} />
               <Tooltip cursor={{ fill: 'transparent' }} content={({ active, payload }: any) => active && payload?.length ? (
                 <TipBox rows={[{ name: payload[0].payload.name, val: payload[0].payload.label, color: payload[0].payload.fill }]} />) : null} />
-              <Bar dataKey="base" stackId="w" fill="transparent" />
-              <Bar dataKey="val" stackId="w" radius={[3, 3, 0, 0]} maxBarSize={60}>
+              <Bar dataKey="val" radius={[3, 3, 0, 0]} maxBarSize={60}>
                 {waterfall.map((d, i) => <Cell key={i} fill={d.fill} />)}
               </Bar>
               {prognosaTotal > 0 && <ReferenceLine y={prognosaTotal} stroke={C.purple} strokeDasharray="5 4" label={{ value: 'Prognosa ' + rpShort(prognosaTotal), position: 'insideTopRight', fontSize: 10, fill: C.purple }} />}
