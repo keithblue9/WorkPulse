@@ -99,6 +99,15 @@ export default function AttendancePage() {
   const [showSlotForm, setShowSlotForm] = useState<string|null>(null)
   const [editingSlot, setEditingSlot] = useState<{date:string; slot:any}|null>(null)
   const [loading, setLoading] = useState(true)
+  const [view, setView] = useState<'calendar'|'cuti'>('calendar')
+  const [leave, setLeave] = useState<any[]|null>(null)
+  const year = month.slice(0,4)
+
+  useEffect(() => {
+    if (view !== 'cuti') return
+    setLeave(null)
+    fetch(`/api/attendance/leave-summary?year=${year}`).then(r=>r.json()).then(d=>setLeave(d.data||[])).catch(()=>setLeave([]))
+  }, [view, year])
 
   useEffect(() => {
     async function load() {
@@ -130,8 +139,29 @@ export default function AttendancePage() {
     return records.find(r => r.date === dateStr)
   }
 
+  // Tipe "Hari Libur" (custom, ditandai admin) — dikenali dari key/label mengandung 'libur'/'holiday'
+  const holidayType = attTypes.find(t => /libur|holiday/i.test(String(t.key)) || /libur/i.test(String(t.label)))
+  const holidayKey = holidayType?.key
+
+  async function reloadRecords() {
+    const att = await fetch(`/api/attendance?userId=${selectedUserId}&month=${month}`).then(r=>r.json()).catch(()=>({data:[]}))
+    setRecords(att.data||[])
+    const sum = await fetch(`/api/attendance/summary?month=${month}`).then(r=>r.json()).catch(()=>({data:null}))
+    setSummary(sum.data)
+  }
+
   async function addSlot(day: number, slot: any) {
     const dateStr = `${month}-${String(day).padStart(2,'0')}`
+    if (holidayKey && slot.type === holidayKey) {
+      const userIds = team.map(m => m.id)
+      const r = await fetch('/api/attendance/holiday', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ date:dateStr, slot, userIds }) })
+      const d = await r.json()
+      if (!r.ok) { toast.error(d.error||'Gagal'); return }
+      await reloadRecords()
+      toast.success(`Hari Libur ${dateStr} diterapkan ke semua member (${d.applied})`)
+      return
+    }
     const r = await fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ userId:selectedUserId, date:dateStr, slot }) })
     const d = await r.json()
@@ -141,6 +171,14 @@ export default function AttendancePage() {
 
   async function removeSlot(day: number, slotId: string) {
     const dateStr = `${month}-${String(day).padStart(2,'0')}`
+    const rec = records.find(r => r.date===dateStr)
+    const slot = rec?.slots?.find((s:any)=>s._id===slotId)
+    if (holidayKey && slot?.type === holidayKey) {
+      await fetch(`/api/attendance/holiday?date=${dateStr}&type=${holidayKey}`, { method:'DELETE' })
+      await reloadRecords()
+      toast.success('Hari Libur dihapus dari semua member')
+      return
+    }
     await fetch(`/api/attendance?userId=${selectedUserId}&date=${dateStr}&slotId=${slotId}`, { method:'DELETE' })
     setRecords(prev => prev.map(r => r.date===dateStr ? {...r, slots:r.slots.filter((s:any)=>s._id!==slotId)} : r))
     toast.success('Slot dihapus')
@@ -173,16 +211,25 @@ export default function AttendancePage() {
       {showSlotForm && <SlotForm date={showSlotForm} attTypes={attTypes} onClose={()=>setShowSlotForm(null)} onSave={slot => { const day=parseInt(showSlotForm.split('-')[2]); addSlot(day,slot); setShowSlotForm(null) }} />}
       {editingSlot && <SlotForm date={editingSlot.date} editing={editingSlot.slot} attTypes={attTypes} onClose={()=>setEditingSlot(null)} onSave={async (slot)=>{ const day=parseInt(editingSlot.date.split('-')[2]); await updateSlot(day, editingSlot.slot._id, slot); setEditingSlot(null) }} />}
 
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-        <div><div style={{ fontSize:14, fontWeight:600 }}>Absensi Harian</div><div style={{ fontSize:11, color:'var(--text3)' }}>Klik tanggal untuk tambah slot kehadiran</div></div>
+      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, gap:12, flexWrap:'wrap' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
+          <div><div style={{ fontSize:14, fontWeight:600 }}>Absensi Harian</div><div style={{ fontSize:11, color:'var(--text3)' }}>{view==='calendar'?'Klik tanggal untuk tambah slot kehadiran':'Rekap cuti seluruh member dalam setahun'}</div></div>
+          <div style={{ display:'flex', gap:4, background:'var(--bg3)', borderRadius:8, padding:3 }}>
+            <button onClick={()=>setView('calendar')} className="btn btn-sm" style={{ background:view==='calendar'?'var(--brand)':'transparent', color:view==='calendar'?'#fff':'var(--text2)', border:'none' }}>📅 Kalender</button>
+            <button onClick={()=>setView('cuti')} className="btn btn-sm" style={{ background:view==='cuti'?'var(--brand)':'transparent', color:view==='cuti'?'#fff':'var(--text2)', border:'none' }}>🌴 Summary Cuti</button>
+          </div>
+        </div>
         <div style={{ display:'flex', gap:8 }}>
           <button onClick={()=>setMonth(prevM)} className="btn btn-sm">◀</button>
-          <span style={{ padding:'5px 14px', background:'var(--bg3)', borderRadius:6, fontSize:13, fontWeight:600, color:'var(--text)' }}>{month}</span>
+          <span style={{ padding:'5px 14px', background:'var(--bg3)', borderRadius:6, fontSize:13, fontWeight:600, color:'var(--text)' }}>{view==='cuti'?year:month}</span>
           <button onClick={()=>setMonth(nextM)} className="btn btn-sm">▶</button>
         </div>
       </div>
 
       <div style={{ flex:1, overflow:'auto', padding:'16px 20px' }}>
+        {view === 'cuti' ? (
+          <CutiSummary team={team} leave={leave} year={year} attTypes={attTypes} />
+        ) : (
         <div className="dash-2col" style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:16 }}>
           {/* Calendar */}
           <div>
@@ -294,8 +341,72 @@ export default function AttendancePage() {
             })()}
           </div>
         </div>
+        )}
       </div>
     </div>
   )
 }
 const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }
+
+function CutiSummary({ team, leave, year, attTypes }: { team:any[]; leave:any[]|null; year:string; attTypes:AttendanceType[] }) {
+  const cutiDef = attTypes.find(t => t.key === 'cuti')
+  if (leave === null) return <div style={{ fontSize:12.5, color:'var(--text3)', padding:20 }}>Memuat rekap cuti…</div>
+
+  const byUser: Record<string, any> = {}
+  for (const l of leave) byUser[l.userId] = l
+  const rows = team.map(m => ({ member:m, entry: byUser[m.id] || { dates:[], total:0 } }))
+    .sort((a,b) => b.entry.total - a.entry.total)
+  const grandTotal = rows.reduce((s,r)=>s+r.entry.total, 0)
+
+  const fmtDate = (d:string) => { const [ , mo, da] = d.split('-'); const MON=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']; return `${parseInt(da)} ${MON[parseInt(mo)-1]}` }
+  // kelompokkan tanggal per bulan
+  const groupByMonth = (dates:any[]) => {
+    const g: Record<string, any[]> = {}
+    for (const d of dates) { const mo = d.date.slice(0,7); (g[mo]=g[mo]||[]).push(d) }
+    return Object.entries(g).sort((a,b)=>a[0].localeCompare(b[0]))
+  }
+  const MON=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
+
+  return (
+    <div style={{ maxWidth:900 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
+        <div style={{ fontSize:15, fontWeight:700 }}>🌴 Rekap Cuti {year}</div>
+        <div style={{ fontSize:12, color:'var(--text3)' }}>Total cuti tim tahun ini: <b style={{ color:'var(--text)' }}>{grandTotal} hari</b></div>
+      </div>
+
+      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        {rows.map(({ member, entry }) => (
+          <div key={member.id} className="card" style={{ padding:0, overflow:'hidden' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'11px 14px', borderBottom: entry.total>0?'1px solid var(--border)':'none' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:9 }}>
+                <span style={{ width:9, height:9, borderRadius:'50%', background:member.color, display:'inline-block' }} />
+                <span style={{ fontSize:13, fontWeight:600 }}>{member.name}</span>
+                <span style={{ fontSize:10.5, color:'var(--text3)' }}>{member.division}</span>
+              </div>
+              <span style={{ fontSize:12, fontWeight:700, padding:'3px 10px', borderRadius:20, background: entry.total>0?(cutiDef?.color||'var(--greenbg)'):'var(--bg3)', color: entry.total>0?(cutiDef?.textColor||'var(--green)'):'var(--text3)' }}>
+                {entry.total>0 ? `${entry.total} hari cuti` : 'Belum ada cuti'}
+              </span>
+            </div>
+            {entry.total>0 && (
+              <div style={{ padding:'10px 14px', display:'flex', flexDirection:'column', gap:7 }}>
+                {groupByMonth(entry.dates).map(([mo, list]:any) => (
+                  <div key={mo} style={{ display:'flex', gap:8, alignItems:'flex-start' }}>
+                    <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', minWidth:74 }}>{MON[parseInt(mo.slice(5,7))-1]} <span style={{ color:'var(--text3)' }}>({list.length})</span></div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                      {list.map((d:any,i:number)=>(
+                        <span key={i} title={d.note||''} style={{ fontSize:11, padding:'2px 8px', borderRadius:6, background:'var(--bg3)', color:'var(--text2)', border:'1px solid var(--border)' }}>
+                          {fmtDate(d.date)}{!d.fullDay && ' ½'}{d.note?` · ${d.note}`:''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+        {rows.length===0 && <div style={{ fontSize:12, color:'var(--text3)', padding:20, textAlign:'center' }} className="card">Belum ada data member.</div>}
+      </div>
+    </div>
+  )
+}
