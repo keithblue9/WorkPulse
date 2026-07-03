@@ -34,16 +34,30 @@ export default function TeamAvailability() {
   }, [scope])
 
   const { data, available, availPct } = useMemo(() => {
-    // Count of MEMBER (distinct), bukan sum slot: dari N member, berapa member yg WFO/WFH/Cuti/dst di periode ini
-    const byType: Record<string, Set<string>> = {}
-    const availSet = new Set<string>()
+    // Tiap member dihitung TEPAT SATU KALI: diklasifikasi ke kategori dominan
+    // (tipe kehadiran terbanyak di periode; seri -> prioritas tipe working). Total pasti = jumlah member.
+    const perMember: Record<string, Record<string, number>> = {}
     for (const doc of docs) for (const s of (doc.slots || [])) {
-      (byType[s.type] = byType[s.type] || new Set()).add(doc.userId)
-      if (WORKING.includes(s.type)) availSet.add(doc.userId)
+      (perMember[doc.userId] = perMember[doc.userId] || {})[s.type] = (perMember[doc.userId][s.type] || 0) + 1
     }
+    const catCount: Record<string, number> = {}
+    let noData = 0, availMembers = 0
+    const memberIds = Object.keys(perMember)
+    for (const uid of memberIds) {
+      const counts = perMember[uid]
+      // dominan: count terbesar; kalau seri, prioritaskan tipe working (biar member yg campuran tetap dianggap available)
+      let best = '', bestN = -1
+      for (const [t, n] of Object.entries(counts)) {
+        if (n > bestN || (n === bestN && WORKING.includes(t) && !WORKING.includes(best))) { best = t; bestN = n }
+      }
+      catCount[best] = (catCount[best] || 0) + 1
+      if (Object.keys(counts).some(t => WORKING.includes(t))) availMembers++
+    }
+    noData = Math.max(0, memberCount - memberIds.length)
     const denom = memberCount || 1
-    const data = types.map((t: any) => ({ name: t.label, key: t.key, value: (byType[t.key]?.size) || 0, color: t.textColor || '#4f8ef7' })).filter((d: any) => d.value > 0)
-    return { data, available: availSet.size, availPct: Math.round(availSet.size / denom * 100) }
+    const data = types.map((t: any) => ({ name: t.label, key: t.key, value: catCount[t.key] || 0, color: t.textColor || '#4f8ef7' })).filter((d: any) => d.value > 0)
+    if (noData > 0) data.push({ name: 'Belum presensi', key: '__none', value: noData, color: '#9aa6b3' })
+    return { data, available: availMembers, availPct: Math.round(availMembers / denom * 100) }
   }, [docs, types, memberCount])
 
   return (
@@ -51,7 +65,7 @@ export default function TeamAvailability() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, gap: 8, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700 }}>👥 Team Availability</div>
-          <div style={{ fontSize: 11, color: 'var(--text3)' }}>Distribusi kehadiran {scope === 'week' ? 'minggu ini' : 'bulan ini'} (s/d hari ini) · {memberCount} member</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)' }}>Per member (kategori dominan) · {scope === 'week' ? 'minggu ini' : 'bulan ini'} s/d hari ini · total {memberCount} member</div>
         </div>
         <div style={{ display: 'flex', gap: 4, background: 'var(--bg3)', borderRadius: 8, padding: 3 }}>
           {(['week', 'month'] as const).map(s => (
