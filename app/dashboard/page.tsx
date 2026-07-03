@@ -348,9 +348,10 @@ export default function DashboardPage() {
 
                 {(() => {
                   const blocks: Record<string, React.ReactNode> = {
-                    'budget-insights': isInternal ? <BudgetInsights /> : null,
-                    'team-availability': isInternal ? <TeamAvailability /> : null,
-                    'mandatory-insights': isInternal ? <MandatoryInsights /> : null,
+                    // Visibilitas blok utk guest dikontrol penuh via Atur Layout (hide/unhide), bukan hardcode role
+                    'budget-insights': <BudgetInsights />,
+                    'team-availability': <TeamAvailability />,
+                    'mandatory-insights': <MandatoryInsights />,
                     'golive-insights': <GoLiveInsights />,
                     'ai-row': (
                       <div className="responsive-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:10 }}>
