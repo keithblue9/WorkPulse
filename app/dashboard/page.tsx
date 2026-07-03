@@ -3,6 +3,8 @@ import { getConfig } from '@/lib/configCache'
 import { picArray, calcInitiativeProgress } from '@/lib/defaults'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import BudgetInsights from '@/components/BudgetInsights'
+import TeamAvailability from '@/components/TeamAvailability'
+import MandatoryInsights from '@/components/MandatoryInsights'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import ExportMenu from '@/components/ExportMenu'
@@ -233,6 +235,24 @@ export default function DashboardPage() {
   // Dashboard widgets toggle
   const widgets = config?.dashboardWidgets || []
   const isWidgetActive = (key:string) => widgets.find((w:any) => w.key === key)?.active !== false
+  const mainOrder = useMemo(() => [...widgets].filter((w:any)=>w.segment==='main').sort((a:any,b:any)=>(a.order??99)-(b.order??99)), [widgets])
+  const [showLayout, setShowLayout] = useState(false)
+  const [savingLayout, setSavingLayout] = useState(false)
+  async function saveWidgets(next:any[]) {
+    setConfig((c:any)=>({ ...c, dashboardWidgets: next }))
+    setSavingLayout(true)
+    try { await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ dashboardWidgets: next }) }) }
+    finally { setSavingLayout(false) }
+  }
+  function toggleWidget(key:string) { saveWidgets(widgets.map((w:any)=>w.key===key?{...w, active: w.active===false}:w)) }
+  function moveMain(key:string, dir:-1|1) {
+    const arr = [...mainOrder]; const i = arr.findIndex(w=>w.key===key); const j=i+dir
+    if (i<0||j<0||j>=arr.length) return
+    ;[arr[i],arr[j]]=[arr[j],arr[i]]
+    const reordered = arr.map((w,idx)=>({...w, order: idx+1}))
+    const others = widgets.filter((w:any)=>w.segment!=='main')
+    saveWidgets([...others, ...reordered])
+  }
 
   // Auto-load AI insights on mount — no manual trigger needed. Personal/Tim only for internal users.
   useEffect(() => {
@@ -297,10 +317,11 @@ export default function DashboardPage() {
             <div style={{ fontSize:14, fontWeight:600 }}>Halo, {user?.name?.split(' ')[0] || 'Mas E'} 👋</div>
             <div style={{ fontSize:11, color:'var(--text3)' }}>{format(new Date(),'EEEE, d MMMM yyyy')}</div>
           </div>
-          <div style={{ display:'flex', gap:5 }}>
+          <div style={{ display:'flex', gap:5, alignItems:'center' }}>
             <button onClick={()=>setTab('general')} style={tabBtn(tab==='general')}>📊 General</button>
             <button onClick={()=>setTab('progress')} style={tabBtn(tab==='progress')}>📈 Progress Project</button>
             <button onClick={()=>setTab('issues')} style={tabBtn(tab==='issues')}>⚠️ Issues</button>
+            {isInternal && tab==='general' && <button onClick={()=>setShowLayout(true)} className="btn btn-sm" title="Atur susunan & tampil/sembunyikan widget dashboard" style={{ marginLeft:4 }}>🎛️ Atur Layout</button>}
           </div>
         </div>
       </div>
@@ -322,97 +343,95 @@ export default function DashboardPage() {
                   {isWidgetActive('member-count') && <Stat icon="🏢" label="WFO Hari Ini" val={wfoToday} color="var(--green)" onClick={()=>{ const today=new Date().toISOString().slice(0,10); const ids=attendance.filter((r:any)=>r.date===today && ((r.slots&&r.slots.some((s:any)=>String(s.type).toLowerCase()==='wfo'))||String(r.type||'').toLowerCase()==='wfo')).map((r:any)=>r.userId); setStatDetail({title:'WFO Hari Ini', items: members.filter((m:any)=>ids.includes(m._id)||ids.includes(m.email)).map((m:any)=>({title:m.name, category:m.division||'', subType:'WFO'}))}) }} />}
                 </div>
 
-                {isInternal && <BudgetInsights />}
-
-                {/* AI Insights row */}
-                <div className="responsive-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:10 }}>
-                  {isWidgetActive('ai-quotes') && (
-                    <div className="card glass" style={{ padding:14 }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                        <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>📅 Inspirasi & Info Hari Ini</div>
-                        <button onClick={genQuotes} disabled={loadingQuotes} className="btn btn-icon btn-sm">↻</button>
-                      </div>
-                      {!aiQuotes && !loadingQuotes ? <button onClick={genQuotes} className="btn btn-sm" style={{ width:'100%' }}>✨ Tampilkan</button> :
-                       loadingQuotes ? <div style={{ fontSize:11, color:'var(--text3)' }}>Generating...</div> :
-                       <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}><Linkify text={stripMd(aiQuotes)} /></div>
-                      }
-                    </div>
-                  )}
-                  {isInternal && isWidgetActive('ai-insight-personal') && (
-                    <div className="card glass" style={{ padding:14 }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                        <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>🤖 AI Insight — Personal</div>
-                        <button onClick={genPersonal} disabled={loadingPersonal} className="btn btn-icon btn-sm">↻</button>
-                      </div>
-                      <div style={{ fontSize:9, color:'var(--text3)', marginBottom:6 }}>Rekomendasi tindakan untuk {user?.name?.split(' ')[0]}</div>
-                      {!aiPersonal && !loadingPersonal ? <button onClick={genPersonal} className="btn btn-sm" style={{ width:'100%' }}>✨ Generate Next Actions</button> :
-                       loadingPersonal ? <div style={{ fontSize:11, color:'var(--text3)' }}>Generating...</div> :
-                       <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}>{stripMd(aiPersonal)}</div>
-                      }
-                    </div>
-                  )}
-                  {isInternal && isWidgetActive('ai-insight-team') && (
-                    <div className="card glass" style={{ padding:14 }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                        <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>🤝 AI Insight — Tim</div>
-                        <button onClick={genTeam} disabled={loadingTeam} className="btn btn-icon btn-sm">↻</button>
-                      </div>
-                      {!aiTeam && !loadingTeam ? <button onClick={genTeam} className="btn btn-sm" style={{ width:'100%' }}>✨ Generate Actions</button> :
-                       loadingTeam ? <div style={{ fontSize:11, color:'var(--text3)' }}>Generating...</div> :
-                       <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}>{stripMd(aiTeam)}</div>
-                      }
-                    </div>
-                  )}
-                </div>
-
-                {/* Progress chart + upcoming */}
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                  {isWidgetActive('progress-chart') && (
-                    <div className="card glass-hover" style={{ padding:14, cursor:'pointer' }} onClick={()=>setTab('progress')}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-                        <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>📊 Progress Project Distribution</div>
-                        <span style={{ fontSize:10, color:'var(--brand)' }}>Lihat detail →</span>
-                      </div>
-                      {progressData.length === 0 ? (
-                        <div style={{ textAlign:'center', padding:'24px 0', color:'var(--text3)', fontSize:12 }}>
-                          Belum ada progress project.<br/>
-                          <span style={{ fontSize:11 }}>Tambah di tab Progress Project</span>
-                        </div>
-                      ) : (
-                        <div style={{ display:'flex', alignItems:'center', gap:14 }}>
-                          <DonutChart data={progressData} />
-                          <div style={{ flex:1, display:'flex', flexDirection:'column', gap:5 }}>
-                            {progressData.map((d, i) => (
-                              <div key={i} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11 }}>
-                                <div style={{ width:10, height:10, borderRadius:2, background:d.color }} />
-                                <span style={{ flex:1 }}>{d.label}</span>
-                                <span style={{ fontWeight:600 }}>{d.value}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {isWidgetActive('upcoming-agenda') && (
-                    <div className="card" style={{ padding:14 }}>
-                      <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>📅 Agenda Mendatang</div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                        {activities.filter(a => a.actionDate && new Date(a.actionDate)>=new Date()).sort((a,b)=>(a.actionDate||'').localeCompare(b.actionDate||'')).slice(0,5).map(a => (
-                          <Link key={a._id} href={`/dashboard/calendar`} style={{ textDecoration:'none', color:'inherit' }}>
-                            <div style={{ padding:'8px 10px', borderRadius:7, background:'var(--bg3)', fontSize:11 }}>
-                              <div style={{ fontWeight:600 }}>{a.title}</div>
-                              <div style={{ color:'var(--text3)', fontSize:10 }}>{a.actionDate} · {a.category}</div>
+                {(() => {
+                  const blocks: Record<string, React.ReactNode> = {
+                    'budget-insights': isInternal ? <BudgetInsights /> : null,
+                    'team-availability': isInternal ? <TeamAvailability /> : null,
+                    'mandatory-insights': isInternal ? <MandatoryInsights /> : null,
+                    'ai-row': (
+                      <div className="responsive-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:10 }}>
+                        {isWidgetActive('ai-quotes') && (
+                          <div className="card glass" style={{ padding:14 }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                              <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>📅 Inspirasi & Info Hari Ini</div>
+                              <button onClick={genQuotes} disabled={loadingQuotes} className="btn btn-icon btn-sm">↻</button>
                             </div>
-                          </Link>
-                        ))}
-                        {activities.filter(a => a.actionDate && new Date(a.actionDate)>=new Date()).length === 0 && (
-                          <div style={{ fontSize:11, color:'var(--text3)', textAlign:'center', padding:20 }}>Tidak ada agenda mendatang</div>
+                            {!aiQuotes && !loadingQuotes ? <button onClick={genQuotes} className="btn btn-sm" style={{ width:'100%' }}>✨ Tampilkan</button> :
+                             loadingQuotes ? <div style={{ fontSize:11, color:'var(--text3)' }}>Generating...</div> :
+                             <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}><Linkify text={stripMd(aiQuotes)} /></div>}
+                          </div>
+                        )}
+                        {isInternal && isWidgetActive('ai-insight-personal') && (
+                          <div className="card glass" style={{ padding:14 }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                              <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>🤖 AI Insight — Personal</div>
+                              <button onClick={genPersonal} disabled={loadingPersonal} className="btn btn-icon btn-sm">↻</button>
+                            </div>
+                            <div style={{ fontSize:9, color:'var(--text3)', marginBottom:6 }}>Rekomendasi tindakan untuk {user?.name?.split(' ')[0]}</div>
+                            {!aiPersonal && !loadingPersonal ? <button onClick={genPersonal} className="btn btn-sm" style={{ width:'100%' }}>✨ Generate Next Actions</button> :
+                             loadingPersonal ? <div style={{ fontSize:11, color:'var(--text3)' }}>Generating...</div> :
+                             <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}>{stripMd(aiPersonal)}</div>}
+                          </div>
+                        )}
+                        {isInternal && isWidgetActive('ai-insight-team') && (
+                          <div className="card glass" style={{ padding:14 }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                              <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>🤝 AI Insight — Tim</div>
+                              <button onClick={genTeam} disabled={loadingTeam} className="btn btn-icon btn-sm">↻</button>
+                            </div>
+                            {!aiTeam && !loadingTeam ? <button onClick={genTeam} className="btn btn-sm" style={{ width:'100%' }}>✨ Generate Actions</button> :
+                             loadingTeam ? <div style={{ fontSize:11, color:'var(--text3)' }}>Generating...</div> :
+                             <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}>{stripMd(aiTeam)}</div>}
+                          </div>
                         )}
                       </div>
-                    </div>
-                  )}
-                </div>
+                    ),
+                    'progress-chart': (
+                      <div className="card glass-hover" style={{ padding:14, cursor:'pointer' }} onClick={()=>setTab('progress')}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                          <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>📊 Progress Project Distribution</div>
+                          <span style={{ fontSize:10, color:'var(--brand)' }}>Lihat detail →</span>
+                        </div>
+                        {progressData.length === 0 ? (
+                          <div style={{ textAlign:'center', padding:'24px 0', color:'var(--text3)', fontSize:12 }}>
+                            Belum ada progress project.<br/><span style={{ fontSize:11 }}>Tambah di tab Progress Project</span>
+                          </div>
+                        ) : (
+                          <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+                            <DonutChart data={progressData} />
+                            <div style={{ flex:1, display:'flex', flexDirection:'column', gap:5 }}>
+                              {progressData.map((d, i) => (
+                                <div key={i} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11 }}>
+                                  <div style={{ width:10, height:10, borderRadius:2, background:d.color }} />
+                                  <span style={{ flex:1 }}>{d.label}</span><span style={{ fontWeight:600 }}>{d.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ),
+                    'upcoming-agenda': (
+                      <div className="card" style={{ padding:14 }}>
+                        <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>📅 Agenda Mendatang</div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                          {activities.filter(a => a.actionDate && new Date(a.actionDate)>=new Date()).sort((a,b)=>(a.actionDate||'').localeCompare(b.actionDate||'')).slice(0,5).map(a => (
+                            <Link key={a._id} href={`/dashboard/calendar`} style={{ textDecoration:'none', color:'inherit' }}>
+                              <div style={{ padding:'8px 10px', borderRadius:7, background:'var(--bg3)', fontSize:11 }}>
+                                <div style={{ fontWeight:600 }}>{a.title}</div>
+                                <div style={{ color:'var(--text3)', fontSize:10 }}>{a.actionDate} · {a.category}</div>
+                              </div>
+                            </Link>
+                          ))}
+                          {activities.filter(a => a.actionDate && new Date(a.actionDate)>=new Date()).length === 0 && (
+                            <div style={{ fontSize:11, color:'var(--text3)', textAlign:'center', padding:20 }}>Tidak ada agenda mendatang</div>
+                          )}
+                        </div>
+                      </div>
+                    ),
+                  }
+                  return mainOrder.filter((w:any)=>w.active!==false).map((w:any)=>{ const node=blocks[w.key]; return node ? <div key={w.key}>{node}</div> : null })
+                })()}
               </div>
             )}
 
@@ -590,6 +609,48 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+
+      {showLayout && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowLayout(false)}>
+          <div className="modal" style={{ width:460, maxWidth:'100%', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
+            <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div><div style={{ fontSize:14, fontWeight:700 }}>🎛️ Atur Layout Dashboard</div><div style={{ fontSize:10.5, color:'var(--text3)' }}>Geser urutan & sembunyikan. Guest/eksternal hanya lihat yg aktif.</div></div>
+              <button onClick={()=>setShowLayout(false)} className="btn btn-icon">×</button>
+            </div>
+            <div style={{ flex:1, overflowY:'auto', padding:'12px 18px' }}>
+              <div style={{ fontSize:10.5, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.5, margin:'2px 0 8px' }}>Blok Utama (bisa digeser)</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {mainOrder.map((w:any, i:number) => (
+                  <div key={w.key} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', border:'1px solid var(--border)', borderRadius:8, background: w.active===false?'var(--bg3)':'var(--bg2)', opacity:w.active===false?0.65:1 }}>
+                    <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                      <button onClick={()=>moveMain(w.key,-1)} disabled={i===0} className="btn btn-icon btn-sm" style={{ height:18, opacity:i===0?0.3:1 }}>▲</button>
+                      <button onClick={()=>moveMain(w.key,1)} disabled={i===mainOrder.length-1} className="btn btn-icon btn-sm" style={{ height:18, opacity:i===mainOrder.length-1?0.3:1 }}>▼</button>
+                    </div>
+                    <span style={{ flex:1, fontSize:12, fontWeight:600 }}>{w.label}</span>
+                    <button onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:11, color: w.active===false?'var(--text3)':'var(--green)' }}>{w.active===false?'🙈 Hidden':'👁 Tampil'}</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize:10.5, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.5, margin:'16px 0 8px' }}>Stat Cards</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {widgets.filter((w:any)=>w.segment==='stats').sort((a:any,b:any)=>(a.order??99)-(b.order??99)).map((w:any)=>(
+                  <button key={w.key} onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:11, background:w.active===false?'var(--bg3)':'var(--brand-soft)', color:w.active===false?'var(--text3)':'var(--brand)', borderColor:w.active===false?'var(--border)':'var(--brand)' }}>{w.active===false?'🙈':'👁'} {w.label.replace('Stat: ','')}</button>
+                ))}
+              </div>
+              <div style={{ fontSize:10.5, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.5, margin:'16px 0 8px' }}>AI Cards (dalam blok AI Insights)</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {widgets.filter((w:any)=>w.segment==='ai').sort((a:any,b:any)=>(a.order??99)-(b.order??99)).map((w:any)=>(
+                  <button key={w.key} onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:11, background:w.active===false?'var(--bg3)':'var(--brand-soft)', color:w.active===false?'var(--text3)':'var(--brand)', borderColor:w.active===false?'var(--border)':'var(--brand)' }}>{w.active===false?'🙈':'👁'} {w.label}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ padding:'10px 18px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontSize:10.5, color:'var(--text3)' }}>{savingLayout?'Menyimpan…':'Tersimpan otomatis'}</span>
+              <button onClick={()=>setShowLayout(false)} className="btn btn-primary btn-sm">Selesai</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {statDetail && (
         <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setStatDetail(null)}>

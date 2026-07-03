@@ -91,6 +91,21 @@ export async function GET() {
       }
     }
 
+    // Reconcile dashboardWidgets dgn DEFAULT_WIDGETS: tambah key baru, buang usang, update label/segment
+    try {
+      const existing: any[] = Array.isArray(cfg.dashboardWidgets) ? cfg.dashboardWidgets : []
+      const byKey: Record<string, any> = {}; existing.forEach(w => { byKey[w.key] = w })
+      const validKeys = new Set(DEFAULT_WIDGETS.map((w:any)=>w.key))
+      let changed = existing.some(w => !validKeys.has(w.key)) || existing.length !== DEFAULT_WIDGETS.length
+      const merged = DEFAULT_WIDGETS.map((dw:any) => {
+        const ex = byKey[dw.key]
+        if (!ex) { changed = true; return { ...dw } }
+        if (ex.label !== dw.label || ex.segment !== dw.segment) changed = true
+        return { ...dw, active: ex.active !== false, order: ex.order ?? dw.order }
+      })
+      if (changed) { cfg.dashboardWidgets = merged; updates.dashboardWidgets = merged; needsUpdate = true }
+    } catch {}
+
     if (needsUpdate) {
       try { await ConfigModel.updateOne({ _id: cfg._id }, { $set: updates }) } catch (e) { console.error('backfill update failed', e) }
     }

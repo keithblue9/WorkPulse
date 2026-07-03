@@ -44,14 +44,16 @@ export const DEFAULT_WIDGETS = [
   { key:'stat-anggaran',      label:'Stat: Anggaran',      segment:'stats', active:true, order:4 },
   { key:'stat-others',        label:'Stat: Others',        segment:'stats', active:true, order:5 },
   { key:'stat-highpriority',  label:'Stat: High Priority', segment:'stats', active:true, order:6 },
-  { key:'progress-chart',     label:'Chart Progress (donut)', segment:'main', active:true, order:1 },
+  { key:'member-count',       label:'Stat: WFO Hari Ini',  segment:'stats', active:true, order:7 },
+  { key:'budget-insights',    label:'Infografis Budget (Yield/Komposisi/Prognosa)', segment:'main', active:true, order:1 },
+  { key:'team-availability',  label:'Team Availability (presensi)', segment:'main', active:true, order:2 },
+  { key:'mandatory-insights', label:'Mandatory (MCU/Training/Support KPI)', segment:'main', active:true, order:3 },
+  { key:'ai-row',             label:'AI Insights (baris)',  segment:'main', active:true, order:4 },
+  { key:'progress-chart',     label:'Chart Progress (donut)', segment:'main', active:true, order:5 },
+  { key:'upcoming-agenda',    label:'Agenda Mendatang',    segment:'main', active:true, order:6 },
   { key:'ai-quotes',          label:'AI Quotes (daily)',   segment:'ai',    active:true, order:1 },
   { key:'ai-insight-personal',label:'AI Insight Personal', segment:'ai',    active:true, order:2 },
   { key:'ai-insight-team',    label:'AI Insight Team',     segment:'ai',    active:true, order:3 },
-  { key:'top-contributors',   label:'Top Contributors',    segment:'main',  active:true, order:2 },
-  { key:'upcoming-agenda',    label:'Agenda Mendatang',    segment:'main',  active:true, order:3 },
-  { key:'issue-distribution', label:'Issue Distribution',  segment:'main',  active:true, order:4 },
-  { key:'member-count',       label:'Member Count Card',   segment:'main',  active:false, order:5 },
 ]
 
 export const DEFAULT_LINK_CATEGORIES = [
