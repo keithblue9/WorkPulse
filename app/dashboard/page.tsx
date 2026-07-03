@@ -1,5 +1,5 @@
 'use client'
-import { getConfig } from '@/lib/configCache'
+import { getConfig, invalidateConfig } from '@/lib/configCache'
 import { picArray, calcInitiativeProgress } from '@/lib/defaults'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import BudgetInsights from '@/components/BudgetInsights'
@@ -182,7 +182,7 @@ export default function DashboardPage() {
       fetch('/api/initiatives').then(r=>r.json()),
       fetch('/api/issues').then(r=>r.json()),
       fetch('/api/users').then(r=>r.json()),
-      getConfig().then((data:any)=>({ data })),
+      getConfig(true).then((data:any)=>({ data })),
       fetch(`/api/attendance?month=${ym}`).then(r=>r.json()).catch(()=>({data:[]})),
     ])
     setActivities(a.data||[]); setInitiatives(init.data||[]); setIssues(iss.data||[]); setMembers(m.data||[]); setConfig(c.data); setAttendance(att.data||[]); setLoading(false)
@@ -242,8 +242,10 @@ export default function DashboardPage() {
   async function saveWidgets(next:any[]) {
     setConfig((c:any)=>({ ...c, dashboardWidgets: next }))
     setSavingLayout(true)
-    try { await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ dashboardWidgets: next }) }) }
-    finally { setSavingLayout(false) }
+    try {
+      await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ dashboardWidgets: next }) })
+      invalidateConfig()
+    } finally { setSavingLayout(false) }
   }
   function toggleWidget(key:string) { saveWidgets(widgets.map((w:any)=>w.key===key?{...w, active: w.active===false}:w)) }
   function moveMain(key:string, dir:-1|1) {
