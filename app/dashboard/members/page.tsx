@@ -13,6 +13,7 @@ function MemberModal({ editing, onClose, onSave, allRoles }: { editing?:any; onC
     password: '',
     roles: editing?.roles && editing.roles.length ? editing.roles : (editing?.role ? [editing.role] : ['member']),
     division: editing?.division || '',
+    status: editing?.status || 'pekerja',
     phone: editing?.phone || '',
     fonnteToken: editing?.fonnteToken || '',
   })
@@ -35,6 +36,7 @@ function MemberModal({ editing, onClose, onSave, allRoles }: { editing?:any; onC
         roles: form.roles,
         role: form.roles[0], // back-compat: first role as primary
         division: form.division,
+        status: form.status,
         phone: form.phone,
         fonnteToken: form.fonnteToken,
       }
@@ -74,6 +76,12 @@ function MemberModal({ editing, onClose, onSave, allRoles }: { editing?:any; onC
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
             <div><label style={lbl}>Nama *</label><input className="input" value={form.name} onChange={e=>set('name',e.target.value)} /></div>
             <div><label style={lbl}>Divisi</label><input className="input" value={form.division} onChange={e=>set('division',e.target.value)} placeholder="BPD Proc, TnD" /></div>
+          </div>
+          <div><label style={lbl}>Status Kepegawaian</label>
+            <select className="input" value={form.status} onChange={e=>set('status',e.target.value)}>
+              <option value="pekerja">Pekerja</option>
+              <option value="TAD">TAD</option>
+            </select>
           </div>
           <div><label style={lbl}>No. HP (untuk WhatsApp / Fonnte)</label><input className="input" value={form.phone} onChange={e=>set('phone',e.target.value)} placeholder="08xxxxxxxxxx" /></div>
           <div>
@@ -191,6 +199,7 @@ export default function MembersPage() {
                           <div>
                             <div style={{ fontSize:12, fontWeight:600 }}>{u.name}</div>
                             {u.jabatan && <div style={{ fontSize:10, color:'var(--text3)' }}>{u.jabatan}</div>}
+                            <span className="badge" style={{ background: u.status==='TAD'?'#fef3c7':'var(--brand-soft)', color: u.status==='TAD'?'#b45309':'var(--brand)', fontSize:9, marginTop:2, display:'inline-block' }}>{u.status==='TAD'?'TAD':'Pekerja'}</span>
                           </div>
                         </div>
                       </td>

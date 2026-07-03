@@ -8,6 +8,8 @@ const UserSchema = new Schema({
   roles: { type: [String], default: ['member'] },
   sortOrder: { type: Number, default: 999 },
   division: { type: String, default: '' },
+  // Status kepegawaian: 'pekerja' (organik) atau 'TAD' (tenaga alih daya)
+  status: { type: String, enum: ['pekerja','TAD'], default: 'pekerja' },
   avatar: String,
   active: { type: Boolean, default: true },
   lastLogin: String,
