@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { AttendanceModel } from '@/models/Attendance'
 
+// Ambil tanggal-tanggal Hari Libur (distinct) dalam 1 tahun untuk tipe libur tertentu.
+export async function GET(req: NextRequest) {
+  try {
+    await connectDB()
+    const { searchParams } = new URL(req.url)
+    const year = searchParams.get('year') || String(new Date().getFullYear())
+    const type = searchParams.get('type') || 'holiday'
+    const recs = await AttendanceModel.find({ date: { $regex: `^${year}-` }, 'slots.type': type }, 'date slots').lean()
+    const dates = Array.from(new Set((recs as any[])
+      .filter(r => (r.slots || []).some((s: any) => s.type === type))
+      .map(r => r.date))).sort()
+    return NextResponse.json({ data: dates })
+  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+}
+
 // Hari Libur berlaku untuk SEMUA member → tambah/hapus slot libur di semua userId pada tanggal itu.
 export async function POST(req: NextRequest) {
   try {

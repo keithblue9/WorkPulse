@@ -30,7 +30,7 @@ function slotTimeLabel(slot:any): string {
 
 const TEAM_COLORS = ['#2563d4','#7c3aed','#0d9488','#d97706','#16a34a','#dc2626','#0891b2','#7c2d12']
 
-function SlotForm({ date, editing, attTypes, onClose, onSave }: { date:string; editing?:any; attTypes:AttendanceType[]; onClose:()=>void; onSave:(slot:any)=>void }) {
+function SlotForm({ date, editing, attTypes, team, selfId, onClose, onSave }: { date:string; editing?:any; attTypes:AttendanceType[]; team?:any[]; selfId?:string; onClose:()=>void; onSave:(slot:any, taggedIds:string[])=>void }) {
   const isEdit = !!editing
   // Initialize from editing slot if provided; helpers handle legacy time shape
   const editIsFullDay = editing ? (
@@ -41,10 +41,13 @@ function SlotForm({ date, editing, attTypes, onClose, onSave }: { date:string; e
   const [startTime, setStartTime] = useState(editing?.startTime && editing.startTime !== 'fullday' ? editing.startTime : '08:00')
   const [endTime, setEndTime] = useState(editing?.endTime && editing.endTime !== 'fullday' ? editing.endTime : '17:00')
   const [note, setNote] = useState(editing?.note || '')
+  const [tagged, setTagged] = useState<string[]>([])
   const typeDef = attTypes.find(t => t.key === type)
+  const isHoliday = /libur|holiday/i.test(String(type)) || /libur/i.test(String(typeDef?.label))
+  const others = (team || []).filter(m => m.id !== selfId)
 
   function save() {
-    onSave({ type, label: typeDef?.label, isFullDay, startTime: isFullDay ? 'fullday' : startTime, endTime: isFullDay ? 'fullday' : endTime, note })
+    onSave({ type, label: typeDef?.label, isFullDay, startTime: isFullDay ? 'fullday' : startTime, endTime: isFullDay ? 'fullday' : endTime, note }, tagged)
     onClose()
   }
 
@@ -73,6 +76,29 @@ function SlotForm({ date, editing, attTypes, onClose, onSave }: { date:string; e
             </div>
           )}
           <div><label style={lbl}>Catatan (opsional)</label><input className="input" value={note} onChange={e=>setNote(e.target.value)} placeholder="cth: WFO pagi, Dinas sore" /></div>
+
+          {/* Tag member lain — hanya saat tambah baru, & bukan hari libur (libur otomatis ke semua) */}
+          {!isEdit && !isHoliday && others.length > 0 && (
+            <div>
+              <label style={lbl}>Tag member lain (opsional) — agenda bareng, isi sekali untuk semua</label>
+              <div className="chip-row" style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {others.map(m => {
+                  const on = tagged.includes(m.id)
+                  return (
+                    <button key={m.id} onClick={()=>setTagged(prev => on ? prev.filter(x=>x!==m.id) : [...prev, m.id])}
+                      style={{ padding:'5px 11px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${on?m.color:'var(--border)'}`, background:on?m.color+'22':'var(--bg3)', color:on?m.color:'var(--text2)' }}>
+                      {on?'✓ ':''}{m.name}
+                    </button>
+                  )
+                })}
+              </div>
+              {tagged.length>0 && <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:5 }}>Kehadiran ini akan ditambahkan juga ke {tagged.length} member lain.</div>}
+            </div>
+          )}
+          {isHoliday && !isEdit && (
+            <div style={{ fontSize:10.5, color:'#b45309', background:'#fff3e0', border:'1px solid #f0c07a', borderRadius:7, padding:'7px 10px' }}>Hari Libur otomatis diterapkan ke <b>semua member</b> & muncul di Calendar.</div>
+          )}
+
           {typeDef && (
             <div style={{ padding:'8px 12px', background:typeDef.color, borderRadius:7, fontSize:12, fontWeight:600, color:typeDef.textColor }}>
               Preview: {typeDef.label} {isFullDay ? '(Full Day)' : `${startTime}–${endTime}`}
@@ -150,7 +176,7 @@ export default function AttendancePage() {
     setSummary(sum.data)
   }
 
-  async function addSlot(day: number, slot: any) {
+  async function addSlot(day: number, slot: any, taggedIds: string[] = []) {
     const dateStr = `${month}-${String(day).padStart(2,'0')}`
     if (holidayKey && slot.type === holidayKey) {
       const userIds = team.map(m => m.id)
@@ -166,7 +192,13 @@ export default function AttendancePage() {
       body: JSON.stringify({ userId:selectedUserId, date:dateStr, slot }) })
     const d = await r.json()
     setRecords(prev => { const filtered=prev.filter(r=>r.date!==dateStr); return [...filtered, d.data] })
-    toast.success(`Ditambahkan: ${slot.label||slot.type} ${slotIsFullDay(slot) ? '(Full Day)' : `${slot.startTime}–${slot.endTime}`}`)
+    if (taggedIds.length) {
+      await Promise.all(taggedIds.map(uid => fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ userId:uid, date:dateStr, slot }) })))
+      toast.success(`Ditambahkan ke kamu + ${taggedIds.length} member lain: ${slot.label||slot.type}`)
+    } else {
+      toast.success(`Ditambahkan: ${slot.label||slot.type} ${slotIsFullDay(slot) ? '(Full Day)' : `${slot.startTime}–${slot.endTime}`}`)
+    }
   }
 
   async function removeSlot(day: number, slotId: string) {
@@ -208,7 +240,7 @@ export default function AttendancePage() {
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      {showSlotForm && <SlotForm date={showSlotForm} attTypes={attTypes} onClose={()=>setShowSlotForm(null)} onSave={slot => { const day=parseInt(showSlotForm.split('-')[2]); addSlot(day,slot); setShowSlotForm(null) }} />}
+      {showSlotForm && <SlotForm date={showSlotForm} attTypes={attTypes} team={team} selfId={selectedUserId} onClose={()=>setShowSlotForm(null)} onSave={(slot, tagged) => { const day=parseInt(showSlotForm.split('-')[2]); addSlot(day,slot,tagged); setShowSlotForm(null) }} />}
       {editingSlot && <SlotForm date={editingSlot.date} editing={editingSlot.slot} attTypes={attTypes} onClose={()=>setEditingSlot(null)} onSave={async (slot)=>{ const day=parseInt(editingSlot.date.split('-')[2]); await updateSlot(day, editingSlot.slot._id, slot); setEditingSlot(null) }} />}
 
       <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, gap:12, flexWrap:'wrap' }}>

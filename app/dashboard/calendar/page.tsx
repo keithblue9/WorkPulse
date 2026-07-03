@@ -92,6 +92,8 @@ export default function CalendarPage() {
   const [selected, setSelected] = useState<any>(null)
   const [selectedDay, setSelectedDay] = useState<Date>(new Date())
 
+  const [holidays, setHolidays] = useState<Set<string>>(new Set())
+
   async function load() {
     setLoading(true)
     const [a,m,c] = await Promise.all([
@@ -100,8 +102,22 @@ export default function CalendarPage() {
       getConfig().then((data:any)=>({ data })),
     ])
     setActivities(a.data||[]); setMembers(m.data||[]); setConfig(c.data); setLoading(false)
+    // Overlay Hari Libur dari Presensi (khusus tipe libur)
+    const hType = (c.data?.attendanceTypes||[]).find((t:any)=> /libur|holiday/i.test(String(t.key)) || /libur/i.test(String(t.label)))
+    if (hType) {
+      const yr = format(currentMonth, 'yyyy')
+      fetch(`/api/attendance/holiday?year=${yr}&type=${hType.key}`).then(r=>r.json())
+        .then(d=>setHolidays(new Set(d.data||[]))).catch(()=>{})
+    }
   }
   useEffect(() => { load() }, [])
+  // refetch libur saat ganti tahun
+  useEffect(() => {
+    const hType = (config?.attendanceTypes||[]).find((t:any)=> /libur|holiday/i.test(String(t.key)) || /libur/i.test(String(t.label)))
+    if (!hType) return
+    fetch(`/api/attendance/holiday?year=${format(currentMonth,'yyyy')}&type=${hType.key}`).then(r=>r.json())
+      .then(d=>setHolidays(new Set(d.data||[]))).catch(()=>{})
+  }, [currentMonth, config])
 
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
@@ -152,22 +168,24 @@ export default function CalendarPage() {
               const isCurrentMonth = isSameMonth(day, currentMonth)
               const isToday = isSameDay(day, new Date())
               const isSelected = isSameDay(day, selectedDay)
+              const isHoliday = holidays.has(format(day,'yyyy-MM-dd'))
               return (
                 <div key={day.toISOString()} onClick={()=>setSelectedDay(day)} style={{
                   minHeight:80, minWidth:0, padding:6, borderRadius:7, cursor:'pointer', overflow:'hidden',
-                  background: isSelected ? 'var(--brand-soft)' : isToday ? 'var(--bg3)' : 'transparent',
-                  border: `1px solid ${isSelected?'var(--brand)':'var(--border)'}`,
+                  background: isSelected ? 'var(--brand-soft)' : isHoliday ? 'rgba(220,38,38,0.08)' : isToday ? 'var(--bg3)' : 'transparent',
+                  border: `1px solid ${isSelected?'var(--brand)':isHoliday?'rgba(220,38,38,0.5)':'var(--border)'}`,
                   opacity: isCurrentMonth ? 1 : 0.4,
                 }}>
-                  <div style={{ fontSize:11, fontWeight: isToday?700:500, color: isToday?'var(--brand)':'var(--text2)', marginBottom:3 }}>{format(day,'d')}</div>
+                  <div style={{ fontSize:11, fontWeight: isToday?700:500, color: isHoliday?'#dc2626':isToday?'var(--brand)':'var(--text2)', marginBottom:3 }}>{format(day,'d')}</div>
                   <div style={{ display:'flex', flexDirection:'column', gap:2, minWidth:0 }}>
-                    {dayActivities.slice(0,2).map(a => (
+                    {isHoliday && <div style={{ fontSize:9, fontWeight:700, color:'#dc2626', display:'flex', alignItems:'center', gap:3, minWidth:0 }}><span style={{ width:5, height:5, borderRadius:'50%', background:'#dc2626', flexShrink:0 }} />Hari Libur</div>}
+                    {dayActivities.slice(0, isHoliday?1:2).map(a => (
                       <div key={a._id} title={a.title} style={{ display:'flex', alignItems:'center', gap:3, fontSize:9, minWidth:0 }}>
                         <span style={{ width:5, height:5, borderRadius:'50%', background:catColor(a.category), flexShrink:0 }} />
                         <span style={{ color:'var(--text2)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 }}>{a.title}</span>
                       </div>
                     ))}
-                    {dayActivities.length > 2 && <div style={{ fontSize:9, color:'var(--text3)', fontWeight:600 }}>+{dayActivities.length-2} lagi</div>}
+                    {dayActivities.length > (isHoliday?1:2) && <div style={{ fontSize:9, color:'var(--text3)', fontWeight:600 }}>+{dayActivities.length-(isHoliday?1:2)} lagi</div>}
                   </div>
                 </div>
               )
@@ -178,6 +196,9 @@ export default function CalendarPage() {
         {/* Selected day detail */}
         <div className="card" style={{ padding:14 }}>
           <div style={{ fontSize:13, fontWeight:600, marginBottom:4 }}>{format(selectedDay,'EEEE, d MMM yyyy')}</div>
+          {holidays.has(format(selectedDay,'yyyy-MM-dd')) && (
+            <div style={{ fontSize:11.5, fontWeight:700, color:'#dc2626', background:'rgba(220,38,38,0.08)', border:'1px solid rgba(220,38,38,0.4)', borderRadius:7, padding:'7px 10px', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>🔴 Hari Libur</div>
+          )}
           <div style={{ fontSize:11, color:'var(--text3)', marginBottom:10 }}>{selectedDayActivities.length} aktivitas</div>
           {selectedDayActivities.length === 0 ? (
             <div style={{ textAlign:'center', padding:20, color:'var(--text3)', fontSize:11 }}>Tidak ada aktivitas</div>
