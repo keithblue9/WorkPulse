@@ -20,6 +20,7 @@ const NAV_GROUPS = [
   { key:'activities', label:'Activities', items:[
     { href:'/dashboard/activities', label:'Activities',  permKey:'activities' },
     { href:'/dashboard/mandatory',  label:'Mandatory', permKey:'mandatory' },
+    { href:'/dashboard/golive',     label:'Go-Live', permKey:'golive' },
     { href:'/dashboard/meetings',   label:'Meeting Reports', permKey:'meetings' },
     { href:'/dashboard/notes',      label:'[Team] Notes', permKey:'notes' },
     { href:'/dashboard/quicknotes', label:'[Personal] Notes', permKey:'quicknotes' },
@@ -45,9 +46,9 @@ const NAV_GROUPS = [
 ]
 
 const FALLBACK_MENUS: Record<string,string[]> = {
-  admin:    ['dashboard','activities','mandatory','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','settlementcc','thirdparty','members','config'],
-  manager:  ['dashboard','activities','mandatory','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','thirdparty','members'],
-  member:   ['dashboard','activities','mandatory','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','reimbursement'],
+  admin:    ['dashboard','activities','mandatory','golive','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','settlementcc','thirdparty','members','config'],
+  manager:  ['dashboard','activities','mandatory','golive','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','thirdparty','members'],
+  member:   ['dashboard','activities','mandatory','golive','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','reimbursement'],
   finance:  ['dashboard','attendance','biodata','links','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','thirdparty'],
   cashier:  ['dashboard','reimbursement','operasional','cashier','cashcard','biodata','quicknotes'],
   ccholder: ['dashboard','reimbursement','operasional','cashcard','settlementcc','quicknotes'],

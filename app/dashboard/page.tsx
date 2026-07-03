@@ -5,6 +5,7 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import BudgetInsights from '@/components/BudgetInsights'
 import TeamAvailability from '@/components/TeamAvailability'
 import MandatoryInsights from '@/components/MandatoryInsights'
+import GoLiveInsights from '@/components/GoLiveInsights'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import ExportMenu from '@/components/ExportMenu'
@@ -333,14 +334,14 @@ export default function DashboardPage() {
             {tab === 'general' && (
               <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
                 {/* Stat cards row */}
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(155px, 1fr))', gap:10 }}>
-                  {isWidgetActive('stat-kpi') && <Stat icon="🎯" label="KPI" val={stats.kpi} color="var(--brand)" onClick={()=>setStatDetail({title:'Aktivitas KPI', items:outstandingActs.filter(a=>a.subType==='KPI')})} />}
-                  {isWidgetActive('stat-nonkpi') && <Stat icon="📋" label="Non KPI" val={stats.nonKpi} color="var(--purple)" onClick={()=>setStatDetail({title:'Aktivitas Non-KPI', items:outstandingActs.filter(a=>a.subType==='Non-KPI')})} />}
-                  {isWidgetActive('stat-golive') && <Stat icon="🚀" label="Go Live" val={stats.goLive} color="var(--green)" onClick={()=>setStatDetail({title:'Aktivitas Go-Live', items:outstandingActs.filter(a=>a.subType==='Go-Live')})} />}
-                  {isWidgetActive('stat-anggaran') && <Stat icon="💰" label="Anggaran" val={stats.anggaran} color="var(--amber)" onClick={()=>setStatDetail({title:'Aktivitas Anggaran', items:outstandingActs.filter(a=>a.subType==='Anggaran')})} />}
-                  {isWidgetActive('stat-others') && <Stat icon="📁" label="Others" val={stats.others} color="var(--text3)" onClick={()=>setStatDetail({title:'Aktivitas Others', items:outstandingActs.filter(a=>a.subType==='Others')})} />}
-                  {isWidgetActive('stat-highpriority') && <Stat icon="🔥" label="High Priority" val={stats.highPriority} color="var(--red)" onClick={()=>setStatDetail({title:'High Priority', items:outstandingActs.filter(a=>a.priority==='high')})} />}
-                  {isWidgetActive('member-count') && <Stat icon="🏢" label="WFO Hari Ini" val={wfoToday} color="var(--green)" onClick={()=>{ const today=new Date().toISOString().slice(0,10); const ids=attendance.filter((r:any)=>r.date===today && ((r.slots&&r.slots.some((s:any)=>String(s.type).toLowerCase()==='wfo'))||String(r.type||'').toLowerCase()==='wfo')).map((r:any)=>r.userId); setStatDetail({title:'WFO Hari Ini', items: members.filter((m:any)=>ids.includes(m._id)||ids.includes(m.email)).map((m:any)=>({title:m.name, category:m.division||'', subType:'WFO'}))}) }} />}
+                <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
+                  {isWidgetActive('stat-kpi') && <Stat icon="🎯" label="KPI" val={stats.kpi} total={stats.total} color="var(--brand)" onClick={()=>setStatDetail({title:'Aktivitas KPI', items:outstandingActs.filter(a=>a.subType==='KPI')})} />}
+                  {isWidgetActive('stat-nonkpi') && <Stat icon="📋" label="Non KPI" val={stats.nonKpi} total={stats.total} color="var(--purple)" onClick={()=>setStatDetail({title:'Aktivitas Non-KPI', items:outstandingActs.filter(a=>a.subType==='Non-KPI')})} />}
+                  {isWidgetActive('stat-golive') && <Stat icon="🚀" label="Go Live" val={stats.goLive} total={stats.total} color="var(--green)" onClick={()=>setStatDetail({title:'Aktivitas Go-Live', items:outstandingActs.filter(a=>a.subType==='Go-Live')})} />}
+                  {isWidgetActive('stat-anggaran') && <Stat icon="💰" label="Anggaran" val={stats.anggaran} total={stats.total} color="var(--amber)" onClick={()=>setStatDetail({title:'Aktivitas Anggaran', items:outstandingActs.filter(a=>a.subType==='Anggaran')})} />}
+                  {isWidgetActive('stat-others') && <Stat icon="📁" label="Others" val={stats.others} total={stats.total} color="var(--text3)" onClick={()=>setStatDetail({title:'Aktivitas Others', items:outstandingActs.filter(a=>a.subType==='Others')})} />}
+                  {isWidgetActive('stat-highpriority') && <Stat icon="🔥" label="High Priority" val={stats.highPriority} total={stats.total} color="var(--red)" onClick={()=>setStatDetail({title:'High Priority', items:outstandingActs.filter(a=>a.priority==='high')})} />}
+                  {isWidgetActive('member-count') && <Stat icon="🏢" label="WFO Hari Ini" val={wfoToday} total={members.filter((m:any)=>m.active!==false).length} totalLabel="member" color="var(--green)" onClick={()=>{ const today=new Date().toISOString().slice(0,10); const ids=attendance.filter((r:any)=>r.date===today && ((r.slots&&r.slots.some((s:any)=>String(s.type).toLowerCase()==='wfo'))||String(r.type||'').toLowerCase()==='wfo')).map((r:any)=>r.userId); setStatDetail({title:'WFO Hari Ini', items: members.filter((m:any)=>ids.includes(m._id)||ids.includes(m.email)).map((m:any)=>({title:m.name, category:m.division||'', subType:'WFO'}))}) }} />}
                 </div>
 
                 {(() => {
@@ -348,6 +349,7 @@ export default function DashboardPage() {
                     'budget-insights': isInternal ? <BudgetInsights /> : null,
                     'team-availability': isInternal ? <TeamAvailability /> : null,
                     'mandatory-insights': isInternal ? <MandatoryInsights /> : null,
+                    'golive-insights': <GoLiveInsights />,
                     'ai-row': (
                       <div className="responsive-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:10 }}>
                         {isWidgetActive('ai-quotes') && (
@@ -676,14 +678,23 @@ export default function DashboardPage() {
   )
 }
 
-function Stat({ icon, label, val, color, onClick }: { icon:string; label:string; val:number; color:string; onClick?:()=>void }) {
+function Stat({ icon, label, val, total, totalLabel, color, onClick }: { icon:string; label:string; val:number; total?:number; totalLabel?:string; color:string; onClick?:()=>void }) {
+  const pct = total && total > 0 ? Math.round(val / total * 100) : null
   return (
-    <div className="card glass-hover" onClick={onClick} style={{ padding:14, borderLeft:`3px solid ${color}`, cursor: onClick?'pointer':'default' }}>
+    <div className="card glass-hover" onClick={onClick} style={{ padding:14, borderLeft:`3px solid ${color}`, cursor: onClick?'pointer':'default', flex:'1 1 150px', minWidth:150 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
         <span style={{ fontSize:9, color:'var(--text3)', textTransform:'uppercase', fontWeight:600, letterSpacing:'0.05em' }}>{label}</span>
         <span style={{ fontSize:14 }}>{icon}</span>
       </div>
-      <div style={{ fontSize:24, fontWeight:800, color }}><CountUp end={val} /></div>
+      <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
+        <span style={{ fontSize:24, fontWeight:800, color }}><CountUp end={val} /></span>
+        {pct !== null && <span style={{ fontSize:10.5, color:'var(--text3)' }}>{pct}% {totalLabel ? `dari ${total} ${totalLabel}` : 'dari total'}</span>}
+      </div>
+      {pct !== null && (
+        <div style={{ height:4, background:'var(--bg3)', borderRadius:2, overflow:'hidden', marginTop:8 }}>
+          <div style={{ width:`${Math.min(100,pct)}%`, height:'100%', background:color, opacity:0.85, transition:'width .4s' }} />
+        </div>
+      )}
     </div>
   )
 }

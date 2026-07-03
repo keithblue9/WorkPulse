@@ -33,14 +33,18 @@ export default function TeamAvailability() {
     })()
   }, [scope])
 
-  const { data, total, available, pct } = useMemo(() => {
-    const counts: Record<string, number> = {}
-    for (const doc of docs) for (const s of (doc.slots || [])) counts[s.type] = (counts[s.type] || 0) + 1
-    const total = Object.values(counts).reduce((a, b) => a + b, 0)
-    const available = WORKING.reduce((a, k) => a + (counts[k] || 0), 0)
-    const data = types.map((t: any) => ({ name: t.label, key: t.key, value: counts[t.key] || 0, color: t.textColor || '#4f8ef7' })).filter((d: any) => d.value > 0)
-    return { data, total, available, pct: total > 0 ? Math.round(available / total * 100) : 0 }
-  }, [docs, types])
+  const { data, available, availPct } = useMemo(() => {
+    // Count of MEMBER (distinct), bukan sum slot: dari N member, berapa member yg WFO/WFH/Cuti/dst di periode ini
+    const byType: Record<string, Set<string>> = {}
+    const availSet = new Set<string>()
+    for (const doc of docs) for (const s of (doc.slots || [])) {
+      (byType[s.type] = byType[s.type] || new Set()).add(doc.userId)
+      if (WORKING.includes(s.type)) availSet.add(doc.userId)
+    }
+    const denom = memberCount || 1
+    const data = types.map((t: any) => ({ name: t.label, key: t.key, value: (byType[t.key]?.size) || 0, color: t.textColor || '#4f8ef7' })).filter((d: any) => d.value > 0)
+    return { data, available: availSet.size, availPct: Math.round(availSet.size / denom * 100) }
+  }, [docs, types, memberCount])
 
   return (
     <div className="card" style={{ padding: 16 }}>
@@ -57,7 +61,7 @@ export default function TeamAvailability() {
       </div>
 
       {loading ? <div style={{ fontSize: 12, color: 'var(--text3)', padding: '30px 0', textAlign: 'center' }}>Memuat…</div>
-        : total === 0 ? <div style={{ fontSize: 12, color: 'var(--text3)', padding: '30px 0', textAlign: 'center' }}>Belum ada data presensi periode ini.</div>
+        : data.length === 0 ? <div style={{ fontSize: 12, color: 'var(--text3)', padding: '30px 0', textAlign: 'center' }}>Belum ada data presensi periode ini.</div>
           : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
               <div style={{ position: 'relative', width: 170, height: 170, flexShrink: 0 }}>
@@ -68,12 +72,12 @@ export default function TeamAvailability() {
                     </Pie>
                     <Tooltip content={({ active, payload }: any) => active && payload?.length ? (
                       <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', fontSize: 11, boxShadow: '0 6px 20px rgba(0,0,0,0.15)' }}>
-                        <b>{payload[0].name}</b>: {payload[0].value} ({total > 0 ? Math.round(payload[0].value / total * 100) : 0}%)
+                        <b>{payload[0].name}</b>: {payload[0].value} member ({memberCount > 0 ? Math.round(payload[0].value / memberCount * 100) : 0}%)
                       </div>) : null} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                  <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--green)' }}>{pct}%</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--green)' }}>{availPct}%</div>
                   <div style={{ fontSize: 9.5, color: 'var(--text3)' }}>Available</div>
                 </div>
               </div>
@@ -82,12 +86,12 @@ export default function TeamAvailability() {
                   <div key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                     <span style={{ width: 10, height: 10, borderRadius: 3, background: d.color, flexShrink: 0 }} />
                     <span style={{ flex: 1, color: 'var(--text2)' }}>{d.name}</span>
-                    <span style={{ fontWeight: 700 }}>{d.value}</span>
-                    <span style={{ fontSize: 10.5, color: 'var(--text3)', width: 34, textAlign: 'right' }}>{total > 0 ? Math.round(d.value / total * 100) : 0}%</span>
+                    <span style={{ fontWeight: 700 }}>{d.value} <span style={{ fontWeight: 400, fontSize: 10, color: 'var(--text3)' }}>member</span></span>
+                    <span style={{ fontSize: 10.5, color: 'var(--text3)', width: 34, textAlign: 'right' }}>{memberCount > 0 ? Math.round(d.value / memberCount * 100) : 0}%</span>
                   </div>
                 ))}
                 <div style={{ marginTop: 4, paddingTop: 8, borderTop: '1px solid var(--border)', fontSize: 11, color: 'var(--text3)' }}>
-                  Available (WFO/WFH/Dinas): <b style={{ color: 'var(--green)' }}>{available}</b> dari {total} kehadiran
+                  Available (WFO/WFH/Dinas): <b style={{ color: 'var(--green)' }}>{available}</b> dari {memberCount} member
                 </div>
               </div>
             </div>
