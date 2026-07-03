@@ -3,6 +3,9 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 
 const GROUPS = ['Holding','SH Upstream','SH Gas','SH C&T','SH PNRE','SH R&P','SH Shipping','Others']
+const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
+
+function fmtDate(v:string){ if(!v) return ''; const [y,m]=v.split('-'); return m&&y ? `${MONTHS[parseInt(m)-1]}-${y.slice(2)}` : v }
 
 export default function GoLivePage() {
   const [apps, setApps] = useState<any[]>([])
@@ -43,7 +46,6 @@ export default function GoLivePage() {
     setEntities(prev=>prev.filter(x=>x._id!==e._id)); toast.success('Entitas dihapus')
   }
 
-  // simpan patch entity (optimistic + debounce ringan via blur/change)
   async function patchEntity(id:string, patch:any) {
     setEntities(prev=>prev.map(e=>e._id===id?{...e, ...patch, apps:{...(e.apps||{}), ...(patch.apps||{})}}:e))
     try { await fetch('/api/golive', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ kind:'entity', id, patch }) }) }
@@ -51,8 +53,7 @@ export default function GoLivePage() {
   }
   function setApp(e:any, appKey:string, val:{done?:boolean; date?:string}) {
     const cur = (e.apps||{})[appKey] || {}
-    const next = { ...cur, ...val }
-    patchEntity(e._id, { apps: { ...(e.apps||{}), [appKey]: next } })
+    patchEntity(e._id, { apps: { ...(e.apps||{}), [appKey]: { ...cur, ...val } } })
   }
 
   const view = useMemo(()=>entities
@@ -60,12 +61,11 @@ export default function GoLivePage() {
     .filter(e=>!q.trim() || (e.name||'').toLowerCase().includes(q.toLowerCase()) || String(e.cocd||'').includes(q)),
   [entities, groupFilter, q])
 
-  // ringkasan per app
   const summary = useMemo(()=>apps.map(a=>({ ...a, done: entities.filter(e=>(e.apps||{})[a.key]?.done).length })), [apps, entities])
 
-  const th: React.CSSProperties = { padding:'7px 8px', fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.4, background:'var(--bg2)', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap', textAlign:'left' }
-  const td: React.CSSProperties = { padding:'4px 8px', fontSize:12, borderBottom:'1px solid var(--border)', verticalAlign:'middle' }
-  const inp: React.CSSProperties = { width:'100%', border:'1px solid transparent', borderRadius:5, padding:'4px 6px', fontSize:12, background:'transparent', color:'var(--text)', outline:'none' }
+  const COLORS = ['#4f8ef7','#8b5cf6','#22c55e','#f59e0b','#ec4899','#14b8a6','#f97316','#06b6d4']
+  const th:React.CSSProperties = { padding:'8px 10px', fontSize:10.5, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.3, background:'var(--bg2)', borderBottom:'2px solid var(--border)', whiteSpace:'nowrap', textAlign:'left', position:'sticky', top:0, zIndex:2 }
+  const td:React.CSSProperties = { padding:'6px 10px', fontSize:12.5, borderBottom:'1px solid var(--border)', verticalAlign:'middle' }
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -81,23 +81,26 @@ export default function GoLivePage() {
       </div>
 
       <div style={{ flex:1, overflow:'auto', padding:'16px 20px' }}>
-        {/* Ringkasan per app */}
+        {/* Summary cards */}
         <div style={{ display:'flex', gap:10, marginBottom:14, flexWrap:'wrap' }}>
-          {summary.map(a=>(
-            <div key={a._id} className="card" style={{ padding:'10px 16px', display:'flex', alignItems:'center', gap:10, flex:'1 1 140px', minWidth:140 }}>
-              <div style={{ fontSize:22, fontWeight:800, color:'var(--brand)' }}>{a.done}</div>
-              <div>
-                <div style={{ fontSize:12, fontWeight:700 }}>{a.label}</div>
-                <div style={{ fontSize:10, color:'var(--text3)' }}>dari {entities.length} entitas</div>
+          {summary.map((a,i)=>{ const color=COLORS[i%COLORS.length]; const pct=entities.length>0?Math.round(a.done/entities.length*100):0; return (
+            <div key={a._id} className="card" style={{ padding:'12px 16px', flex:'1 1 140px', minWidth:140, borderLeft:`3px solid ${color}` }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.3, marginBottom:4 }}>{a.label}</div>
+              <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
+                <span style={{ fontSize:24, fontWeight:800, color }}>{a.done}</span>
+                <span style={{ fontSize:11, color:'var(--text3)' }}>/ {entities.length}</span>
+              </div>
+              <div style={{ height:4, background:'var(--bg3)', borderRadius:2, overflow:'hidden', marginTop:6 }}>
+                <div style={{ width:`${pct}%`, height:'100%', background:color, transition:'width .3s' }} />
               </div>
             </div>
-          ))}
+          )})}
         </div>
 
-        {/* Filter */}
+        {/* Filters */}
         <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap', alignItems:'center' }}>
-          <input className="input" placeholder="🔍 Cari entitas / CoCd…" value={q} onChange={e=>setQ(e.target.value)} style={{ maxWidth:240 }} />
-          <select className="input" value={groupFilter} onChange={e=>setGroupFilter(e.target.value)} style={{ maxWidth:180 }}>
+          <input className="input" placeholder="🔍 Cari entitas / CoCd…" value={q} onChange={e=>setQ(e.target.value)} style={{ maxWidth:240, fontSize:12 }} />
+          <select className="input" value={groupFilter} onChange={e=>setGroupFilter(e.target.value)} style={{ maxWidth:180, fontSize:12 }}>
             <option value="all">Semua Grup</option>
             {GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
           </select>
@@ -105,55 +108,63 @@ export default function GoLivePage() {
         </div>
 
         {loading ? <div style={{ fontSize:12.5, color:'var(--text3)' }}>Memuat…</div> : (
-        <div className="card" style={{ padding:0, overflow:'auto' }}>
-          <table style={{ borderCollapse:'collapse', minWidth: 560 + apps.length*150 }}>
+        <div className="card" style={{ padding:0, overflow:'auto', maxHeight:'calc(100vh - 300px)' }}>
+          <table style={{ borderCollapse:'collapse', width:'100%', minWidth: 420 + apps.length*110 }}>
             <thead>
               <tr>
-                <th style={{ ...th, width:34 }} rowSpan={2}>No</th>
-                <th style={{ ...th, minWidth:220 }} rowSpan={2}>Company</th>
-                <th style={{ ...th, width:70 }} rowSpan={2}>CoCd</th>
-                <th style={{ ...th, width:130 }} rowSpan={2}>HSH</th>
-                {apps.map(a=>(
-                  <th key={a._id} style={{ ...th, textAlign:'center', borderLeft:'1px solid var(--border)' }} colSpan={2}>
-                    <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}>{a.label}
-                      <button onClick={()=>delApp(a)} title="Hapus app" className="btn btn-icon btn-sm" style={{ fontSize:9, height:16, width:16, color:'var(--red)' }}>✕</button>
-                    </span>
+                <th style={{ ...th, width:36, textAlign:'center' }}>No</th>
+                <th style={{ ...th, minWidth:200 }}>Company</th>
+                <th style={{ ...th, width:60, textAlign:'center' }}>CoCd</th>
+                <th style={{ ...th, width:120 }}>HSH</th>
+                {apps.map((a,i)=>(
+                  <th key={a._id} style={{ ...th, textAlign:'center', borderLeft:'2px solid var(--border)', minWidth:100 }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:4 }}>
+                      <span style={{ color:COLORS[i%COLORS.length], fontWeight:800 }}>{a.label}</span>
+                      <button onClick={()=>delApp(a)} title="Hapus app" className="btn btn-icon btn-sm" style={{ fontSize:8, height:14, width:14, color:'var(--red)', opacity:0.5 }}>✕</button>
+                    </div>
                   </th>
                 ))}
-                <th style={{ ...th, width:40 }} rowSpan={2}></th>
-              </tr>
-              <tr>
-                {apps.map(a=>(<Fragment key={a._id}><th style={{ ...th, width:46, textAlign:'center', borderLeft:'1px solid var(--border)' }}>✓</th><th style={{ ...th, width:118 }}>Tgl</th></Fragment>))}
+                <th style={{ ...th, width:36 }}></th>
               </tr>
             </thead>
             <tbody>
               {view.map((e,i)=>(
-                <tr key={e._id}>
+                <tr key={e._id} style={{ background: i%2===0?'transparent':'var(--bg2)' }}>
                   <td style={{ ...td, textAlign:'center', color:'var(--text3)', fontSize:11 }}>{i+1}</td>
-                  <td style={td}><input style={{ ...inp, fontWeight:600 }} defaultValue={e.name||''} placeholder="Nama entitas…" onBlur={ev=>{ if(ev.target.value!==e.name) patchEntity(e._id,{ name:ev.target.value }) }} /></td>
-                  <td style={td}><input style={inp} defaultValue={e.cocd||''} placeholder="0000" onBlur={ev=>{ if(ev.target.value!==e.cocd) patchEntity(e._id,{ cocd:ev.target.value }) }} /></td>
                   <td style={td}>
-                    <select value={e.group||''} onChange={ev=>patchEntity(e._id,{ group:ev.target.value })} style={{ ...inp, border:'1px solid var(--border)', background:'var(--bg)' }}>
+                    <input defaultValue={e.name||''} placeholder="Nama entitas…" onBlur={ev=>{ if(ev.target.value!==e.name) patchEntity(e._id,{name:ev.target.value}) }}
+                      style={{ width:'100%', border:'none', background:'transparent', fontSize:12.5, fontWeight:600, color:'var(--text)', padding:'2px 0', outline:'none' }} />
+                  </td>
+                  <td style={{ ...td, textAlign:'center' }}>
+                    <input defaultValue={e.cocd||''} placeholder="—" onBlur={ev=>{ if(ev.target.value!==e.cocd) patchEntity(e._id,{cocd:ev.target.value}) }}
+                      style={{ width:56, border:'none', background:'transparent', fontSize:12, color:'var(--text2)', padding:'2px 0', outline:'none', textAlign:'center' }} />
+                  </td>
+                  <td style={td}>
+                    <select value={e.group||''} onChange={ev=>patchEntity(e._id,{group:ev.target.value})}
+                      style={{ width:'100%', border:'1px solid var(--border)', borderRadius:5, padding:'4px 6px', fontSize:11, background:'var(--bg)', color:'var(--text)' }}>
                       <option value="">—</option>
                       {GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
                     </select>
                   </td>
-                  {apps.map(a=>{ const st=(e.apps||{})[a.key]||{}; return (
-                    <Fragment key={a._id}>
-                      <td style={{ ...td, textAlign:'center', borderLeft:'1px solid var(--border)' }}>
-                        <input type="checkbox" checked={!!st.done} onChange={ev=>setApp(e, a.key, { done: ev.target.checked })} style={{ width:15, height:15, cursor:'pointer', accentColor:'var(--green)' }} />
-                      </td>
-                      <td style={td}>
-                        <input type="month" value={st.date||''} onChange={ev=>setApp(e, a.key, { date: ev.target.value })} style={{ ...inp, border:'1px solid var(--border)', background:'var(--bg)', fontSize:11, color: st.done?'var(--text)':'var(--text3)' }} />
-                      </td>
-                    </Fragment>
+                  {apps.map((a,ai)=>{ const st=(e.apps||{})[a.key]||{}; const color=COLORS[ai%COLORS.length]; return (
+                    <td key={a._id} style={{ ...td, textAlign:'center', borderLeft:'2px solid var(--border)', padding:'4px 6px' }}>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                        <input type="checkbox" checked={!!st.done} onChange={ev=>setApp(e,a.key,{done:ev.target.checked})}
+                          style={{ width:16, height:16, cursor:'pointer', accentColor:color, flexShrink:0 }} />
+                        <input type="text" value={st.date ? fmtDate(st.date) : ''} placeholder="—"
+                          onFocus={ev=>{ ev.target.type='month'; ev.target.value=st.date||'' }}
+                          onBlur={ev=>{ ev.target.type='text'; ev.target.value=ev.target.value ? fmtDate(ev.target.value) : ''; if(ev.target.value!==fmtDate(st.date||'')) setApp(e,a.key,{date:(ev.target as any)._rawVal||''}) }}
+                          onChange={ev=>{ (ev.target as any)._rawVal=ev.target.value; setApp(e,a.key,{date:ev.target.value}) }}
+                          style={{ width:72, border:'1px solid var(--border)', borderRadius:5, padding:'3px 6px', fontSize:11, background: st.done?`${color}11`:'var(--bg)', color: st.done?color:'var(--text3)', textAlign:'center', fontWeight:st.done?700:400, outline:'none' }} />
+                      </div>
+                    </td>
                   )})}
                   <td style={{ ...td, textAlign:'center' }}>
-                    <button onClick={()=>delEntity(e)} className="btn btn-icon btn-sm" title="Hapus entitas" style={{ color:'var(--red)', fontSize:11 }}>🗑</button>
+                    <button onClick={()=>delEntity(e)} className="btn btn-icon btn-sm" title="Hapus" style={{ color:'var(--red)', fontSize:11, opacity:0.6 }}>🗑</button>
                   </td>
                 </tr>
               ))}
-              {view.length===0 && <tr><td colSpan={5+apps.length*2} style={{ padding:24, textAlign:'center', fontSize:12, color:'var(--text3)' }}>Belum ada entitas. Klik <b>+ Entitas</b> untuk mulai.</td></tr>}
+              {view.length===0 && <tr><td colSpan={4+apps.length+1} style={{ padding:30, textAlign:'center', fontSize:12, color:'var(--text3)' }}>Belum ada entitas. Klik <b>+ Entitas</b> untuk mulai.</td></tr>}
             </tbody>
           </table>
         </div>
