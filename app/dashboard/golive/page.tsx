@@ -14,6 +14,18 @@ export default function GoLivePage() {
   const [q, setQ] = useState('')
 
   const [seeding, setSeeding] = useState(false)
+  const [editApp, setEditApp] = useState<any|null>(null)
+
+  async function patchApp(id:string, patch:any) {
+    setApps(p=>p.map(a=>a._id===id?{...a,...patch}:a))
+    try { await fetch('/api/golive',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'app',id,patch})}) }
+    catch { toast.error('Gagal') }
+  }
+  async function delApp(app:any) {
+    if(!confirm(`Hapus aplikasi "${app.label}" beserta semua data centangnya?`)) return
+    await fetch(`/api/golive?kind=app&id=${app._id}`,{method:'DELETE'})
+    setApps(p=>p.filter(a=>a._id!==app._id)); setEditApp(null); toast.success('App dihapus')
+  }
 
   async function doSeed() {
     setSeeding(true)
@@ -100,7 +112,7 @@ export default function GoLivePage() {
                 {apps.map((a:any,ai:number)=>{
                   const subs=(a.subFeatures||[]); const cols=subs.length+1; // subs + date
                   const color=['#4f8ef7','#8b5cf6','#22c55e','#f59e0b','#ec4899','#14b8a6'][ai%6]
-                  return <th key={a._id||a.key} style={{...th,borderLeft:'2px solid var(--border)',color}} colSpan={cols}>{a.label}</th>
+                  return <th key={a._id||a.key} style={{...th,borderLeft:'2px solid var(--border)',color,cursor:'pointer'}} colSpan={cols} onClick={()=>setEditApp({...a})} title="Klik untuk edit app & sub-fitur">{a.label} <span style={{fontSize:8,opacity:0.6}}>✎</span></th>
                 })}
                 <th style={{...th,width:30}} rowSpan={2}></th>
               </tr>
@@ -146,6 +158,58 @@ export default function GoLivePage() {
         </div>
         )}
       </div>
+
+      {/* Edit App Modal */}
+      {editApp && (
+        <div className="modal-overlay" onClick={ev=>{if(ev.target===ev.currentTarget) setEditApp(null)}}>
+          <div className="modal" style={{width:420,maxWidth:'100%'}}>
+            <div style={{padding:'14px 18px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontSize:14,fontWeight:700}}>Edit Aplikasi</span>
+              <button onClick={()=>setEditApp(null)} className="btn btn-icon">×</button>
+            </div>
+            <div style={{padding:'14px 18px',display:'flex',flexDirection:'column',gap:14}}>
+              {/* App label */}
+              <div>
+                <label style={{display:'block',fontSize:11,fontWeight:600,color:'var(--text3)',marginBottom:4}}>Nama Aplikasi</label>
+                <input className="input" value={editApp.label||''} onChange={ev=>setEditApp((p:any)=>({...p,label:ev.target.value}))} />
+              </div>
+
+              {/* Sub-features list */}
+              <div>
+                <label style={{display:'block',fontSize:11,fontWeight:600,color:'var(--text3)',marginBottom:6}}>Sub-fitur (kolom checkbox)</label>
+                <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  {(editApp.subFeatures||[]).map((sf:any, i:number)=>(
+                    <div key={sf.key||i} style={{display:'flex',gap:8,alignItems:'center'}}>
+                      <input className="input" value={sf.label||''} onChange={ev=>{
+                        const next=[...(editApp.subFeatures||[])]; next[i]={...next[i],label:ev.target.value}; setEditApp((p:any)=>({...p,subFeatures:next}))
+                      }} style={{flex:1}} placeholder="Nama sub-fitur" />
+                      <button onClick={()=>{
+                        const next=(editApp.subFeatures||[]).filter((_:any,j:number)=>j!==i); setEditApp((p:any)=>({...p,subFeatures:next}))
+                      }} className="btn btn-icon btn-sm" style={{color:'var(--red)'}}>✕</button>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={()=>{
+                  const key='sf'+Date.now().toString(36)
+                  const next=[...(editApp.subFeatures||[]),{key,label:'',order:(editApp.subFeatures||[]).length+1}]
+                  setEditApp((p:any)=>({...p,subFeatures:next}))
+                }} className="btn btn-sm" style={{marginTop:8,fontSize:11}}>+ Sub-fitur</button>
+              </div>
+            </div>
+            <div style={{padding:'12px 18px',borderTop:'1px solid var(--border)',display:'flex',justifyContent:'space-between',gap:8}}>
+              <button onClick={()=>delApp(editApp)} className="btn btn-sm" style={{color:'var(--red)'}}>🗑 Hapus App</button>
+              <div style={{display:'flex',gap:8}}>
+                <button onClick={()=>setEditApp(null)} className="btn btn-sm">Batal</button>
+                <button onClick={async ()=>{
+                  const patch = { label: editApp.label, subFeatures: (editApp.subFeatures||[]).filter((sf:any)=>sf.label?.trim()).map((sf:any,i:number)=>({...sf, key:sf.key||sf.label.toLowerCase().replace(/[^a-z0-9]+/g,'-'), order:i+1})) }
+                  await patchApp(editApp._id, patch)
+                  setEditApp(null); toast.success('App diperbarui')
+                }} className="btn btn-primary btn-sm">Simpan</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
