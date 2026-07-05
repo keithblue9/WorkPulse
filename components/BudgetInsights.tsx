@@ -184,7 +184,7 @@ export default function BudgetInsights({ section }: { section?: 'yield' | 'realp
       )}
 
       {show('cashcard') && (
-        <CardBox title={`Rata-rata Settlement Cash Card ${ccYear}`} sub="Total settlement ÷ total top-up × 100%">
+        <CardBox title={`% Settlement Cash Card ${ccYear}`} sub="Total settlement ÷ total top-up × 100%">
           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginBottom: 6 }}>
             <button onClick={()=>setCcYear(y=>y-1)} className="btn btn-sm" style={{ padding:'2px 8px' }}>◀</button>
             <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40, textAlign: 'center' }}>{ccYear}</span>
@@ -196,22 +196,22 @@ export default function BudgetInsights({ section }: { section?: 'yield' | 'realp
             const gaugeData = [{ name: 'Settlement', value: Math.min(pct, 100) }, { name: 'Sisa', value: Math.max(0, 100 - pct) }]
             const color = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444'
             return (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'center' }}>
-                <div style={{ position: 'relative', width: 130, height: 130 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={gaugeData} dataKey="value" innerRadius={42} outerRadius={60} paddingAngle={2} startAngle={90} endAngle={-270} stroke="none">
-                        <Cell fill={color} /><Cell fill="var(--bg3)" />
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ fontSize: 22, fontWeight: 800, color }}>{pct}%</div>
+              <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <div style={{ textAlign: 'center', flex: '1 1 140px', maxWidth: 200 }}>
+                  <div style={{ position: 'relative', width: 130, height: 130, margin: '0 auto' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={gaugeData} dataKey="value" innerRadius={42} outerRadius={60} paddingAngle={2} startAngle={90} endAngle={-270} stroke="none">
+                          <Cell fill={color} /><Cell fill="var(--bg3)" />
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, color }}>{pct}%</div>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Total Settlement: <b>{rp(ccData.settlement)}</b></div>
-                  <div style={{ fontSize: 12, color: 'var(--text2)' }}>Total Top-up: <b>{rp(ccData.topup)}</b></div>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 4 }}>Settlement</div>
+                  <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{rpShort(ccData.settlement)} / {rpShort(ccData.topup)}</div>
                 </div>
               </div>
             )
