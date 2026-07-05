@@ -1,0 +1,3744 @@
+{
+  "apps": [
+    {
+      "key": "ivendor",
+      "label": "iVendor (VR)",
+      "order": 1,
+      "subFeatures": [
+        {
+          "key": "dpt",
+          "label": "DPT",
+          "order": 1
+        },
+        {
+          "key": "csms",
+          "label": "CSMS",
+          "order": 2
+        },
+        {
+          "key": "akun",
+          "label": "Akun",
+          "order": 3
+        }
+      ]
+    },
+    {
+      "key": "ipro",
+      "label": "iPRO",
+      "order": 2,
+      "subFeatures": [
+        {
+          "key": "poro",
+          "label": "PO/RO",
+          "order": 1
+        },
+        {
+          "key": "oa",
+          "label": "OA",
+          "order": 2
+        },
+        {
+          "key": "pr",
+          "label": "PR",
+          "order": 3
+        },
+        {
+          "key": "gr",
+          "label": "GR",
+          "order": 4
+        },
+        {
+          "key": "sa",
+          "label": "SA",
+          "order": 5
+        }
+      ]
+    },
+    {
+      "key": "myssc",
+      "label": "MySSC",
+      "order": 3,
+      "subFeatures": [
+        {
+          "key": "dpt",
+          "label": "DPT",
+          "order": 1
+        }
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "name": "PT Pertamina (Persero)",
+      "cocd": "1010",
+      "group": "Holding",
+      "client": "PEP170",
+      "order": 1,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2021-07",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2022-05",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Drilling Services Indonesia",
+      "cocd": "2110",
+      "group": "SH Upstream",
+      "client": "PEP100",
+      "order": 2,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2021-07",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2022-05",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Perusahaan Gas Negara",
+      "cocd": "3100",
+      "group": "SH Gas",
+      "client": "PEP100",
+      "order": 3,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2023-05",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-04",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Geothermal Energy",
+      "cocd": "2022",
+      "group": "SH PNRE",
+      "client": "PEP100",
+      "order": 4,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-02",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-05",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Retail",
+      "cocd": "2042",
+      "group": "SH C&T",
+      "client": "PEP100",
+      "order": 5,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2023-11",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-09",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Lubricants",
+      "cocd": "2138",
+      "group": "SH C&T",
+      "client": "PEP100",
+      "order": 6,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2023-09",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-09",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Trans Kontinental",
+      "cocd": "2033",
+      "group": "SH Shipping",
+      "client": "PEP100",
+      "order": 7,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-03",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-04",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Gas",
+      "cocd": "2045",
+      "group": "SH Gas",
+      "client": "PEP100",
+      "order": 8,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-02",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-04",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Patra Logistik",
+      "cocd": "2050",
+      "group": "SH C&T",
+      "client": "PEP100",
+      "order": 9,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2023-09",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-05",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Peteka Karya Tirta / PT Pertamina Energy Terminal",
+      "cocd": "2061",
+      "group": "SH Shipping",
+      "client": "PEP170",
+      "order": 10,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-02",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-09",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Nusantara Regas",
+      "cocd": "2119",
+      "group": "SH Gas",
+      "client": "PEP100",
+      "order": 11,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2023-09",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-05",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina International Shipping",
+      "cocd": "2147",
+      "group": "SH Shipping",
+      "client": "DIP 111",
+      "order": 12,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2023-09",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-09",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Power Indonesia",
+      "cocd": "2183",
+      "group": "SH PNRE",
+      "client": "PEP100",
+      "order": 13,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2023-09",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-05",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Kilang Pertamina Internasional",
+      "cocd": "2186",
+      "group": "SH R&P",
+      "client": "PEP170",
+      "order": 14,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2021-09",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2022-05",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Kilang Pertamina Balikpapan",
+      "cocd": "2205",
+      "group": "SH R&P",
+      "client": "PEP170",
+      "order": 15,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2023-09",
+          "subs": {
+            "dpt": true,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-09",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Rosneft Pengolahan dan Petrokimia",
+      "cocd": "2208",
+      "group": "SH R&P",
+      "client": "PEP170",
+      "order": 16,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-03",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-05",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Patra Niaga",
+      "cocd": "2222",
+      "group": "SH C&T",
+      "client": "PEP170",
+      "order": 17,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2021-07",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2022-05",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Badak Arun Solusi / Pertamina Maintenance & Construction",
+      "cocd": "2052",
+      "group": "SH C&T",
+      "client": "PEP100",
+      "order": 18,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-04",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-09",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Perta Arun Gas",
+      "cocd": "2149",
+      "group": "SH Gas",
+      "client": "PEP100",
+      "order": 19,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-04",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-10",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Patra Trading",
+      "cocd": "2053",
+      "group": "SH C&T",
+      "client": "PEP100",
+      "order": 20,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-04",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-10",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi",
+      "cocd": "5000",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 21,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-08",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Indonesia",
+      "cocd": "2181",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 22,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-08",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina International EP",
+      "cocd": "2151",
+      "group": "SH Upstream",
+      "client": "PEP160",
+      "order": 23,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-08",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertagas Niaga",
+      "cocd": "2124",
+      "group": "SH Gas",
+      "client": "PEP100",
+      "order": 24,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-10",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-05",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Patra Drilling Contractor",
+      "cocd": "2090",
+      "group": "SH Upstream",
+      "client": "PEP100",
+      "order": 25,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-09",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-10",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Perta-Samtan Gas",
+      "cocd": "2129",
+      "group": "SH Gas",
+      "client": "PEP100",
+      "order": 26,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-10",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-10",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Patra Jasa",
+      "cocd": "2031",
+      "group": "Others",
+      "client": "PEP100",
+      "order": 27,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-10",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2024-03",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pelita Air Service",
+      "cocd": "2034",
+      "group": "Others",
+      "client": "PEP100",
+      "order": 28,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2024-10",
+          "subs": {
+            "dpt": true,
+            "csms": true,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2023-10",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Nunukan (PHE Nunukan)",
+      "cocd": "7005",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 29,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Ogan Komering (PHE OK)",
+      "cocd": "7014",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 30,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Rokan (PHR)",
+      "cocd": "2202",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 31,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi NSO",
+      "cocd": "7007",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 32,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Jambi Merang",
+      "cocd": "7016",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 33,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Raja Tempirai",
+      "cocd": "7017",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 34,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Mahakam (PHM)",
+      "cocd": "2210",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 35,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Kalimantan Timur (PHKT)",
+      "cocd": "2191",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 36,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Sanga Sanga (PHSS)",
+      "cocd": "2197",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 37,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Abar (PHE Abar)",
+      "cocd": "7008",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 38,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Anggursi (PHE Anggursi)",
+      "cocd": "7009",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 39,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina EP",
+      "cocd": "2021",
+      "group": "SH Upstream",
+      "client": "PEP100",
+      "order": 40,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi ONWJ",
+      "cocd": "7001",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 41,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi OSES",
+      "cocd": "7015",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 42,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi West Madura Offshore (PHE WMO)",
+      "cocd": "7002",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 43,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Randugunting (PHE Randugunting)",
+      "cocd": "7011",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 44,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Tuban East Java (PHE TEJ)",
+      "cocd": "7013",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 45,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina EP Cepu ADK",
+      "cocd": "2155",
+      "group": "SH Upstream",
+      "client": "PEP100",
+      "order": 46,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina EP Cepu",
+      "cocd": "2046",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 47,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina EP Cepu Jambaran Tiung Biru (PEPC JTB)",
+      "cocd": "9HA1",
+      "group": "SH Upstream",
+      "client": "PEP180",
+      "order": 48,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-01",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Petrochemical Trading",
+      "cocd": "2166",
+      "group": "SH C&T",
+      "client": "PEP100",
+      "order": 49,
+      "apps": {
+        "ivendor": {
+          "done": true,
+          "date": "2025-10",
+          "subs": {
+            "dpt": true,
+            "csms": false,
+            "akun": true
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-10",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "Pertamina International Marketing & Distribution PTE. LTD.",
+      "cocd": "2207",
+      "group": "SH C&T",
+      "client": "",
+      "order": 50,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "2026-11",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "2026-09",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "Pertamina Lubricants Thailand",
+      "cocd": "2173",
+      "group": "SH C&T",
+      "client": "",
+      "order": 51,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "2026-11",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "Trans-Pacific Petrochemical Indotama",
+      "cocd": "2177",
+      "group": "SH R&P",
+      "client": "",
+      "order": 52,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Trans Yeong Maritime",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 53,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Alor Bahtera Laju Abadi",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 54,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Ararkula Bahtera Laju Abadi",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 55,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Aru Bahtera Laju Abadi",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 56,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Banggai Bahtera Laju Abadi",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 57,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Bangkit Bahtera Laju Abadi",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 58,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Barung Bahtera Laju Abadi",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 59,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Benggala Bahtera Laju Abadi",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 60,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Bepondi Bahtera Laju Abadi",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 61,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Brass Bahtera Laju Abadi",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 62,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Damanusa Bahtera Laju Abadi",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 63,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Damar Bahtera Laju Abadi",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 64,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Liran Bahtera Laju Abadi",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 65,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Miangas Bahtera Laju Abadi",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 66,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PIS Paragon Pte., Ltd.",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 67,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PIS Polaris Pte., Ltd",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 68,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "Dana Bahtera Laju Abadi Pte. Ltd.",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 69,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "Demi Bahtera Laju Abadi Pte. Ltd.",
+      "cocd": "",
+      "group": "SH Shipping",
+      "client": "",
+      "order": 70,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Training & Consulting",
+      "cocd": "2043",
+      "group": "Others",
+      "client": "",
+      "order": 71,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Pedeve Indonesia",
+      "cocd": "2040",
+      "group": "Others",
+      "client": "",
+      "order": 72,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Asuransi Tugu Pratama Indonesia Tbk",
+      "cocd": "2044",
+      "group": "Others",
+      "client": "",
+      "order": 73,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "Dana Pensiun Pertamina",
+      "cocd": "",
+      "group": "Others",
+      "client": "",
+      "order": 74,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Bina Medika",
+      "cocd": "2038",
+      "group": "Others",
+      "client": "",
+      "order": 75,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Ambalat Timur",
+      "cocd": "",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 76,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "2026-11",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Lepas Pantai Bunyu",
+      "cocd": "7018",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 77,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "2026-11",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Attaka",
+      "cocd": "2189",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 78,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu West Ganal",
+      "cocd": "2209",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 79,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Jabung",
+      "cocd": "",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 80,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Tomori Sulawesi",
+      "cocd": "",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 81,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Simenggarisl",
+      "cocd": "[object Object]",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 82,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Salawati",
+      "cocd": "",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 83,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi South Jambi B",
+      "cocd": "",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 84,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Kakap",
+      "cocd": "",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 85,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Corridor",
+      "cocd": "",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 86,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Salawati Basin",
+      "cocd": "",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 87,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Makassar Strait",
+      "cocd": "",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 88,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi Coastal Plains Pekanbaru",
+      "cocd": "",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 89,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Hulu Energi East Sepinggan",
+      "cocd": "2167",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 90,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "Pertamina Hulu Energi Oil and Gas B.V",
+      "cocd": "",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 91,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina East Natuna",
+      "cocd": "7019",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 92,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "2026-11",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-08",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Irak Eksplorasi Produksi",
+      "cocd": "2150",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 93,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Algeria Eksplorasi Produksi",
+      "cocd": "2148",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 94,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "2026-11",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "2026-09",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Pertamina Malaysia Eksplorasi Produksi",
+      "cocd": "2168",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 95,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PT Elnusa Petrofin",
+      "cocd": "",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 96,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "Yayasan Kesehatan",
+      "cocd": "YKES",
+      "group": "Others",
+      "client": "",
+      "order": 97,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "2026-11",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2024-03",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": true,
+            "gr": true,
+            "sa": true
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "Pertamina International Timor S.A.",
+      "cocd": "2180",
+      "group": "SH C&T",
+      "client": "",
+      "order": 98,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "2026-11",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": true,
+          "date": "2025-10",
+          "subs": {
+            "poro": true,
+            "oa": true,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": true,
+          "date": "",
+          "subs": {
+            "dpt": true
+          }
+        }
+      }
+    },
+    {
+      "name": "WK Eksplorasi Regional 4",
+      "cocd": "7020",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 99,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "WK Eksplorasi Regional 4 - PHE Masela",
+      "cocd": "5020",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 100,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PHE Sulawesi Melati",
+      "cocd": "7021",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 101,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    },
+    {
+      "name": "PHE Binaiya",
+      "cocd": "7022",
+      "group": "SH Upstream",
+      "client": "",
+      "order": 102,
+      "apps": {
+        "ivendor": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "dpt": false,
+            "csms": false,
+            "akun": false
+          }
+        },
+        "ipro": {
+          "done": false,
+          "date": "Not Yet",
+          "subs": {
+            "poro": false,
+            "oa": false,
+            "pr": false,
+            "gr": false,
+            "sa": false
+          }
+        },
+        "myssc": {
+          "done": false,
+          "date": "",
+          "subs": {
+            "dpt": false
+          }
+        }
+      }
+    }
+  ]
+}

@@ -66,7 +66,16 @@ export default function BudgetInsights() {
     })()
   }, [])
 
-  const { trend, donut3, budgetBars, catColors, legendCats, hasData } = useMemo(() => {
+  const [viewYear, setViewYear] = useState(new Date().getFullYear())
+  const [ccData, setCcData] = useState<{topup:number;settlement:number}|null>(null)
+  const [ccYear, setCcYear] = useState(new Date().getFullYear())
+
+  // Fetch cash card data
+  useEffect(() => {
+    fetch(`/api/cashcard/summary?year=${ccYear}`).then(r=>r.json()).then(d=>setCcData(d.data||null)).catch(()=>setCcData(null))
+  }, [ccYear])
+
+  const { trend, realPctData, budgetBars, catColors, legendCats, hasData } = useMemo(() => {
     const byYear: Record<number, any[]> = {}
     for (const r of rows) { (byYear[r.year] = byYear[r.year] || []).push(r) }
     const years = Object.keys(byYear).map(Number).sort((a, b) => a - b)
@@ -76,22 +85,22 @@ export default function BudgetInsights() {
       const real = list.reduce((s, r) => s + (r.annualRealIDR || 0), 0)
       return { year: String(y), plan, real, pct: plan > 0 ? +(real / plan * 100).toFixed(1) : 0 }
     })
-    const nowY = new Date().getFullYear()
-    // rolling: 3 tahun terakhir yang ada datanya
-    const last3 = years.slice(-3)
 
-    // warna konsisten per cost element di semua tahun
     const catKeys = Array.from(new Set(rows.map(r => r.category)))
     const catColors: Record<string, string> = {}
     catKeys.forEach((k, i) => { catColors[k] = PIE_COLORS[i % PIE_COLORS.length] })
     const legendCats = catKeys.map(k => ({ key: k, name: catName(k) }))
 
-    const donut3 = last3.map(y => {
-      const list = byYear[y] || []
-      const data = list.map(r => ({ name: catName(r.category), value: r.annualRealIDR || 0, key: r.category })).filter(d => d.value > 0)
-      return { year: y, data, total: data.reduce((s, d) => s + d.value, 0) }
+    // % Realisasi per cost element for viewYear
+    const yrList = byYear[viewYear] || []
+    const realPctData = catKeys.map(k => {
+      const items = yrList.filter(r => r.category === k)
+      const plan = items.reduce((s, r) => s + (r.annualBudgetIDR || 0), 0)
+      const real = items.reduce((s, r) => s + (r.annualRealIDR || 0), 0)
+      return { key: k, name: catName(k), plan, real, pct: plan > 0 ? Math.round(real / plan * 100) : 0, color: catColors[k] }
     })
 
+    const last3 = years.slice(-3)
     const thrOf = (cat: string) => (cat === 'travel' ? thr.travel : cat === 'accommodation' ? thr.accommodation : 80) / 100
     const budgetBars = last3.map(y => {
       const list = byYear[y] || []
@@ -101,13 +110,12 @@ export default function BudgetInsights() {
       return { year: String(y), RKAP: plan, Terpakai: real, Sisa: Math.max(0, plan - real), Prognosa: prog }
     })
 
-    return { trend, donut3, budgetBars, catColors, legendCats, hasData: rows.length > 0 }
-  }, [rows, thr])
+    return { trend, realPctData, budgetBars, catColors, legendCats, hasData: rows.length > 0 }
+  }, [rows, thr, viewYear])
 
   if (loading) return <div className="card" style={{ padding: 20, fontSize: 12.5, color: 'var(--text3)' }}>Memuat infografis budget…</div>
   if (!hasData) return null
 
-  const yrLabel = donut3.length ? `${donut3[0].year}–${donut3[donut3.length - 1].year}` : ''
 
   return (
     <div style={{ marginBottom: 18 }}>
@@ -137,43 +145,79 @@ export default function BudgetInsights() {
           </ResponsiveContainer>
         </CardBox>
 
-        {/* 2. Donut per tahun: komposisi realisasi cost element (3 tahun terakhir) */}
-        <CardBox title={`Komposisi Realisasi ${yrLabel}`} sub="Porsi realisasi per cost element (IDR) · 3 tahun terakhir">
-          <div style={{ display: 'flex', gap: 6 }}>
-            {donut3.map(d => (
-              <div key={d.year} style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 2 }}>{d.year}</div>
-                {d.data.length === 0 ? (
-                  <div style={{ fontSize: 10, color: 'var(--text3)', padding: '58px 0' }}>Belum ada</div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={150}>
+        {/* 2. % Realisasi per cost element — 2 donut gauges + year nav */}
+        <CardBox title={`% Realisasi ${viewYear}`} sub="Realisasi dibanding Plan (RKAP) per cost element">
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginBottom: 6 }}>
+            <button onClick={()=>setViewYear(y=>y-1)} className="btn btn-sm" style={{ padding:'2px 8px' }}>◀</button>
+            <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40, textAlign: 'center' }}>{viewYear}</span>
+            <button onClick={()=>setViewYear(y=>y+1)} className="btn btn-sm" style={{ padding:'2px 8px' }}>▶</button>
+          </div>
+          {realPctData.length === 0 ? (
+            <div style={{ fontSize: 11, color: 'var(--text3)', padding: '40px 0', textAlign: 'center' }}>Belum ada data {viewYear}.</div>
+          ) : (
+            <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {realPctData.map(d => {
+                const gaugeData = [{ name: 'Realisasi', value: Math.min(d.pct, 100) }, { name: 'Sisa', value: Math.max(0, 100 - d.pct) }]
+                return (
+                  <div key={d.key} style={{ textAlign: 'center', flex: '1 1 140px', maxWidth: 200 }}>
+                    <div style={{ position: 'relative', width: 130, height: 130, margin: '0 auto' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={gaugeData} dataKey="value" innerRadius={42} outerRadius={60} paddingAngle={2} startAngle={90} endAngle={-270} stroke="none">
+                            <Cell fill={d.color} /><Cell fill="var(--bg3)" />
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: d.color }}>{d.pct}%</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 4 }}>{d.name}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{rpShort(d.real)} / {rpShort(d.plan)}</div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardBox>
+
+        {/* 2b. Cash Card: % settlement dibanding top-up + year nav */}
+        <CardBox title={`Rata-rata Settlement Cash Card ${ccYear}`} sub="Total settlement ÷ total top-up × 100%">
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginBottom: 6 }}>
+            <button onClick={()=>setCcYear(y=>y-1)} className="btn btn-sm" style={{ padding:'2px 8px' }}>◀</button>
+            <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40, textAlign: 'center' }}>{ccYear}</span>
+            <button onClick={()=>setCcYear(y=>y+1)} className="btn btn-sm" style={{ padding:'2px 8px' }}>▶</button>
+          </div>
+          {(() => {
+            if (!ccData) return <div style={{ fontSize: 11, color: 'var(--text3)', padding: '40px 0', textAlign: 'center' }}>Belum ada data cash card {ccYear}.</div>
+            const pct = ccData.topup > 0 ? Math.round(ccData.settlement / ccData.topup * 100) : 0
+            const gaugeData = [{ name: 'Settlement', value: Math.min(pct, 100) }, { name: 'Sisa', value: Math.max(0, 100 - pct) }]
+            const color = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444'
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, justifyContent: 'center' }}>
+                <div style={{ position: 'relative', width: 130, height: 130 }}>
+                  <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={d.data} dataKey="value" nameKey="name" innerRadius={34} outerRadius={54} paddingAngle={2} stroke="none">
-                        {d.data.map((seg, i) => <Cell key={i} fill={catColors[seg.key] || PIE_COLORS[i % PIE_COLORS.length]} />)}
+                      <Pie data={gaugeData} dataKey="value" innerRadius={42} outerRadius={60} paddingAngle={2} startAngle={90} endAngle={-270} stroke="none">
+                        <Cell fill={color} /><Cell fill="var(--bg3)" />
                       </Pie>
-                      <Tooltip content={({ active, payload }: any) => active && payload?.length ? (
-                        <TipBox rows={[
-                          { name: payload[0].name, val: rp(payload[0].value), color: payload[0].payload.fill },
-                          { name: 'Porsi', val: d.total > 0 ? (payload[0].value / d.total * 100).toFixed(1) + '%' : '—' },
-                        ]} />) : null} />
                     </PieChart>
                   </ResponsiveContainer>
-                )}
-                <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{rpShort(d.total)}</div>
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color }}>{pct}%</div>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Total Settlement: <b>{rp(ccData.settlement)}</b></div>
+                  <div style={{ fontSize: 12, color: 'var(--text2)' }}>Total Top-up: <b>{rp(ccData.topup)}</b></div>
+                </div>
               </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8, flexWrap: 'wrap' }}>
-            {legendCats.map(c => (
-              <span key={c.key} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5, color: 'var(--text2)' }}>
-                <span style={{ width: 9, height: 9, borderRadius: 2, background: catColors[c.key], display: 'inline-block' }} />{c.name}
-              </span>
-            ))}
-          </div>
+            )
+          })()}
         </CardBox>
 
         {/* 3. Grouped bar per tahun: RKAP / Terpakai / Sisa + garis Prognosa (3 tahun terakhir) */}
-        <CardBox title={`Prognosa & Sisa Budget ${yrLabel}`} sub="RKAP vs Terpakai vs Sisa per tahun · garis = Prognosa (threshold)">
+        <CardBox title={`Prognosa & Sisa Budget (3 Tahun Terakhir)`} sub="RKAP vs Terpakai vs Sisa per tahun · garis = Prognosa (threshold)">
           <ResponsiveContainer width="100%" height={240}>
             <ComposedChart data={budgetBars} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />

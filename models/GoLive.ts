@@ -1,17 +1,25 @@
 import mongoose, { Schema, models } from 'mongoose'
 
-// Aplikasi (kolom) — bisa nambah selain iVendor/iPRO/MySSC
+// Sub-feature per app (mis. iVendor: DPT, CSMS, Akun)
+const GoLiveSubFeatureSchema = new Schema({
+  key: { type: String, required: true },
+  label: { type: String, required: true },
+  order: { type: Number, default: 0 },
+}, { _id: false })
+
 const GoLiveAppSchema = new Schema({
   key: { type: String, required: true, unique: true },
   label: { type: String, required: true },
   order: { type: Number, default: 999 },
+  subFeatures: { type: [GoLiveSubFeatureSchema], default: [] },
 }, { timestamps: true })
 
-// Entitas (baris) — apps: { [appKey]: { done:boolean, date:string } }
+// Entity apps shape: { [appKey]: { date:string, subs: { [subKey]: boolean } } }
 const GoLiveEntitySchema = new Schema({
-  name: { type: String, required: true },     // nama perusahaan/entitas
-  cocd: { type: String, default: '' },        // Company Code
-  group: { type: String, default: '' },       // Holding / SH Upstream / dst
+  name: { type: String, required: true },
+  cocd: { type: String, default: '' },
+  group: { type: String, default: '' },
+  client: { type: String, default: '' },
   order: { type: Number, default: 999 },
   apps: { type: Schema.Types.Mixed, default: {} },
 }, { timestamps: true, minimize: false })

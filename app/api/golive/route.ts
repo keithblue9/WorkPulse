@@ -3,9 +3,16 @@ import { connectDB } from '@/lib/db'
 import { GoLiveAppModel, GoLiveEntityModel } from '@/models/GoLive'
 
 const DEFAULT_APPS = [
-  { key: 'ivendor', label: 'iVendor', order: 1 },
-  { key: 'ipro', label: 'iPRO', order: 2 },
-  { key: 'myssc', label: 'MySSC', order: 3 },
+  { key: 'ivendor', label: 'iVendor (VR)', order: 1, subFeatures: [
+    { key:'dpt', label:'DPT', order:1 }, { key:'csms', label:'CSMS', order:2 }, { key:'akun', label:'Akun', order:3 }
+  ]},
+  { key: 'ipro', label: 'iPRO', order: 2, subFeatures: [
+    { key:'poro', label:'PO/RO', order:1 }, { key:'oa', label:'OA', order:2 },
+    { key:'pr', label:'PR', order:3 }, { key:'gr', label:'GR', order:4 }, { key:'sa', label:'SA', order:5 }
+  ]},
+  { key: 'myssc', label: 'MySSC', order: 3, subFeatures: [
+    { key:'dpt', label:'DPT', order:1 }
+  ]},
 ]
 
 export async function GET() {
