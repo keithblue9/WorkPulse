@@ -32,7 +32,7 @@ export default function GoLiveInsights() {
           : (
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {apps.map((a, i) => {
-                const done = entities.filter(e => (e.apps || {})[a.key]?.done).length
+                const done = entities.filter(e => { const ap=(e.apps||{})[a.key]; return ap?.done || (ap?.subs && Object.values(ap.subs).some(Boolean)) }).length
                 const pct = total > 0 ? Math.round(done / total * 100) : 0
                 const color = COLORS[i % COLORS.length]
                 return (

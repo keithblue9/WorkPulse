@@ -20,6 +20,14 @@ export async function GET() {
     await connectDB()
     let apps = await GoLiveAppModel.find().sort({ order: 1 }).lean()
     if (!apps.length) { await GoLiveAppModel.insertMany(DEFAULT_APPS); apps = await GoLiveAppModel.find().sort({ order: 1 }).lean() }
+    // Backfill subFeatures from defaults if DB apps are missing them
+    for (const app of apps as any[]) {
+      const def = DEFAULT_APPS.find(d => d.key === app.key)
+      if (def && (!app.subFeatures || !app.subFeatures.length) && def.subFeatures.length) {
+        await GoLiveAppModel.updateOne({ _id: app._id }, { $set: { subFeatures: def.subFeatures } })
+        app.subFeatures = def.subFeatures
+      }
+    }
     const entities = await GoLiveEntityModel.find().sort({ order: 1, createdAt: 1 }).lean()
     return NextResponse.json({ apps, entities })
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
@@ -40,7 +48,7 @@ export async function POST(req: NextRequest) {
     }
     // entity
     const count = await GoLiveEntityModel.countDocuments()
-    const doc = await GoLiveEntityModel.create({ name: body.name || 'Entitas Baru', cocd: body.cocd || '', group: body.group || '', order: count + 1, apps: {} })
+    const doc = await GoLiveEntityModel.create({ name: body.name || 'Entitas Baru', cocd: body.cocd || '', group: body.group || '', client: body.client || '', order: count + 1, apps: {} })
     return NextResponse.json({ data: doc }, { status: 201 })
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
 }
