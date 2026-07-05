@@ -441,7 +441,13 @@ export default function DashboardPage() {
                       </div>
                     ),
                   }
-                  return mainOrder.filter((w:any)=>w.active!==false).map((w:any)=>{ const node=blocks[w.key]; return node ? <div key={w.key}>{node}</div> : null })
+                  return (
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:14 }}>
+                      {mainOrder.filter((w:any)=>w.active!==false).map((w:any)=>{ const node=blocks[w.key]; if(!node) return null; const isHalf=w.size==='half'; return (
+                        <div key={w.key} style={{ flex: isHalf?'1 1 calc(50% - 7px)':'1 1 100%', minWidth: isHalf?320:'100%', maxWidth:'100%' }}>{node}</div>
+                      ) })}
+                    </div>
+                  )
                 })()}
               </div>
             )}
@@ -623,22 +629,25 @@ export default function DashboardPage() {
 
       {showLayout && (
         <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowLayout(false)}>
-          <div className="modal" style={{ width:460, maxWidth:'100%', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
+          <div className="modal" style={{ width:500, maxWidth:'100%', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
             <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <div><div style={{ fontSize:14, fontWeight:700 }}>🎛️ Atur Layout Dashboard</div><div style={{ fontSize:10.5, color:'var(--text3)' }}>Geser urutan & sembunyikan. Guest/eksternal hanya lihat yg aktif.</div></div>
+              <div><div style={{ fontSize:14, fontWeight:700 }}>🎛️ Atur Layout Dashboard</div><div style={{ fontSize:10.5, color:'var(--text3)' }}>Drag & drop urutan · ubah ukuran · hide/unhide</div></div>
               <button onClick={()=>setShowLayout(false)} className="btn btn-icon">×</button>
             </div>
             <div style={{ flex:1, overflowY:'auto', padding:'12px 18px' }}>
-              <div style={{ fontSize:10.5, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.5, margin:'2px 0 8px' }}>Blok Utama (bisa digeser)</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              <div style={{ fontSize:10.5, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.5, margin:'2px 0 8px' }}>Blok Utama — drag untuk geser, klik ukuran untuk toggle</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
                 {mainOrder.map((w:any, i:number) => (
-                  <div key={w.key} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', border:'1px solid var(--border)', borderRadius:8, background: w.active===false?'var(--bg3)':'var(--bg2)', opacity:w.active===false?0.65:1 }}>
-                    <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-                      <button onClick={()=>moveMain(w.key,-1)} disabled={i===0} className="btn btn-icon btn-sm" style={{ height:18, opacity:i===0?0.3:1 }}>▲</button>
-                      <button onClick={()=>moveMain(w.key,1)} disabled={i===mainOrder.length-1} className="btn btn-icon btn-sm" style={{ height:18, opacity:i===mainOrder.length-1?0.3:1 }}>▼</button>
-                    </div>
-                    <span style={{ flex:1, fontSize:12, fontWeight:600 }}>{w.label}</span>
-                    <button onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:11, color: w.active===false?'var(--text3)':'var(--green)' }}>{w.active===false?'🙈 Hidden':'👁 Tampil'}</button>
+                  <div key={w.key} draggable
+                    onDragStart={e=>{e.dataTransfer.setData('text/plain',w.key); e.currentTarget.style.opacity='0.5'}}
+                    onDragEnd={e=>{e.currentTarget.style.opacity='1'}}
+                    onDragOver={e=>e.preventDefault()}
+                    onDrop={e=>{e.preventDefault(); const fromKey=e.dataTransfer.getData('text/plain'); if(fromKey===w.key) return; const arr=[...mainOrder]; const fi=arr.findIndex(x=>x.key===fromKey); const ti=i; if(fi<0) return; const [item]=arr.splice(fi,1); arr.splice(ti,0,item); const reordered=arr.map((x,idx)=>({...x,order:idx+1})); const others=widgets.filter((x:any)=>x.segment!=='main'); saveWidgets([...others,...reordered])}}
+                    style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', border:'1px solid var(--border)', borderRadius:8, background: w.active===false?'var(--bg3)':'var(--bg2)', opacity:w.active===false?0.6:1, cursor:'grab', userSelect:'none' }}>
+                    <span style={{ fontSize:14, color:'var(--text3)', cursor:'grab' }}>⠿</span>
+                    <span style={{ flex:1, fontSize:12, fontWeight:600, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.label}</span>
+                    <button onClick={()=>{const next=widgets.map((x:any)=>x.key===w.key?{...x,size:x.size==='half'?'full':'half'}:x); saveWidgets(next)}} className="btn btn-sm" style={{ fontSize:10, padding:'2px 8px', whiteSpace:'nowrap', background:(w.size||'full')==='half'?'var(--brand-soft)':'var(--bg3)', color:(w.size||'full')==='half'?'var(--brand)':'var(--text3)', borderColor:(w.size||'full')==='half'?'var(--brand)':'var(--border)' }}>{(w.size||'full')==='half'?'½ Setengah':'▬ Penuh'}</button>
+                    <button onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:10, padding:'2px 8px', color: w.active===false?'var(--text3)':'var(--green)' }}>{w.active===false?'🙈':'👁'}</button>
                   </div>
                 ))}
               </div>
@@ -648,7 +657,7 @@ export default function DashboardPage() {
                   <button key={w.key} onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:11, background:w.active===false?'var(--bg3)':'var(--brand-soft)', color:w.active===false?'var(--text3)':'var(--brand)', borderColor:w.active===false?'var(--border)':'var(--brand)' }}>{w.active===false?'🙈':'👁'} {w.label.replace('Stat: ','')}</button>
                 ))}
               </div>
-              <div style={{ fontSize:10.5, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.5, margin:'16px 0 8px' }}>AI Cards (dalam blok AI Insights)</div>
+              <div style={{ fontSize:10.5, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.5, margin:'16px 0 8px' }}>AI Cards</div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
                 {widgets.filter((w:any)=>w.segment==='ai').sort((a:any,b:any)=>(a.order??99)-(b.order??99)).map((w:any)=>(
                   <button key={w.key} onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:11, background:w.active===false?'var(--bg3)':'var(--brand-soft)', color:w.active===false?'var(--text3)':'var(--brand)', borderColor:w.active===false?'var(--border)':'var(--brand)' }}>{w.active===false?'🙈':'👁'} {w.label}</button>

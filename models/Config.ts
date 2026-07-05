@@ -20,6 +20,7 @@ const DashboardWidgetSchema = new Schema({
   segment: { type:String, default:'main' }, // segment grouping (main/secondary)
   active: { type: Boolean, default: true },
   order: { type: Number, default: 0 },
+  size: { type: String, enum: ['full', 'half'], default: 'full' },
 }, { _id:false })
 
 const ConfigSchema = new Schema({
