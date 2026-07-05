@@ -100,12 +100,12 @@ export default function GoLivePage() {
 
         {loading?<div style={{fontSize:12,color:'var(--text3)'}}>Memuat…</div>:(
         <div className="card" style={{padding:0,overflow:'auto',maxHeight:'calc(100vh - 300px)'}}>
-          <table style={{borderCollapse:'collapse',width:'100%',minWidth:420+totalSubs*52}}>
+          <table style={{borderCollapse:'collapse',width:'100%',minWidth:600+totalSubs*70}}>
             <thead>
               {/* Row 1: app group headers */}
               <tr>
                 <th style={{...th,width:30}} rowSpan={2}>No</th>
-                <th style={{...th,minWidth:180,textAlign:'left'}} rowSpan={2}>Company</th>
+                <th style={{...th,minWidth:280,textAlign:'left'}} rowSpan={2}>Company</th>
                 <th style={{...th,width:52}} rowSpan={2}>CoCd</th>
                 <th style={{...th,width:100,textAlign:'left'}} rowSpan={2}>HSH</th>
                 <th style={{...th,width:60,textAlign:'left'}} rowSpan={2}>Client</th>
@@ -120,8 +120,8 @@ export default function GoLivePage() {
               <tr>
                 {apps.map((a:any)=>{const subs=(a.subFeatures||[]); return(
                   <Fragment key={a._id||a.key}>
-                    <th style={{...th,borderLeft:'2px solid var(--border)',width:70,fontSize:9}}>Tgl</th>
-                    {subs.map((sf:any)=><th key={sf.key} style={{...th,width:42,fontSize:9}}>{sf.label}</th>)}
+                    <th style={{...th,borderLeft:'2px solid var(--border)',width:110,fontSize:9}}>Tgl</th>
+                    {subs.map((sf:any)=><th key={sf.key} style={{...th,width:48,fontSize:9}}>{sf.label}</th>)}
                   </Fragment>
                 )})}
               </tr>
@@ -140,7 +140,7 @@ export default function GoLivePage() {
                     <Fragment key={a._id||a.key}>
                       <td style={{...td,borderLeft:'2px solid var(--border)',textAlign:'center',padding:'3px 4px'}}>
                         <input type="month" value={dateStr!=='Not Yet'?dateStr:''} onChange={ev=>setAppDate(e,a.key,ev.target.value)}
-                          style={{width:80,border:'1px solid var(--border)',borderRadius:4,padding:'2px 4px',fontSize:10,background:dateStr&&dateStr!=='Not Yet'?`${color}11`:'var(--bg)',color:dateStr&&dateStr!=='Not Yet'?color:'var(--text3)',fontWeight:dateStr&&dateStr!=='Not Yet'?700:400,outline:'none',cursor:'pointer'}} />
+                          style={{width:110,border:'1px solid var(--border)',borderRadius:4,padding:'2px 4px',fontSize:10,background:dateStr&&dateStr!=='Not Yet'?`${color}11`:'var(--bg)',color:dateStr&&dateStr!=='Not Yet'?color:'var(--text3)',fontWeight:dateStr&&dateStr!=='Not Yet'?700:400,outline:'none',cursor:'pointer'}} />
                       </td>
                       {subs.map((sf:any)=>{const checked=!!(ap.subs||{})[sf.key]; return(
                         <td key={sf.key} style={{...td,textAlign:'center',padding:'3px 2px'}}>

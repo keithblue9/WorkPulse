@@ -44,7 +44,7 @@ function TipBox({ rows }: { rows: { name: string; val: string; color?: string }[
   )
 }
 
-export default function BudgetInsights() {
+export default function BudgetInsights({ section }: { section?: 'yield' | 'realpct' | 'prognosa' | 'cashcard' }) {
   const [rows, setRows] = useState<any[]>([])
   const [thr, setThr] = useState({ travel: 80, accommodation: 80 })
   const [loading, setLoading] = useState(true)
@@ -117,12 +117,12 @@ export default function BudgetInsights() {
   if (!hasData) return null
 
 
-  return (
-    <div style={{ marginBottom: 18 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, margin: '4px 2px 12px' }}>📊 Budget Report — Infografis</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
+  const showAll = !section
+  const show = (s: string) => showAll || section === s
 
-        {/* 1. Yield trend: Plan vs Realisasi + % */}
+  return (
+    <>
+      {show('yield') && (
         <CardBox title="Yield — Plan vs Realisasi per Tahun" sub="Tren RKAP & realisasi (IDR) + % realisasi">
           <ResponsiveContainer width="100%" height={240}>
             <ComposedChart data={trend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -144,8 +144,9 @@ export default function BudgetInsights() {
             </ComposedChart>
           </ResponsiveContainer>
         </CardBox>
+      )}
 
-        {/* 2. % Realisasi per cost element — 2 donut gauges + year nav */}
+      {show('realpct') && (
         <CardBox title={`% Realisasi ${viewYear}`} sub="Realisasi dibanding Plan (RKAP) per cost element">
           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginBottom: 6 }}>
             <button onClick={()=>setViewYear(y=>y-1)} className="btn btn-sm" style={{ padding:'2px 8px' }}>◀</button>
@@ -180,8 +181,9 @@ export default function BudgetInsights() {
             </div>
           )}
         </CardBox>
+      )}
 
-        {/* 2b. Cash Card: % settlement dibanding top-up + year nav */}
+      {show('cashcard') && (
         <CardBox title={`Rata-rata Settlement Cash Card ${ccYear}`} sub="Total settlement ÷ total top-up × 100%">
           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginBottom: 6 }}>
             <button onClick={()=>setCcYear(y=>y-1)} className="btn btn-sm" style={{ padding:'2px 8px' }}>◀</button>
@@ -215,8 +217,9 @@ export default function BudgetInsights() {
             )
           })()}
         </CardBox>
+      )}
 
-        {/* 3. Grouped bar per tahun: RKAP / Terpakai / Sisa + garis Prognosa (3 tahun terakhir) */}
+      {show('prognosa') && (
         <CardBox title={`Prognosa & Sisa Budget (3 Tahun Terakhir)`} sub="RKAP vs Terpakai vs Sisa per tahun · garis = Prognosa (threshold)">
           <ResponsiveContainer width="100%" height={240}>
             <ComposedChart data={budgetBars} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -239,7 +242,7 @@ export default function BudgetInsights() {
             </ComposedChart>
           </ResponsiveContainer>
         </CardBox>
-      </div>
-    </div>
+      )}
+    </>
   )
 }

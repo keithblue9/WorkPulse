@@ -348,10 +348,16 @@ export default function DashboardPage() {
 
                 {(() => {
                   const blocks: Record<string, React.ReactNode> = {
-                    // Visibilitas blok utk guest dikontrol penuh via Atur Layout (hide/unhide), bukan hardcode role
-                    'budget-insights': <BudgetInsights />,
+                    // Budget split: each chart independently hide-able
+                    'budget-yield': <BudgetInsights section="yield" />,
+                    'budget-realpct': <BudgetInsights section="realpct" />,
+                    'budget-prognosa': <BudgetInsights section="prognosa" />,
+                    'budget-cashcard': <BudgetInsights section="cashcard" />,
                     'team-availability': <TeamAvailability />,
-                    'mandatory-insights': <MandatoryInsights />,
+                    // Mandatory split: MCU / Training / KPI independently
+                    'mandatory-mcu': <MandatoryInsights section="mcu" />,
+                    'mandatory-training': <MandatoryInsights section="training" />,
+                    'mandatory-kpi': <MandatoryInsights section="kpi" />,
                     'golive-insights': <GoLiveInsights />,
                     'ai-row': (
                       <div className="responsive-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:10 }}>

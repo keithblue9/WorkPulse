@@ -15,7 +15,7 @@ function Ring({ pct, color, size = 96 }: { pct: number; color: string; size?: nu
   )
 }
 
-export default function MandatoryInsights() {
+export default function MandatoryInsights({ section }: { section?: 'mcu' | 'training' | 'kpi' }) {
   const [year] = useState(new Date().getFullYear())
   const [status, setStatus] = useState<'all' | 'pekerja' | 'TAD'>('all')
   const [kpiJenis, setKpiJenis] = useState<string>('all')
@@ -69,16 +69,17 @@ export default function MandatoryInsights() {
     return { pct: rows.length ? Math.round(done / rows.length * 100) : 0, done, total: rows.length, rows }
   }, [members, recs, kpiJenis])
 
-  const cards = [
+  const allCards = [
     { key: 'mcu', title: '🩺 Progress MCU', color: '#22c55e', data: mcu, okLabel: 'Sudah MCU', noLabel: 'Belum MCU' },
     { key: 'training', title: '🎓 Training', color: '#8b5cf6', data: training, okLabel: 'Sudah training', noLabel: 'Belum training' },
     { key: 'kpi', title: '📊 Support KPI', color: '#4f8ef7', data: kpi, okLabel: 'Sudah mengisi', noLabel: 'Belum mengisi' },
   ]
+  const cards = section ? allCards.filter(c => c.key === section) : allCards
 
   return (
     <div className="card" style={{ padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>📋 Mandatory {year}</div>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>{section ? cards[0]?.title || 'Mandatory' : `📋 Mandatory ${year}`}</div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, color: 'var(--text3)' }}>Status:</span>
           {(['all', 'pekerja', 'TAD'] as const).map(s => (
