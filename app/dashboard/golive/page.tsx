@@ -13,19 +13,23 @@ export default function GoLivePage() {
   const [groupFilter, setGroupFilter] = useState('all')
   const [q, setQ] = useState('')
 
+  const [seeding, setSeeding] = useState(false)
+
+  async function doSeed() {
+    setSeeding(true)
+    try {
+      const sr = await fetch('/api/golive/seed', { method:'POST' })
+      const sd = await sr.json()
+      if (!sr.ok) { toast.error(sd.error || 'Seed gagal'); setSeeding(false); return }
+      toast.success(`Berhasil import ${sd.entities} entitas`)
+      await load()
+    } catch { toast.error('Seed gagal') }
+    setSeeding(false)
+  }
+
   async function load() {
     setLoading(true)
     const d=await fetch('/api/golive').then(r=>r.json()).catch(()=>({apps:[],entities:[]}))
-    // Auto-seed from Excel data if no entities exist yet
-    if (!(d.entities||[]).length) {
-      try {
-        const sr = await fetch('/api/golive/seed', { method:'POST' })
-        if (sr.ok) {
-          const d2=await fetch('/api/golive').then(r=>r.json()).catch(()=>({apps:[],entities:[]}))
-          setApps(d2.apps||[]); setEntities(d2.entities||[]); setLoading(false); return
-        }
-      } catch {}
-    }
     setApps(d.apps||[]); setEntities(d.entities||[]); setLoading(false)
   }
   useEffect(()=>{ load() }, [])
@@ -55,6 +59,7 @@ export default function GoLivePage() {
       <div style={{padding:'12px 20px',borderBottom:'1px solid var(--border)',background:'var(--bg2)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',flexShrink:0}}>
         <div><div style={{fontSize:14,fontWeight:600}}>🚀 Go-Live</div><div style={{fontSize:11,color:'var(--text3)'}}>Status go-live entitas per aplikasi · sub-fitur + tanggal</div></div>
         <div style={{display:'flex',gap:8}}>
+          {entities.length===0 && !loading && <button onClick={doSeed} disabled={seeding} className="btn btn-sm" style={{background:'#f59e0b',color:'#fff',border:'none'}}>{seeding?'Importing…':'📥 Import dari Excel'}</button>}
           <button onClick={addApp} className="btn btn-sm">+ App</button>
           <button onClick={addEntity} className="btn btn-primary btn-sm">+ Entitas</button>
         </div>
@@ -122,7 +127,8 @@ export default function GoLivePage() {
                   {apps.map((a:any,ai:number)=>{const ap=(e.apps||{})[a.key]||{}; const subs=(a.subFeatures||[]); const color=['#4f8ef7','#8b5cf6','#22c55e','#f59e0b','#ec4899','#14b8a6'][ai%6]; const dateStr=ap.date||''; return(
                     <Fragment key={a._id||a.key}>
                       <td style={{...td,borderLeft:'2px solid var(--border)',textAlign:'center',padding:'3px 4px'}}>
-                        <span style={{fontSize:10,color:dateStr&&dateStr!=='Not Yet'?color:'var(--text3)',fontWeight:dateStr&&dateStr!=='Not Yet'?700:400}}>{fmtDate(dateStr)||'—'}</span>
+                        <input type="month" value={dateStr!=='Not Yet'?dateStr:''} onChange={ev=>setAppDate(e,a.key,ev.target.value)}
+                          style={{width:80,border:'1px solid var(--border)',borderRadius:4,padding:'2px 4px',fontSize:10,background:dateStr&&dateStr!=='Not Yet'?`${color}11`:'var(--bg)',color:dateStr&&dateStr!=='Not Yet'?color:'var(--text3)',fontWeight:dateStr&&dateStr!=='Not Yet'?700:400,outline:'none',cursor:'pointer'}} />
                       </td>
                       {subs.map((sf:any)=>{const checked=!!(ap.subs||{})[sf.key]; return(
                         <td key={sf.key} style={{...td,textAlign:'center',padding:'3px 2px'}}>
