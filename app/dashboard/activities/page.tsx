@@ -241,8 +241,10 @@ export default function ActivitiesPage() {
   const [editing, setEditing] = useState<any>(null)
   const [filterCat, setFilterCat] = useState('All')
   const [filterSub, setFilterSub] = useState('')
+  const [filterStatus, setFilterStatus] = useState('All')
   const [filterPic, setFilterPic] = useState('All')
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<'date_desc'|'date_asc'|'status'>('date_desc')
 
   // Read URL params on mount
   useEffect(() => { if (typeof window !== 'undefined') { const sp = new URLSearchParams(window.location.search); const cat = sp.get('cat'); const sub = sp.get('sub'); if (cat) setFilterCat(cat); if (sub) setFilterSub(sub) } }, [])
@@ -260,13 +262,21 @@ export default function ActivitiesPage() {
 
   const cats = config?.activityCategories?.filter((c:any)=>c.active) || []
   const subs = config?.activitySubTypes?.filter((s:any)=>s.active) || []
+  const statuses = config?.issueStatuses?.filter((s:any)=>s.active) || []
+  const statusOrder: Record<string,number> = {}
+  statuses.forEach((s:any,i:number)=>{ statusOrder[s.key]=i })
 
   const filtered = activities.filter(a => {
     if (search && !a.title.toLowerCase().includes(search.toLowerCase())) return false
     if (filterCat !== 'All' && normKey(a.category) !== normKey(filterCat) && normKey(a.subType) !== normKey(filterCat)) return false
     if (filterSub && normKey(a.subType) !== normKey(filterSub)) return false
+    if (filterStatus !== 'All' && normKey(a.status) !== normKey(filterStatus)) return false
     if (filterPic !== 'All' && !picArray(a.pic).includes(filterPic)) return false
     return true
+  }).sort((a, b) => {
+    if (sortBy === 'status') return (statusOrder[a.status] ?? 99) - (statusOrder[b.status] ?? 99)
+    const da = a.actionDate || '', db = b.actionDate || ''
+    return sortBy === 'date_asc' ? da.localeCompare(db) : db.localeCompare(da)
   })
 
   return (
@@ -287,10 +297,15 @@ export default function ActivitiesPage() {
           <option value="All">👤 Semua PIC</option>
           {members.map(m => <option key={m._id} value={m.name}>{m.name}</option>)}
         </select>
+        <select className="input" style={{ width:160 }} value={sortBy} onChange={e=>setSortBy(e.target.value as any)}>
+          <option value="date_desc">📅 Tanggal Terbaru</option>
+          <option value="date_asc">📅 Tanggal Terlama</option>
+          <option value="status">🚦 Urutkan per Status</option>
+        </select>
         <div className="chip-row" style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-          <button onClick={()=>setFilterCat('All')} style={chip(filterCat==='All')}>All</button>
-          {subs.map((s:any) => (
-            <button key={s.key} onClick={()=>setFilterCat(s.key)} style={chip(filterCat===s.key, s.color)}>{s.label}</button>
+          <button onClick={()=>setFilterStatus('All')} style={chip(filterStatus==='All')}>Semua Status</button>
+          {statuses.map((s:any) => (
+            <button key={s.key} onClick={()=>setFilterStatus(s.key)} style={chip(filterStatus===s.key, s.color)}>{s.label}</button>
           ))}
         </div>
       </div>
@@ -307,12 +322,14 @@ export default function ActivitiesPage() {
              {filtered.map(a => {
                const catColor = cats.find((c:any)=>c.key===a.category)?.color || 'var(--brand)'
                const subColor = subs.find((s:any)=>s.key===a.subType)?.color || 'var(--text3)'
+               const statusDef = statuses.find((s:any)=>normKey(s.key)===normKey(a.status))
                return (
-                 <div key={a._id} className="card" style={{ padding:'12px 14px', borderLeft:`3px solid ${catColor}`, cursor:'pointer' }} onClick={()=>setEditing(a)}>
+                 <div key={a._id} className="card" style={{ padding:'12px 14px', borderLeft:`3px solid ${statusDef?.color || catColor}`, cursor:'pointer' }} onClick={()=>setEditing(a)}>
                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10 }}>
                      <div style={{ flex:1, minWidth:0 }}>
                        <div style={{ display:'flex', flexWrap:'wrap', gap:5, alignItems:'center', marginBottom:5 }}>
                          <span style={{ fontSize:13, fontWeight:600 }}>{a.title}</span>
+                         {statusDef && <span className="badge" style={{ background:statusDef.color+'22', color:statusDef.color, fontSize:10, fontWeight:700 }}>{statusDef.label}</span>}
                          <span className="badge" style={{ background:catColor+'22', color:catColor, fontSize:10 }}>{a.category}</span>
                          <span className="badge" style={{ background:subColor+'22', color:subColor, fontSize:10 }}>{a.subType}</span>
                          {a.priority && <span className="badge" style={{ background:PRIORITY_CFG[a.priority]?.bg, color:PRIORITY_CFG[a.priority]?.color, fontSize:10 }}>{PRIORITY_CFG[a.priority]?.label}</span>}

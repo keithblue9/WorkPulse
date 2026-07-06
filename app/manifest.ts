@@ -5,7 +5,7 @@ import { ConfigModel } from '@/models/Config'
 export const dynamic = 'force-dynamic'
 
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
-  let appName = 'WinS'
+  let appName = 'WorkPulse'
   let appColor = '#4f8ef7'
   try {
     await connectDB()

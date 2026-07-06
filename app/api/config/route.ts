@@ -83,6 +83,11 @@ export async function GET() {
     }
     if (!cfg.loginBackgrounds) cfg.loginBackgrounds = []
 
+    // One-time rename: WinS -> WorkPulse (nama resmi produk)
+    if (cfg.appName === 'WinS' || cfg.appName === 'Work Intelligence System') {
+      cfg.appName = 'WorkPulse'; updates.appName = 'WorkPulse'; needsUpdate = true
+    }
+
     // One-time cleanup: WinS dedicated untuk BPD Procurement — buang sisa "& SS Procurement" di tagline lama
     for (const k of ['appTagline','loginTagline']) {
       if (typeof cfg[k] === 'string' && /SS Procurement/i.test(cfg[k])) {

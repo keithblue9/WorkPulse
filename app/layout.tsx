@@ -7,7 +7,7 @@ import { ConfigModel } from '@/models/Config'
 // App name is sourced from Config (config.appName) so renaming the app in-app also
 // updates the browser tab title, PWA name, and iOS home-screen title.
 export async function generateMetadata(): Promise<Metadata> {
-  let appName = 'WinS'
+  let appName = 'WorkPulse'
   try {
     await connectDB()
     const cfg = await ConfigModel.findOne({}).lean() as any
