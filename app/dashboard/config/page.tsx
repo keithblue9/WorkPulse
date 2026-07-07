@@ -524,6 +524,34 @@ export default function ConfigPage() {
               </div>
             </Section>
 
+            <Section title="💸 Notifikasi Reimbursement (Push)" sub="Push notification otomatis untuk flow reimbursement — khusus member pengaju & cashier">
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ fontSize:11.5, color:'var(--text2)', lineHeight:1.6 }}>
+                  <b style={{ color:'var(--text)' }}>Alur notifikasi:</b> (1) Member submit reimburse → notif ke <b>member pengaju</b> (konfirmasi terkirim) + <b>semua cashier</b> (ada pengajuan baru). (2) Cashier klik transfer → notif ke <b>member pengaju</b> (sudah ditransfer) + <b>cashier</b> (konfirmasi transfer selesai). Hanya user yang sudah mengaktifkan notifikasi di HP-nya yang menerima.
+                </div>
+                {(() => {
+                  const rn = { enabled:true, notifySubmit:true, notifyTransfer:true, ...(config.reimburseNotif||{}) }
+                  const saveRn = (patch:any) => save({ reimburseNotif: { ...rn, ...patch } })
+                  const Toggle = ({ on, onClick, label, sub }:{ on:boolean; onClick:()=>void; label:string; sub:string }) => (
+                    <div style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', border:'1px solid var(--border)', borderRadius:8, background:'var(--bg2)' }}>
+                      <div className={`toggle-wrap${on?' on':''}`} onClick={onClick} />
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:12, fontWeight:600 }}>{label}</div>
+                        <div style={{ fontSize:10.5, color:'var(--text3)' }}>{sub}</div>
+                      </div>
+                    </div>
+                  )
+                  return (
+                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                      <Toggle on={rn.enabled} onClick={()=>saveRn({ enabled: !rn.enabled })} label="Aktifkan Notifikasi Reimbursement" sub="Master switch — matikan untuk menonaktifkan semua notif reimburse" />
+                      <Toggle on={rn.enabled && rn.notifySubmit} onClick={()=>rn.enabled && saveRn({ notifySubmit: !rn.notifySubmit })} label="Notif saat Submit" sub="Member submit → pengaju dapat konfirmasi + cashier dapat alert pengajuan baru" />
+                      <Toggle on={rn.enabled && rn.notifyTransfer} onClick={()=>rn.enabled && saveRn({ notifyTransfer: !rn.notifyTransfer })} label="Notif saat Transfer" sub="Cashier transfer → pengaju dapat notif sudah ditransfer + cashier dapat konfirmasi selesai" />
+                    </div>
+                  )
+                })()}
+              </div>
+            </Section>
+
             <Section title="⏰ Pengingat Harian (Push Notification)" sub="Notifikasi otomatis ke HP semua member (iOS & Android) tiap pagi ±08:00 WIB">
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                 <div style={{ fontSize:11.5, color:'var(--text2)', lineHeight:1.6 }}>

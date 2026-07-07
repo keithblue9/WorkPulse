@@ -174,6 +174,13 @@ const ConfigSchema = new Schema({
     waWeeklyDigest: { type:Boolean, default:false },
   },
 
+  // Push notification flow reimbursement (member pengaju + cashier)
+  reimburseNotif: {
+    enabled: { type:Boolean, default:true },        // master switch
+    notifySubmit: { type:Boolean, default:true },   // saat member submit -> pengaju + cashier
+    notifyTransfer: { type:Boolean, default:true }, // saat cashier transfer -> pengaju + cashier
+  },
+
   // Guard: tanggal terakhir broadcast pengingat harian (absen + agenda) dikirim — biar 1x/hari
   lastDailyBroadcast: { type:String, default:'' },
 }, { timestamps:true })

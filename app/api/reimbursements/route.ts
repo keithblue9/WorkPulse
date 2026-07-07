@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { ReimbursementModel } from '@/models/Reimbursement'
+import { notifyReimburseSubmitted } from '@/lib/reimburseNotif'
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,6 +22,8 @@ export async function POST(req: NextRequest) {
     await connectDB()
     const body = await req.json()
     const item = await ReimbursementModel.create(body)
+    // Push notif: pengajuan baru -> member pengaju + cashier (non-blocking, jangan gagalin create)
+    notifyReimburseSubmitted(item).catch(() => {})
     return NextResponse.json({ data: item }, { status: 201 })
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
 }
