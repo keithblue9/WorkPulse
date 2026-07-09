@@ -9,6 +9,26 @@ import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
+
+// Kompres gambar besar jadi JPEG ~1600px lebar biar payload evidence ga kena limit body Vercel
+async function compressImage(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const maxW = 1600
+      const scale = img.width > maxW ? maxW / img.width : 1
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w; canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { resolve(dataUrl); return }
+      ctx.drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/jpeg', 0.72))
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
+}
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 
 function periodDate(r:any):Date|null {
@@ -83,7 +103,11 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
     for (const file of Array.from(files)) {
       if (file.size > 5 * 1024 * 1024) { toast.error(`${file.name}: max 5MB`); continue }
       const reader = new FileReader()
-      const dataUrl: string = await new Promise(resolve => { reader.onload = e => resolve(e.target?.result as string); reader.readAsDataURL(file) })
+      let dataUrl: string = await new Promise(resolve => { reader.onload = e => resolve(e.target?.result as string); reader.readAsDataURL(file) })
+      // Kompres gambar besar (jpg/png) client-side biar total payload ga kena limit Vercel
+      if (file.type.startsWith('image/') && file.size > 800 * 1024) {
+        try { dataUrl = await compressImage(dataUrl) } catch {}
+      }
       newDocs.push({ url: dataUrl, name: file.name, type: file.type, size: file.size })
     }
     setForm(f=>({...f, documents: [...f.documents, ...newDocs] })); setUploading(false)
@@ -109,6 +133,12 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
     const e = validate()
     setErrors(e)
     if (e.length) { toast.error('Ada field yang belum diisi'); return }
+    // Cek total ukuran evidence (base64) — Vercel batasi body ~4.5MB. Kasih tau sebelum kirim biar ga "gagal" misterius.
+    const totalBytes = (form.documents||[]).reduce((s:number,d:any)=>s+(d.url?.length||0), 0)
+    if (totalBytes > 4_000_000) {
+      toast.error(`Total bukti ${(totalBytes/1_048_576).toFixed(1)}MB terlalu besar. Maks total ±3MB. Kompres PDF atau upload lebih sedikit file.`)
+      return
+    }
     setSaving(true)
     try {
       const isCC = form.source === 'cash_card'
@@ -123,7 +153,12 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
         ...(isResubmit ? { resubmittedAt: new Date().toISOString() } : {}),
       }
       const r = await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
-      if (!r.ok) { toast.error('Gagal menyimpan'); return }
+      if (!r.ok) {
+        let msg = 'Gagal menyimpan'
+        if (r.status === 413) msg = 'File bukti terlalu besar. Kompres/perkecil PDF (maks ±3MB) lalu coba lagi.'
+        else { try { const j = await r.json(); if (j?.error) msg = `Gagal: ${j.error}` } catch {} }
+        toast.error(msg); return
+      }
       if (!editing) {
         try {
           const cfg = await getConfig()
@@ -197,7 +232,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
             <label style={lbl}>Bukti / Dokumen Pendukung * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(bill/nota/struk + agenda)</span></label>
             <label style={{ display:'block', padding:'18px', borderRadius:8, border:`2px dashed ${missing('Evidence / Bukti (minimal 1 file)')?'var(--red)':'var(--border2)'}`, background:'var(--bg3)', cursor:'pointer', textAlign:'center', fontSize:11, color:'var(--text2)' }}>
               <input type="file" multiple accept="image/*,application/pdf" onChange={e=>handleFileUpload(e.target.files)} style={{ display:'none' }} />
-              {uploading ? 'Mengupload...' : '📎 Klik untuk upload (multi file, max 5MB/file)'}
+              {uploading ? 'Mengupload...' : '📎 Klik untuk upload (PDF/gambar · total maks ±3MB)'}
             </label>
             {form.documents.length > 0 && (
               <div style={{ marginTop:6, display:'flex', flexDirection:'column', gap:4 }}>
