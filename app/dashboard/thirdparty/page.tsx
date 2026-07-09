@@ -104,7 +104,15 @@ function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:(
         <div>
           <div style={{ fontSize:13, fontWeight:700 }}>{it.judulKegiatan||'(tanpa judul)'}</div>
           <div style={{ fontSize:11, color:'var(--text2)', marginTop:2 }}>EO: <b>{it.namaEO||'—'}</b> · {it.kota||'—'} · {it.venue||'—'}</div>
-          <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{it.tanggalKegiatan?new Date(it.tanggalKegiatan).toLocaleDateString('id-ID'):'—'} · {it.jumlahPeserta||0} peserta</div>
+          <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{(() => {
+            const s = it.tanggalMulai || it.tanggalKegiatan
+            const e = it.tanggalSelesai || it.tanggalKegiatan
+            const fmtD = (d:string)=> d ? new Date(d).toLocaleDateString('id-ID',{ day:'numeric', month:'short', year:'numeric' }) : '—'
+            const range = s && e && s!==e ? `${fmtD(s)} – ${fmtD(e)}` : fmtD(s)
+            const hari = it.durasiHari ? ` (${it.durasiHari} hari)` : ''
+            return `📅 ${range}${hari} · 👥 ${it.jumlahPeserta||0} peserta`
+          })()}</div>
+          {it.picInternal && <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:2 }}>PIC: {it.picInternal}</div>}
         </div>
         <div style={{ display:'flex', gap:6 }}>
           <button onClick={onEdit} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>
@@ -140,8 +148,9 @@ function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:(
 
 function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:any; onClose:()=>void; onSaved:()=>void }) {
   const now = new Date()
-  const [f, setF] = useState<any>(editing ? { ...editing, others: editing.others?.length?editing.others:OTHER_DEFAULTS.map(o=>({...o,pax:0,times:1,price:0})) } : {
-    namaEO:'', judulKegiatan:'', tanggalKegiatan:'', kota:'', venue:'', jumlahPeserta:0,
+  const [f, setF] = useState<any>(editing ? { ...editing, tanggalMulai: editing.tanggalMulai||editing.tanggalKegiatan||'', tanggalSelesai: editing.tanggalSelesai||editing.tanggalKegiatan||'', others: editing.others?.length?editing.others:OTHER_DEFAULTS.map(o=>({...o,pax:0,times:1,price:0})) } : {
+    namaEO:'', judulKegiatan:'', tanggalMulai:'', tanggalSelesai:'', kota:'', venue:'', jumlahPeserta:0,
+    picInternal:'', kontakEO:'', catatan:'',
     mrPax:0, mrDays:0, mrPrice:0, brRooms:0, brNights:0, brPrice:0,
     others: OTHER_DEFAULTS.map(o=>({...o,pax:0,times:1,price:0})),
     year: now.getFullYear(), month: now.getMonth()+1,
@@ -157,12 +166,22 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
   const estimasi = estimasiOf(f)
   const withFee = estimasi*1.1
 
+  // Hitung jumlah hari dari rentang tanggal (inklusif)
+  const durasiHari = useMemo(() => {
+    if (!f.tanggalMulai || !f.tanggalSelesai) return 0
+    const a = new Date(f.tanggalMulai), b = new Date(f.tanggalSelesai)
+    if (isNaN(a.getTime()) || isNaN(b.getTime()) || b < a) return 0
+    return Math.round((b.getTime() - a.getTime()) / 86400000) + 1
+  }, [f.tanggalMulai, f.tanggalSelesai])
+
   async function save() {
     if (!f.judulKegiatan?.trim() && !f.namaEO?.trim()) { toast.error('Isi minimal Nama EO / Judul Kegiatan'); return }
+    if (f.tanggalMulai && f.tanggalSelesai && new Date(f.tanggalSelesai) < new Date(f.tanggalMulai)) { toast.error('Tanggal selesai tidak boleh sebelum tanggal mulai'); return }
     setSaving(true)
     try {
-      const d = f.tanggalKegiatan ? new Date(f.tanggalKegiatan) : null
-      const body = { ...f, kind:'rencana', estimasiBiaya: estimasi, createdBy: user?.name,
+      const d = f.tanggalMulai ? new Date(f.tanggalMulai) : null
+      const body = { ...f, kind:'rencana', estimasiBiaya: estimasi, durasiHari, createdBy: user?.name,
+        tanggalKegiatan: f.tanggalMulai, // kompat lama
         year: d?d.getFullYear():f.year, month: d?d.getMonth()+1:f.month }
       const url = editing ? `/api/thirdparty/${editing._id}` : '/api/thirdparty'
       const r = await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
@@ -183,7 +202,12 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
             <div><label style={lbl}>Nama EO</label>
               <input className="input" list="eo-list" value={f.namaEO} onChange={e=>set('namaEO',e.target.value)} placeholder="PTC / Kinanti / MTT / Others" />
               <datalist id="eo-list"><option value="PTC"/><option value="Kinanti"/><option value="MTT"/><option value="Others"/></datalist></div>
-            <div><label style={lbl}>Tanggal Kegiatan</label><input type="date" className="input" value={f.tanggalKegiatan} onChange={e=>set('tanggalKegiatan',e.target.value)} /></div>
+            <div><label style={lbl}>Kontak EO (opsional)</label><input className="input" value={f.kontakEO||''} onChange={e=>set('kontakEO',e.target.value)} placeholder="Nama PIC / No. HP EO" /></div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr auto', gap:10, alignItems:'end' }}>
+            <div><label style={lbl}>Tanggal Mulai</label><input type="date" className="input" value={f.tanggalMulai||''} onChange={e=>{ set('tanggalMulai',e.target.value); if(!f.tanggalSelesai||new Date(f.tanggalSelesai)<new Date(e.target.value)) set('tanggalSelesai',e.target.value) }} /></div>
+            <div><label style={lbl}>Tanggal Selesai</label><input type="date" className="input" min={f.tanggalMulai||undefined} value={f.tanggalSelesai||''} onChange={e=>set('tanggalSelesai',e.target.value)} /></div>
+            <div style={{ paddingBottom:9, fontSize:11.5, color:'var(--text2)', whiteSpace:'nowrap' }}>{durasiHari>0 ? <><b style={{ color:'var(--brand)' }}>{durasiHari}</b> hari</> : '—'}</div>
           </div>
           <div><label style={lbl}>Judul Kegiatan</label><input className="input" value={f.judulKegiatan} onChange={e=>set('judulKegiatan',e.target.value)} /></div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
@@ -191,6 +215,7 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
             <div><label style={lbl}>Venue</label><input className="input" value={f.venue} onChange={e=>set('venue',e.target.value)} /></div>
             <div><label style={lbl}>Jumlah Peserta</label><input type="number" className="input" value={f.jumlahPeserta} onChange={e=>set('jumlahPeserta',Number(e.target.value))} /></div>
           </div>
+          <div><label style={lbl}>PIC Internal (opsional)</label><input className="input" value={f.picInternal||''} onChange={e=>set('picInternal',e.target.value)} placeholder="Penanggung jawab dari tim" /></div>
 
           <Section title="Meeting Room" total={mr}>
             <Trio a={['Pax','mrPax']} b={['Days','mrDays']} c={['Price/pax/day','mrPrice']} f={f} set={set} />
@@ -217,6 +242,8 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
               ))}
             </div>
           </div>
+
+          <div><label style={lbl}>Catatan (opsional)</label><textarea className="input" rows={2} value={f.catatan||''} onChange={e=>set('catatan',e.target.value)} placeholder="Kebutuhan khusus, rundown, dsb." style={{ resize:'vertical' }} /></div>
 
           <div style={{ padding:'14px 16px', background:'var(--brand-soft)', borderRadius:10, border:'1px solid var(--brand)' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>

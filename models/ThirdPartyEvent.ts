@@ -17,10 +17,16 @@ const ThirdPartyEventSchema = new Schema({
   // ---------- Rencana (slide 7) ----------
   namaEO: String,                 // PTC/Kinanti/MTT/Others — free text
   judulKegiatan: String,
-  tanggalKegiatan: String,        // YYYY-MM-DD (tanggal rencana)
+  tanggalKegiatan: String,        // YYYY-MM-DD (kompat lama = tanggal mulai)
+  tanggalMulai: String,           // YYYY-MM-DD
+  tanggalSelesai: String,         // YYYY-MM-DD
+  durasiHari: { type:Number, default:0 },
   kota: String,
   venue: String,
   jumlahPeserta: { type:Number, default:0 },
+  picInternal: String,            // penanggung jawab internal
+  kontakEO: String,               // PIC / kontak EO
+  catatan: String,                // catatan tambahan
   // Meeting Room
   mrPax: { type:Number, default:0 }, mrDays: { type:Number, default:0 }, mrPrice: { type:Number, default:0 },
   // Bedroom
