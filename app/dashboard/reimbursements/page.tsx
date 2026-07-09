@@ -101,14 +101,36 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
     setUploading(true)
     const newDocs: any[] = []
     for (const file of Array.from(files)) {
-      if (file.size > 5 * 1024 * 1024) { toast.error(`${file.name}: max 5MB`); continue }
-      const reader = new FileReader()
-      let dataUrl: string = await new Promise(resolve => { reader.onload = e => resolve(e.target?.result as string); reader.readAsDataURL(file) })
-      // Kompres gambar besar (jpg/png) client-side biar total payload ga kena limit Vercel
-      if (file.type.startsWith('image/') && file.size > 800 * 1024) {
-        try { dataUrl = await compressImage(dataUrl) } catch {}
+      if (file.size > 15 * 1024 * 1024) { toast.error(`${file.name}: maks 15MB`); continue }
+      // 1) Coba upload ke Vercel Blob (file besar, ga inline di DB). 2) Fallback base64 kalau Blob belum dikonfigurasi.
+      let uploaded: any = null
+      try {
+        let toUpload: Blob = file
+        // kompres gambar besar dulu biar hemat storage & cepat
+        if (file.type.startsWith('image/') && file.size > 800 * 1024) {
+          try {
+            const dataUrl: string = await new Promise(res => { const r=new FileReader(); r.onload=e=>res(e.target?.result as string); r.readAsDataURL(file) })
+            const compressed = await compressImage(dataUrl)
+            const blob = await (await fetch(compressed)).blob()
+            if (blob.size < file.size) toUpload = blob
+          } catch {}
+        }
+        const { upload } = await import('@vercel/blob/client')
+        const result = await upload(`reimburse/${Date.now()}-${file.name}`, toUpload, {
+          access: 'public', handleUploadUrl: '/api/blob/upload', contentType: file.type,
+        })
+        uploaded = { url: result.url, name: file.name, type: file.type, size: file.size, blob: true }
+      } catch (err) {
+        // Fallback: base64 inline (untuk file kecil / kalau Blob token belum ada)
+        try {
+          const reader = new FileReader()
+          let dataUrl: string = await new Promise(resolve => { reader.onload = e => resolve(e.target?.result as string); reader.readAsDataURL(file) })
+          if (file.type.startsWith('image/') && file.size > 800 * 1024) { try { dataUrl = await compressImage(dataUrl) } catch {} }
+          if (dataUrl.length > 4_000_000) { toast.error(`${file.name} terlalu besar & Blob storage belum aktif. Perkecil file dulu.`); continue }
+          uploaded = { url: dataUrl, name: file.name, type: file.type, size: file.size }
+        } catch { toast.error(`Gagal upload ${file.name}`); continue }
       }
-      newDocs.push({ url: dataUrl, name: file.name, type: file.type, size: file.size })
+      if (uploaded) newDocs.push(uploaded)
     }
     setForm(f=>({...f, documents: [...f.documents, ...newDocs] })); setUploading(false)
     if (newDocs.length) toast.success(`${newDocs.length} file diupload`)
@@ -133,10 +155,10 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
     const e = validate()
     setErrors(e)
     if (e.length) { toast.error('Ada field yang belum diisi'); return }
-    // Cek total ukuran evidence (base64) — Vercel batasi body ~4.5MB. Kasih tau sebelum kirim biar ga "gagal" misterius.
-    const totalBytes = (form.documents||[]).reduce((s:number,d:any)=>s+(d.url?.length||0), 0)
+    // Cek hanya bukti yang masih inline base64 (blob URL kecil, aman). Vercel batasi body ~4.5MB.
+    const totalBytes = (form.documents||[]).filter((d:any)=>!d.blob && d.url?.startsWith('data:')).reduce((s:number,d:any)=>s+(d.url?.length||0), 0)
     if (totalBytes > 4_000_000) {
-      toast.error(`Total bukti ${(totalBytes/1_048_576).toFixed(1)}MB terlalu besar. Maks total ±3MB. Kompres PDF atau upload lebih sedikit file.`)
+      toast.error(`Total bukti inline ${(totalBytes/1_048_576).toFixed(1)}MB terlalu besar. Perkecil file atau pastikan Blob storage aktif.`)
       return
     }
     setSaving(true)
@@ -232,7 +254,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
             <label style={lbl}>Bukti / Dokumen Pendukung * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(bill/nota/struk + agenda)</span></label>
             <label style={{ display:'block', padding:'18px', borderRadius:8, border:`2px dashed ${missing('Evidence / Bukti (minimal 1 file)')?'var(--red)':'var(--border2)'}`, background:'var(--bg3)', cursor:'pointer', textAlign:'center', fontSize:11, color:'var(--text2)' }}>
               <input type="file" multiple accept="image/*,application/pdf" onChange={e=>handleFileUpload(e.target.files)} style={{ display:'none' }} />
-              {uploading ? 'Mengupload...' : '📎 Klik untuk upload (PDF/gambar · total maks ±3MB)'}
+              {uploading ? 'Mengupload...' : '📎 Klik untuk upload (PDF/gambar · maks 15MB/file)'}
             </label>
             {form.documents.length > 0 && (
               <div style={{ marginTop:6, display:'flex', flexDirection:'column', gap:4 }}>

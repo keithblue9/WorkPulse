@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@vercel/blob": "^2.6.1",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.4.0",
     "exceljs": "^4.4.0",
