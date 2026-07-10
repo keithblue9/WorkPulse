@@ -235,7 +235,7 @@ export default function DashboardPage() {
 
   // Dashboard widgets toggle
   const widgets = config?.dashboardWidgets || []
-  const isWidgetActive = (key:string) => widgets.find((w:any) => w.key === key)?.active !== false
+  const isWidgetActive = (key:string) => { const w = widgets.find((w:any) => w.key === key); if (!w) return true; return isInternal ? w.active !== false : (w.active !== false && w.activeGuest !== false) }
   const mainOrder = useMemo(() => [...widgets].filter((w:any)=>w.segment==='main').sort((a:any,b:any)=>(a.order??99)-(b.order??99)), [widgets])
   const [showLayout, setShowLayout] = useState(false)
   const [savingLayout, setSavingLayout] = useState(false)
@@ -247,7 +247,12 @@ export default function DashboardPage() {
       invalidateConfig()
     } finally { setSavingLayout(false) }
   }
-  function toggleWidget(key:string) { saveWidgets(widgets.map((w:any)=>w.key===key?{...w, active: w.active===false}:w)) }
+  const [layoutMode, setLayoutMode] = useState<'internal'|'guest'>('internal')
+  function toggleWidget(key:string) {
+    const field = layoutMode === 'guest' ? 'activeGuest' : 'active'
+    saveWidgets(widgets.map((w:any)=>w.key===key?{...w, [field]: w[field]===false ? true : false}:w))
+  }
+  const wActive = (w:any) => layoutMode==='guest' ? w.activeGuest!==false : w.active!==false
   function moveMain(key:string, dir:-1|1) {
     const arr = [...mainOrder]; const i = arr.findIndex(w=>w.key===key); const j=i+dir
     if (i<0||j<0||j>=arr.length) return
@@ -426,7 +431,7 @@ export default function DashboardPage() {
                       <div className="card" style={{ padding:14 }}>
                         <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>📅 Agenda Mendatang</div>
                         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                          {activities.filter(a => a.actionDate && new Date(a.actionDate)>=new Date()).sort((a,b)=>(a.actionDate||'').localeCompare(b.actionDate||'')).slice(0,5).map(a => (
+                          {activities.filter(a => a.showInList!==false && a.actionDate && new Date(a.actionDate)>=new Date()).sort((a,b)=>(a.actionDate||'').localeCompare(b.actionDate||'')).slice(0,5).map(a => (
                             <Link key={a._id} href={`/dashboard/calendar`} style={{ textDecoration:'none', color:'inherit' }}>
                               <div style={{ padding:'8px 10px', borderRadius:7, background:'var(--bg3)', fontSize:11 }}>
                                 <div style={{ fontWeight:600 }}>{a.title}</div>
@@ -434,7 +439,7 @@ export default function DashboardPage() {
                               </div>
                             </Link>
                           ))}
-                          {activities.filter(a => a.actionDate && new Date(a.actionDate)>=new Date()).length === 0 && (
+                          {activities.filter(a => a.showInList!==false && a.actionDate && new Date(a.actionDate)>=new Date()).length === 0 && (
                             <div style={{ fontSize:11, color:'var(--text3)', textAlign:'center', padding:20 }}>Tidak ada agenda mendatang</div>
                           )}
                         </div>
@@ -443,7 +448,7 @@ export default function DashboardPage() {
                   }
                   return (
                     <div style={{ display:'flex', flexWrap:'wrap', gap:14 }}>
-                      {mainOrder.filter((w:any)=>w.active!==false).map((w:any)=>{ const node=blocks[w.key]; if(!node) return null; const isHalf=w.size==='half'; return (
+                      {mainOrder.filter((w:any)=> isInternal ? w.active!==false : (w.active!==false && w.activeGuest!==false)).map((w:any)=>{ const node=blocks[w.key]; if(!node) return null; const isHalf=w.size==='half'; return (
                         <div key={w.key} style={{ flex: isHalf?'1 1 calc(50% - 7px)':'1 1 100%', minWidth: isHalf?320:'100%', maxWidth:'100%' }}>{node}</div>
                       ) })}
                     </div>
@@ -631,8 +636,16 @@ export default function DashboardPage() {
         <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowLayout(false)}>
           <div className="modal" style={{ width:500, maxWidth:'100%', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
             <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <div><div style={{ fontSize:14, fontWeight:700 }}>🎛️ Atur Layout Dashboard</div><div style={{ fontSize:10.5, color:'var(--text3)' }}>Drag & drop urutan · ubah ukuran · hide/unhide</div></div>
+              <div><div style={{ fontSize:14, fontWeight:700 }}>🎛️ Atur Layout Dashboard</div><div style={{ fontSize:10.5, color:'var(--text3)' }}>Drag & drop urutan · ubah ukuran · atur tampilan Internal & Guest terpisah</div></div>
               <button onClick={()=>setShowLayout(false)} className="btn btn-icon">×</button>
+            </div>
+            <div style={{ padding:'10px 18px 0' }}>
+              <div style={{ fontSize:10.5, color:'var(--text3)', marginBottom:6 }}>Sedang mengatur tampilan untuk:</div>
+              <div style={{ display:'flex', gap:6, background:'var(--bg3)', borderRadius:8, padding:3 }}>
+                <button onClick={()=>setLayoutMode('internal')} className="btn btn-sm" style={{ flex:1, background:layoutMode==='internal'?'var(--brand)':'transparent', color:layoutMode==='internal'?'#fff':'var(--text2)', border:'none' }}>👤 Internal</button>
+                <button onClick={()=>setLayoutMode('guest')} className="btn btn-sm" style={{ flex:1, background:layoutMode==='guest'?'#f59e0b':'transparent', color:layoutMode==='guest'?'#fff':'var(--text2)', border:'none' }}>🌐 Guest / Eksternal</button>
+              </div>
+              <div style={{ fontSize:10, color:'var(--text3)', margin:'6px 0 0' }}>{layoutMode==='guest' ? 'Yang disembunyikan di sini TIDAK terlihat oleh guest (tetap terlihat internal jika aktif).' : 'Urutan & ukuran berlaku untuk semua. Visibilitas ini khusus tampilan internal.'}</div>
             </div>
             <div style={{ flex:1, overflowY:'auto', padding:'12px 18px' }}>
               <div style={{ fontSize:10.5, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.5, margin:'2px 0 8px' }}>Blok Utama — drag untuk geser, klik ukuran untuk toggle</div>
@@ -643,24 +656,24 @@ export default function DashboardPage() {
                     onDragEnd={e=>{e.currentTarget.style.opacity='1'}}
                     onDragOver={e=>e.preventDefault()}
                     onDrop={e=>{e.preventDefault(); const fromKey=e.dataTransfer.getData('text/plain'); if(fromKey===w.key) return; const arr=[...mainOrder]; const fi=arr.findIndex(x=>x.key===fromKey); const ti=i; if(fi<0) return; const [item]=arr.splice(fi,1); arr.splice(ti,0,item); const reordered=arr.map((x,idx)=>({...x,order:idx+1})); const others=widgets.filter((x:any)=>x.segment!=='main'); saveWidgets([...others,...reordered])}}
-                    style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', border:'1px solid var(--border)', borderRadius:8, background: w.active===false?'var(--bg3)':'var(--bg2)', opacity:w.active===false?0.6:1, cursor:'grab', userSelect:'none' }}>
+                    style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', border:'1px solid var(--border)', borderRadius:8, background: !wActive(w)?'var(--bg3)':'var(--bg2)', opacity:!wActive(w)?0.6:1, cursor:'grab', userSelect:'none' }}>
                     <span style={{ fontSize:14, color:'var(--text3)', cursor:'grab' }}>⠿</span>
                     <span style={{ flex:1, fontSize:12, fontWeight:600, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.label}</span>
                     <button onClick={()=>{const next=widgets.map((x:any)=>x.key===w.key?{...x,size:x.size==='half'?'full':'half'}:x); saveWidgets(next)}} className="btn btn-sm" style={{ fontSize:10, padding:'2px 8px', whiteSpace:'nowrap', background:(w.size||'full')==='half'?'var(--brand-soft)':'var(--bg3)', color:(w.size||'full')==='half'?'var(--brand)':'var(--text3)', borderColor:(w.size||'full')==='half'?'var(--brand)':'var(--border)' }}>{(w.size||'full')==='half'?'½ Setengah':'▬ Penuh'}</button>
-                    <button onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:10, padding:'2px 8px', color: w.active===false?'var(--text3)':'var(--green)' }}>{w.active===false?'🙈':'👁'}</button>
+                    <button onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:10, padding:'2px 8px', color: !wActive(w)?'var(--text3)':'var(--green)' }}>{!wActive(w)?'🙈':'👁'}</button>
                   </div>
                 ))}
               </div>
               <div style={{ fontSize:10.5, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.5, margin:'16px 0 8px' }}>Stat Cards</div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
                 {widgets.filter((w:any)=>w.segment==='stats').sort((a:any,b:any)=>(a.order??99)-(b.order??99)).map((w:any)=>(
-                  <button key={w.key} onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:11, background:w.active===false?'var(--bg3)':'var(--brand-soft)', color:w.active===false?'var(--text3)':'var(--brand)', borderColor:w.active===false?'var(--border)':'var(--brand)' }}>{w.active===false?'🙈':'👁'} {w.label.replace('Stat: ','')}</button>
+                  <button key={w.key} onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:11, background:!wActive(w)?'var(--bg3)':'var(--brand-soft)', color:!wActive(w)?'var(--text3)':'var(--brand)', borderColor:!wActive(w)?'var(--border)':'var(--brand)' }}>{!wActive(w)?'🙈':'👁'} {w.label.replace('Stat: ','')}</button>
                 ))}
               </div>
               <div style={{ fontSize:10.5, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.5, margin:'16px 0 8px' }}>AI Cards</div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
                 {widgets.filter((w:any)=>w.segment==='ai').sort((a:any,b:any)=>(a.order??99)-(b.order??99)).map((w:any)=>(
-                  <button key={w.key} onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:11, background:w.active===false?'var(--bg3)':'var(--brand-soft)', color:w.active===false?'var(--text3)':'var(--brand)', borderColor:w.active===false?'var(--border)':'var(--brand)' }}>{w.active===false?'🙈':'👁'} {w.label}</button>
+                  <button key={w.key} onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:11, background:!wActive(w)?'var(--bg3)':'var(--brand-soft)', color:!wActive(w)?'var(--text3)':'var(--brand)', borderColor:!wActive(w)?'var(--border)':'var(--brand)' }}>{!wActive(w)?'🙈':'👁'} {w.label}</button>
                 ))}
               </div>
             </div>

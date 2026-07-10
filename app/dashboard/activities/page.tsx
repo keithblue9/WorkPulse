@@ -78,6 +78,8 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
     const start = new Date(startStr + 'T00:00:00')
     const end = new Date(endStr + 'T00:00:00')
     if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return dates
+    // Format tanggal LOKAL (bukan toISOString yg konversi ke UTC -> geser hari di WIB)
+    const fmtLocal = (d:Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     const cur = new Date(start)
     let guard = 0
     while (guard < 200) {
@@ -87,7 +89,7 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
       else if (freq === 'monthly') cur.setMonth(cur.getMonth() + 1)
       else break
       if (cur > end) break
-      dates.push(cur.toISOString().split('T')[0])
+      dates.push(fmtLocal(cur))
     }
     return dates
   }
@@ -126,6 +128,30 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
     if (!confirm('Hapus aktivitas ini?')) return
     await fetch(`/api/projects/${editing._id}`, { method:'DELETE' })
     toast.success('Dihapus'); onSave(); onClose()
+  }
+
+  async function delAll() {
+    if (!editing?.recurrenceGroupId) return del()
+    if (!confirm('Hapus SEMUA pengulangan agenda ini (termasuk yg di Calendar)?')) return
+    const r = await fetch(`/api/projects/recurring?groupId=${editing.recurrenceGroupId}`, { method:'DELETE' })
+    const d = await r.json()
+    toast.success(`${d.deleted||0} agenda berulang dihapus`); onSave(); onClose()
+  }
+
+  async function saveEditAll() {
+    if (!editing?.recurrenceGroupId) return save()
+    setSaving(true)
+    try {
+      // Field yg diubah utk semua occurrence (kecuali tanggal per-occurrence)
+      const patch = { title:form.title, description:form.description, category:form.category, subType:form.subType,
+        status:form.status, priority:form.priority, pic:form.pic, members:form.pic, picName:form.pic[0]||'',
+        location:form.location, mode:form.mode, showInList: editing.showInList !== false }
+      const r = await fetch('/api/projects/recurring', { method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ groupId: editing.recurrenceGroupId, patch }) })
+      const d = await r.json()
+      if (!r.ok) { toast.error(d.error||'Gagal'); return }
+      toast.success(`${d.modified||0} agenda berulang diperbarui`); onSave(); onClose()
+    } finally { setSaving(false) }
   }
 
   const cats = config?.activityCategories?.filter((c:any)=>c.active) || []
@@ -226,10 +252,16 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
               <input type="time" className="input" value={form.endTime} onChange={e=>set('endTime', e.target.value)} /></div>
           </div>
         </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          {editing ? <button onClick={del} className="btn btn-danger btn-sm">🗑 Hapus</button> : <div />}
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
+          {editing ? (
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              <button onClick={del} className="btn btn-danger btn-sm">🗑 Hapus{editing.recurrenceGroupId?' ini':''}</button>
+              {editing.recurrenceGroupId && <button onClick={delAll} className="btn btn-sm" style={{ color:'var(--red)', borderColor:'var(--red)' }}>🗑 Hapus semua rutin</button>}
+            </div>
+          ) : <div />}
           <div style={{ display:'flex', gap:8 }}>
             <button onClick={onClose} className="btn">Batal</button>
+            {editing?.recurrenceGroupId && <button onClick={saveEditAll} disabled={saving} className="btn btn-sm" style={{ background:'#8b5cf6', color:'#fff' }}>{saving?'...':'Simpan ke semua rutin'}</button>}
             <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'Menyimpan...':editing?'Simpan':'Buat Aktivitas'}</button>
           </div>
         </div>

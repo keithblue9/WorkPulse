@@ -18,7 +18,8 @@ const DashboardWidgetSchema = new Schema({
   key: String,            // 'stat-kpi','stat-nonkpi','stat-golive','stat-anggaran','stat-others','stat-highpriority','progress-chart','quotes','ai-insight-team','ai-insight-personal','top-contributors','agenda','issue-distribution','member-count'
   label: String,
   segment: { type:String, default:'main' }, // segment grouping (main/secondary)
-  active: { type: Boolean, default: true },
+  active: { type: Boolean, default: true },        // visibilitas utk internal
+  activeGuest: { type: Boolean, default: true },   // visibilitas utk guest/eksternal
   order: { type: Number, default: 0 },
   size: { type: String, enum: ['full', 'half'], default: 'full' },
 }, { _id:false })

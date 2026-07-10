@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 
 type Detail = { title: string; rows: { name: string; sub?: string; ok: boolean; extra?: string }[]; okLabel: string; noLabel: string }
 
+function resultColor(r: string) { if (['P1','P2','P3'].includes(r)) return '#22c55e'; if (r==='P4') return '#f59e0b'; if (['P5','P6'].includes(r)) return '#dc2626'; return 'var(--text3)' }
+
 function Ring({ pct, color, size = 96 }: { pct: number; color: string; size?: number }) {
   const r = size / 2 - 8, c = 2 * Math.PI * r
   return (
@@ -46,9 +48,16 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
   }, [recs])
 
   const mcu = useMemo(() => {
-    const rows = members.map(u => { const r = recs[idOf(u)]; const ok = r?.mcu?.done === 'sudah'; return { name: u.name, sub: u.division, ok, extra: r?.mcu?.result || '' } })
+    const rows = members.map(u => { const r = recs[idOf(u)]; const ok = r?.mcu?.done === 'sudah'; return { name: u.name, sub: u.division, ok, extra: r?.mcu?.result || '', date: r?.mcu?.date || '' } })
     const done = rows.filter(r => r.ok).length
-    return { pct: rows.length ? Math.round(done / rows.length * 100) : 0, done, total: rows.length, rows }
+    // Breakdown hasil P1-P6 (jumlah orang per hasil) + tanggal MCU terakhir
+    const pCount: Record<string, number> = {}
+    let lastDate = ''
+    for (const r of rows) {
+      if (r.extra) pCount[r.extra] = (pCount[r.extra] || 0) + 1
+      if (r.date && r.date > lastDate) lastDate = r.date
+    }
+    return { pct: rows.length ? Math.round(done / rows.length * 100) : 0, done, total: rows.length, rows, pCount, lastDate }
   }, [members, recs])
 
   const training = useMemo(() => {
@@ -63,7 +72,7 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
       let items = (r?.supportKpi || [])
       if (kpiJenis !== 'all') items = items.filter((k: any) => (k.jenis === 'lainnya' ? (k.customName || 'Lainnya') : k.jenis) === kpiJenis)
       const jml = items.reduce((s: number, k: any) => s + (k.jumlah || 0), 0)
-      return { name: u.name, sub: u.division, ok: items.length > 0, extra: items.length ? `${jml}× isi` : '' }
+      return { name: u.name, sub: u.division, ok: items.length > 0, extra: items.length ? `${jml}× isi` : '', jml }
     })
     const done = rows.filter(r => r.ok).length
     return { pct: rows.length ? Math.round(done / rows.length * 100) : 0, done, total: rows.length, rows }
@@ -98,12 +107,41 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 3 }}>{c.title}</div>
                 <div style={{ fontSize: 11, color: 'var(--text2)' }}>{c.data.done} / {c.data.total} {c.okLabel.toLowerCase()}</div>
+
+                {/* MCU: tanggal terakhir + breakdown hasil P */}
+                {c.key === 'mcu' && (
+                  <div style={{ marginTop: 5 }}>
+                    {(mcu as any).lastDate && <div style={{ fontSize: 10, color: 'var(--text3)' }}>MCU terakhir: <b>{new Date((mcu as any).lastDate).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</b></div>}
+                    {Object.keys((mcu as any).pCount).length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                        {['P1','P2','P3','P4','P5','P6'].filter(p=>(mcu as any).pCount[p]).map(p => (
+                          <span key={p} style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 5, background: resultColor(p)+'22', color: resultColor(p) }}>{p}: {(mcu as any).pCount[p]}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {c.key === 'kpi' && jenisOptions.length > 0 && (
                   <select value={kpiJenis} onClick={e => e.stopPropagation()} onChange={e => setKpiJenis(e.target.value)} style={{ marginTop: 6, fontSize: 10.5, padding: '3px 6px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', width: '100%' }}>
                     <option value="all">Semua jenis</option>
                     {jenisOptions.map(j => <option key={j} value={j}>{j}</option>)}
                   </select>
                 )}
+
+                {/* KPI: jumlah pengisian per member (dinamis ikut filter status/jenis) */}
+                {c.key === 'kpi' && (
+                  <div style={{ marginTop: 5, display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 96, overflowY: 'auto' }}>
+                    {c.data.rows.filter((r:any)=>r.ok).slice(0, 8).map((r:any, i:number) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, gap: 6 }}>
+                        <span style={{ color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+                        <span style={{ fontWeight: 700, color: c.color, flexShrink: 0 }}>{r.jml}×</span>
+                      </div>
+                    ))}
+                    {c.data.rows.filter((r:any)=>r.ok).length === 0 && <span style={{ fontSize: 10, color: 'var(--text3)' }}>Belum ada yg mengisi</span>}
+                  </div>
+                )}
+
                 <div style={{ fontSize: 10, color: 'var(--brand)', marginTop: 5 }}>Klik untuk detail →</div>
               </div>
             </div>
