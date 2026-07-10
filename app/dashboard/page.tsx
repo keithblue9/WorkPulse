@@ -369,7 +369,7 @@ export default function DashboardPage() {
                     'mandatory-kpi': <MandatoryInsights section="kpi" />,
                     'golive-insights': <GoLiveInsights />,
                     'ai-row': (
-                      <div className="responsive-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:10 }}>
+                      <div className="responsive-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:10, width:'100%' }}>
                         {isWidgetActive('ai-quotes') && (
                           <div className="card glass" style={{ padding:14 }}>
                             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
@@ -407,7 +407,7 @@ export default function DashboardPage() {
                       </div>
                     ),
                     'progress-chart': (
-                      <div className="card glass-hover" style={{ padding:14, cursor:'pointer' }} onClick={()=>{ window.location.href='/dashboard/progress' }}>
+                      <div className="card glass-hover" style={{ padding:14, cursor:'pointer', width:'100%' }} onClick={()=>{ window.location.href='/dashboard/progress' }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
                           <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>📊 Progress Project Distribution</div>
                           <span style={{ fontSize:10, color:'var(--brand)' }}>Lihat detail →</span>
@@ -432,7 +432,7 @@ export default function DashboardPage() {
                       </div>
                     ),
                     'upcoming-agenda': (
-                      <div className="card" style={{ padding:14 }}>
+                      <div className="card" style={{ padding:14, width:'100%' }}>
                         <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:10 }}>📅 Agenda Mendatang</div>
                         <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                           {activities.filter(a => a.showInList!==false && a.actionDate && new Date(a.actionDate)>=new Date()).sort((a,b)=>(a.actionDate||'').localeCompare(b.actionDate||'')).slice(0,5).map(a => (
