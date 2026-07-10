@@ -248,8 +248,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
         <AppPopups />
-        <BirthdayPopup />
-        <DailyCheckin />
+        {userRoles.some((r:string)=>r!=='guest') && <><BirthdayPopup /><DailyCheckin /></>}
         {userRoles.some((r:string)=>r!=='guest') ? <NotifyEnabler /> : <InstallPWA />}
       </div>
     </div>

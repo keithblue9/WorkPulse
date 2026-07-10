@@ -139,6 +139,11 @@ export default function AppPopups() {
   }, [session])
 
   if (!session?.user) return null
+  const user = session.user as any
+  const userRoles: string[] = user?.roles && user.roles.length ? user.roles : (user?.role ? [user.role] : ['guest'])
+  const isInternal = userRoles.some((r:string) => r !== 'guest')
+  // Guest: ga ada agenda reminder & PWA prompt di sini (guest pakai InstallPWA dari layout)
+  if (!isInternal) return null
   return (
     <>
       <AgendaReminder />
