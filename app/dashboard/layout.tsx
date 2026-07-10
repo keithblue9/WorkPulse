@@ -16,6 +16,7 @@ import InstallPWA from '@/components/InstallPWA'
 const NAV_GROUPS = [
   { key:'dashboard', label:'Dashboard & Overview', items:[
     { href:'/dashboard',          label:'Dashboard',    permKey:'dashboard' },
+    { href:'/dashboard/progress', label:'Progress Project', permKey:'progress' },
   ]},
   { key:'activities', label:'Activities', items:[
     { href:'/dashboard/activities', label:'Activities',  permKey:'activities' },

@@ -332,7 +332,6 @@ export default function DashboardPage() {
           </div>
           <div style={{ display:'flex', gap:5, alignItems:'center' }}>
             <button onClick={()=>setTab('general')} style={tabBtn(tab==='general')}>📊 General</button>
-            <button onClick={()=>setTab('progress')} style={tabBtn(tab==='progress')}>📈 Progress Project</button>
             <button onClick={()=>setTab('issues')} style={tabBtn(tab==='issues')}>⚠️ Issues</button>
             {isInternal && tab==='general' && <button onClick={()=>setShowLayout(true)} className="btn btn-sm" title="Atur susunan & tampil/sembunyikan widget dashboard" style={{ marginLeft:4 }}>🎛️ Atur Layout</button>}
           </div>
@@ -408,14 +407,14 @@ export default function DashboardPage() {
                       </div>
                     ),
                     'progress-chart': (
-                      <div className="card glass-hover" style={{ padding:14, cursor:'pointer' }} onClick={()=>setTab('progress')}>
+                      <div className="card glass-hover" style={{ padding:14, cursor:'pointer' }} onClick={()=>{ window.location.href='/dashboard/progress' }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
                           <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>📊 Progress Project Distribution</div>
                           <span style={{ fontSize:10, color:'var(--brand)' }}>Lihat detail →</span>
                         </div>
                         {progressData.length === 0 ? (
                           <div style={{ textAlign:'center', padding:'24px 0', color:'var(--text3)', fontSize:12 }}>
-                            Belum ada progress project.<br/><span style={{ fontSize:11 }}>Tambah di tab Progress Project</span>
+                            Belum ada progress project.<br/><span style={{ fontSize:11 }}>Buka menu Progress Project di sidebar</span>
                           </div>
                         ) : (
                           <div style={{ display:'flex', alignItems:'center', gap:14 }}>
