@@ -48,16 +48,19 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
   }, [recs])
 
   const mcu = useMemo(() => {
-    const rows = members.map(u => { const r = recs[idOf(u)]; const ok = r?.mcu?.done === 'sudah'; return { name: u.name, sub: u.division, ok, extra: r?.mcu?.result || '', date: r?.mcu?.date || '' } })
+    const rows = members.map(u => { const r = recs[idOf(u)]; const ok = r?.mcu?.done === 'sudah'; return { name: u.name, sub: u.division, ok, extra: r?.mcu?.result || '', date: r?.mcu?.date || '', status: (u.status||'pekerja') } })
     const done = rows.filter(r => r.ok).length
-    // Breakdown hasil P1-P6 (jumlah orang per hasil) + tanggal MCU terakhir
     const pCount: Record<string, number> = {}
-    let lastDate = ''
+    let lastDate = '', lastPekerja = '', lastTAD = ''
     for (const r of rows) {
       if (r.extra) pCount[r.extra] = (pCount[r.extra] || 0) + 1
-      if (r.date && r.date > lastDate) lastDate = r.date
+      if (r.date) {
+        if (r.date > lastDate) lastDate = r.date
+        if (r.status === 'TAD') { if (r.date > lastTAD) lastTAD = r.date }
+        else { if (r.date > lastPekerja) lastPekerja = r.date }
+      }
     }
-    return { pct: rows.length ? Math.round(done / rows.length * 100) : 0, done, total: rows.length, rows, pCount, lastDate }
+    return { pct: rows.length ? Math.round(done / rows.length * 100) : 0, done, total: rows.length, rows, pCount, lastDate, lastPekerja, lastTAD }
   }, [members, recs])
 
   const training = useMemo(() => {
@@ -72,10 +75,15 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
       let items = (r?.supportKpi || [])
       if (kpiJenis !== 'all') items = items.filter((k: any) => (k.jenis === 'lainnya' ? (k.customName || 'Lainnya') : k.jenis) === kpiJenis)
       const jml = items.reduce((s: number, k: any) => s + (k.jumlah || 0), 0)
-      return { name: u.name, sub: u.division, ok: items.length > 0, extra: items.length ? `${jml}× isi` : '', jml }
+      return { name: u.name, sub: u.division, ok: items.length > 0, extra: items.length ? `${jml}× isi` : '', jml, status: (u.status||'pekerja') }
     })
     const done = rows.filter(r => r.ok).length
-    return { pct: rows.length ? Math.round(done / rows.length * 100) : 0, done, total: rows.length, rows }
+    // Total pengisian per status (mirip MCU breakdown)
+    const totPekerja = rows.filter(r=>r.status!=='TAD').reduce((s,r)=>s+r.jml,0)
+    const totTAD = rows.filter(r=>r.status==='TAD').reduce((s,r)=>s+r.jml,0)
+    const donePekerja = rows.filter(r=>r.status!=='TAD' && r.ok).length
+    const doneTAD = rows.filter(r=>r.status==='TAD' && r.ok).length
+    return { pct: rows.length ? Math.round(done / rows.length * 100) : 0, done, total: rows.length, rows, totPekerja, totTAD, donePekerja, doneTAD }
   }, [members, recs, kpiJenis])
 
   const allCards = [
@@ -111,7 +119,15 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
                 {/* MCU: tanggal terakhir + breakdown hasil P */}
                 {c.key === 'mcu' && (
                   <div style={{ marginTop: 5 }}>
-                    {(mcu as any).lastDate && <div style={{ fontSize: 10, color: 'var(--text3)' }}>MCU terakhir: <b>{new Date((mcu as any).lastDate).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</b></div>}
+                    {status === 'all' ? (
+                      <div style={{ fontSize: 10, color: 'var(--text3)', lineHeight: 1.5 }}>
+                        {(mcu as any).lastPekerja && <div>Pekerja: <b>{new Date((mcu as any).lastPekerja).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</b></div>}
+                        {(mcu as any).lastTAD && <div>TAD: <b>{new Date((mcu as any).lastTAD).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</b></div>}
+                        {!(mcu as any).lastPekerja && !(mcu as any).lastTAD && <span>Belum ada tanggal MCU</span>}
+                      </div>
+                    ) : (
+                      (mcu as any).lastDate && <div style={{ fontSize: 10, color: 'var(--text3)' }}>MCU terakhir: <b>{new Date((mcu as any).lastDate).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</b></div>
+                    )}
                     {Object.keys((mcu as any).pCount).length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
                         {['P1','P2','P3','P4','P5','P6'].filter(p=>(mcu as any).pCount[p]).map(p => (
@@ -129,16 +145,17 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
                   </select>
                 )}
 
-                {/* KPI: jumlah pengisian per member (dinamis ikut filter status/jenis) */}
+                {/* KPI: total pengisian per status (mirip MCU, bukan per nama) */}
                 {c.key === 'kpi' && (
-                  <div style={{ marginTop: 5, display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 96, overflowY: 'auto' }}>
-                    {c.data.rows.filter((r:any)=>r.ok).slice(0, 8).map((r:any, i:number) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, gap: 6 }}>
-                        <span style={{ color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
-                        <span style={{ fontWeight: 700, color: c.color, flexShrink: 0 }}>{r.jml}×</span>
+                  <div style={{ marginTop: 5 }}>
+                    {status === 'all' ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 5, background: c.color+'22', color: c.color }}>Pekerja: {(kpi as any).totPekerja}×</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 5, background: '#f59e0b22', color: '#f59e0b' }}>TAD: {(kpi as any).totTAD}×</span>
                       </div>
-                    ))}
-                    {c.data.rows.filter((r:any)=>r.ok).length === 0 && <span style={{ fontSize: 10, color: 'var(--text3)' }}>Belum ada yg mengisi</span>}
+                    ) : (
+                      <div style={{ fontSize: 10, color: 'var(--text3)' }}>Total pengisian: <b style={{ color: c.color }}>{(kpi as any).totPekerja + (kpi as any).totTAD}×</b></div>
+                    )}
                   </div>
                 )}
 

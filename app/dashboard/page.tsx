@@ -222,7 +222,8 @@ export default function DashboardPage() {
 
   // Hanya hitung aktivitas yg BELUM selesai (outstanding). Status selesai = completed/done/finished/closed.
   const isFinished = (a:any) => ['completed','done','finished','closed','selesai'].includes(String(a?.status||'').toLowerCase())
-  const outstandingActs = useMemo(() => activities.filter(a => !isFinished(a)), [activities])
+  // Occurrence berulang yg disembunyikan (showInList:false) tidak dihitung di stat cards & issues (hanya muncul di Calendar)
+  const outstandingActs = useMemo(() => activities.filter(a => a.showInList !== false && !isFinished(a)), [activities])
   const stats = useMemo(() => {
     const kpi = outstandingActs.filter(a => a.subType === 'KPI').length
     const nonKpi = outstandingActs.filter(a => a.subType === 'Non-KPI').length
@@ -274,7 +275,7 @@ export default function DashboardPage() {
 
   // Issues visibility — hidden activities are excluded from ALL dashboard Issues sections
   // (Status Distribution, High Priority Active, Detail) so everything stays aligned.
-  const visibleActivities = useMemo(() => activities.filter((a:any)=>!a.hidden), [activities])
+  const visibleActivities = useMemo(() => activities.filter((a:any)=>!a.hidden && a.showInList !== false), [activities])
   const hiddenCount = activities.length - visibleActivities.length
 
   async function toggleHidden(a:any) {
