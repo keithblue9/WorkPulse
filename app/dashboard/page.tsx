@@ -254,6 +254,7 @@ export default function DashboardPage() {
     saveWidgets(widgets.map((w:any)=>w.key===key?{...w, [field]: w[field]===false ? true : false}:w))
   }
   const wActive = (w:any) => layoutMode==='guest' ? w.activeGuest!==false : w.active!==false
+  const wSize = (w:any) => (layoutMode==='guest' ? (w.sizeGuest||w.size) : w.size) || 'full'
   function moveMain(key:string, dir:-1|1) {
     const arr = [...mainOrder]; const i = arr.findIndex(w=>w.key===key); const j=i+dir
     if (i<0||j<0||j>=arr.length) return
@@ -449,7 +450,7 @@ export default function DashboardPage() {
                   }
                   return (
                     <div style={{ display:'flex', flexWrap:'wrap', gap:14 }}>
-                      {mainOrder.filter((w:any)=> isInternal ? w.active!==false : (w.active!==false && w.activeGuest!==false)).map((w:any)=>{ const node=blocks[w.key]; if(!node) return null; const isHalf=w.size==='half'; return (
+                      {mainOrder.filter((w:any)=> isInternal ? w.active!==false : (w.active!==false && w.activeGuest!==false)).map((w:any)=>{ const node=blocks[w.key]; if(!node) return null; const isHalf=(isInternal ? w.size : (w.sizeGuest||w.size))==='half'; return (
                         <div key={w.key} style={{ flex: isHalf?'1 1 calc(50% - 7px)':'1 1 100%', minWidth: isHalf?320:'100%', maxWidth:'100%' }}>{node}</div>
                       ) })}
                     </div>
@@ -660,7 +661,7 @@ export default function DashboardPage() {
                     style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', border:'1px solid var(--border)', borderRadius:8, background: !wActive(w)?'var(--bg3)':'var(--bg2)', opacity:!wActive(w)?0.6:1, cursor:'grab', userSelect:'none' }}>
                     <span style={{ fontSize:14, color:'var(--text3)', cursor:'grab' }}>⠿</span>
                     <span style={{ flex:1, fontSize:12, fontWeight:600, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.label}</span>
-                    <button onClick={()=>{const next=widgets.map((x:any)=>x.key===w.key?{...x,size:x.size==='half'?'full':'half'}:x); saveWidgets(next)}} className="btn btn-sm" style={{ fontSize:10, padding:'2px 8px', whiteSpace:'nowrap', background:(w.size||'full')==='half'?'var(--brand-soft)':'var(--bg3)', color:(w.size||'full')==='half'?'var(--brand)':'var(--text3)', borderColor:(w.size||'full')==='half'?'var(--brand)':'var(--border)' }}>{(w.size||'full')==='half'?'½ Setengah':'▬ Penuh'}</button>
+                    <button onClick={()=>{const field=layoutMode==='guest'?'sizeGuest':'size'; const cur=(layoutMode==='guest'?(w.sizeGuest||w.size):w.size)||'full'; const next=widgets.map((x:any)=>x.key===w.key?{...x,[field]:cur==='half'?'full':'half'}:x); saveWidgets(next)}} className="btn btn-sm" style={{ fontSize:10, padding:'2px 8px', whiteSpace:'nowrap', background:wSize(w)==='half'?'var(--brand-soft)':'var(--bg3)', color:wSize(w)==='half'?'var(--brand)':'var(--text3)', borderColor:wSize(w)==='half'?'var(--brand)':'var(--border)' }}>{wSize(w)==='half'?'½ Setengah':'▬ Penuh'}</button>
                     <button onClick={()=>toggleWidget(w.key)} className="btn btn-sm" style={{ fontSize:10, padding:'2px 8px', color: !wActive(w)?'var(--text3)':'var(--green)' }}>{!wActive(w)?'🙈':'👁'}</button>
                   </div>
                 ))}

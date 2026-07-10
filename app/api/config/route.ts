@@ -106,7 +106,7 @@ export async function GET() {
         const ex = byKey[dw.key]
         if (!ex) { changed = true; return { ...dw } }
         if (ex.label !== dw.label || ex.segment !== dw.segment || (!ex.size && dw.size)) changed = true
-        return { ...dw, active: ex.active !== false, activeGuest: ex.activeGuest !== false, order: ex.order ?? dw.order, size: ex.size || dw.size || 'full' }
+        return { ...dw, active: ex.active !== false, activeGuest: ex.activeGuest !== false, order: ex.order ?? dw.order, size: ex.size || dw.size || 'full', sizeGuest: ex.sizeGuest || ex.size || dw.size || 'full' }
       })
       if (changed) { cfg.dashboardWidgets = merged; updates.dashboardWidgets = merged; needsUpdate = true }
     } catch {}

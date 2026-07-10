@@ -21,7 +21,8 @@ const DashboardWidgetSchema = new Schema({
   active: { type: Boolean, default: true },        // visibilitas utk internal
   activeGuest: { type: Boolean, default: true },   // visibilitas utk guest/eksternal
   order: { type: Number, default: 0 },
-  size: { type: String, enum: ['full', 'half'], default: 'full' },
+  size: { type: String, enum: ['full', 'half'], default: 'full' },        // ukuran utk internal
+  sizeGuest: { type: String, enum: ['full', 'half'], default: 'full' },   // ukuran utk guest
 }, { _id:false })
 
 const ConfigSchema = new Schema({

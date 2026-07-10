@@ -18,7 +18,7 @@ function Ring({ pct, color, size = 96 }: { pct: number; color: string; size?: nu
 }
 
 export default function MandatoryInsights({ section }: { section?: 'mcu' | 'training' | 'kpi' }) {
-  const [year] = useState(new Date().getFullYear())
+  const [year, setYear] = useState(new Date().getFullYear())
   const [status, setStatus] = useState<'all' | 'pekerja' | 'TAD'>('all')
   const [kpiJenis, setKpiJenis] = useState<string>('all')
   const [users, setUsers] = useState<any[]>([])
@@ -98,6 +98,11 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 13, fontWeight: 700 }}>{section ? cards[0]?.title || 'Mandatory' : `📋 Mandatory ${year}`}</div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 3, alignItems: 'center', marginRight: 4 }}>
+            <button onClick={() => setYear(y => y - 1)} className="btn btn-sm" style={{ padding: '2px 7px', fontSize: 10 }}>◀</button>
+            <span style={{ fontSize: 11, fontWeight: 700, minWidth: 34, textAlign: 'center' }}>{year}</span>
+            <button onClick={() => setYear(y => y + 1)} disabled={year >= new Date().getFullYear()} className="btn btn-sm" style={{ padding: '2px 7px', fontSize: 10, opacity: year >= new Date().getFullYear() ? 0.3 : 1 }}>▶</button>
+          </div>
           <span style={{ fontSize: 11, color: 'var(--text3)' }}>Status:</span>
           {(['all', 'pekerja', 'TAD'] as const).map(s => (
             <button key={s} onClick={() => setStatus(s)} className="btn btn-sm" style={{ fontSize: 10.5, textTransform: 'capitalize', background: status === s ? 'var(--brand-soft)' : 'var(--bg3)', color: status === s ? 'var(--brand)' : 'var(--text2)', borderColor: status === s ? 'var(--brand)' : 'var(--border)' }}>{s === 'all' ? 'Semua' : s}</button>
@@ -109,27 +114,26 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           {cards.map(c => (
             <div key={c.key} onClick={() => setDetail({ title: c.title, rows: c.data.rows, okLabel: c.okLabel, noLabel: c.noLabel })}
-              className="card" style={{ padding: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, transition: 'box-shadow .15s', border: '1px solid var(--border)' }}
+              className="card" style={{ padding: 14, cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12, transition: 'box-shadow .15s', border: '1px solid var(--border)' }}
               onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.10)')} onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}>
               <Ring pct={c.data.pct} color={c.color} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 3 }}>{c.title}</div>
                 <div style={{ fontSize: 11, color: 'var(--text2)' }}>{c.data.done} / {c.data.total} {c.okLabel.toLowerCase()}</div>
 
-                {/* MCU: tanggal terakhir + breakdown hasil P */}
+                {/* MCU: tanggal terakhir (berjajar) + breakdown hasil P */}
                 {c.key === 'mcu' && (
                   <div style={{ marginTop: 5 }}>
                     {status === 'all' ? (
-                      <div style={{ fontSize: 10, color: 'var(--text3)', lineHeight: 1.5 }}>
-                        {(mcu as any).lastPekerja && <div>Pekerja: <b>{new Date((mcu as any).lastPekerja).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</b></div>}
-                        {(mcu as any).lastTAD && <div>TAD: <b>{new Date((mcu as any).lastTAD).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</b></div>}
-                        {!(mcu as any).lastPekerja && !(mcu as any).lastTAD && <span>Belum ada tanggal MCU</span>}
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 9.5, color: 'var(--text3)', background: 'var(--bg3)', padding: '2px 7px', borderRadius: 5 }}>Pekerja: <b style={{ color: 'var(--text2)' }}>{(mcu as any).lastPekerja ? new Date((mcu as any).lastPekerja).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'}) : '—'}</b></span>
+                        <span style={{ fontSize: 9.5, color: 'var(--text3)', background: 'var(--bg3)', padding: '2px 7px', borderRadius: 5 }}>TAD: <b style={{ color: 'var(--text2)' }}>{(mcu as any).lastTAD ? new Date((mcu as any).lastTAD).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'}) : '—'}</b></span>
                       </div>
                     ) : (
-                      (mcu as any).lastDate && <div style={{ fontSize: 10, color: 'var(--text3)' }}>MCU terakhir: <b>{new Date((mcu as any).lastDate).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</b></div>
+                      <div style={{ fontSize: 9.5, color: 'var(--text3)' }}>MCU terakhir: <b style={{ color: 'var(--text2)' }}>{(mcu as any).lastDate ? new Date((mcu as any).lastDate).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'2-digit'}) : '—'}</b></div>
                     )}
                     {Object.keys((mcu as any).pCount).length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
                         {['P1','P2','P3','P4','P5','P6'].filter(p=>(mcu as any).pCount[p]).map(p => (
                           <span key={p} style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 5, background: resultColor(p)+'22', color: resultColor(p) }}>{p}: {(mcu as any).pCount[p]}</span>
                         ))}

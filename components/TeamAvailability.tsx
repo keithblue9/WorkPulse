@@ -74,9 +74,10 @@ export default function TeamAvailability() {
       if (Object.keys(counts).some(t => WORKING.includes(t))) availMembers++
     }
     const noData = Math.max(0, memberCount - ids.length)
-    const data = types.map((t: any) => ({ name: t.label, key: t.key, value: catCount[t.key] || 0, color: t.textColor || '#4f8ef7' })).filter((d: any) => d.value > 0)
-    if (noData > 0) data.push({ name: 'Belum presensi', key: '__none', value: noData, color: '#9aa6b3' })
-    return { data, available: availMembers, availPct: memberCount > 0 ? Math.round(availMembers / memberCount * 100) : 0 }
+    // Semua kategori presensi tampil di legend (termasuk yg 0) biar lengkap; donut hanya segmen >0
+    const allCats = types.map((t: any) => ({ name: t.label, key: t.key, value: catCount[t.key] || 0, color: t.textColor || '#4f8ef7' }))
+    if (noData > 0) allCats.push({ name: 'Belum presensi', key: '__none', value: noData, color: '#9aa6b3' })
+    return { data: allCats, available: availMembers, availPct: memberCount > 0 ? Math.round(availMembers / memberCount * 100) : 0 }
   }, [docs, types, memberCount])
 
   // WFO hari ini: list nama member
@@ -126,13 +127,13 @@ export default function TeamAvailability() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             {/* KIRI: donut + breakdown */}
             <div>
-              {data.length === 0 ? <div style={{ fontSize: 12, color: 'var(--text3)', padding: '30px 0', textAlign: 'center' }}>Belum ada data presensi.</div> : (
+              {data.every((d:any)=>d.value===0) ? <div style={{ fontSize: 12, color: 'var(--text3)', padding: '30px 0', textAlign: 'center' }}>Belum ada data presensi.</div> : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                   <div style={{ position: 'relative', width: 140, height: 140, flexShrink: 0 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={data} dataKey="value" nameKey="name" innerRadius={44} outerRadius={66} paddingAngle={2} stroke="none">
-                          {data.map((d, i) => <Cell key={i} fill={d.color} />)}
+                        <Pie data={data.filter((d:any)=>d.value>0)} dataKey="value" nameKey="name" innerRadius={44} outerRadius={66} paddingAngle={2} stroke="none">
+                          {data.filter((d:any)=>d.value>0).map((d, i) => <Cell key={i} fill={d.color} />)}
                         </Pie>
                         <Tooltip content={({ active, payload }: any) => active && payload?.length ? (
                           <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', fontSize: 11, boxShadow: '0 6px 20px rgba(0,0,0,0.15)' }}>
