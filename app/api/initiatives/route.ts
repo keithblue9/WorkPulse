@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     await connectDB()
     const { searchParams } = new URL(req.url)
     const year = searchParams.get('year') || new Date().getFullYear()
-    const initiatives = await InitiativeModel.find({ year }).sort({ code: 1 }).lean()
+    const initiatives = await InitiativeModel.find({ year }).sort({ app: 1, title: 1 }).lean()
     return NextResponse.json({ data: initiatives })
   } catch (e) {
     return NextResponse.json({ error: 'Failed to fetch initiatives' }, { status: 500 })
