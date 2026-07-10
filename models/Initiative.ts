@@ -15,11 +15,14 @@ const PhaseSchema = new Schema({
 }, { _id:false })
 
 const InitiativeSchema = new Schema({
-  code: { type:String, required:true },
+  code: { type:String, default:'' },              // legacy, dipertahankan
+  app: { type:String, default:'' },               // iVendor/iPRO/PAL/KIMs/Others
+  urgency: { type:String, default:'' },           // SI/Non SI/Others
+  hiddenGuest: { type:Boolean, default:false },   // true = disembunyikan dari guest (internal tetap tampil)
   title: { type:String, required:true },
-  planProgress: { type:Number, default:0 },     // auto = sum of phase planPct (=100 if all planned)
-  actualProgress: { type:Number, default:0 },   // auto = sum of phase actualPct
-  spi: { type:Number, default:null },           // Schedule Performance Index (schedule efficiency, capped 1.0)
+  planProgress: { type:Number, default:0 },
+  actualProgress: { type:Number, default:0 },
+  spi: { type:Number, default:null },
   status: { type:String, default:'on_track' },
   year: { type:Number, default:2026 },
   pic: { type:[String], default:[] },

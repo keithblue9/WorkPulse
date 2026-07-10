@@ -167,6 +167,7 @@ export default function DashboardPage() {
   const [aiPersonal, setAiPersonal] = useState(''); const [loadingPersonal, setLoadingPersonal] = useState(false)
   const [statDetail, setStatDetail] = useState<{title:string; items:any[]}|null>(null)
   const [showHidden, setShowHidden] = useState(false)
+  const [issueStatusFilter, setIssueStatusFilter] = useState('all')
   const autoRan = useRef(false)
   const issuesRef = useRef<HTMLDivElement>(null)
 
@@ -578,6 +579,14 @@ export default function DashboardPage() {
                       <button data-export-hide onClick={()=>setShowHidden(v=>!v)} className="btn btn-sm">{showHidden ? '🙈 Sembunyikan yg hidden' : `👁 Tampilkan ${hiddenCount} hidden`}</button>
                     )}
                   </div>
+                  {/* Filter status seperti di Activities */}
+                  <div data-export-hide style={{ padding:'8px 14px', borderBottom:'1px solid var(--border)', display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
+                    <span style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase' }}>Status:</span>
+                    <button onClick={()=>setIssueStatusFilter('all')} className="btn btn-sm" style={{ fontSize:10.5, padding:'3px 10px', background:issueStatusFilter==='all'?'var(--brand-soft)':'var(--bg3)', color:issueStatusFilter==='all'?'var(--brand)':'var(--text2)', borderColor:issueStatusFilter==='all'?'var(--brand)':'var(--border)' }}>Semua</button>
+                    {(config?.issueStatuses||[]).filter((s:any)=>s.active).map((s:any)=>(
+                      <button key={s.key} onClick={()=>setIssueStatusFilter(s.key)} className="btn btn-sm" style={{ fontSize:10.5, padding:'3px 10px', background:issueStatusFilter===s.key?s.color+'22':'var(--bg3)', color:issueStatusFilter===s.key?s.color:'var(--text2)', borderColor:issueStatusFilter===s.key?s.color:'var(--border)' }}>{s.label}</button>
+                    ))}
+                  </div>
                   <div style={{ maxHeight:'calc(100vh - 420px)', minHeight:200, overflowY:'auto' }}>
                     <table className="wp-table" style={{ minWidth:900 }}>
                       <thead style={{ position:'sticky', top:0, zIndex:2, background:'var(--bg2)' }}>
@@ -592,9 +601,9 @@ export default function DashboardPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {(showHidden ? activities : visibleActivities).length === 0 ? (
+                        {(() => { const base = (showHidden ? activities : visibleActivities).filter((a:any)=> issueStatusFilter==='all' || a.status===issueStatusFilter); return base.length === 0 ? (
                           <tr><td colSpan={7} style={{ textAlign:'center', padding:24, color:'var(--text3)' }}>Belum ada activity/issue</td></tr>
-                        ) : (showHidden ? activities : visibleActivities).map((a:any) => {
+                        ) : base.map((a:any) => {
                           const catColor = (config?.activityCategories||[]).find((c:any)=>c.key===a.category)?.color || 'var(--brand)'
                           const pc: any = { high:{l:'High',c:'var(--red)',b:'var(--redbg)'}, medium:{l:'Medium',c:'var(--amber)',b:'var(--amberbg)'}, low:{l:'Low',c:'var(--green)',b:'var(--greenbg)'} }
                           return (
@@ -622,7 +631,7 @@ export default function DashboardPage() {
                               <td style={{ fontSize:10.5 }}>{picArray(a.pic).join(', ') || a.picName || '—'}</td>
                             </tr>
                           )
-                        })}
+                        }) })()}
                       </tbody>
                     </table>
                   </div>

@@ -163,6 +163,9 @@ function PhaseEditor({ phase, idx, onChange, onRemove, computed }: { phase:any; 
 
 function InitiativeForm({ editing, onClose, onSave, members }: { editing?:any; onClose:()=>void; onSave:()=>void; members:any[] }) {
   const [form, setForm] = useState({
+    app: editing?.app || '',
+    urgency: editing?.urgency || '',
+    hiddenGuest: editing?.hiddenGuest || false,
     code: editing?.code || '',
     title: editing?.title || '',
     year: editing?.year || new Date().getFullYear(),
@@ -182,7 +185,7 @@ function InitiativeForm({ editing, onClose, onSave, members }: { editing?:any; o
   function removePic(name:string) { setForm(f=>({...f, pic: f.pic.filter((p:string)=>p!==name)})) }
 
   async function save() {
-    if (!form.code || !form.title) { toast.error('Code & title wajib'); return }
+    if (!form.app || !form.title) { toast.error('App & title wajib'); return }
     setSaving(true)
     try {
       const phasesWithPct = calc.phases.map((p:any) => {
@@ -213,9 +216,24 @@ function InitiativeForm({ editing, onClose, onSave, members }: { editing?:any; o
         <div style={{ padding:'14px 20px', overflowY:'auto', flex:1, display:'flex', flexDirection:'column', gap:11 }}>
           <div className="card" style={{ padding:12 }}>
             <div style={{ display:'grid', gridTemplateColumns:'120px 1fr 100px', gap:10, marginBottom:10 }}>
-              <div><label style={lbl}>Code *</label><input className="input" value={form.code} onChange={e=>setForm(f=>({...f, code:e.target.value}))} /></div>
+              <div><label style={lbl}>Apps *</label>
+                <select className="input" value={form.app} onChange={e=>setForm(f=>({...f, app:e.target.value}))}>
+                  <option value="">— Pilih App —</option>
+                  {['iVendor','iPRO','PAL','KIMs','Others'].map(a=><option key={a} value={a}>{a}</option>)}
+                </select></div>
+              <div><label style={lbl}>Urgensi</label>
+                <select className="input" value={form.urgency} onChange={e=>setForm(f=>({...f, urgency:e.target.value}))}>
+                  <option value="">— Pilih —</option>
+                  {['SI','Non SI','Others'].map(u=><option key={u} value={u}>{u}</option>)}
+                </select></div>
               <div><label style={lbl}>Title *</label><input className="input" value={form.title} onChange={e=>setForm(f=>({...f, title:e.target.value}))} /></div>
               <div><label style={lbl}>Tahun</label><input type="number" className="input" value={form.year} onChange={e=>setForm(f=>({...f, year:Number(e.target.value)}))} /></div>
+              <div style={{ gridColumn:'1/-1' }}>
+                <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, cursor:'pointer' }}>
+                  <input type="checkbox" checked={form.hiddenGuest} onChange={e=>setForm(f=>({...f, hiddenGuest:e.target.checked}))} />
+                  <span>🙈 Sembunyikan dari tampilan Guest/Eksternal (internal tetap tampil)</span>
+                </label>
+              </div>
             </div>
             <div style={{ display:'flex', gap:14, marginBottom:10, alignItems:'center', justifyContent:'center' }}>
               <ProgressRing plan={calc.planProgress} actual={calc.actualProgress} />
@@ -281,6 +299,8 @@ export default function ProgressPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
+  const [filterApp, setFilterApp] = useState('all')
+  const [filterUrgency, setFilterUrgency] = useState('all')
   const exportRef = useRef<HTMLDivElement>(null)
 
   async function load() {
@@ -290,26 +310,49 @@ export default function ProgressPage() {
   }
   useEffect(() => { load() }, [])
 
+  // Guest: sembunyikan yg hiddenGuest. Lalu filter app + urgency.
+  const visibleInitiatives = initiatives
+    .filter(i => isInternal || !i.hiddenGuest)
+    .filter(i => filterApp === 'all' || i.app === filterApp)
+    .filter(i => filterUrgency === 'all' || i.urgency === filterUrgency)
+
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       {(showForm||editing) && <InitiativeForm editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} members={members} />}
 
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', flexShrink:0 }}>
-        <div>
-          <div style={{ fontSize:14, fontWeight:600 }}>Progress Initiatives</div>
-          <div style={{ fontSize:11, color:'var(--text3)' }}>{initiatives.length} initiative · Detail per phase (week-level){isInternal ? ' · klik card untuk edit' : ''}</div>
+      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, flexWrap:'wrap' }}>
+          <div>
+            <div style={{ fontSize:14, fontWeight:600 }}>Progress Initiatives</div>
+            <div style={{ fontSize:11, color:'var(--text3)' }}>{visibleInitiatives.length} initiative · Detail per phase (week-level){isInternal ? ' · klik card untuk edit' : ''}</div>
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <ExportMenu getNodes={() => exportRef.current ? Array.from(exportRef.current.querySelectorAll<HTMLElement>('[data-export-card]')) : []} filename="progress-initiatives" title="Progress Initiative — WorkPulse" />
+            {isInternal && <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Initiative Baru</button>}
+          </div>
         </div>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <ExportMenu getNodes={() => exportRef.current ? Array.from(exportRef.current.querySelectorAll<HTMLElement>('[data-export-card]')) : []} filename="progress-initiatives" title="Progress Initiative — WinS" />
-          {isInternal && <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Initiative Baru</button>}
+        {/* Filter view: Apps + Urgensi */}
+        <div style={{ display:'flex', gap:14, marginTop:10, flexWrap:'wrap' }}>
+          <div style={{ display:'flex', gap:5, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase' }}>App:</span>
+            {['all','iVendor','iPRO','PAL','KIMs','Others'].map(a=>(
+              <button key={a} onClick={()=>setFilterApp(a)} className="btn btn-sm" style={{ fontSize:10.5, padding:'3px 10px', background:filterApp===a?'var(--brand-soft)':'var(--bg3)', color:filterApp===a?'var(--brand)':'var(--text2)', borderColor:filterApp===a?'var(--brand)':'var(--border)' }}>{a==='all'?'Semua':a}</button>
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:5, alignItems:'center', flexWrap:'wrap' }}>
+            <span style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase' }}>Urgensi:</span>
+            {['all','SI','Non SI','Others'].map(u=>(
+              <button key={u} onClick={()=>setFilterUrgency(u)} className="btn btn-sm" style={{ fontSize:10.5, padding:'3px 10px', background:filterUrgency===u?'#f59e0b22':'var(--bg3)', color:filterUrgency===u?'#f59e0b':'var(--text2)', borderColor:filterUrgency===u?'#f59e0b':'var(--border)' }}>{u==='all'?'Semua':u}</button>
+            ))}
+          </div>
         </div>
       </div>
 
       <div ref={exportRef} style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
-         initiatives.length === 0 ? <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>{isInternal ? <>Belum ada initiative · klik <b>+ Initiative Baru</b></> : 'Belum ada initiative'}</div> : (
+         visibleInitiatives.length === 0 ? <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>{isInternal ? <>Belum ada initiative · klik <b>+ Initiative Baru</b></> : 'Belum ada initiative'}</div> : (
           <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-            {initiatives.map(i => {
+            {visibleInitiatives.map(i => {
               const calc = calcInitiativeProgress(i.phases || [], i.year)
               return (
                 <div key={i._id} data-export-card className="card" style={{ padding:16 }}>
@@ -318,7 +361,12 @@ export default function ProgressPage() {
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
                         <div>
-                          <div style={{ fontSize:9, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.05em' }}>{i.code} · {i.year}</div>
+                          <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', marginBottom:3 }}>
+                            {i.app && <span className="badge" style={{ fontSize:9, background:'var(--brand-soft)', color:'var(--brand)', fontWeight:700 }}>{i.app}</span>}
+                            {i.urgency && <span className="badge" style={{ fontSize:9, background:'#f59e0b22', color:'#f59e0b', fontWeight:700 }}>{i.urgency}</span>}
+                            {isInternal && i.hiddenGuest && <span className="badge" style={{ fontSize:9, background:'var(--bg3)', color:'var(--text3)' }} title="Disembunyikan dari guest">🙈 Hidden</span>}
+                            <span style={{ fontSize:9, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.05em' }}>{i.year}</span>
+                          </div>
                           <div style={{ fontSize:15, fontWeight:700 }}>{i.title}</div>
                           {picArray(i.pic).length > 0 && <div style={{ fontSize:10, color:'var(--text3)', marginTop:2 }}>👤 {picArray(i.pic).join(', ')}</div>}
                         </div>
