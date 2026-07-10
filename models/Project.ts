@@ -17,6 +17,7 @@ const ProjectSchema = new Schema({
   actionDateEnd: String,    // optional end date for multi-day activities
   recurrence: String,       // '', 'weekly', 'biweekly', 'monthly'
   recurrenceGroupId: String, // links generated recurring instances together
+  showInList: { type: Boolean, default: true }, // false = sembunyi dari list Activities (tetap muncul di Calendar)
   // NEW: Progress narrative (point2 / bullet)
   progressNotes: String,
   // NEW: Next Plan narrative

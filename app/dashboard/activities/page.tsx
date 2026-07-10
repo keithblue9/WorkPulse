@@ -59,6 +59,7 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
     actionDateEnd: editing?.actionDateEnd || '',
     recurrence: editing?.recurrence || '',
     recurrenceEnd: '',
+    recurrenceShowAll: false, // default: hanya occurrence pertama yg muncul di list
     targetWeek: editing?.targetWeek || '',
     progressNotes: editing?.progressNotes || '',
     nextPlan: editing?.nextPlan || '',
@@ -107,9 +108,13 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
       const dates = form.recurrence ? buildRecurrenceDates(form.actionDate, form.recurrence, form.recurrenceEnd) : [form.actionDate]
       const groupId = form.recurrence ? `rec_${Date.now()}_${Math.random().toString(36).slice(2,8)}` : ''
       let ok = 0
-      for (const d of dates) {
+      for (let i = 0; i < dates.length; i++) {
+        const d = dates[i]
+        // Untuk aktivitas berulang: default hanya occurrence PERTAMA yg tampil di list (biar list ga penuh).
+        // Semua occurrence tetap tersimpan -> muncul di Calendar. Bisa di-override "tampilkan semua".
+        const showInList = form.recurrence ? (form.recurrenceShowAll || i === 0) : true
         const r = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ ...form, actionDate: d, actionDateEnd:'', recurrenceGroupId: groupId, picName: form.pic[0] || '', members: form.pic }) })
+          body: JSON.stringify({ ...form, actionDate: d, actionDateEnd:'', recurrenceGroupId: groupId, showInList, picName: form.pic[0] || '', members: form.pic }) })
         if (r.ok) ok++
       }
       if (ok === 0) { toast.error('Gagal membuat aktivitas'); return }
@@ -181,6 +186,14 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
                 <input type="date" className="input" value={form.recurrenceEnd} min={form.actionDate||undefined} onChange={e=>set('recurrenceEnd', e.target.value)} disabled={!form.recurrence} />
                 <div style={{ fontSize:9, color:'var(--text3)', marginTop:3 }}>Agenda otomatis muncul di kalender tiap pengulangan</div></div>
             </div>
+          )}
+          {form.recurrence && (
+            <label style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'9px 11px', background:'var(--bg3)', borderRadius:8, cursor:'pointer', fontSize:11.5 }}>
+              <input type="checkbox" checked={form.recurrenceShowAll} onChange={e=>set('recurrenceShowAll', e.target.checked)} style={{ marginTop:1, cursor:'pointer' }} />
+              <span style={{ color:'var(--text2)' }}>Tampilkan <b>semua pengulangan</b> di list Activities.
+                <span style={{ display:'block', fontSize:10, color:'var(--text3)', marginTop:1 }}>Default: hanya agenda pertama yg muncul di list biar rapi — sisanya tetap tampil di <b>Calendar</b>.</span>
+              </span>
+            </label>
           )}
           <div><label style={lbl}>PIC (multi tag)</label>
             <PicTagInput value={form.pic} onChange={v=>set('pic', v)} members={members} /></div>
@@ -267,6 +280,7 @@ export default function ActivitiesPage() {
   statuses.forEach((s:any,i:number)=>{ statusOrder[s.key]=i })
 
   const filtered = activities.filter(a => {
+    if (a.showInList === false) return false // occurrence berulang yg disembunyikan (tetap di Calendar)
     if (search && !a.title.toLowerCase().includes(search.toLowerCase())) return false
     if (filterCat !== 'All' && normKey(a.category) !== normKey(filterCat) && normKey(a.subType) !== normKey(filterCat)) return false
     if (filterSub && normKey(a.subType) !== normKey(filterSub)) return false
@@ -286,7 +300,7 @@ export default function ActivitiesPage() {
       <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
         <div>
           <div style={{ fontSize:14, fontWeight:600 }}>Activities</div>
-          <div style={{ fontSize:11, color:'var(--text3)' }}>Trigger Issues & Calendar · {activities.length} total</div>
+          <div style={{ fontSize:11, color:'var(--text3)' }}>Trigger Issues &amp; Calendar · {filtered.length} tampil{activities.length>filtered.length ? ` · ${activities.length-filtered.length} agenda rutin disembunyikan (cek Calendar)` : ''}</div>
         </div>
         <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Aktivitas Baru</button>
       </div>
@@ -330,6 +344,7 @@ export default function ActivitiesPage() {
                        <div style={{ display:'flex', flexWrap:'wrap', gap:5, alignItems:'center', marginBottom:5 }}>
                          <span style={{ fontSize:13, fontWeight:600 }}>{a.title}</span>
                          {statusDef && <span className="badge" style={{ background:statusDef.color+'22', color:statusDef.color, fontSize:10, fontWeight:700 }}>{statusDef.label}</span>}
+                         {a.recurrenceGroupId && <span className="badge" style={{ background:'#8b5cf622', color:'#8b5cf6', fontSize:10, fontWeight:700 }} title="Agenda berulang — pengulangan lain ada di Calendar">🔁 Rutin</span>}
                          <span className="badge" style={{ background:catColor+'22', color:catColor, fontSize:10 }}>{a.category}</span>
                          <span className="badge" style={{ background:subColor+'22', color:subColor, fontSize:10 }}>{a.subType}</span>
                          {a.priority && <span className="badge" style={{ background:PRIORITY_CFG[a.priority]?.bg, color:PRIORITY_CFG[a.priority]?.color, fontSize:10 }}>{PRIORITY_CFG[a.priority]?.label}</span>}
