@@ -10,12 +10,12 @@ import BirthdayPopup from '@/components/BirthdayPopup'
 import OnlinePresence from '@/components/OnlinePresence'
 import DailyCheckin from '@/components/DailyCheckin'
 import NotifyEnabler from '@/components/NotifyEnabler'
+import InstallPWA from '@/components/InstallPWA'
 
 // Menu definitions with permission keys (matches config.roleDefs[].allowedMenus)
 const NAV_GROUPS = [
   { key:'dashboard', label:'Dashboard & Overview', items:[
     { href:'/dashboard',          label:'Dashboard',    permKey:'dashboard' },
-    { href:'/dashboard/progress', label:'Progress Project', permKey:'progress' },
   ]},
   { key:'activities', label:'Activities', items:[
     { href:'/dashboard/activities', label:'Activities',  permKey:'activities' },
@@ -250,7 +250,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <AppPopups />
         <BirthdayPopup />
         <DailyCheckin />
-        <NotifyEnabler />
+        {userRoles.some((r:string)=>r!=='guest') ? <NotifyEnabler /> : <InstallPWA />}
       </div>
     </div>
   )

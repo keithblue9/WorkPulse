@@ -174,6 +174,8 @@ export default function DashboardPage() {
   // Guest/external users (only 'guest' role, no internal role) get a reduced dashboard
   const userRoles: string[] = (user?.roles && user.roles.length) ? user.roles : (user?.role ? [user.role] : ['guest'])
   const isInternal = userRoles.some((r:string) => r !== 'guest')
+  // Guest ga lihat initiative yg hiddenGuest
+  const visibleInitiatives = useMemo(() => initiatives.filter((i:any)=> isInternal || !i.hiddenGuest), [initiatives, isInternal])
 
   async function load() {
     setLoading(true)
@@ -301,7 +303,7 @@ export default function DashboardPage() {
       completed: { label:'Completed', color:'var(--brand)' },
     }
     const counts: Record<string, number> = {}
-    initiatives.forEach((i:any) => {
+    visibleInitiatives.forEach((i:any) => {
       const k = i.status || 'on_track'
       counts[k] = (counts[k] || 0) + 1
     })
@@ -311,7 +313,7 @@ export default function DashboardPage() {
       value: counts[k] || 0,
       color: STATUS_META[k].color,
     })).filter(d => d.value > 0)
-  }, [initiatives])
+  }, [visibleInitiatives])
 
   // Issue distribution by status — only counts VISIBLE issues (aligned with what's shown)
   const issueDist = useMemo(() => {
@@ -466,7 +468,7 @@ export default function DashboardPage() {
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, gap:10, flexWrap:'wrap' }}>
                   <div>
                     <div style={{ fontSize:13, fontWeight:600 }}>Progress Initiatives</div>
-                    <div style={{ fontSize:11, color:'var(--text3)' }}>{initiatives.length} initiative{isInternal ? ' · klik card untuk edit/update' : ''}</div>
+                    <div style={{ fontSize:11, color:'var(--text3)' }}>{visibleInitiatives.length} initiative{isInternal ? ' · klik card untuk edit/update' : ''}</div>
                   </div>
                   {isInternal && (
                     <Link href="/dashboard/progress" style={{ textDecoration:'none' }}>
@@ -474,7 +476,7 @@ export default function DashboardPage() {
                     </Link>
                   )}
                 </div>
-                {initiatives.length === 0 ? (
+                {visibleInitiatives.length === 0 ? (
                   <Link href="/dashboard/progress" style={{ textDecoration:'none' }}>
                     <div className="card glass-hover" style={{ padding:30, textAlign:'center', color:'var(--text3)', cursor:'pointer' }}>
                       <div style={{ fontSize:28, marginBottom:8 }}>📈</div>
@@ -484,7 +486,7 @@ export default function DashboardPage() {
                   </Link>
                 ) : (
                   <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                    {initiatives.map(i => {
+                    {visibleInitiatives.map(i => {
                       const calc = calcInitiativeProgress(i.phases || [], i.year)
                       return (
                         <div key={i._id} className="card glass-hover" style={{ padding:16, cursor:'pointer' }} onClick={()=>{ window.location.href='/dashboard/progress' }}>
