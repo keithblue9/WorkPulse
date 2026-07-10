@@ -451,9 +451,9 @@ export default function DashboardPage() {
                     ),
                   }
                   return (
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:14 }}>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:14, alignItems:'stretch' }}>
                       {mainOrder.filter((w:any)=> isInternal ? w.active!==false : (w.active!==false && w.activeGuest!==false)).map((w:any)=>{ const node=blocks[w.key]; if(!node) return null; const isHalf=(isInternal ? w.size : (w.sizeGuest||w.size))==='half'; return (
-                        <div key={w.key} style={{ flex: isHalf?'1 1 calc(50% - 7px)':'1 1 100%', minWidth: isHalf?320:'100%', maxWidth:'100%' }}>{node}</div>
+                        <div key={w.key} style={{ flex: isHalf?'1 1 calc(50% - 7px)':'1 1 100%', minWidth: isHalf?320:'100%', maxWidth:'100%', display:'flex' }}>{node}</div>
                       ) })}
                     </div>
                   )

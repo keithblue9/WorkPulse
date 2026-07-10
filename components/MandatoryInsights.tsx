@@ -94,7 +94,7 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
   const cards = section ? allCards.filter(c => c.key === section) : allCards
 
   return (
-    <div className="card" style={{ padding: 16 }}>
+    <div className="card" style={{ padding: 16, width: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 13, fontWeight: 700 }}>{section ? cards[0]?.title || 'Mandatory' : `📋 Mandatory ${year}`}</div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -114,7 +114,7 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
           {cards.map(c => (
             <div key={c.key} onClick={() => setDetail({ title: c.title, rows: c.data.rows, okLabel: c.okLabel, noLabel: c.noLabel })}
-              className="card" style={{ padding: 14, cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12, transition: 'box-shadow .15s', border: '1px solid var(--border)' }}
+              className="card" style={{ padding: 14, cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12, transition: 'box-shadow .15s', border: '1px solid var(--border)', minHeight: 132 }}
               onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.10)')} onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}>
               <Ring pct={c.data.pct} color={c.color} />
               <div style={{ flex: 1, minWidth: 0 }}>

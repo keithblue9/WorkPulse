@@ -147,7 +147,7 @@ export default function TeamAvailability() {
   const donutNonZero = stats.donutData.filter((d: any) => d.value > 0)
 
   return (
-    <div className="card" style={{ padding: 16 }}>
+    <div className="card" style={{ padding: 16, width: "100%" }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700 }}>👥 Team Availability</div>

@@ -30,7 +30,7 @@ export default function GoLiveInsights() {
   }), [apps, entities])
 
   return (
-    <div className="card" style={{ padding: 16 }}>
+    <div className="card" style={{ padding: 16, width: "100%" }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700 }}>🚀 Go-Live per Aplikasi</div>

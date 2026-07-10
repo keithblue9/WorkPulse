@@ -21,7 +21,7 @@ const catName = (k: string) => k === 'travel' ? 'Travel Expense' : k === 'accomm
 
 function CardBox({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
-    <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column' }}>
+    <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', width: '100%' }}>
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 700 }}>{title}</div>
         {sub && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{sub}</div>}
