@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
+import { cachedFetch } from '@/lib/fetchCache'
 
 type Detail = { title: string; rows: { name: string; sub?: string; ok: boolean; extra?: string }[]; okLabel: string; noLabel: string }
 
@@ -30,8 +31,8 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
     (async () => {
       setLoading(true)
       const [u, m] = await Promise.all([
-        fetch('/api/users').then(r => r.json()).catch(() => ({ data: [] })),
-        fetch(`/api/mandatory?year=${year}`).then(r => r.json()).catch(() => ({ data: [] })),
+        cachedFetch('/api/users').catch(() => ({ data: [] })),
+        cachedFetch(`/api/mandatory?year=${year}`).catch(() => ({ data: [] })),
       ])
       setUsers((u.data || []).filter((x: any) => x.active !== false && !(x.roles || []).includes('guest')).sort((a: any, b: any) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)))
       const map: Record<string, any> = {}; for (const r of (m.data || [])) map[r.userId] = r

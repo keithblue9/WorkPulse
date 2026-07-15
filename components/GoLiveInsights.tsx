@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { cachedFetch } from '@/lib/fetchCache'
 
 export default function GoLiveInsights() {
   const [apps, setApps] = useState<any[]>([])
@@ -9,8 +10,8 @@ export default function GoLiveInsights() {
   const [detail, setDetail] = useState<{app:any; done:any[]; notDone:any[]; color:string}|null>(null)
 
   useEffect(() => {
-    fetch('/api/golive').then(r => r.json())
-      .then(d => { setApps(d.apps || []); setEntities(d.entities || []) })
+    cachedFetch('/api/golive')
+      .then((d: any) => { setApps(d.apps || []); setEntities(d.entities || []) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])

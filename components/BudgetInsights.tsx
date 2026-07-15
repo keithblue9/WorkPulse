@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
+import { cachedFetch } from '@/lib/fetchCache'
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell,
@@ -49,12 +50,14 @@ export default function BudgetInsights({ section }: { section?: 'yield' | 'realp
   const [thr, setThr] = useState({ travel: 80, accommodation: 80 })
   const [loading, setLoading] = useState(true)
 
+  // cachedFetch: komponen ini dirender s/d 4x (yield/realpct/prognosa/cashcard).
+  // Tanpa dedupe, tiap instance nembak API sama -> request duplikat & dashboard lemot.
   useEffect(() => {
     (async () => {
       try {
         const [b, c] = await Promise.all([
-          fetch('/api/budget?all=1').then(r => r.json()).catch(() => ({ data: [] })),
-          fetch('/api/config').then(r => r.json()).catch(() => ({ data: {} })),
+          cachedFetch('/api/budget?all=1').catch(() => ({ data: [] })),
+          cachedFetch('/api/config').catch(() => ({ data: {} })),
         ])
         setRows(b.data || [])
         const cats = c.data?.budgetCategories || []
@@ -70,10 +73,11 @@ export default function BudgetInsights({ section }: { section?: 'yield' | 'realp
   const [ccData, setCcData] = useState<{topup:number;settlement:number}|null>(null)
   const [ccYear, setCcYear] = useState(new Date().getFullYear())
 
-  // Fetch cash card data
+  // Data cash card cuma dibutuhkan section 'cashcard' -> instance lain ga usah fetch
   useEffect(() => {
-    fetch(`/api/cashcard/summary?year=${ccYear}`).then(r=>r.json()).then(d=>setCcData(d.data||null)).catch(()=>setCcData(null))
-  }, [ccYear])
+    if (section && section !== 'cashcard') return
+    cachedFetch(`/api/cashcard/summary?year=${ccYear}`).then(d=>setCcData(d.data||null)).catch(()=>setCcData(null))
+  }, [ccYear, section])
 
   const { trend, realPctData, budgetBars, catColors, legendCats, hasData } = useMemo(() => {
     const byYear: Record<number, any[]> = {}

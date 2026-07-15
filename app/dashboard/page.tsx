@@ -1,5 +1,6 @@
 'use client'
 import { getConfig, invalidateConfig } from '@/lib/configCache'
+import { cachedFetch, invalidateFetch } from '@/lib/fetchCache'
 import { picArray, calcInitiativeProgress } from '@/lib/defaults'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import BudgetInsights from '@/components/BudgetInsights'
@@ -181,12 +182,12 @@ export default function DashboardPage() {
     setLoading(true)
     const ym = new Date().toISOString().slice(0,7)
     const [a, init, iss, m, c, att] = await Promise.all([
-      fetch('/api/projects').then(r=>r.json()),
-      fetch('/api/initiatives').then(r=>r.json()),
-      fetch('/api/issues').then(r=>r.json()),
-      fetch('/api/users').then(r=>r.json()),
+      cachedFetch('/api/projects'),
+      cachedFetch('/api/initiatives'),
+      cachedFetch('/api/issues'),
+      cachedFetch('/api/users'),
       getConfig(true).then((data:any)=>({ data })),
-      fetch(`/api/attendance?month=${ym}`).then(r=>r.json()).catch(()=>({data:[]})),
+      cachedFetch(`/api/attendance?month=${ym}`).catch(()=>({data:[]})),
     ])
     setActivities(a.data||[]); setInitiatives(init.data||[]); setIssues(iss.data||[]); setMembers(m.data||[]); setConfig(c.data); setAttendance(att.data||[]); setLoading(false)
   }
@@ -288,6 +289,7 @@ export default function DashboardPage() {
     try {
       const r = await fetch(`/api/projects/${a._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ hidden: next }) })
       if (!r.ok) throw new Error('failed')
+      invalidateFetch('/api/projects')
     } catch {
       setActivities(prev => prev.map((x:any)=> x._id===a._id ? { ...x, hidden: !next } : x)) // rollback on error
     }

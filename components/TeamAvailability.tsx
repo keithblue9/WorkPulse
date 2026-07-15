@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts'
 import { getConfig } from '@/lib/configCache'
+import { cachedFetch } from '@/lib/fetchCache'
 
 // Prioritas kategori per hari (kalau 1 hari multiple slot): WFO > Dinas > Izin > WFH > Cuti > Sakit
 const PRIORITY = ['wfo', 'dinas', 'izin', 'wfh', 'cuti', 'sakit']
@@ -51,9 +52,9 @@ export default function TeamAvailability() {
       if (scope === 'week') { start = mondayOfWeek(now); end = now }
       else { start = new Date(ym, mm - 1, 1); end = isCurrentMonth ? now : new Date(ym, mm, 0) }
       const [ov, cfg, usersR] = await Promise.all([
-        fetch(`/api/attendance/overview?from=${fmtD(start)}&to=${fmtD(end)}`).then(r => r.json()).catch(() => ({ data: [] })),
+        cachedFetch(`/api/attendance/overview?from=${fmtD(start)}&to=${fmtD(end)}`).catch(() => ({ data: [] })),
         getConfig().catch(() => null),
-        fetch('/api/users').then(r => r.json()).catch(() => ({ data: [] })),
+        cachedFetch('/api/users').catch(() => ({ data: [] })),
       ])
       setDocs(ov.data || [])
       setTypes((cfg?.attendanceTypes || []).filter((t: any) => t.active !== false))
