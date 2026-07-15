@@ -9,10 +9,29 @@ const CostItemSchema = new Schema({
   price: { type:Number, default:0 },     // harga per unit
 }, { _id:false })
 
+// Satu OPSI usulan (tim biasanya ajukan >1 opsi ke manager utk dibandingkan:
+// venue/kota/EO/item/biaya bisa beda tiap opsi).
+const EventOptionSchema = new Schema({
+  label: { type:String, default:'' },     // "Opsi 1" / nama bebas
+  namaEO: String,
+  kontakEO: String,
+  kota: String,
+  venue: String,
+  mrPax: { type:Number, default:0 }, mrDays: { type:Number, default:0 }, mrPrice: { type:Number, default:0 },
+  brRooms: { type:Number, default:0 }, brNights: { type:Number, default:0 }, brPrice: { type:Number, default:0 },
+  others: { type:[CostItemSchema], default:[] },
+  catatan: String,
+  estimasiBiaya: { type:Number, default:0 },   // snapshot subtotal opsi ini (sebelum fee)
+}, { _id:false })
+
 const ThirdPartyEventSchema = new Schema({
   kind: { type:String, enum:['rencana','realisasi'], required:true },
   year: { type:Number, required:true },
   month: { type:Number, required:true },  // 1-12 (untuk filter)
+
+  // ---------- Multi-opsi usulan (baru) ----------
+  options: { type:[EventOptionSchema], default:[] },
+  recommendedIndex: { type:Number, default:0 },   // opsi yang direkomendasikan tim
 
   // ---------- Rencana (slide 7) ----------
   namaEO: String,                 // PTC/Kinanti/MTT/Others — free text
