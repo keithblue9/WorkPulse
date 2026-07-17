@@ -7,9 +7,35 @@ import { cachedFetch } from '@/lib/fetchCache'
 // Prioritas kategori per hari (kalau 1 hari multiple slot): WFO > Dinas > Izin > WFH > Cuti > Sakit
 const PRIORITY = ['wfo', 'dinas', 'izin', 'wfh', 'cuti', 'sakit']
 const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
+const HARI = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu']
 
 function fmtD(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 function mondayOfWeek(d: Date) { const r = new Date(d); const wd = (r.getDay() + 6) % 7; r.setDate(r.getDate() - wd); return r }
+// Parse 'YYYY-MM-DD' sbg tanggal LOKAL (hindari geser hari gara2 UTC)
+function parseLocal(s: string) { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, (m || 1) - 1, d || 1) }
+function dayNameOf(dateStr: string) { const d = parseLocal(dateStr); return isNaN(d.getTime()) ? '' : HARI[d.getDay()] }
+function fmtShort(d: Date) { return `${d.getDate()} ${BULAN[d.getMonth()].slice(0, 3)}` }
+
+// Minggu (Senin–Minggu) dalam 1 bulan, dipotong di batas bulan.
+// Mis. Juli 2026: Minggu 1 = 1–5 Jul, Minggu 2 = 6–12 Jul, dst.
+function weeksOfMonth(y: number, m: number) {
+  const first = new Date(y, m - 1, 1)
+  const last = new Date(y, m, 0)
+  const out: { start: Date; end: Date; no: number }[] = []
+  const cur = mondayOfWeek(first)
+  let no = 1, guard = 0
+  while (cur <= last && guard < 10) {
+    guard++
+    const wEnd = new Date(cur); wEnd.setDate(wEnd.getDate() + 6)
+    out.push({
+      start: cur < first ? new Date(first) : new Date(cur),
+      end: wEnd > last ? new Date(last) : new Date(wEnd),
+      no: no++,
+    })
+    cur.setDate(cur.getDate() + 7)
+  }
+  return out
+}
 
 // Nama depan; khusus Dwi Bagus -> "D. Bagus"
 function shortName(full: string) {
@@ -38,19 +64,53 @@ export default function TeamAvailability() {
   const isCurrentMonth = viewMonth === `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
   const memberCount = members.length
 
+  // ── Navigasi minggu dalam bulan terpilih ──
+  const [my, mm0] = viewMonth.split('-').map(Number)
+  const weekList = useMemo(() => weeksOfMonth(my, mm0), [my, mm0])
+  const [viewWeek, setViewWeek] = useState(0)
+  const wIdx = Math.min(Math.max(viewWeek, 0), Math.max(0, weekList.length - 1))
+  const curWeek = weekList[wIdx]
+  // Index minggu yg memuat hari ini (dipakai saat switch ke mode Minggu)
+  const weekIdxOfToday = (y: number, m: number) => {
+    const ws = weeksOfMonth(y, m)
+    const i = ws.findIndex(w => now >= w.start && now <= new Date(w.end.getFullYear(), w.end.getMonth(), w.end.getDate(), 23, 59, 59))
+    return i < 0 ? 0 : i
+  }
+  // Jangan bisa geser ke minggu yg belum datang
+  const nextWeekDisabled = scope === 'week' && !!curWeek && (() => {
+    const next = weekList[wIdx + 1]
+    if (next) return next.start > now
+    const d = new Date(my, mm0, 1)  // minggu 1 bulan depan
+    return d > now
+  })()
+
   function shiftMonth(dir: -1|1) {
-    const [y, m] = viewMonth.split('-').map(Number)
-    const d = new Date(y, m - 1 + dir, 1)
+    const d = new Date(my, mm0 - 1 + dir, 1)
     setViewMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)
+    setViewWeek(0)
+  }
+  function shiftWeek(dir: -1|1) {
+    const ni = wIdx + dir
+    if (ni >= 0 && ni < weekList.length) { setViewWeek(ni); return }
+    // lompat bulan: mundur -> minggu terakhir bulan sebelumnya; maju -> minggu pertama bulan berikutnya
+    const d = new Date(my, mm0 - 1 + dir, 1)
+    const nw = weeksOfMonth(d.getFullYear(), d.getMonth() + 1)
+    setViewMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)
+    setViewWeek(dir < 0 ? Math.max(0, nw.length - 1) : 0)
   }
 
   useEffect(() => {
     (async () => {
       setLoading(true)
-      const [ym, mm] = viewMonth.split('-').map(Number)
       let start: Date, end: Date
-      if (scope === 'week') { start = mondayOfWeek(now); end = now }
-      else { start = new Date(ym, mm - 1, 1); end = isCurrentMonth ? now : new Date(ym, mm, 0) }
+      if (scope === 'week') {
+        const w = weekList[Math.min(Math.max(viewWeek, 0), Math.max(0, weekList.length - 1))]
+        if (!w) { setLoading(false); return }
+        start = w.start; end = w.end
+      } else {
+        start = new Date(my, mm0 - 1, 1)
+        end = isCurrentMonth ? now : new Date(my, mm0, 0)
+      }
       const [ov, cfg, usersR] = await Promise.all([
         cachedFetch(`/api/attendance/overview?from=${fmtD(start)}&to=${fmtD(end)}`).catch(() => ({ data: [] })),
         getConfig().catch(() => null),
@@ -62,7 +122,7 @@ export default function TeamAvailability() {
       setLoading(false)
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, viewMonth])
+  }, [scope, viewMonth, viewWeek])
 
   const colorOf = (key: string) => (types.find((t: any) => t.key === key)?.textColor) || '#9aa6b3'
   const labelOf = (key: string) => (types.find((t: any) => t.key === key)?.label) || key
@@ -81,26 +141,28 @@ export default function TeamAvailability() {
       ;(byMemberDate[uid][date] = (byMemberDate[uid][date] || [])).push(...types0)
     }
 
-    // per member: hitung hari per kategori (setelah prioritas)
-    const perMember: Record<string, { days: Record<string, number>, total: number, wfo: number }> = {}
+    // per member: hitung hari per kategori (setelah prioritas) + catat tanggal WFO-nya
+    const perMember: Record<string, { days: Record<string, number>, total: number, wfo: number, wfoDates: string[] }> = {}
     for (const [uid, dates] of Object.entries(byMemberDate)) {
       const days: Record<string, number> = {}
+      const wfoDates: string[] = []
       let total = 0, wfo = 0
-      for (const [, slotTypes] of Object.entries(dates)) {
+      for (const [date, slotTypes] of Object.entries(dates)) {
         const cat = pickDayCategory(slotTypes)
         if (!cat) continue
         days[cat] = (days[cat] || 0) + 1
         total++
-        if (cat === 'wfo') wfo++
+        if (cat === 'wfo') { wfo++; wfoDates.push(date) }
       }
-      perMember[uid] = { days, total, wfo }
+      wfoDates.sort()
+      perMember[uid] = { days, total, wfo, wfoDates }
     }
 
     // map ke member objek (match by _id atau email)
     const memberRows = members.map(m => {
-      const rec = perMember[m._id] || perMember[m.email] || { days: {}, total: 0, wfo: 0 }
+      const rec = perMember[m._id] || perMember[m.email] || { days: {}, total: 0, wfo: 0, wfoDates: [] }
       const pct = rec.total > 0 ? Math.round(rec.wfo / rec.total * 100) : 0
-      return { id: m._id, name: shortName(m.name), fullName: m.name, status: (m.status || 'pekerja'), division: m.division, ...rec, pct }
+      return { id: m._id, name: shortName(m.name), fullName: m.name, status: (m.status || 'pekerja'), division: m.division, sortOrder: m.sortOrder ?? 999, ...rec, pct }
     })
 
     // komposisi total (semua member) untuk donut
@@ -130,20 +192,21 @@ export default function TeamAvailability() {
     }
   }, [docs, members, types])
 
-  // WFO hari ini
-  const wfoToday = useMemo(() => {
-    const todayStr = fmtD(now)
-    const wfoIds = new Set<string>()
-    for (const doc of docs) {
-      if (doc.date !== todayStr) continue
-      for (const s of (doc.slots || [])) { if (String(s.type).toLowerCase() === 'wfo') wfoIds.add(doc.userId) }
-    }
-    return members.filter(m => wfoIds.has(m.email) || wfoIds.has(m._id)).sort((a: any, b: any) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docs, members])
+  // Member yang WFO di periode terpilih + hari-harinya
+  const wfoList = useMemo(() => {
+    return stats.memberRows
+      .filter((r: any) => (r.wfoDates || []).length > 0)
+      .map((r: any) => ({
+        ...r,
+        // Mode Minggu -> nama hari (Senin, Selasa). Mode Bulan -> tanggal (1 Jul, 2 Jul)
+        dayLabels: (r.wfoDates || []).map((d: string) => scope === 'week' ? dayNameOf(d) : fmtShort(parseLocal(d))).filter(Boolean),
+      }))
+      .sort((a: any, b: any) => (b.wfoDates.length - a.wfoDates.length) || (a.sortOrder - b.sortOrder))
+  }, [stats.memberRows, scope])
 
-  const periodLabel = scope === 'week' ? 'minggu ini'
-    : isCurrentMonth ? `${BULAN[parseInt(viewMonth.split('-')[1])-1]} (s/d hari ini)` : BULAN[parseInt(viewMonth.split('-')[1])-1] + ' ' + viewMonth.split('-')[0]
+  const periodLabel = scope === 'week'
+    ? (curWeek ? `Minggu ${curWeek.no} ${BULAN[mm0 - 1]} (${fmtShort(curWeek.start)}–${fmtShort(curWeek.end)})` : 'minggu ini')
+    : isCurrentMonth ? `${BULAN[mm0 - 1]} (s/d hari ini)` : `${BULAN[mm0 - 1]} ${my}`
 
   const donutNonZero = stats.donutData.filter((d: any) => d.value > 0)
 
@@ -154,17 +217,29 @@ export default function TeamAvailability() {
           <div style={{ fontSize: 13, fontWeight: 700 }}>👥 Team Availability</div>
           <div style={{ fontSize: 11, color: 'var(--text3)' }}>% WFO dari hari terisi · {periodLabel} · {memberCount} member</div>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {scope === 'month' && (
-            <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-              <button onClick={() => shiftMonth(-1)} className="btn btn-sm" style={{ padding: '3px 8px' }}>◀</button>
-              <span style={{ fontSize: 11, fontWeight: 600, minWidth: 70, textAlign: 'center' }}>{BULAN[parseInt(viewMonth.split('-')[1]) - 1].slice(0, 3)} {viewMonth.split('-')[0]}</span>
-              <button onClick={() => shiftMonth(1)} disabled={isCurrentMonth} className="btn btn-sm" style={{ padding: '3px 8px', opacity: isCurrentMonth ? 0.3 : 1 }}>▶</button>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Navigasi bulan (selalu ada — mode Minggu pun pilih minggu DALAM bulan ini) */}
+          <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+            <button onClick={() => shiftMonth(-1)} className="btn btn-sm" style={{ padding: '3px 8px' }}>◀</button>
+            <span style={{ fontSize: 11, fontWeight: 600, minWidth: 70, textAlign: 'center' }}>{BULAN[mm0 - 1].slice(0, 3)} {my}</span>
+            <button onClick={() => shiftMonth(1)} disabled={isCurrentMonth} className="btn btn-sm" style={{ padding: '3px 8px', opacity: isCurrentMonth ? 0.3 : 1 }}>▶</button>
+          </div>
+          {/* Navigasi minggu (hanya mode Minggu) */}
+          {scope === 'week' && curWeek && (
+            <div style={{ display: 'flex', gap: 3, alignItems: 'center', background: 'var(--bg3)', borderRadius: 8, padding: 2 }}>
+              <button onClick={() => shiftWeek(-1)} className="btn btn-sm" style={{ padding: '3px 8px' }}>‹</button>
+              <span style={{ fontSize: 11, fontWeight: 700, minWidth: 92, textAlign: 'center', color: 'var(--brand)' }} title={`${fmtShort(curWeek.start)} – ${fmtShort(curWeek.end)}`}>
+                Minggu {curWeek.no} <span style={{ fontWeight: 400, color: 'var(--text3)' }}>({curWeek.start.getDate()}–{curWeek.end.getDate()})</span>
+              </span>
+              <button onClick={() => shiftWeek(1)} disabled={nextWeekDisabled} className="btn btn-sm" style={{ padding: '3px 8px', opacity: nextWeekDisabled ? 0.3 : 1 }}>›</button>
             </div>
           )}
           <div style={{ display: 'flex', gap: 3, background: 'var(--bg3)', borderRadius: 8, padding: 3 }}>
             {(['week', 'month'] as const).map(s => (
-              <button key={s} onClick={() => { setScope(s); if (s === 'month') setViewMonth(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`) }} className="btn btn-sm" style={{ fontSize: 11, background: scope === s ? 'var(--brand)' : 'transparent', color: scope === s ? '#fff' : 'var(--text2)', border: 'none' }}>{s === 'week' ? 'Minggu' : 'Bulan'}</button>
+              <button key={s} onClick={() => {
+                setScope(s)
+                if (s === 'week') setViewWeek(isCurrentMonth ? weekIdxOfToday(my, mm0) : 0)
+              }} className="btn btn-sm" style={{ fontSize: 11, background: scope === s ? 'var(--brand)' : 'transparent', color: scope === s ? '#fff' : 'var(--text2)', border: 'none' }}>{s === 'week' ? 'Minggu' : 'Bulan'}</button>
             ))}
           </div>
         </div>
@@ -216,21 +291,31 @@ export default function TeamAvailability() {
               )}
             </div>
 
-            {/* KANAN: WFO hari ini */}
-            <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>🏢 WFO Hari Ini</div>
-              {wfoToday.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'var(--text3)', padding: '14px 0' }}>Belum ada member WFO hari ini.</div>
+            {/* KANAN: siapa yang WFO di periode terpilih + hari-harinya */}
+            <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16, minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>
+                🏢 WFO · {scope === 'week' && curWeek ? `Minggu ${curWeek.no} ${BULAN[mm0 - 1].slice(0, 3)}` : `${BULAN[mm0 - 1].slice(0, 3)} ${my}`}
+              </div>
+              {wfoList.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--text3)', padding: '14px 0' }}>Belum ada member WFO di periode ini.</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {wfoToday.map((m: any) => (
-                    <div key={m._id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 7, background: 'var(--bg3)' }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.color || 'var(--brand)', flexShrink: 0 }} />
-                      <span style={{ fontSize: 12, fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</span>
-                      {m.division && <span style={{ fontSize: 10, color: 'var(--text3)' }}>{m.division}</span>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 210, overflowY: 'auto' }}>
+                  {wfoList.map((m: any, i: number) => (
+                    <div key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px', borderRadius: 7, background: 'var(--bg3)' }}>
+                      <span style={{ fontSize: 10, color: 'var(--text3)', minWidth: 12, textAlign: 'right', flexShrink: 0, paddingTop: 1 }}>{i + 1}.</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600 }}>{m.name}</span>
+                          {m.status === 'TAD' && <span style={{ fontSize: 8.5, color: '#f59e0b', fontWeight: 700 }}>TAD</span>}
+                          <span style={{ fontSize: 9.5, color: 'var(--text3)', marginLeft: 'auto', flexShrink: 0 }}>{m.wfoDates.length} hari</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 1, lineHeight: 1.45 }}>
+                          {m.dayLabels.join(', ')}
+                        </div>
+                      </div>
                     </div>
                   ))}
-                  <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 2 }}>{wfoToday.length} dari {memberCount} member WFO</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 2 }}>{wfoList.length} dari {memberCount} member pernah WFO</div>
                 </div>
               )}
             </div>
