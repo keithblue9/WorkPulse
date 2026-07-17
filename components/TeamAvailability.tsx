@@ -122,7 +122,11 @@ export default function TeamAvailability() {
   const colorOf = (key: string) => (types.find((t: any) => t.key === key)?.textColor) || '#9aa6b3'
   const labelOf = (key: string) => (types.find((t: any) => t.key === key)?.label) || key
 
-  // Hitung per member: 1 hari = 1 kategori (prioritas). % WFO = hari WFO / hari terisi.
+  // Hitungan berbasis MEMBER (bukan hari):
+  // - Tiap member dapat SATU kategori utama utk periode terpilih, pakai prioritas
+  //   WFO > Dinas > Izin > WFH > Cuti > Sakit. Jadi member yg pernah WFO di periode
+  //   itu dihitung sebagai WFO.
+  // - % WFO = jumlah member WFO / total member. Angka legend = jumlah MEMBER (maks = total member).
   const stats = useMemo(() => {
     // group slots by member + date
     const byMemberDate: Record<string, Record<string, string[]>> = {}
@@ -136,7 +140,7 @@ export default function TeamAvailability() {
       ;(byMemberDate[uid][date] = (byMemberDate[uid][date] || [])).push(...types0)
     }
 
-    // per member: hitung hari per kategori (setelah prioritas) + catat tanggal WFO-nya
+    // per member: kategori tiap hari (prioritas dalam 1 hari) + catat tanggal WFO
     const perMember: Record<string, { days: Record<string, number>, total: number, wfo: number, wfoDates: string[] }> = {}
     for (const [uid, dates] of Object.entries(byMemberDate)) {
       const days: Record<string, number> = {}
@@ -153,41 +157,45 @@ export default function TeamAvailability() {
       perMember[uid] = { days, total, wfo, wfoDates }
     }
 
-    // map ke member objek (match by _id atau email)
+    // map ke member objek (match by _id atau email) + kategori utama periode ini
     const memberRows = members.map(m => {
       const rec = perMember[m._id] || perMember[m.email] || { days: {}, total: 0, wfo: 0, wfoDates: [] }
-      const pct = rec.total > 0 ? Math.round(rec.wfo / rec.total * 100) : 0
-      return { id: m._id, name: shortName(m.name), fullName: m.name, status: (m.status || 'pekerja'), division: m.division, sortOrder: m.sortOrder ?? 999, ...rec, pct }
+      const pct = rec.total > 0 ? Math.round(rec.wfo / rec.total * 100) : 0   // % WFO member ini (dipakai di popup detail)
+      const mainCat = rec.total > 0 ? pickDayCategory(Object.keys(rec.days)) : ''  // prioritas antar hari
+      return { id: m._id, name: shortName(m.name), fullName: m.name, status: (m.status || 'pekerja'), division: m.division, sortOrder: m.sortOrder ?? 999, ...rec, pct, mainCat }
     })
 
-    // komposisi total (semua member) untuk donut
-    const catTotals: Record<string, number> = {}
+    // Komposisi donut = jumlah MEMBER per kategori (tiap member dihitung 1x) + yg belum presensi.
+    // Total selalu = jumlah member.
+    const catCount: Record<string, number> = {}
     let grandTotal = 0, grandWfo = 0
     for (const r of memberRows) {
-      for (const [cat, n] of Object.entries(r.days)) { catTotals[cat] = (catTotals[cat] || 0) + n }
-      grandTotal += r.total; grandWfo += r.wfo
+      if (r.mainCat) catCount[r.mainCat] = (catCount[r.mainCat] || 0) + 1
+      grandTotal += r.total; grandWfo += r.wfo   // info hari (dipakai di popup)
     }
-    const teamPct = grandTotal > 0 ? Math.round(grandWfo / grandTotal * 100) : 0
+    const noData = memberRows.filter(r => r.total === 0).length
+    const wfoMembers = memberRows.filter(r => r.wfo > 0).length
+    const teamPct = memberCount > 0 ? Math.round(wfoMembers / memberCount * 100) : 0
 
-    // per status
+    // % per status = member WFO / total member di status itu
     const calcStatus = (st: string) => {
       const rows = memberRows.filter(r => (st === 'TAD' ? r.status === 'TAD' : r.status !== 'TAD'))
-      const t = rows.reduce((s, r) => s + r.total, 0)
-      const w = rows.reduce((s, r) => s + r.wfo, 0)
-      return t > 0 ? Math.round(w / t * 100) : 0
+      if (!rows.length) return 0
+      return Math.round(rows.filter(r => r.wfo > 0).length / rows.length * 100)
     }
 
-    // donut data: semua kategori (termasuk 0 di legend)
-    const donutData = types.map((t: any) => ({ name: t.label, key: t.key, value: catTotals[t.key] || 0, color: t.textColor || '#4f8ef7' }))
+    // donut data: semua kategori (termasuk 0 di legend) + bucket belum presensi
+    const donutData = types.map((t: any) => ({ name: t.label, key: t.key, value: catCount[t.key] || 0, color: t.textColor || '#4f8ef7' }))
+    if (noData > 0) donutData.push({ name: 'Belum presensi', key: '__none', value: noData, color: '#9aa6b3' })
 
     return {
       memberRows: memberRows.sort((a, b) => b.pct - a.pct),
       // Member yang sama sekali belum isi presensi di periode ini
       notFilled: memberRows.filter((r: any) => r.total === 0).sort((a: any, b: any) => a.sortOrder - b.sortOrder),
-      donutData, teamPct, grandTotal, grandWfo,
+      donutData, teamPct, grandTotal, grandWfo, wfoMembers,
       pctPekerja: calcStatus('pekerja'), pctTAD: calcStatus('TAD'),
     }
-  }, [docs, members, types])
+  }, [docs, members, types, memberCount])
 
   // Member yang WFO di periode terpilih + hari-harinya
   const wfoList = useMemo(() => {
@@ -212,7 +220,7 @@ export default function TeamAvailability() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 700 }}>👥 Team Availability</div>
-          <div style={{ fontSize: 11, color: 'var(--text3)' }}>% WFO dari hari terisi · {periodLabel} · {memberCount} member</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)' }}>% member WFO · {periodLabel} · {memberCount} member</div>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Navigasi bulan (selalu ada — mode Minggu pun pilih minggu DALAM bulan ini) */}
@@ -257,7 +265,7 @@ export default function TeamAvailability() {
                         </Pie>
                         <Tooltip content={({ active, payload }: any) => active && payload?.length ? (
                           <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', fontSize: 11, boxShadow: '0 6px 20px rgba(0,0,0,0.15)' }}>
-                            <b>{payload[0].name}</b>: {payload[0].value} hari ({stats.grandTotal > 0 ? Math.round(payload[0].value / stats.grandTotal * 100) : 0}%)
+                            <b>{payload[0].name}</b>: {payload[0].value} member ({memberCount > 0 ? Math.round(payload[0].value / memberCount * 100) : 0}%)
                           </div>) : null} />
                       </PieChart>
                     </ResponsiveContainer>
@@ -271,7 +279,7 @@ export default function TeamAvailability() {
                       <span style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: '#4f8ef722', color: '#4f8ef7' }}>Pekerja: {stats.pctPekerja}%</span>
                       <span style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: '#f59e0b22', color: '#f59e0b' }}>TAD: {stats.pctTAD}%</span>
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text3)' }}>Total {stats.grandWfo} WFO / {stats.grandTotal} hari terisi</div>
+                    <div style={{ fontSize: 10, color: 'var(--text3)' }}><b style={{ color:'var(--green)' }}>{stats.wfoMembers}</b> dari {memberCount} member WFO · {stats.grandWfo} hari WFO</div>
                     {/* legend ringkas */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 2 }}>
                       {stats.donutData.map((d: any) => (
