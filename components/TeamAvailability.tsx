@@ -76,13 +76,8 @@ export default function TeamAvailability() {
     const i = ws.findIndex(w => now >= w.start && now <= new Date(w.end.getFullYear(), w.end.getMonth(), w.end.getDate(), 23, 59, 59))
     return i < 0 ? 0 : i
   }
-  // Jangan bisa geser ke minggu yg belum datang
-  const nextWeekDisabled = scope === 'week' && !!curWeek && (() => {
-    const next = weekList[wIdx + 1]
-    if (next) return next.start > now
-    const d = new Date(my, mm0, 1)  // minggu 1 bulan depan
-    return d > now
-  })()
+  // Geser minggu bebas maju/mundur — minggu depan sengaja TIDAK dimatikan
+  // karena dipakai buat lihat rencana ke depan.
 
   function shiftMonth(dir: -1|1) {
     const d = new Date(my, mm0 - 1 + dir, 1)
@@ -187,6 +182,8 @@ export default function TeamAvailability() {
 
     return {
       memberRows: memberRows.sort((a, b) => b.pct - a.pct),
+      // Member yang sama sekali belum isi presensi di periode ini
+      notFilled: memberRows.filter((r: any) => r.total === 0).sort((a: any, b: any) => a.sortOrder - b.sortOrder),
       donutData, teamPct, grandTotal, grandWfo,
       pctPekerja: calcStatus('pekerja'), pctTAD: calcStatus('TAD'),
     }
@@ -222,7 +219,7 @@ export default function TeamAvailability() {
           <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
             <button onClick={() => shiftMonth(-1)} className="btn btn-sm" style={{ padding: '3px 8px' }}>◀</button>
             <span style={{ fontSize: 11, fontWeight: 600, minWidth: 70, textAlign: 'center' }}>{BULAN[mm0 - 1].slice(0, 3)} {my}</span>
-            <button onClick={() => shiftMonth(1)} disabled={isCurrentMonth} className="btn btn-sm" style={{ padding: '3px 8px', opacity: isCurrentMonth ? 0.3 : 1 }}>▶</button>
+            <button onClick={() => shiftMonth(1)} className="btn btn-sm" style={{ padding: '3px 8px' }}>▶</button>
           </div>
           {/* Navigasi minggu (hanya mode Minggu) */}
           {scope === 'week' && curWeek && (
@@ -231,7 +228,7 @@ export default function TeamAvailability() {
               <span style={{ fontSize: 11, fontWeight: 700, minWidth: 92, textAlign: 'center', color: 'var(--brand)' }} title={`${fmtShort(curWeek.start)} – ${fmtShort(curWeek.end)}`}>
                 Minggu {curWeek.no} <span style={{ fontWeight: 400, color: 'var(--text3)' }}>({curWeek.start.getDate()}–{curWeek.end.getDate()})</span>
               </span>
-              <button onClick={() => shiftWeek(1)} disabled={nextWeekDisabled} className="btn btn-sm" style={{ padding: '3px 8px', opacity: nextWeekDisabled ? 0.3 : 1 }}>›</button>
+              <button onClick={() => shiftWeek(1)} className="btn btn-sm" style={{ padding: '3px 8px' }}>›</button>
             </div>
           )}
           <div style={{ display: 'flex', gap: 3, background: 'var(--bg3)', borderRadius: 8, padding: 3 }}>
@@ -316,6 +313,22 @@ export default function TeamAvailability() {
                     </div>
                   ))}
                   <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 2 }}>{wfoList.length} dari {memberCount} member pernah WFO</div>
+                </div>
+              )}
+
+              {/* Legend: siapa yang belum isi presensi di periode ini */}
+              {stats.notFilled.length > 0 && (
+                <div style={{ marginTop: 10, padding: '7px 9px', borderRadius: 7, background: 'var(--bg3)', border: '1px dashed var(--border)' }}>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>
+                    ⚠️ Belum isi presensi ({stats.notFilled.length})
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {stats.notFilled.map((m: any) => (
+                      <span key={m.id} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, background: 'var(--bg)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                        {m.name}{m.status === 'TAD' ? ' · TAD' : ''}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
