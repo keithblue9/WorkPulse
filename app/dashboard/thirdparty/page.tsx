@@ -27,7 +27,8 @@ function estimasiOf(o:any){
 function blankOption(label:string){
   return { label, namaEO:'', kontakEO:'', kota:'', venue:'', catatan:'',
     mrPax:0, mrDays:0, mrPrice:0, brRooms:0, brNights:0, brPrice:0,
-    others: OTHER_DEFAULTS.map(o=>({ ...o, pax:0, times:1, price:0 })) }
+    others: OTHER_DEFAULTS.map(o=>({ ...o, pax:0, times:1, price:0, detail:'', link:'' })),
+    participants: [] }
 }
 // Normalisasi: dokumen lama (1 opsi, field flat) -> array options. Aman utk data lama.
 function optionsOf(it:any): any[] {
@@ -46,7 +47,7 @@ const clampNum = (v:any) => Math.max(0, Number(v)||0)
 const fmtTgl = (d:string)=> d ? new Date(d).toLocaleDateString('id-ID',{ day:'numeric', month:'short', year:'numeric' }) : '—'
 
 export default function ThirdPartyPage() {
-  const [tab, setTab] = useState<'rencana'|'realisasi'>('rencana')
+  const [tab, setTab] = useState<'rencana'|'realisasi'|'suvenir'>('rencana')
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <div style={{ padding:'12px 20px 0', borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
@@ -54,9 +55,10 @@ export default function ThirdPartyPage() {
         <div style={{ display:'flex', gap:4, marginTop:10 }}>
           <button onClick={()=>setTab('rencana')} style={subtab(tab==='rencana')}>Rencana</button>
           <button onClick={()=>setTab('realisasi')} style={subtab(tab==='realisasi')}>Realisasi</button>
+          <button onClick={()=>setTab('suvenir')} style={subtab(tab==='suvenir')}>🎁 Suvenir</button>
         </div>
       </div>
-      {tab==='rencana' ? <RencanaTab/> : <RealisasiTab/>}
+      {tab==='rencana' ? <RencanaTab/> : tab==='realisasi' ? <RealisasiTab/> : <SuvenirTab/>}
     </div>
   )
 }
@@ -105,6 +107,8 @@ function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:(
   const opts = useMemo(()=>optionsOf(it), [it])
   const multi = opts.length > 1
   const [openDetail, setOpenDetail] = useState<number|null>(multi ? null : 0)
+  const [detailItem, setDetailItem] = useState<{title:string; items:any[]}|null>(null)
+  const [pesertaItem, setPesertaItem] = useState<{title:string; list:any[]}|null>(null)
   const recIdx = Math.min(Math.max(Number(it.recommendedIndex)||0, 0), opts.length-1)
 
   // Hitung biaya tiap opsi
@@ -203,9 +207,37 @@ function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:(
             {otherRows.map(([key, disp])=>(
               <tr key={key}>
                 <td style={{ fontSize:11, color:'var(--text2)', paddingLeft:14 }}>↳ {disp}</td>
-                {opts.map((o:any,i:number)=>{ const v = otherValOf(o,key); return <td key={i} style={{ ...cellNum, color: v?'var(--text)':'var(--text3)' }}>{v?`Rp ${fmt(v)}`:'—'}</td> })}
+                {opts.map((o:any,i:number)=>{
+                  const v = otherValOf(o,key)
+                  const items = (o.others||[]).filter((x:any)=>String(x?.label||x?.key||'').trim().toLowerCase()===key)
+                  const hasDetail = items.some((x:any)=>x.detail?.trim() || x.link?.trim())
+                  if (!v) return <td key={i} style={{ ...cellNum, color:'var(--text3)' }}>—</td>
+                  return (
+                    <td key={i} style={cellNum}>
+                      {hasDetail ? (
+                        <button onClick={()=>setDetailItem({ title:`${disp} · ${o.label||`Opsi ${i+1}`}`, items })}
+                          style={{ background:'var(--brand-soft)', color:'var(--brand)', border:'1px solid var(--brand)', borderRadius:6, padding:'2px 8px', fontSize:10.5, fontWeight:600, cursor:'pointer' }}
+                          title="Klik lihat rincian">📄 Rp {fmt(v)}</button>
+                      ) : `Rp ${fmt(v)}`}
+                    </td>
+                  )
+                })}
               </tr>
             ))}
+            {/* Peserta (kalau ada di salah satu opsi) */}
+            {opts.some((o:any)=>(o.participants||[]).length>0) && (
+              <tr>
+                <td style={{ fontSize:11, color:'var(--text2)', paddingLeft:14 }}>↳ Peserta</td>
+                {opts.map((o:any,i:number)=>{
+                  const n = (o.participants||[]).length
+                  return <td key={i} style={cellNum}>{n>0 ? (
+                    <button onClick={()=>setPesertaItem({ title:`Peserta · ${o.label||`Opsi ${i+1}`}`, list:o.participants })}
+                      style={{ background:'var(--bg3)', color:'var(--text)', border:'1px solid var(--border)', borderRadius:6, padding:'2px 8px', fontSize:10.5, fontWeight:600, cursor:'pointer' }}
+                      title="Klik lihat daftar peserta">👥 {n} orang</button>
+                  ) : '—'}</td>
+                })}
+              </tr>
+            )}
             <tr style={{ borderTop:'2px solid var(--border)' }}>
               <td style={{ fontSize:11, fontWeight:700 }}>Subtotal</td>
               {opts.map((_o:any,i:number)=><td key={i} style={{ ...cellNum, fontWeight:700 }}>Rp {fmt(calc[i].sub)}</td>)}
@@ -247,6 +279,58 @@ function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:(
       {openDetail!==null && opts[openDetail] && (
         <div style={{ marginTop:8, overflowX:'auto' }}>
           <OptionDetailTable o={opts[openDetail]} c={calc[openDetail]} />
+        </div>
+      )}
+
+      {/* Popup rincian item (souvenir/oleh-oleh/dll) */}
+      {detailItem && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setDetailItem(null)}>
+          <div className="modal" style={{ width:460, maxWidth:'100%' }}>
+            <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontSize:13.5, fontWeight:700 }}>{detailItem.title}</span>
+              <button onClick={()=>setDetailItem(null)} className="btn btn-icon">×</button>
+            </div>
+            <div style={{ padding:'14px 18px', maxHeight:'70vh', overflowY:'auto', display:'flex', flexDirection:'column', gap:10 }}>
+              {detailItem.items.map((x:any,i:number)=>(
+                <div key={i} style={{ border:'1px solid var(--border)', borderRadius:10, padding:12 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', gap:8, marginBottom:4 }}>
+                    <span style={{ fontSize:12.5, fontWeight:700 }}>{x.label||x.key}</span>
+                    <span style={{ fontSize:12, fontWeight:700, color:'var(--brand)' }}>Rp {fmt(otherTotal(x))}</span>
+                  </div>
+                  <div style={{ fontSize:10.5, color:'var(--text3)', marginBottom:x.detail||x.link?6:0 }}>{x.pax||0} pax × {x.times||1} = {(Number(x.pax)||0)*(Number(x.times)||1)} unit · @ Rp {fmt(x.price||0)}</div>
+                  {x.detail?.trim() && <div style={{ fontSize:11.5, color:'var(--text2)', lineHeight:1.5, whiteSpace:'pre-wrap' }}>{x.detail}</div>}
+                  {x.link?.trim() && <a href={x.link} target="_blank" rel="noopener noreferrer" style={{ fontSize:11, color:'var(--brand)', display:'inline-block', marginTop:6, wordBreak:'break-all' }}>🔗 {x.link}</a>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Popup daftar peserta */}
+      {pesertaItem && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setPesertaItem(null)}>
+          <div className="modal" style={{ width:520, maxWidth:'100%' }}>
+            <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontSize:13.5, fontWeight:700 }}>{pesertaItem.title} <span style={{ fontSize:11, fontWeight:400, color:'var(--text3)' }}>({pesertaItem.list.length} orang)</span></span>
+              <button onClick={()=>setPesertaItem(null)} className="btn btn-icon">×</button>
+            </div>
+            <div style={{ padding:'8px 0', maxHeight:'70vh', overflowY:'auto' }}>
+              <table className="wp-table" style={{ width:'100%' }}>
+                <thead><tr><th style={{ width:30, textAlign:'center' }}>No</th><th>Nama</th><th>Jabatan</th><th>Instansi</th></tr></thead>
+                <tbody>
+                  {pesertaItem.list.map((p:any,i:number)=>(
+                    <tr key={i}>
+                      <td style={{ textAlign:'center', fontSize:11, color:'var(--text3)' }}>{i+1}</td>
+                      <td style={{ fontSize:11.5, fontWeight:600 }}>{p.nama||'—'}</td>
+                      <td style={{ fontSize:11, color:'var(--text2)' }}>{p.jabatan||'—'}</td>
+                      <td style={{ fontSize:11, color:'var(--text2)' }}>{p.instansi||'—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -316,7 +400,10 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
   const opt = f.options[active] || f.options[0]
   const setOpt = (k:string,v:any)=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{...o,[k]:v}:o) }))
   const setOptOther = (oi:number,k:string,v:any)=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, others:(o.others||[]).map((x:any,j:number)=> j===oi?{...x,[k]:v}:x) }:o) }))
-  const addOther = ()=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, others:[...(o.others||[]), { key:'custom', label:'', pax:0, times:1, price:0 }] }:o) }))
+  const addOther = ()=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, others:[...(o.others||[]), { key:'custom', label:'', pax:0, times:1, price:0, detail:'', link:'' }] }:o) }))
+  const setPeserta = (pi:number,k:string,v:any)=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, participants:(o.participants||[]).map((x:any,j:number)=> j===pi?{...x,[k]:v}:x) }:o) }))
+  const addPeserta = ()=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, participants:[...(o.participants||[]), { nama:'', jabatan:'', instansi:'' }] }:o) }))
+  const delPeserta = (pi:number)=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, participants:(o.participants||[]).filter((_:any,j:number)=>j!==pi) }:o) }))
   const delOther = (oi:number)=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, others:(o.others||[]).filter((_:any,j:number)=>j!==oi) }:o) }))
 
   function addOpt() {
@@ -468,16 +555,41 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
                     <span style={{ fontSize:12, fontWeight:600 }}>Others</span>
                     <button onClick={addOther} className="btn btn-sm">+ Item</button>
                   </div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                     {(opt.others||[]).length===0 && <div style={{ fontSize:10.5, color:'var(--text3)' }}>Belum ada item. Klik <b>+ Item</b> untuk menambah.</div>}
                     {(opt.others||[]).map((o:any,i:number)=>(
-                      <div key={i} style={{ display:'grid', gridTemplateColumns:'1.3fr 70px 70px 110px 90px 28px', gap:6, alignItems:'center' }}>
-                        <input className="input input-sm" placeholder="Label" value={o.label||''} onChange={e=>setOptOther(i,'label',e.target.value)} />
-                        <input type="number" min={0} className="input input-sm" placeholder="Pax" value={o.pax||0} onChange={e=>setOptOther(i,'pax',clampNum(e.target.value))} />
-                        <input type="number" min={0} className="input input-sm" placeholder="Times" value={o.times||0} onChange={e=>setOptOther(i,'times',clampNum(e.target.value))} />
-                        <MoneyInput currency="IDR" className="input input-sm" placeholder="Price" value={o.price||0} onChange={n=>setOptOther(i,'price',clampNum(n))} />
-                        <span style={{ fontSize:10, color:'var(--text2)', textAlign:'right' }}>Rp {fmt(otherTotal(o))}</span>
-                        <button onClick={()=>delOther(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
+                      <div key={i} style={{ border:'1px solid var(--border)', borderRadius:8, padding:8, background:'var(--bg2)' }}>
+                        <div style={{ display:'grid', gridTemplateColumns:'1.3fr 70px 70px 110px 90px 28px', gap:6, alignItems:'center' }}>
+                          <input className="input input-sm" placeholder="Label" value={o.label||''} onChange={e=>setOptOther(i,'label',e.target.value)} />
+                          <input type="number" min={0} className="input input-sm" placeholder="Pax" value={o.pax||0} onChange={e=>setOptOther(i,'pax',clampNum(e.target.value))} />
+                          <input type="number" min={0} className="input input-sm" placeholder="Times" value={o.times||0} onChange={e=>setOptOther(i,'times',clampNum(e.target.value))} />
+                          <MoneyInput currency="IDR" className="input input-sm" placeholder="Price" value={o.price||0} onChange={n=>setOptOther(i,'price',clampNum(n))} />
+                          <span style={{ fontSize:10, color:'var(--text2)', textAlign:'right' }}>Rp {fmt(otherTotal(o))}</span>
+                          <button onClick={()=>delOther(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
+                        </div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:6 }}>
+                          <input className="input input-sm" placeholder="Rincian (mis. UGREEN UNO Robot + Keychain)" value={o.detail||''} onChange={e=>setOptOther(i,'detail',e.target.value)} />
+                          <input className="input input-sm" placeholder="Link e-commerce (opsional)" value={o.link||''} onChange={e=>setOptOther(i,'link',e.target.value)} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Peserta */}
+                <div>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                    <span style={{ fontSize:12, fontWeight:600 }}>Peserta <span style={{ fontSize:10, fontWeight:400, color:'var(--text3)' }}>({(opt.participants||[]).length})</span></span>
+                    <button onClick={addPeserta} className="btn btn-sm">+ Peserta</button>
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {(opt.participants||[]).length===0 && <div style={{ fontSize:10.5, color:'var(--text3)' }}>Belum ada peserta. Klik <b>+ Peserta</b> untuk menambah.</div>}
+                    {(opt.participants||[]).map((p:any,i:number)=>(
+                      <div key={i} style={{ display:'grid', gridTemplateColumns:'1.2fr 1fr 1fr 28px', gap:6, alignItems:'center' }}>
+                        <input className="input input-sm" placeholder="Nama" value={p.nama||''} onChange={e=>setPeserta(i,'nama',e.target.value)} />
+                        <input className="input input-sm" placeholder="Jabatan" value={p.jabatan||''} onChange={e=>setPeserta(i,'jabatan',e.target.value)} />
+                        <input className="input input-sm" placeholder="Instansi" value={p.instansi||''} onChange={e=>setPeserta(i,'instansi',e.target.value)} />
+                        <button onClick={()=>delPeserta(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
                       </div>
                     ))}
                   </div>
@@ -660,3 +772,196 @@ function RealisasiForm({ editing, user, onClose, onSaved }: { editing?:any; user
 
 const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }
 function subtab(active:boolean):React.CSSProperties { return { padding:'8px 16px', fontSize:12.5, fontWeight:600, cursor:'pointer', border:'none', borderBottom:`2px solid ${active?'var(--brand)':'transparent'}`, background:'transparent', color:active?'var(--brand)':'var(--text3)' } }
+
+// =====================  SUVENIR (ide usulan + stok)  =====================
+function stockOf(s:any){ return (s.moves||[]).reduce((n:number,m:any)=> n + (m.type==='in' ? Number(m.qty)||0 : -(Number(m.qty)||0)), 0) }
+
+function SuvenirTab() {
+  const { data:session } = useSession(); const user = session?.user as any
+  const [items, setItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<any>(null)
+  const [moveFor, setMoveFor] = useState<any>(null)
+  const [filter, setFilter] = useState<'all'|'usulan'|'disetujui'|'stok'>('all')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const r = await fetch('/api/souvenir').then(r=>r.json()).catch(()=>({data:[]})); setItems(r.data||[]); setLoading(false)
+  }, [])
+  useEffect(()=>{ load() }, [load])
+
+  const shown = items.filter(s => filter==='all' ? true : s.status===filter)
+  const STATUS: Record<string,{label:string;color:string}> = {
+    usulan:{label:'Usulan',color:'#f59e0b'}, disetujui:{label:'Disetujui',color:'#22c55e'},
+    ditolak:{label:'Ditolak',color:'#dc2626'}, stok:{label:'Stok',color:'#4f8ef7'},
+  }
+
+  return (
+    <>
+      {(showForm||editing) && <SuvenirForm editing={editing} user={user} onClose={()=>{setShowForm(false);setEditing(null)}} onSaved={()=>{setShowForm(false);setEditing(null);load()}} />}
+      {moveFor && <StockMoveModal item={moveFor} user={user} onClose={()=>setMoveFor(null)} onSaved={()=>{setMoveFor(null);load()}} />}
+      <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexWrap:'wrap', alignItems:'center', flexShrink:0 }}>
+        {(['all','usulan','disetujui','stok'] as const).map(f=>(
+          <button key={f} onClick={()=>setFilter(f)} className="btn btn-sm" style={{ fontSize:11, background:filter===f?'var(--brand-soft)':'var(--bg3)', color:filter===f?'var(--brand)':'var(--text2)', borderColor:filter===f?'var(--brand)':'var(--border)' }}>{f==='all'?'Semua':STATUS[f].label}</button>
+        ))}
+        <button onClick={()=>setShowForm(true)} className="btn btn-sm btn-primary" style={{ marginLeft:'auto' }}>+ Suvenir</button>
+      </div>
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
+        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
+         shown.length===0 ? <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>🎁</div><div>Belum ada suvenir</div></div> :
+         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:12 }}>
+           {shown.map(s => {
+             const stock = stockOf(s)
+             const st = STATUS[s.status] || STATUS.usulan
+             return (
+               <div key={s._id} className="card" style={{ padding:14, display:'flex', flexDirection:'column', gap:8 }}>
+                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
+                   <div style={{ minWidth:0 }}>
+                     <div style={{ fontSize:13, fontWeight:700 }}>{s.nama}</div>
+                     {s.deskripsi && <div style={{ fontSize:11, color:'var(--text2)', marginTop:2, lineHeight:1.4 }}>{s.deskripsi}</div>}
+                   </div>
+                   <span className="badge" style={{ fontSize:9, background:st.color+'22', color:st.color, fontWeight:700, flexShrink:0 }}>{st.label}</span>
+                 </div>
+                 <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:11 }}>
+                   {s.hargaSatuan>0 && <span style={{ color:'var(--text2)' }}>💰 Rp {fmt(s.hargaSatuan)}/unit</span>}
+                   {s.jumlahUsulan>0 && <span style={{ color:'var(--text2)' }}>📦 Usul {s.jumlahUsulan}</span>}
+                 </div>
+                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 10px', background:'var(--bg3)', borderRadius:8 }}>
+                   <span style={{ fontSize:11, color:'var(--text3)' }}>Stok tersedia</span>
+                   <span style={{ fontSize:16, fontWeight:800, color: stock>0?'var(--green)':stock<0?'var(--red)':'var(--text3)' }}>{stock}</span>
+                 </div>
+                 {s.link && <a href={s.link} target="_blank" rel="noopener noreferrer" style={{ fontSize:10.5, color:'var(--brand)', wordBreak:'break-all' }}>🔗 {s.link}</a>}
+                 {(s.moves||[]).length>0 && (
+                   <div style={{ borderTop:'1px solid var(--border)', paddingTop:6, maxHeight:110, overflowY:'auto' }}>
+                     {(s.moves||[]).slice().reverse().slice(0,5).map((m:any,i:number)=>(
+                       <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:10, padding:'2px 0' }}>
+                         <span style={{ color:'var(--text3)' }}>{m.date||'—'} · {m.note||(m.type==='in'?'Masuk':'Keluar')}</span>
+                         <span style={{ fontWeight:700, color: m.type==='in'?'var(--green)':'var(--red)' }}>{m.type==='in'?'+':'−'}{m.qty}</span>
+                       </div>
+                     ))}
+                   </div>
+                 )}
+                 <div style={{ display:'flex', gap:6, marginTop:2 }}>
+                   <button onClick={()=>setMoveFor(s)} className="btn btn-sm" style={{ fontSize:10, flex:1 }}>📥 Stok In/Out</button>
+                   <button onClick={()=>setEditing(s)} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>
+                   <button onClick={async()=>{ if(!confirm(`Hapus suvenir "${s.nama}"?`))return; await fetch(`/api/souvenir/${s._id}`,{method:'DELETE'}); toast.success('Dihapus'); load() }} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑</button>
+                 </div>
+               </div>
+             )
+           })}
+         </div>}
+      </div>
+    </>
+  )
+}
+
+function SuvenirForm({ editing, user, onClose, onSaved }: { editing?:any; user:any; onClose:()=>void; onSaved:()=>void }) {
+  const [f, setF] = useState<any>(() => editing ? { ...editing } : { nama:'', deskripsi:'', hargaSatuan:0, jumlahUsulan:0, link:'', status:'usulan', catatan:'' })
+  const [saving, setSaving] = useState(false)
+  const set = (k:string,v:any)=>setF((p:any)=>({...p,[k]:v}))
+  async function save() {
+    if (!f.nama?.trim()) { toast.error('Nama wajib'); return }
+    setSaving(true)
+    try {
+      const url = editing ? `/api/souvenir/${editing._id}` : '/api/souvenir'
+      const r = await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ...f, createdBy:user?.name }) })
+      if (!r.ok) { toast.error('Gagal menyimpan'); return }
+      toast.success(editing?'Diperbarui':'Suvenir tersimpan'); onSaved()
+    } catch { toast.error('Gagal') } finally { setSaving(false) }
+  }
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{ width:500, maxWidth:'100%' }}>
+        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
+          <span style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit Suvenir':'+ Suvenir'}</span>
+          <button onClick={onClose} className="btn btn-icon">×</button>
+        </div>
+        <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:11, maxHeight:'70vh', overflowY:'auto' }}>
+          <div><label style={lbl}>Nama Suvenir *</label><input className="input" value={f.nama} onChange={e=>set('nama',e.target.value)} placeholder="mis. UGREEN UNO Robot" /></div>
+          <div><label style={lbl}>Deskripsi</label><textarea className="input" rows={2} value={f.deskripsi} onChange={e=>set('deskripsi',e.target.value)} style={{ resize:'vertical' }} /></div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div><label style={lbl}>Harga Satuan</label><MoneyInput currency="IDR" className="input" value={f.hargaSatuan} onChange={n=>set('hargaSatuan',Math.max(0,Number(n)||0))} /></div>
+            <div><label style={lbl}>Jumlah Usulan</label><input type="number" min={0} className="input" value={f.jumlahUsulan} onChange={e=>set('jumlahUsulan',Math.max(0,Number(e.target.value)||0))} /></div>
+          </div>
+          <div><label style={lbl}>Link E-commerce</label><input className="input" value={f.link} onChange={e=>set('link',e.target.value)} placeholder="https://..." /></div>
+          <div><label style={lbl}>Status</label>
+            <select className="input" value={f.status} onChange={e=>set('status',e.target.value)}>
+              <option value="usulan">Usulan</option><option value="disetujui">Disetujui</option>
+              <option value="ditolak">Ditolak</option><option value="stok">Stok</option>
+            </select></div>
+          <div><label style={lbl}>Catatan</label><textarea className="input" rows={2} value={f.catatan} onChange={e=>set('catatan',e.target.value)} style={{ resize:'vertical' }} /></div>
+        </div>
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
+          <button onClick={onClose} className="btn">Batal</button>
+          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Simpan'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StockMoveModal({ item, user, onClose, onSaved }: { item:any; user:any; onClose:()=>void; onSaved:()=>void }) {
+  const [type, setType] = useState<'in'|'out'>('in')
+  const [qty, setQty] = useState(0)
+  const [date, setDate] = useState(new Date().toISOString().slice(0,10))
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
+  const stock = stockOf(item)
+  async function save() {
+    if (!(qty>0)) { toast.error('Jumlah harus lebih dari 0'); return }
+    if (type==='out' && qty>stock) { toast.error(`Stok tidak cukup (tersedia ${stock})`); return }
+    setSaving(true)
+    try {
+      const r = await fetch(`/api/souvenir/${item._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ addMove:{ type, qty, date, note, by:user?.name } }) })
+      if (!r.ok) { toast.error('Gagal'); return }
+      toast.success('Stok diperbarui'); onSaved()
+    } catch { toast.error('Gagal') } finally { setSaving(false) }
+  }
+  async function removeMove(id:string) {
+    if (!confirm('Hapus catatan stok ini?')) return
+    const r = await fetch(`/api/souvenir/${item._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ removeMoveId:id }) })
+    if (r.ok) { toast.success('Dihapus'); onSaved() }
+  }
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{ width:460, maxWidth:'100%' }}>
+        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div><div style={{ fontSize:14, fontWeight:700 }}>{item.nama}</div><div style={{ fontSize:11, color:'var(--text3)' }}>Stok saat ini: <b style={{ color: stock>0?'var(--green)':'var(--text2)' }}>{stock}</b></div></div>
+          <button onClick={onClose} className="btn btn-icon">×</button>
+        </div>
+        <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:11 }}>
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={()=>setType('in')} className="btn btn-sm" style={{ flex:1, background:type==='in'?'#22c55e22':'var(--bg3)', color:type==='in'?'#16a34a':'var(--text2)', borderColor:type==='in'?'#22c55e':'var(--border)' }}>📥 Masuk (In)</button>
+            <button onClick={()=>setType('out')} className="btn btn-sm" style={{ flex:1, background:type==='out'?'#dc262622':'var(--bg3)', color:type==='out'?'#dc2626':'var(--text2)', borderColor:type==='out'?'#dc2626':'var(--border)' }}>📤 Keluar (Out)</button>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div><label style={lbl}>Jumlah</label><input type="number" min={1} className="input" value={qty} onChange={e=>setQty(Math.max(0,Number(e.target.value)||0))} /></div>
+            <div><label style={lbl}>Tanggal</label><input type="date" className="input" value={date} onChange={e=>setDate(e.target.value)} /></div>
+          </div>
+          <div><label style={lbl}>Keterangan</label><input className="input" value={note} onChange={e=>setNote(e.target.value)} placeholder="mis. beli batch 1 / dipakai event UAT" /></div>
+          {(item.moves||[]).length>0 && (
+            <div style={{ borderTop:'1px solid var(--border)', paddingTop:8 }}>
+              <div style={{ fontSize:10.5, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', marginBottom:6 }}>Riwayat stok</div>
+              <div style={{ maxHeight:150, overflowY:'auto', display:'flex', flexDirection:'column', gap:3 }}>
+                {(item.moves||[]).slice().reverse().map((m:any)=>(
+                  <div key={m._id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:10.5, padding:'3px 6px', background:'var(--bg3)', borderRadius:6 }}>
+                    <span style={{ color:'var(--text3)' }}>{m.date||'—'} · {m.note||'-'}</span>
+                    <span style={{ display:'flex', gap:6, alignItems:'center' }}>
+                      <b style={{ color: m.type==='in'?'var(--green)':'var(--red)' }}>{m.type==='in'?'+':'−'}{m.qty}</b>
+                      <button onClick={()=>removeMove(m._id)} className="btn btn-icon btn-sm" style={{ color:'var(--red)', fontSize:10 }}>×</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
+          <button onClick={onClose} className="btn">Tutup</button>
+          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Simpan'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}

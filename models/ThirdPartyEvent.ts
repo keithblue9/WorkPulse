@@ -7,6 +7,16 @@ const CostItemSchema = new Schema({
   pax: { type:Number, default:0 },
   times: { type:Number, default:0 },     // dipakai meals
   price: { type:Number, default:0 },     // harga per unit
+  detail: String,                        // rincian bebas (mis. "UGREEN UNO Robot + Keychain emoney 150k")
+  link: String,                          // link e-commerce (opsional)
+}, { _id:false })
+
+// Peserta event (buat opsi rencana)
+const ParticipantSchema = new Schema({
+  nama: String,
+  jabatan: String,
+  instansi: String,
+  catatan: String,
 }, { _id:false })
 
 // Satu OPSI usulan (tim biasanya ajukan >1 opsi ke manager utk dibandingkan:
@@ -20,6 +30,7 @@ const EventOptionSchema = new Schema({
   mrPax: { type:Number, default:0 }, mrDays: { type:Number, default:0 }, mrPrice: { type:Number, default:0 },
   brRooms: { type:Number, default:0 }, brNights: { type:Number, default:0 }, brPrice: { type:Number, default:0 },
   others: { type:[CostItemSchema], default:[] },
+  participants: { type:[ParticipantSchema], default:[] },   // list peserta opsi ini
   catatan: String,
   estimasiBiaya: { type:Number, default:0 },   // snapshot subtotal opsi ini (sebelum fee)
 }, { _id:false })

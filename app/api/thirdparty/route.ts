@@ -20,6 +20,14 @@ export async function POST(req:NextRequest) {
   try {
     await connectDB()
     const body = await req.json()
+    // Fallback year/month dari tanggal kalau belum diisi, biar list (yg difilter by year/month) selalu nemu
+    const d = body.tanggalMulai || body.tanggalKegiatan
+    if (d) {
+      const dt = new Date(d)
+      if (!isNaN(dt.getTime())) { if (!body.year) body.year = dt.getFullYear(); if (!body.month) body.month = dt.getMonth()+1 }
+    }
+    if (!body.year) body.year = new Date().getFullYear()
+    if (!body.month) body.month = new Date().getMonth()+1
     const item = await ThirdPartyEventModel.create(body)
     return NextResponse.json({ data:item }, { status:201 })
   } catch (e:any) { return NextResponse.json({ error:e.message }, { status:500 }) }
