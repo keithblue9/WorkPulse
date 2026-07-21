@@ -802,7 +802,7 @@ function SuvenirTab() {
 
   return (
     <>
-      {(showForm||editing) && <SuvenirForm editing={editing} user={user} onClose={()=>{setShowForm(false);setEditing(null)}} onSaved={()=>{setShowForm(false);setEditing(null);load()}} />}
+      {(showForm||editing) && <SuvenirForm editing={editing} mode={view} user={user} onClose={()=>{setShowForm(false);setEditing(null)}} onSaved={()=>{setShowForm(false);setEditing(null);load()}} />}
       {moveFor && <StockMoveModal item={moveFor} user={user} onClose={()=>setMoveFor(null)} onSaved={()=>{setMoveFor(null);load()}} />}
       <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexWrap:'wrap', alignItems:'center', flexShrink:0 }}>
         <div style={{ display:'flex', gap:3, background:'var(--bg3)', borderRadius:8, padding:3 }}>
@@ -886,36 +886,49 @@ function EmptyS({ text }: { text:string }) {
   return <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>🎁</div><div style={{ fontSize:12 }}>{text}</div></div>
 }
 
-function SuvenirForm({ editing, user, onClose, onSaved }: { editing?:any; user:any; onClose:()=>void; onSaved:()=>void }) {
+function SuvenirForm({ editing, mode, user, onClose, onSaved }: { editing?:any; mode:'usulan'|'stok'; user:any; onClose:()=>void; onSaved:()=>void }) {
+  const isStok = mode === 'stok' && !editing   // form stok cuma buat tambah baru
   const [f, setF] = useState<any>(() => editing ? { ...editing } : { nama:'', deskripsi:'', hargaSatuan:0, jumlahUsulan:0, link:'', catatan:'' })
+  const [stokAwal, setStokAwal] = useState(0)
   const [saving, setSaving] = useState(false)
   const set = (k:string,v:any)=>setF((p:any)=>({...p,[k]:v}))
   async function save() {
     if (!f.nama?.trim()) { toast.error('Nama wajib'); return }
     setSaving(true)
     try {
+      // Mode stok: simpan nama + langsung catat stok awal sbg gerakan 'in'
+      const body:any = { ...f, createdBy:user?.name }
+      if (isStok && stokAwal > 0) body.moves = [{ type:'in', qty:stokAwal, date:new Date().toISOString().slice(0,10), note:'Stok awal', by:user?.name }]
       const url = editing ? `/api/souvenir/${editing._id}` : '/api/souvenir'
-      const r = await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ...f, createdBy:user?.name }) })
+      const r = await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
       if (!r.ok) { toast.error('Gagal menyimpan'); return }
-      toast.success(editing?'Diperbarui':'Suvenir tersimpan'); onSaved()
+      toast.success(editing?'Diperbarui':'Tersimpan'); onSaved()
     } catch { toast.error('Gagal') } finally { setSaving(false) }
   }
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:500, maxWidth:'100%' }}>
+      <div className="modal" style={{ width:isStok?420:500, maxWidth:'100%' }}>
         <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit Suvenir':'+ Suvenir'}</span>
+          <span style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit Suvenir':isStok?'+ Barang Stok':'+ Usulan Suvenir'}</span>
           <button onClick={onClose} className="btn btn-icon">×</button>
         </div>
         <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:11, maxHeight:'70vh', overflowY:'auto' }}>
-          <div><label style={lbl}>Nama Suvenir *</label><input className="input" value={f.nama} onChange={e=>set('nama',e.target.value)} placeholder="mis. UGREEN UNO Robot" /></div>
-          <div><label style={lbl}>Deskripsi</label><textarea className="input" rows={2} value={f.deskripsi} onChange={e=>set('deskripsi',e.target.value)} style={{ resize:'vertical' }} /></div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Harga Satuan</label><MoneyInput currency="IDR" className="input" value={f.hargaSatuan} onChange={n=>set('hargaSatuan',Math.max(0,Number(n)||0))} /></div>
-            <div><label style={lbl}>Jumlah Usulan</label><input type="number" min={0} className="input" value={f.jumlahUsulan} onChange={e=>set('jumlahUsulan',Math.max(0,Number(e.target.value)||0))} /></div>
-          </div>
-          <div><label style={lbl}>Link E-commerce</label><input className="input" value={f.link} onChange={e=>set('link',e.target.value)} placeholder="https://..." /></div>
-          <div><label style={lbl}>Catatan</label><textarea className="input" rows={2} value={f.catatan} onChange={e=>set('catatan',e.target.value)} style={{ resize:'vertical' }} /></div>
+          <div><label style={lbl}>Nama Barang *</label><input className="input" value={f.nama} onChange={e=>set('nama',e.target.value)} placeholder="mis. Omron Wrist" /></div>
+          {isStok ? (
+            // Form STOK: cukup nama + jumlah stok awal
+            <div><label style={lbl}>Jumlah Stok Awal</label><input type="number" min={0} className="input" value={stokAwal} onChange={e=>setStokAwal(Math.max(0,Number(e.target.value)||0))} placeholder="0" /><div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Bisa diubah nanti lewat tombol Stok In/Out.</div></div>
+          ) : (
+            // Form USULAN: nama + jumlah + harga + link
+            <>
+              <div><label style={lbl}>Deskripsi</label><textarea className="input" rows={2} value={f.deskripsi} onChange={e=>set('deskripsi',e.target.value)} style={{ resize:'vertical' }} /></div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                <div><label style={lbl}>Harga Satuan</label><MoneyInput currency="IDR" className="input" value={f.hargaSatuan} onChange={n=>set('hargaSatuan',Math.max(0,Number(n)||0))} /></div>
+                <div><label style={lbl}>Jumlah Usulan</label><input type="number" min={0} className="input" value={f.jumlahUsulan} onChange={e=>set('jumlahUsulan',Math.max(0,Number(e.target.value)||0))} /></div>
+              </div>
+              <div><label style={lbl}>Link E-commerce</label><input className="input" value={f.link} onChange={e=>set('link',e.target.value)} placeholder="https://..." /></div>
+              <div><label style={lbl}>Catatan</label><textarea className="input" rows={2} value={f.catatan} onChange={e=>set('catatan',e.target.value)} style={{ resize:'vertical' }} /></div>
+            </>
+          )}
         </div>
         <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
           <button onClick={onClose} className="btn">Batal</button>
