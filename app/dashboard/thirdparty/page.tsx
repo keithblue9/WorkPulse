@@ -783,6 +783,7 @@ function SuvenirTab() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [moveFor, setMoveFor] = useState<any>(null)
+  const [makeStok, setMakeStok] = useState<any>(null)
   const [view, setView] = useState<'usulan'|'stok'>('usulan')
 
   const load = useCallback(async () => {
@@ -806,6 +807,7 @@ function SuvenirTab() {
     <>
       {(showForm||editing) && <SuvenirForm editing={editing} mode={view} user={user} onClose={()=>{setShowForm(false);setEditing(null)}} onSaved={()=>{setShowForm(false);setEditing(null);load()}} />}
       {moveFor && <StockMoveModal item={moveFor} user={user} onClose={()=>setMoveFor(null)} onSaved={()=>{setMoveFor(null);load()}} />}
+      {makeStok && <MakeStokModal item={makeStok} user={user} onClose={()=>setMakeStok(null)} onSaved={()=>{setMakeStok(null);setView('stok');load()}} />}
       <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexWrap:'wrap', alignItems:'center', flexShrink:0 }}>
         <div style={{ display:'flex', gap:3, background:'var(--bg3)', borderRadius:8, padding:3 }}>
           {(['usulan','stok'] as const).map(v=>(
@@ -840,6 +842,7 @@ function SuvenirTab() {
                        <td style={{ textAlign:'right', fontSize:12 }}>{s.hargaSatuan>0?`Rp ${fmt(s.hargaSatuan)}`:'—'}</td>
                        <td>{s.link ? <a href={s.link} target="_blank" rel="noopener noreferrer" style={{ fontSize:10.5, color:'var(--brand)' }}>🔗 Buka</a> : <span style={{ fontSize:11, color:'var(--text3)' }}>—</span>}</td>
                        <td style={{ textAlign:'right' }}>
+                         <button onClick={()=>setMakeStok(s)} className="btn btn-sm" style={{ fontSize:10 }} title="Pindahkan ke daftar stok">→ Stok</button>{' '}
                          <button onClick={()=>setEditing(s)} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>{' '}
                          <button onClick={()=>del(s._id,s.nama)} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑</button>
                        </td>
@@ -850,7 +853,7 @@ function SuvenirTab() {
              </div>
            )
          ) : (
-           stokRows.length===0 ? <EmptyS text="Belum ada barang berstok. Klik 'Stok In/Out' di sebuah suvenir untuk mulai mencatat." /> : (
+           stokRows.length===0 ? <EmptyS text="Belum ada barang berstok. Buat lewat + Suvenir di tab ini, atau pindahkan dari tab Usulan pakai tombol → Stok." /> : (
              <div className="card" style={{ padding:0, overflowX:'auto' }}>
                <table className="wp-table" style={{ width:'100%' }}>
                  <thead><tr>
@@ -876,9 +879,6 @@ function SuvenirTab() {
              </div>
            )
          )}
-        {view==='usulan' && usulanRows.length>0 && (
-          <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:8 }}>💡 Untuk mulai mencatat stok barang, klik <b>+ Suvenir</b> lalu gunakan tombol <b>Stok In/Out</b> di tab Stok, atau edit barang usulan jadi berstok.</div>
-        )}
       </div>
     </>
   )
@@ -1001,6 +1001,40 @@ function StockMoveModal({ item, user, onClose, onSaved }: { item:any; user:any; 
         <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
           <button onClick={onClose} className="btn">Tutup</button>
           <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Simpan'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Pindahkan barang usulan -> stok (set kind='stok' + stok awal opsional)
+function MakeStokModal({ item, user, onClose, onSaved }: { item:any; user:any; onClose:()=>void; onSaved:()=>void }) {
+  const [qty, setQty] = useState(0)
+  const [saving, setSaving] = useState(false)
+  async function save() {
+    setSaving(true)
+    try {
+      const body:any = { kind:'stok' }
+      if (qty > 0) body.addMove = { type:'in', qty, date:new Date().toISOString().slice(0,10), note:'Stok awal', by:user?.name }
+      const r = await fetch(`/api/souvenir/${item._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+      if (!r.ok) { toast.error('Gagal'); return }
+      toast.success(`"${item.nama}" dipindah ke Stok`); onSaved()
+    } catch { toast.error('Gagal') } finally { setSaving(false) }
+  }
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{ width:400, maxWidth:'100%' }}>
+        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
+          <span style={{ fontSize:14, fontWeight:600 }}>Jadikan Barang Stok</span>
+          <button onClick={onClose} className="btn btn-icon">×</button>
+        </div>
+        <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:11 }}>
+          <div style={{ fontSize:12, color:'var(--text2)' }}>Pindahkan <b>{item.nama}</b> dari daftar Usulan ke daftar Stok.</div>
+          <div><label style={lbl}>Jumlah Stok Awal (opsional)</label><input type="number" min={0} className="input" value={qty} onChange={e=>setQty(Math.max(0,Number(e.target.value)||0))} placeholder="0" /><div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Bisa dikosongkan, lalu catat nanti lewat Stok In/Out.</div></div>
+        </div>
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
+          <button onClick={onClose} className="btn">Batal</button>
+          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Pindahkan'}</button>
         </div>
       </div>
     </div>
