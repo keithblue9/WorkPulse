@@ -11,6 +11,7 @@ const StockMoveSchema = new Schema({
 
 // Souvenir: ide usulan + tracking stok
 const SouvenirSchema = new Schema({
+  kind: { type:String, enum:['usulan','stok'], default:'usulan' },   // pisahkan daftar usulan vs barang stok
   nama: { type:String, required:true },
   deskripsi: String,
   hargaSatuan: { type:Number, default:0 },

@@ -791,9 +791,11 @@ function SuvenirTab() {
   }, [])
   useEffect(()=>{ load() }, [load])
 
-  // Usulan = daftar ide barang. Stok = barang yg punya pergerakan stok (ada moves).
-  const usulanRows = items
-  const stokRows = items.filter(s => (s.moves||[]).length > 0 || stockOf(s) !== 0)
+  // Pisahkan berdasarkan kind: usulan vs stok. Barang lama tanpa kind:
+  // kalau punya moves -> stok, selain itu -> usulan (biar data lama ga hilang).
+  const kindOf = (s:any) => s.kind || ((s.moves||[]).length > 0 ? 'stok' : 'usulan')
+  const usulanRows = items.filter(s => kindOf(s) === 'usulan')
+  const stokRows = items.filter(s => kindOf(s) === 'stok')
 
   async function del(id:string, nama:string) {
     if (!confirm(`Hapus suvenir "${nama}"?`)) return
@@ -898,6 +900,7 @@ function SuvenirForm({ editing, mode, user, onClose, onSaved }: { editing?:any; 
     try {
       // Mode stok: simpan nama + langsung catat stok awal sbg gerakan 'in'
       const body:any = { ...f, createdBy:user?.name }
+      if (!editing) body.kind = isStok ? 'stok' : 'usulan'
       if (isStok && stokAwal > 0) body.moves = [{ type:'in', qty:stokAwal, date:new Date().toISOString().slice(0,10), note:'Stok awal', by:user?.name }]
       const url = editing ? `/api/souvenir/${editing._id}` : '/api/souvenir'
       const r = await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
