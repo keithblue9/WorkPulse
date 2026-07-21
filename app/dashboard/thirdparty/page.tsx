@@ -783,7 +783,7 @@ function SuvenirTab() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [moveFor, setMoveFor] = useState<any>(null)
-  const [filter, setFilter] = useState<'all'|'usulan'|'disetujui'|'stok'>('all')
+  const [view, setView] = useState<'usulan'|'stok'>('usulan')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -791,10 +791,13 @@ function SuvenirTab() {
   }, [])
   useEffect(()=>{ load() }, [load])
 
-  const shown = items.filter(s => filter==='all' ? true : s.status===filter)
-  const STATUS: Record<string,{label:string;color:string}> = {
-    usulan:{label:'Usulan',color:'#f59e0b'}, disetujui:{label:'Disetujui',color:'#22c55e'},
-    ditolak:{label:'Ditolak',color:'#dc2626'}, stok:{label:'Stok',color:'#4f8ef7'},
+  // Usulan = daftar ide barang. Stok = barang yg punya pergerakan stok (ada moves).
+  const usulanRows = items
+  const stokRows = items.filter(s => (s.moves||[]).length > 0 || stockOf(s) !== 0)
+
+  async function del(id:string, nama:string) {
+    if (!confirm(`Hapus suvenir "${nama}"?`)) return
+    await fetch(`/api/souvenir/${id}`, { method:'DELETE' }); toast.success('Dihapus'); load()
   }
 
   return (
@@ -802,62 +805,89 @@ function SuvenirTab() {
       {(showForm||editing) && <SuvenirForm editing={editing} user={user} onClose={()=>{setShowForm(false);setEditing(null)}} onSaved={()=>{setShowForm(false);setEditing(null);load()}} />}
       {moveFor && <StockMoveModal item={moveFor} user={user} onClose={()=>setMoveFor(null)} onSaved={()=>{setMoveFor(null);load()}} />}
       <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexWrap:'wrap', alignItems:'center', flexShrink:0 }}>
-        {(['all','usulan','disetujui','stok'] as const).map(f=>(
-          <button key={f} onClick={()=>setFilter(f)} className="btn btn-sm" style={{ fontSize:11, background:filter===f?'var(--brand-soft)':'var(--bg3)', color:filter===f?'var(--brand)':'var(--text2)', borderColor:filter===f?'var(--brand)':'var(--border)' }}>{f==='all'?'Semua':STATUS[f].label}</button>
-        ))}
+        <div style={{ display:'flex', gap:3, background:'var(--bg3)', borderRadius:8, padding:3 }}>
+          {(['usulan','stok'] as const).map(v=>(
+            <button key={v} onClick={()=>setView(v)} className="btn btn-sm" style={{ fontSize:11.5, textTransform:'capitalize', background:view===v?'var(--brand)':'transparent', color:view===v?'#fff':'var(--text2)', border:'none' }}>{v==='usulan'?'💡 Usulan':'📦 Stok'}</button>
+          ))}
+        </div>
         <button onClick={()=>setShowForm(true)} className="btn btn-sm btn-primary" style={{ marginLeft:'auto' }}>+ Suvenir</button>
       </div>
       <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
-         shown.length===0 ? <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>🎁</div><div>Belum ada suvenir</div></div> :
-         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:12 }}>
-           {shown.map(s => {
-             const stock = stockOf(s)
-             const st = STATUS[s.status] || STATUS.usulan
-             return (
-               <div key={s._id} className="card" style={{ padding:14, display:'flex', flexDirection:'column', gap:8 }}>
-                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
-                   <div style={{ minWidth:0 }}>
-                     <div style={{ fontSize:13, fontWeight:700 }}>{s.nama}</div>
-                     {s.deskripsi && <div style={{ fontSize:11, color:'var(--text2)', marginTop:2, lineHeight:1.4 }}>{s.deskripsi}</div>}
-                   </div>
-                   <span className="badge" style={{ fontSize:9, background:st.color+'22', color:st.color, fontWeight:700, flexShrink:0 }}>{st.label}</span>
-                 </div>
-                 <div style={{ display:'flex', gap:12, flexWrap:'wrap', fontSize:11 }}>
-                   {s.hargaSatuan>0 && <span style={{ color:'var(--text2)' }}>💰 Rp {fmt(s.hargaSatuan)}/unit</span>}
-                   {s.jumlahUsulan>0 && <span style={{ color:'var(--text2)' }}>📦 Usul {s.jumlahUsulan}</span>}
-                 </div>
-                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 10px', background:'var(--bg3)', borderRadius:8 }}>
-                   <span style={{ fontSize:11, color:'var(--text3)' }}>Stok tersedia</span>
-                   <span style={{ fontSize:16, fontWeight:800, color: stock>0?'var(--green)':stock<0?'var(--red)':'var(--text3)' }}>{stock}</span>
-                 </div>
-                 {s.link && <a href={s.link} target="_blank" rel="noopener noreferrer" style={{ fontSize:10.5, color:'var(--brand)', wordBreak:'break-all' }}>🔗 {s.link}</a>}
-                 {(s.moves||[]).length>0 && (
-                   <div style={{ borderTop:'1px solid var(--border)', paddingTop:6, maxHeight:110, overflowY:'auto' }}>
-                     {(s.moves||[]).slice().reverse().slice(0,5).map((m:any,i:number)=>(
-                       <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:10, padding:'2px 0' }}>
-                         <span style={{ color:'var(--text3)' }}>{m.date||'—'} · {m.note||(m.type==='in'?'Masuk':'Keluar')}</span>
-                         <span style={{ fontWeight:700, color: m.type==='in'?'var(--green)':'var(--red)' }}>{m.type==='in'?'+':'−'}{m.qty}</span>
-                       </div>
-                     ))}
-                   </div>
-                 )}
-                 <div style={{ display:'flex', gap:6, marginTop:2 }}>
-                   <button onClick={()=>setMoveFor(s)} className="btn btn-sm" style={{ fontSize:10, flex:1 }}>📥 Stok In/Out</button>
-                   <button onClick={()=>setEditing(s)} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>
-                   <button onClick={async()=>{ if(!confirm(`Hapus suvenir "${s.nama}"?`))return; await fetch(`/api/souvenir/${s._id}`,{method:'DELETE'}); toast.success('Dihapus'); load() }} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑</button>
-                 </div>
-               </div>
-             )
-           })}
-         </div>}
+         view==='usulan' ? (
+           usulanRows.length===0 ? <EmptyS text="Belum ada usulan suvenir" /> : (
+             <div className="card" style={{ padding:0, overflowX:'auto' }}>
+               <table className="wp-table" style={{ width:'100%' }}>
+                 <thead><tr>
+                   <th style={{ width:34, textAlign:'center' }}>No</th>
+                   <th>Nama Barang</th>
+                   <th style={{ textAlign:'center', width:90 }}>Jumlah</th>
+                   <th style={{ textAlign:'right', width:130 }}>Harga Satuan</th>
+                   <th style={{ width:120 }}>Link</th>
+                   <th style={{ width:110 }}></th>
+                 </tr></thead>
+                 <tbody>
+                   {usulanRows.map((s,i)=>(
+                     <tr key={s._id}>
+                       <td style={{ textAlign:'center', fontSize:11, color:'var(--text3)' }}>{i+1}</td>
+                       <td>
+                         <div style={{ fontSize:12.5, fontWeight:600 }}>{s.nama}</div>
+                         {s.deskripsi && <div style={{ fontSize:10.5, color:'var(--text3)' }}>{s.deskripsi}</div>}
+                       </td>
+                       <td style={{ textAlign:'center', fontSize:12 }}>{s.jumlahUsulan||0}</td>
+                       <td style={{ textAlign:'right', fontSize:12 }}>{s.hargaSatuan>0?`Rp ${fmt(s.hargaSatuan)}`:'—'}</td>
+                       <td>{s.link ? <a href={s.link} target="_blank" rel="noopener noreferrer" style={{ fontSize:10.5, color:'var(--brand)' }}>🔗 Buka</a> : <span style={{ fontSize:11, color:'var(--text3)' }}>—</span>}</td>
+                       <td style={{ textAlign:'right' }}>
+                         <button onClick={()=>setEditing(s)} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>{' '}
+                         <button onClick={()=>del(s._id,s.nama)} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑</button>
+                       </td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
+           )
+         ) : (
+           stokRows.length===0 ? <EmptyS text="Belum ada barang berstok. Klik 'Stok In/Out' di sebuah suvenir untuk mulai mencatat." /> : (
+             <div className="card" style={{ padding:0, overflowX:'auto' }}>
+               <table className="wp-table" style={{ width:'100%' }}>
+                 <thead><tr>
+                   <th style={{ width:34, textAlign:'center' }}>No</th>
+                   <th>Nama Barang</th>
+                   <th style={{ textAlign:'center', width:120 }}>Stok Tersedia</th>
+                   <th style={{ width:160 }}></th>
+                 </tr></thead>
+                 <tbody>
+                   {stokRows.map((s,i)=>{ const stock = stockOf(s); return (
+                     <tr key={s._id}>
+                       <td style={{ textAlign:'center', fontSize:11, color:'var(--text3)' }}>{i+1}</td>
+                       <td style={{ fontSize:12.5, fontWeight:600 }}>{s.nama}</td>
+                       <td style={{ textAlign:'center', fontSize:15, fontWeight:800, color: stock>0?'var(--green)':stock<0?'var(--red)':'var(--text3)' }}>{stock}</td>
+                       <td style={{ textAlign:'right' }}>
+                         <button onClick={()=>setMoveFor(s)} className="btn btn-sm" style={{ fontSize:10 }}>📥 Stok In/Out</button>{' '}
+                         <button onClick={()=>del(s._id,s.nama)} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑</button>
+                       </td>
+                     </tr>
+                   )})}
+                 </tbody>
+               </table>
+             </div>
+           )
+         )}
+        {view==='usulan' && usulanRows.length>0 && (
+          <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:8 }}>💡 Untuk mulai mencatat stok barang, klik <b>+ Suvenir</b> lalu gunakan tombol <b>Stok In/Out</b> di tab Stok, atau edit barang usulan jadi berstok.</div>
+        )}
       </div>
     </>
   )
 }
 
+function EmptyS({ text }: { text:string }) {
+  return <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>🎁</div><div style={{ fontSize:12 }}>{text}</div></div>
+}
+
 function SuvenirForm({ editing, user, onClose, onSaved }: { editing?:any; user:any; onClose:()=>void; onSaved:()=>void }) {
-  const [f, setF] = useState<any>(() => editing ? { ...editing } : { nama:'', deskripsi:'', hargaSatuan:0, jumlahUsulan:0, link:'', status:'usulan', catatan:'' })
+  const [f, setF] = useState<any>(() => editing ? { ...editing } : { nama:'', deskripsi:'', hargaSatuan:0, jumlahUsulan:0, link:'', catatan:'' })
   const [saving, setSaving] = useState(false)
   const set = (k:string,v:any)=>setF((p:any)=>({...p,[k]:v}))
   async function save() {
@@ -885,11 +915,6 @@ function SuvenirForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
             <div><label style={lbl}>Jumlah Usulan</label><input type="number" min={0} className="input" value={f.jumlahUsulan} onChange={e=>set('jumlahUsulan',Math.max(0,Number(e.target.value)||0))} /></div>
           </div>
           <div><label style={lbl}>Link E-commerce</label><input className="input" value={f.link} onChange={e=>set('link',e.target.value)} placeholder="https://..." /></div>
-          <div><label style={lbl}>Status</label>
-            <select className="input" value={f.status} onChange={e=>set('status',e.target.value)}>
-              <option value="usulan">Usulan</option><option value="disetujui">Disetujui</option>
-              <option value="ditolak">Ditolak</option><option value="stok">Stok</option>
-            </select></div>
           <div><label style={lbl}>Catatan</label><textarea className="input" rows={2} value={f.catatan} onChange={e=>set('catatan',e.target.value)} style={{ resize:'vertical' }} /></div>
         </div>
         <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
