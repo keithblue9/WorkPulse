@@ -631,6 +631,42 @@ function CashierTab({ items, loading, reload }: { items:any[]; loading:boolean; 
   const pending = items.filter(r => ['submitted','approved','draft'].includes(r.status)).filter(inPeriod)
   const done = items.filter(r => ['done','paid','verified','reversal_requested','reversal_approved'].includes(r.status)).filter(inPeriod)
 
+  // ── Pilih beberapa antrian utk hitung total (cashier sering transfer sekaligus) ──
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [showRincian, setShowRincian] = useState(false)
+  const pendingKey = pending.map(r=>r._id).join(',')
+  // Buang pilihan yg sudah tidak ada di antrian (mis. ganti filter / sudah ditransfer)
+  useEffect(() => {
+    const ids = new Set(pending.map(r=>r._id))
+    setSelected(prev => {
+      const next = new Set(Array.from(prev).filter(id => ids.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingKey])
+
+  const toggleOne = (id:string) => setSelected(prev => {
+    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next
+  })
+  const allChecked = pending.length > 0 && pending.every(r => selected.has(r._id))
+  const someChecked = selected.size > 0 && !allChecked
+  const toggleAll = () => setSelected(allChecked ? new Set() : new Set(pending.map(r=>r._id)))
+
+  // Rekap: total keseluruhan + rincian per pengaju & rekening (1 transfer = 1 rekening)
+  const rekap = useMemo(() => {
+    const rows = pending.filter(r => selected.has(r._id))
+    const total = rows.reduce((s,r)=> s + (Number(r.amount)||0), 0)
+    const map = new Map<string, { pengaju:string; bank:string; rek:string; count:number; subtotal:number }>()
+    for (const r of rows) {
+      const key = `${r.userName||'-'}|${r.bank||'-'}|${r.noRekening||'-'}`
+      const g = map.get(key) || { pengaju:r.userName||'—', bank:r.bank||'—', rek:r.noRekening||'—', count:0, subtotal:0 }
+      g.count++; g.subtotal += Number(r.amount)||0
+      map.set(key, g)
+    }
+    const groups = Array.from(map.values()).sort((a,b)=> b.subtotal - a.subtotal)
+    return { rows, total, groups }
+  }, [pending, selected])
+
   const sortP = useSort('submittedAt','desc')
   const pendingSorted = useMemo(()=>sortRows(pending, sortP.sortKey, sortP.sortDir, {
     pengaju:(r:any)=>r.userName||'', kategori:(r:any)=>oeLookup(r.category).name, bank:(r:any)=>r.bank||'',
@@ -658,6 +694,75 @@ function CashierTab({ items, loading, reload }: { items:any[]; loading:boolean; 
   return (
     <>
       {transferring && <TransferModal item={transferring} onClose={()=>setTransferring(null)} onSave={reload} />}
+
+      {/* Popup rincian total yang dicentang */}
+      {showRincian && (
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setShowRincian(false)}>
+          <div className="modal" style={{ width:600, maxWidth:'100%' }}>
+            <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div>
+                <div style={{ fontSize:14, fontWeight:700 }}>Rincian Transfer</div>
+                <div style={{ fontSize:11, color:'var(--text3)' }}>{rekap.rows.length} item dipilih · dikelompokkan per rekening</div>
+              </div>
+              <button onClick={()=>setShowRincian(false)} className="btn btn-icon">×</button>
+            </div>
+            <div style={{ maxHeight:'62vh', overflowY:'auto' }}>
+              <table className="wp-table" style={{ width:'100%' }}>
+                <thead><tr>
+                  <th style={{ width:30, textAlign:'center' }}>No</th>
+                  <th>Pengaju</th>
+                  <th>Bank / Rek</th>
+                  <th style={{ textAlign:'center', width:60 }}>Item</th>
+                  <th style={{ textAlign:'right', width:130 }}>Subtotal</th>
+                </tr></thead>
+                <tbody>
+                  {rekap.groups.map((g,i)=>(
+                    <tr key={i}>
+                      <td style={{ textAlign:'center', fontSize:11, color:'var(--text3)' }}>{i+1}</td>
+                      <td style={{ fontSize:12, fontWeight:600 }}>{g.pengaju}</td>
+                      <td style={{ fontSize:11 }}>{g.bank}<br/><span style={{ color:'var(--text3)', fontSize:10 }}>{g.rek}</span></td>
+                      <td style={{ textAlign:'center', fontSize:11 }}>{g.count}</td>
+                      <td style={{ textAlign:'right', fontSize:12.5, fontWeight:700 }}>Rp {fmt(g.subtotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot><tr style={{ background:'var(--brand-soft)' }}>
+                  <td/><td colSpan={2} style={{ fontSize:12.5, fontWeight:800, color:'var(--brand)' }}>TOTAL</td>
+                  <td style={{ textAlign:'center', fontSize:11, fontWeight:700 }}>{rekap.rows.length}</td>
+                  <td style={{ textAlign:'right', fontSize:14, fontWeight:800, color:'var(--brand)' }}>Rp {fmt(rekap.total)}</td>
+                </tr></tfoot>
+              </table>
+              {/* Daftar item yang dicentang */}
+              <div style={{ padding:'10px 16px', borderTop:'1px solid var(--border)' }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', marginBottom:6 }}>Item yang dipilih</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                  {rekap.rows.map((r:any)=>(
+                    <div key={r._id} style={{ display:'flex', justifyContent:'space-between', gap:8, fontSize:11 }}>
+                      <span style={{ color:'var(--text2)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.userName} · {oeLookup(r.category).name}</span>
+                      <b style={{ flexShrink:0 }}>Rp {fmt(r.amount)}</b>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end' }}>
+              <button onClick={()=>setShowRincian(false)} className="btn">Tutup</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bar total melayang saat ada yang dicentang */}
+      {selected.size > 0 && (
+        <div style={{ position:'fixed', bottom:18, left:'50%', transform:'translateX(-50%)', zIndex:180, background:'var(--bg)', border:'1px solid var(--brand)', borderRadius:12, boxShadow:'0 10px 34px rgba(0,0,0,0.20)', padding:'10px 14px', display:'flex', alignItems:'center', gap:14, flexWrap:'wrap', maxWidth:'calc(100vw - 24px)' }}>
+          <div style={{ display:'flex', flexDirection:'column' }}>
+            <span style={{ fontSize:10, color:'var(--text3)' }}>{selected.size} item · {rekap.groups.length} rekening</span>
+            <span style={{ fontSize:17, fontWeight:800, color:'var(--brand)' }}>Rp {fmt(rekap.total)}</span>
+          </div>
+          <button onClick={()=>setShowRincian(true)} className="btn btn-sm btn-primary">📋 Rincian</button>
+          <button onClick={()=>setSelected(new Set())} className="btn btn-sm">Batal pilih</button>
+        </div>
+      )}
       <div style={{ display:'flex', gap:8, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, alignItems:'center' }}>
         <span style={{ fontSize:11, color:'var(--text3)' }}>Filter (Bill Date):</span>
         <select className="input input-sm" style={{ width:120 }} value={month} onChange={e=>setMonth(Number(e.target.value))}>
@@ -675,8 +780,11 @@ function CashierTab({ items, loading, reload }: { items:any[]; loading:boolean; 
           {loading ? <div style={{ color:'var(--text3)', fontSize:12 }}>Memuat...</div> :
            pending.length === 0 ? <div className="card" style={{ padding:20, textAlign:'center', color:'var(--text3)', fontSize:12 }}>Tidak ada antrian</div> : (
             <div className="card" style={{ overflow:'auto' }}>
-              <table className="wp-table" style={{ minWidth:900 }}>
+              <table className="wp-table" style={{ minWidth:960 }}>
                 <thead><tr>
+                  <th style={{ width:34, textAlign:'center' }}>
+                    <input type="checkbox" checked={allChecked} ref={el=>{ if(el) el.indeterminate = someChecked }} onChange={toggleAll} title="Pilih semua" style={{ cursor:'pointer' }} />
+                  </th>
                   {(()=>{ const sp={ sortKey:sortP.sortKey, sortDir:sortP.sortDir, onSort:sortP.toggle }; return <>
                     <SortTh label="Pengaju" k="pengaju" {...sp} />
                     <SortTh label="Keperluan" k="kategori" {...sp} />
@@ -688,8 +796,13 @@ function CashierTab({ items, loading, reload }: { items:any[]; loading:boolean; 
                   </> })()}
                 </tr></thead>
                 <tbody>
-                  {pendingSorted.map(r => (
-                    <tr key={r._id}>
+                  {pendingSorted.map(r => {
+                    const checked = selected.has(r._id)
+                    return (
+                    <tr key={r._id} style={{ background: checked ? 'var(--brand-soft)' : undefined }}>
+                      <td style={{ textAlign:'center' }}>
+                        <input type="checkbox" checked={checked} onChange={()=>toggleOne(r._id)} style={{ cursor:'pointer' }} />
+                      </td>
                       <td style={{ fontSize:11, fontWeight:600 }}>{r.userName}</td>
                       <td style={{ fontSize:11 }}>{oeLookup(r.category).name}</td>
                       <td style={{ fontSize:11 }}>{r.bank}<br/><span style={{ color:'var(--text3)', fontSize:10 }}>{r.noRekening}</span></td>
@@ -698,7 +811,7 @@ function CashierTab({ items, loading, reload }: { items:any[]; loading:boolean; 
                       <td style={{ fontSize:10 }}>{r.submittedAt?new Date(r.submittedAt).toLocaleDateString('id-ID'):'—'}</td>
                       <td><button onClick={()=>setTransferring(r)} className="btn btn-primary btn-sm">💸 Transfer</button></td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>
