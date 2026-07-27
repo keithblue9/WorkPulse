@@ -78,6 +78,7 @@ function RencanaTab() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
+  const [finalFor, setFinalFor] = useState<any>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -89,6 +90,7 @@ function RencanaTab() {
   return (
     <>
       {(showForm||editing) && <RencanaForm editing={editing} user={user} onClose={()=>{setShowForm(false);setEditing(null)}} onSaved={()=>{setShowForm(false);setEditing(null);load()}} />}
+      {finalFor && <RealisasiFinalModal it={finalFor} user={user} onClose={()=>setFinalFor(null)} onSaved={()=>{setFinalFor(null);load()}} />}
       <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexWrap:'wrap', alignItems:'center', flexShrink:0 }}>
         <select className="input input-sm" style={{ width:130 }} value={month} onChange={e=>setMonth(Number(e.target.value))}>
           <option value={-1}>Semua Bulan</option>{MONTHS.map((m,i)=><option key={i} value={i}>{m}</option>)}
@@ -101,14 +103,14 @@ function RencanaTab() {
       <div style={{ flex:1, overflowY:'auto', padding:'14px 20px', display:'flex', flexDirection:'column', gap:12 }} className="safe-bottom page-pad">
         {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
          items.length===0 ? <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>🎪</div><div>Belum ada rencana event</div></div> :
-         items.map(it => <RABCard key={it._id} it={it} onEdit={()=>setEditing(it)} onDelete={async()=>{ if(!confirm(`Hapus rencana "${it.judulKegiatan||it.namaEO||''}"?`))return; await fetch(`/api/thirdparty/${it._id}`,{method:'DELETE'}); toast.success('Rencana dihapus'); load() }} />)}
+         items.map(it => <RABCard key={it._id} it={it} onReload={load} onFinal={()=>setFinalFor(it)} onEdit={()=>setEditing(it)} onDelete={async()=>{ if(!confirm(`Hapus rencana "${it.judulKegiatan||it.namaEO||''}"?`))return; await fetch(`/api/thirdparty/${it._id}`,{method:'DELETE'}); toast.success('Rencana dihapus'); load() }} />)}
       </div>
     </>
   )
 }
 
 // Kartu Rencana — perbandingan antar OPSI (tabel ke samping) + detail RAB per opsi
-function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:()=>void }) {
+function RABCard({ it, onEdit, onDelete, onReload, onFinal }: { it:any; onEdit:()=>void; onDelete:()=>void; onReload:()=>void; onFinal:()=>void }) {
   const opts = useMemo(()=>optionsOf(it), [it])
   const multi = opts.length > 1
   const [openDetail, setOpenDetail] = useState<number|null>(multi ? null : 0)
@@ -175,6 +177,33 @@ function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:(
           <button onClick={onEdit} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>
           <button onClick={onDelete} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑 Hapus</button>
         </div>
+      </div>
+
+      {/* Checklist pelaksanaan + realisasi final */}
+      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginTop:8, paddingLeft:18, paddingTop:8, borderTop:'1px dashed var(--border)' }}>
+        <label style={{ display:'flex', alignItems:'center', gap:7, fontSize:11.5, cursor:'pointer', fontWeight:600 }}>
+          <input type="checkbox" checked={!!it.executed} onChange={async e=>{
+            const checked = e.target.checked
+            await fetch(`/api/thirdparty/${it._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ executed:checked, executedAt: checked ? new Date().toISOString().slice(0,10) : '' }) })
+            toast.success(checked ? 'Ditandai sudah dilaksanakan' : 'Tanda pelaksanaan dilepas'); onReload()
+          }} style={{ cursor:'pointer', width:15, height:15 }} />
+          <span style={{ color: it.executed ? 'var(--green)' : 'var(--text2)' }}>{it.executed ? '✅ Sudah dilaksanakan' : 'Tandai sudah dilaksanakan'}</span>
+          {it.executed && it.executedAt && <span style={{ fontSize:10, color:'var(--text3)', fontWeight:400 }}>({fmtTgl(it.executedAt)})</span>}
+        </label>
+        {it.executed && (
+          it.finalTotal > 0 ? (
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <span style={{ fontSize:11, color:'var(--text3)' }}>Realisasi final:</span>
+              <span style={{ fontSize:12.5, fontWeight:800, color:'var(--green)' }}>Rp {fmt(it.finalTotal)}</span>
+              {it.estimasiBiaya>0 && (()=>{ const est = calc[recIdx]?.total || it.estimasiBiaya; const diff = it.finalTotal - est; return (
+                <span style={{ fontSize:10, fontWeight:700, color: diff>0?'var(--red)':'var(--green)' }}>{diff>0?'▲':'▼'} Rp {fmt(Math.abs(diff))} vs estimasi</span>
+              )})()}
+              <button onClick={onFinal} className="btn btn-sm" style={{ fontSize:10 }}>Ubah realisasi</button>
+            </div>
+          ) : (
+            <button onClick={onFinal} className="btn btn-sm btn-primary" style={{ fontSize:10.5 }}>+ Input Realisasi Final</button>
+          )
+        )}
       </div>
 
       {/* Ringkasan opsi (selalu tampil) — total tiap opsi berdampingan */}
@@ -1031,6 +1060,155 @@ function StockMoveModal({ item, user, onClose, onSaved }: { item:any; user:any; 
         <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
           <button onClick={onClose} className="btn">Tutup</button>
           <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Simpan'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Input rincian realisasi final (aktif setelah agenda dicentang "sudah dilaksanakan")
+function RealisasiFinalModal({ it, user, onClose, onSaved }: { it:any; user:any; onClose:()=>void; onSaved:()=>void }) {
+  const opts = useMemo(()=>optionsOf(it), [it])
+  // Prefill: kalau sudah pernah isi final pakai itu; kalau belum, ambil dari opsi rekomendasi
+  const recIdx = Math.min(Math.max(Number(it.recommendedIndex)||0, 0), opts.length-1)
+  const [pickedOpt, setPickedOpt] = useState<number>(it.finalOptionIndex>=0 ? it.finalOptionIndex : recIdx)
+  const seed = it.finalTotal>0 ? {
+    finalVenue: it.finalVenue||'', finalKota: it.finalKota||'', finalNamaEO: it.finalNamaEO||'',
+    finalMrPax: it.finalMrPax||0, finalMrDays: it.finalMrDays||0, finalMrPrice: it.finalMrPrice||0,
+    finalBrRooms: it.finalBrRooms||0, finalBrNights: it.finalBrNights||0, finalBrPrice: it.finalBrPrice||0,
+    finalItems: (it.finalItems||[]).map((x:any)=>({ ...x })), finalCatatan: it.finalCatatan||'',
+  } : (()=>{ const o = opts[recIdx]||{}; return {
+    finalVenue: o.venue||'', finalKota: o.kota||'', finalNamaEO: o.namaEO||'',
+    finalMrPax: o.mrPax||0, finalMrDays: o.mrDays||0, finalMrPrice: o.mrPrice||0,
+    finalBrRooms: o.brRooms||0, finalBrNights: o.brNights||0, finalBrPrice: o.brPrice||0,
+    finalItems: (o.others||[]).map((x:any)=>({ ...x })), finalCatatan:'',
+  }})()
+  const [f, setF] = useState<any>(seed)
+  const [saving, setSaving] = useState(false)
+  const set = (k:string,v:any)=>setF((p:any)=>({...p,[k]:v}))
+  const setItem = (i:number,k:string,v:any)=>setF((p:any)=>({ ...p, finalItems: p.finalItems.map((x:any,j:number)=> j===i?{...x,[k]:v}:x) }))
+  const addItem = ()=>setF((p:any)=>({ ...p, finalItems:[...(p.finalItems||[]), { key:'custom', label:'', pax:0, times:1, price:0 }] }))
+  const delItem = (i:number)=>setF((p:any)=>({ ...p, finalItems:(p.finalItems||[]).filter((_:any,j:number)=>j!==i) }))
+
+  // Isi ulang dari opsi tertentu
+  function loadFromOption(idx:number){
+    const o = opts[idx]||{}
+    setPickedOpt(idx)
+    setF({
+      finalVenue:o.venue||'', finalKota:o.kota||'', finalNamaEO:o.namaEO||'',
+      finalMrPax:o.mrPax||0, finalMrDays:o.mrDays||0, finalMrPrice:o.mrPrice||0,
+      finalBrRooms:o.brRooms||0, finalBrNights:o.brNights||0, finalBrPrice:o.brPrice||0,
+      finalItems:(o.others||[]).map((x:any)=>({...x})), finalCatatan: f.finalCatatan||'',
+    })
+  }
+
+  const mr = (Number(f.finalMrPax)||0)*(Number(f.finalMrDays)||0)*(Number(f.finalMrPrice)||0)
+  const br = (Number(f.finalBrRooms)||0)*(Number(f.finalBrNights)||0)*(Number(f.finalBrPrice)||0)
+  const oth = (f.finalItems||[]).reduce((s:number,x:any)=>s+otherTotal(x),0)
+  const sub = mr+br+oth
+  const fee = sub*FEE_RATE
+  const total = sub+fee
+  const estimasi = opts[pickedOpt] ? estimasiOf(opts[pickedOpt])*(1+FEE_RATE) : (Number(it.estimasiBiaya)||0)*(1+FEE_RATE)
+  const diff = total - estimasi
+
+  async function save() {
+    setSaving(true)
+    try {
+      const body = {
+        finalOptionIndex: pickedOpt,
+        finalVenue:f.finalVenue, finalKota:f.finalKota, finalNamaEO:f.finalNamaEO,
+        finalMrPax:f.finalMrPax, finalMrDays:f.finalMrDays, finalMrPrice:f.finalMrPrice,
+        finalBrRooms:f.finalBrRooms, finalBrNights:f.finalBrNights, finalBrPrice:f.finalBrPrice,
+        finalItems:f.finalItems, finalCatatan:f.finalCatatan, finalTotal: total,
+        executed: true,
+      }
+      const r = await fetch(`/api/thirdparty/${it._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+      if (!r.ok) { toast.error('Gagal menyimpan'); return }
+      toast.success('Realisasi final tersimpan'); onSaved()
+    } catch { toast.error('Gagal') } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{ width:640, maxWidth:'100%' }}>
+        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
+          <div><div style={{ fontSize:14, fontWeight:700 }}>Realisasi Final</div><div style={{ fontSize:11, color:'var(--text3)' }}>{it.judulKegiatan||'(tanpa judul)'} · biaya aktual pelaksanaan</div></div>
+          <button onClick={onClose} className="btn btn-icon">×</button>
+        </div>
+        <div style={{ padding:'14px 20px', maxHeight:'72vh', overflowY:'auto', display:'flex', flexDirection:'column', gap:11 }}>
+          {opts.length>1 && (
+            <div>
+              <label style={lbl}>Opsi yang dipakai</label>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {opts.map((o:any,i:number)=>(
+                  <button key={i} onClick={()=>loadFromOption(i)} className="btn btn-sm" style={{ fontSize:10.5, background:pickedOpt===i?'var(--brand-soft)':'var(--bg3)', color:pickedOpt===i?'var(--brand)':'var(--text2)', borderColor:pickedOpt===i?'var(--brand)':'var(--border)' }}>{o.label||`Opsi ${i+1}`}{i===recIdx?' ⭐':''}</button>
+                ))}
+              </div>
+              <div style={{ fontSize:9.5, color:'var(--text3)', marginTop:4 }}>Pilih opsi untuk isi otomatis dari rencana, lalu sesuaikan angka aktualnya.</div>
+            </div>
+          )}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+            <div><label style={lbl}>Venue</label><input className="input input-sm" value={f.finalVenue} onChange={e=>set('finalVenue',e.target.value)} /></div>
+            <div><label style={lbl}>Kota</label><input className="input input-sm" value={f.finalKota} onChange={e=>set('finalKota',e.target.value)} /></div>
+            <div><label style={lbl}>EO</label><input className="input input-sm" value={f.finalNamaEO} onChange={e=>set('finalNamaEO',e.target.value)} /></div>
+          </div>
+
+          <div className="card" style={{ padding:'10px 12px', background:'var(--bg3)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}><span style={{ fontSize:12, fontWeight:600 }}>Meeting Room</span><span style={{ fontSize:11, color:'var(--text2)' }}>Rp {fmt(mr)}</span></div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1.3fr', gap:8 }}>
+              <div><label style={{ ...lbl, fontSize:10 }}>Pax</label><input type="number" min={0} className="input input-sm" value={f.finalMrPax||0} onChange={e=>set('finalMrPax',clampNum(e.target.value))} /></div>
+              <div><label style={{ ...lbl, fontSize:10 }}>Days</label><input type="number" min={0} className="input input-sm" value={f.finalMrDays||0} onChange={e=>set('finalMrDays',clampNum(e.target.value))} /></div>
+              <div><label style={{ ...lbl, fontSize:10 }}>Price/pax/day</label><MoneyInput currency="IDR" className="input input-sm" value={f.finalMrPrice||0} onChange={n=>set('finalMrPrice',clampNum(n))} /></div>
+            </div>
+          </div>
+          <div className="card" style={{ padding:'10px 12px', background:'var(--bg3)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}><span style={{ fontSize:12, fontWeight:600 }}>Bedroom</span><span style={{ fontSize:11, color:'var(--text2)' }}>Rp {fmt(br)}</span></div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1.3fr', gap:8 }}>
+              <div><label style={{ ...lbl, fontSize:10 }}>Rooms</label><input type="number" min={0} className="input input-sm" value={f.finalBrRooms||0} onChange={e=>set('finalBrRooms',clampNum(e.target.value))} /></div>
+              <div><label style={{ ...lbl, fontSize:10 }}>Nights</label><input type="number" min={0} className="input input-sm" value={f.finalBrNights||0} onChange={e=>set('finalBrNights',clampNum(e.target.value))} /></div>
+              <div><label style={{ ...lbl, fontSize:10 }}>Price/room/night</label><MoneyInput currency="IDR" className="input input-sm" value={f.finalBrPrice||0} onChange={n=>set('finalBrPrice',clampNum(n))} /></div>
+            </div>
+          </div>
+
+          <div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+              <span style={{ fontSize:12, fontWeight:600 }}>Others</span>
+              <button onClick={addItem} className="btn btn-sm">+ Item</button>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {(f.finalItems||[]).length===0 && <div style={{ fontSize:10.5, color:'var(--text3)' }}>Belum ada item.</div>}
+              {(f.finalItems||[]).map((o:any,i:number)=>(
+                <div key={i} style={{ display:'grid', gridTemplateColumns:'1.3fr 70px 70px 110px 90px 28px', gap:6, alignItems:'center' }}>
+                  <input className="input input-sm" placeholder="Label" value={o.label||''} onChange={e=>setItem(i,'label',e.target.value)} />
+                  <input type="number" min={0} className="input input-sm" placeholder="Pax" value={o.pax||0} onChange={e=>setItem(i,'pax',clampNum(e.target.value))} />
+                  <input type="number" min={0} className="input input-sm" placeholder="Times" value={o.times||0} onChange={e=>setItem(i,'times',clampNum(e.target.value))} />
+                  <MoneyInput currency="IDR" className="input input-sm" placeholder="Price" value={o.price||0} onChange={n=>setItem(i,'price',clampNum(n))} />
+                  <span style={{ fontSize:10, color:'var(--text2)', textAlign:'right' }}>Rp {fmt(otherTotal(o))}</span>
+                  <button onClick={()=>delItem(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div><label style={lbl}>Catatan Realisasi</label><textarea className="input input-sm" rows={2} value={f.finalCatatan||''} onChange={e=>set('finalCatatan',e.target.value)} style={{ resize:'vertical' }} /></div>
+
+          <div style={{ padding:'12px 14px', background:'var(--brand-soft)', borderRadius:10, border:'1px solid var(--brand)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:2 }}><span>Subtotal</span><b>Rp {fmt(sub)}</b></div>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--amber)', marginBottom:2 }}><span>EO Handling &amp; Mgmt Fee (10%)</span><b>Rp {fmt(fee)}</b></div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', borderTop:'1px solid var(--brand)', paddingTop:6, marginTop:4 }}>
+              <span style={{ fontSize:12, fontWeight:800, color:'var(--brand)' }}>TOTAL REALISASI</span>
+              <span style={{ fontSize:18, fontWeight:800, color:'var(--brand)' }}>Rp {fmt(total)}</span>
+            </div>
+            {estimasi>0 && (
+              <div style={{ fontSize:10.5, textAlign:'right', marginTop:4, fontWeight:700, color: diff>0?'var(--red)':'var(--green)' }}>
+                {diff>0?'▲ Lebih':'▼ Hemat'} Rp {fmt(Math.abs(diff))} dari estimasi (Rp {fmt(estimasi)})
+              </div>
+            )}
+          </div>
+        </div>
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
+          <button onClick={onClose} className="btn">Batal</button>
+          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Simpan Realisasi'}</button>
         </div>
       </div>
     </div>

@@ -77,6 +77,17 @@ const ThirdPartyEventSchema = new Schema({
   nomorInvoice: String,
   tglInvoice: String,
 
+  // ---------- Checklist pelaksanaan + realisasi final (untuk agenda Rencana) ----------
+  executed: { type:Boolean, default:false },        // checklist: agenda sudah dilaksanakan?
+  executedAt: String,                                // tanggal ditandai selesai
+  finalOptionIndex: { type:Number, default:-1 },     // opsi mana yang akhirnya dipakai (-1 = belum pilih)
+  finalItems: { type:[CostItemSchema], default:[] }, // rincian biaya aktual (bebas)
+  finalMrPax: { type:Number, default:0 }, finalMrDays: { type:Number, default:0 }, finalMrPrice: { type:Number, default:0 },
+  finalBrRooms: { type:Number, default:0 }, finalBrNights: { type:Number, default:0 }, finalBrPrice: { type:Number, default:0 },
+  finalVenue: String, finalKota: String, finalNamaEO: String,
+  finalCatatan: String,
+  finalTotal: { type:Number, default:0 },            // snapshot total realisasi final
+
   createdBy: String,
 }, { timestamps:true })
 
