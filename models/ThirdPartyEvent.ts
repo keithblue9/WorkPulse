@@ -11,12 +11,15 @@ const CostItemSchema = new Schema({
   link: String,                          // link e-commerce (opsional)
 }, { _id:false })
 
-// Peserta event (buat opsi rencana)
+// Peserta event — cukup kelompok fungsi/bagian + jumlah orang + keterangan
 const ParticipantSchema = new Schema({
+  fungsi: String,        // Fungsi / Bagian (mis. "Procurement", "Finance")
+  jumlah: { type:Number, default:0 },
+  keterangan: String,
+  // legacy (data lama): nama/jabatan/instansi — dipertahankan biar ga error saat baca
   nama: String,
   jabatan: String,
   instansi: String,
-  catatan: String,
 }, { _id:false })
 
 // Satu OPSI usulan (tim biasanya ajukan >1 opsi ke manager utk dibandingkan:

@@ -17,6 +17,11 @@ const OTHER_DEFAULTS = [
   { key:'voucher', label:'Voucher' },
 ]
 function otherTotal(o:any){ return (Number(o?.pax)||0) * (Number(o?.times)||1) * (Number(o?.price)||0) }
+// Total orang peserta: jumlahkan field jumlah; kalau data lama (pakai nama, tanpa jumlah) hitung per baris
+function pesertaTotal(list:any[]){
+  if (!Array.isArray(list)) return 0
+  return list.reduce((s,p)=> s + (Number(p?.jumlah) || (p?.nama ? 1 : 0)), 0)
+}
 // Estimasi 1 OPSI (sebelum fee)
 function estimasiOf(o:any){
   const mr = (Number(o?.mrPax)||0)*(Number(o?.mrDays)||0)*(Number(o?.mrPrice)||0)
@@ -109,6 +114,7 @@ function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:(
   const [openDetail, setOpenDetail] = useState<number|null>(multi ? null : 0)
   const [detailItem, setDetailItem] = useState<{title:string; items:any[]}|null>(null)
   const [pesertaItem, setPesertaItem] = useState<{title:string; list:any[]}|null>(null)
+  const [expanded, setExpanded] = useState(false)   // default ringkas; klik utk lihat rincian
   const recIdx = Math.min(Math.max(Number(it.recommendedIndex)||0, 0), opts.length-1)
 
   // Hitung biaya tiap opsi
@@ -154,15 +160,16 @@ function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:(
 
   return (
     <div className="card" style={{ padding:'14px 16px' }}>
-      {/* Header agenda */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, marginBottom:10 }}>
-        <div>
+      {/* Header agenda — klik utk buka/tutup rincian */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, marginBottom:expanded?10:0 }}>
+        <div onClick={()=>setExpanded(v=>!v)} style={{ cursor:'pointer', flex:1, minWidth:0 }}>
           <div style={{ display:'flex', alignItems:'center', gap:7, flexWrap:'wrap' }}>
+            <span style={{ fontSize:11, color:'var(--text3)' }}>{expanded?'▾':'▸'}</span>
             <span style={{ fontSize:13, fontWeight:700 }}>{it.judulKegiatan||'(tanpa judul)'}</span>
             <span className="badge" style={{ fontSize:9, background:'var(--bg3)', color:'var(--text2)', fontWeight:700 }}>{opts.length} opsi</span>
           </div>
-          <div style={{ fontSize:11, color:'var(--text3)', marginTop:3 }}>📅 {range}{it.durasiHari?` (${it.durasiHari} hari)`:''} · 👥 {it.jumlahPeserta||0} peserta</div>
-          {it.picInternal && <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:2 }}>PIC: {it.picInternal}</div>}
+          <div style={{ fontSize:11, color:'var(--text3)', marginTop:3, paddingLeft:18 }}>📅 {range}{it.durasiHari?` (${it.durasiHari} hari)`:''} · 👥 {it.jumlahPeserta||0} peserta</div>
+          {it.picInternal && <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:2, paddingLeft:18 }}>PIC: {it.picInternal}</div>}
         </div>
         <div style={{ display:'flex', gap:6 }}>
           <button onClick={onEdit} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>
@@ -170,6 +177,23 @@ function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:(
         </div>
       </div>
 
+      {/* Ringkasan opsi (selalu tampil) — total tiap opsi berdampingan */}
+      {!expanded && (
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:8, paddingLeft:18 }}>
+          {opts.map((o:any,i:number)=>(
+            <div key={i} onClick={()=>setExpanded(true)} style={{ cursor:'pointer', border:`1px solid ${i===recIdx?'var(--brand)':'var(--border)'}`, background:i===recIdx?'var(--brand-soft)':'var(--bg2)', borderRadius:8, padding:'6px 11px', minWidth:130 }}>
+              <div style={{ fontSize:10, color:'var(--text3)', display:'flex', alignItems:'center', gap:4 }}>
+                {o.label||`Opsi ${i+1}`}{i===recIdx && <span title="Rekomendasi tim">⭐</span>}
+                {i===cheapestIdx && <span style={{ fontSize:8, fontWeight:700, color:'var(--green)' }}>· TERMURAH</span>}
+              </div>
+              <div style={{ fontSize:10, color:'var(--text3)', margin:'1px 0' }}>{o.venue||o.kota||'—'}</div>
+              <div style={{ fontSize:13, fontWeight:800, color:i===recIdx?'var(--brand)':i===cheapestIdx?'var(--green)':'var(--text)' }}>Rp {fmt(calc[i].total)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {expanded && <>
       {/* Tabel perbandingan antar opsi */}
       <div style={{ overflowX:'auto' }}>
         <table className="wp-table" style={{ minWidth: 320 + opts.length*130 }}>
@@ -229,11 +253,12 @@ function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:(
               <tr>
                 <td style={{ fontSize:11, color:'var(--text2)', paddingLeft:14 }}>↳ Peserta</td>
                 {opts.map((o:any,i:number)=>{
-                  const n = (o.participants||[]).length
-                  return <td key={i} style={cellNum}>{n>0 ? (
-                    <button onClick={()=>setPesertaItem({ title:`Peserta · ${o.label||`Opsi ${i+1}`}`, list:o.participants })}
+                  const list = o.participants||[]
+                  const total = pesertaTotal(list)
+                  return <td key={i} style={cellNum}>{list.length>0 ? (
+                    <button onClick={()=>setPesertaItem({ title:`Peserta · ${o.label||`Opsi ${i+1}`}`, list })}
                       style={{ background:'var(--bg3)', color:'var(--text)', border:'1px solid var(--border)', borderRadius:6, padding:'2px 8px', fontSize:10.5, fontWeight:600, cursor:'pointer' }}
-                      title="Klik lihat daftar peserta">👥 {n} orang</button>
+                      title="Klik lihat rincian peserta">👥 {total} orang</button>
                   ) : '—'}</td>
                 })}
               </tr>
@@ -281,6 +306,7 @@ function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:(
           <OptionDetailTable o={opts[openDetail]} c={calc[openDetail]} />
         </div>
       )}
+      </>}
 
       {/* Popup rincian item (souvenir/oleh-oleh/dll) */}
       {detailItem && (
@@ -307,27 +333,31 @@ function RABCard({ it, onEdit, onDelete }: { it:any; onEdit:()=>void; onDelete:(
         </div>
       )}
 
-      {/* Popup daftar peserta */}
+      {/* Popup rincian peserta */}
       {pesertaItem && (
         <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setPesertaItem(null)}>
           <div className="modal" style={{ width:520, maxWidth:'100%' }}>
             <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ fontSize:13.5, fontWeight:700 }}>{pesertaItem.title} <span style={{ fontSize:11, fontWeight:400, color:'var(--text3)' }}>({pesertaItem.list.length} orang)</span></span>
+              <span style={{ fontSize:13.5, fontWeight:700 }}>{pesertaItem.title} <span style={{ fontSize:11, fontWeight:400, color:'var(--text3)' }}>({pesertaTotal(pesertaItem.list)} orang)</span></span>
               <button onClick={()=>setPesertaItem(null)} className="btn btn-icon">×</button>
             </div>
             <div style={{ padding:'8px 0', maxHeight:'70vh', overflowY:'auto' }}>
               <table className="wp-table" style={{ width:'100%' }}>
-                <thead><tr><th style={{ width:30, textAlign:'center' }}>No</th><th>Nama</th><th>Jabatan</th><th>Instansi</th></tr></thead>
+                <thead><tr><th style={{ width:30, textAlign:'center' }}>No</th><th>Fungsi / Bagian</th><th style={{ textAlign:'center', width:70 }}>Jumlah</th><th>Keterangan</th></tr></thead>
                 <tbody>
                   {pesertaItem.list.map((p:any,i:number)=>(
                     <tr key={i}>
                       <td style={{ textAlign:'center', fontSize:11, color:'var(--text3)' }}>{i+1}</td>
-                      <td style={{ fontSize:11.5, fontWeight:600 }}>{p.nama||'—'}</td>
-                      <td style={{ fontSize:11, color:'var(--text2)' }}>{p.jabatan||'—'}</td>
-                      <td style={{ fontSize:11, color:'var(--text2)' }}>{p.instansi||'—'}</td>
+                      <td style={{ fontSize:11.5, fontWeight:600 }}>{p.fungsi ?? p.instansi ?? '—'}</td>
+                      <td style={{ textAlign:'center', fontSize:11.5 }}>{p.jumlah || (p.nama?1:0) || '—'}</td>
+                      <td style={{ fontSize:11, color:'var(--text2)' }}>{p.keterangan ?? p.jabatan ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
+                <tfoot><tr style={{ background:'var(--bg3)' }}>
+                  <td/><td style={{ fontSize:11.5, fontWeight:700 }}>Total</td>
+                  <td style={{ textAlign:'center', fontSize:12, fontWeight:800 }}>{pesertaTotal(pesertaItem.list)}</td><td/>
+                </tr></tfoot>
               </table>
             </div>
           </div>
@@ -402,7 +432,7 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
   const setOptOther = (oi:number,k:string,v:any)=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, others:(o.others||[]).map((x:any,j:number)=> j===oi?{...x,[k]:v}:x) }:o) }))
   const addOther = ()=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, others:[...(o.others||[]), { key:'custom', label:'', pax:0, times:1, price:0, detail:'', link:'' }] }:o) }))
   const setPeserta = (pi:number,k:string,v:any)=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, participants:(o.participants||[]).map((x:any,j:number)=> j===pi?{...x,[k]:v}:x) }:o) }))
-  const addPeserta = ()=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, participants:[...(o.participants||[]), { nama:'', jabatan:'', instansi:'' }] }:o) }))
+  const addPeserta = ()=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, participants:[...(o.participants||[]), { fungsi:'', jumlah:0, keterangan:'' }] }:o) }))
   const delPeserta = (pi:number)=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, participants:(o.participants||[]).filter((_:any,j:number)=>j!==pi) }:o) }))
   const delOther = (oi:number)=>setF((p:any)=>({ ...p, options: p.options.map((o:any,i:number)=> i===active?{ ...o, others:(o.others||[]).filter((_:any,j:number)=>j!==oi) }:o) }))
 
@@ -585,13 +615,16 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
                   <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                     {(opt.participants||[]).length===0 && <div style={{ fontSize:10.5, color:'var(--text3)' }}>Belum ada peserta. Klik <b>+ Peserta</b> untuk menambah.</div>}
                     {(opt.participants||[]).map((p:any,i:number)=>(
-                      <div key={i} style={{ display:'grid', gridTemplateColumns:'1.2fr 1fr 1fr 28px', gap:6, alignItems:'center' }}>
-                        <input className="input input-sm" placeholder="Nama" value={p.nama||''} onChange={e=>setPeserta(i,'nama',e.target.value)} />
-                        <input className="input input-sm" placeholder="Jabatan" value={p.jabatan||''} onChange={e=>setPeserta(i,'jabatan',e.target.value)} />
-                        <input className="input input-sm" placeholder="Instansi" value={p.instansi||''} onChange={e=>setPeserta(i,'instansi',e.target.value)} />
+                      <div key={i} style={{ display:'grid', gridTemplateColumns:'1.4fr 80px 1.4fr 28px', gap:6, alignItems:'center' }}>
+                        <input className="input input-sm" placeholder="Fungsi / Bagian" value={p.fungsi ?? p.instansi ?? ''} onChange={e=>setPeserta(i,'fungsi',e.target.value)} />
+                        <input type="number" min={0} className="input input-sm" placeholder="Jumlah" value={p.jumlah||0} onChange={e=>setPeserta(i,'jumlah',clampNum(e.target.value))} />
+                        <input className="input input-sm" placeholder="Keterangan (opsional)" value={p.keterangan ?? p.jabatan ?? ''} onChange={e=>setPeserta(i,'keterangan',e.target.value)} />
                         <button onClick={()=>delPeserta(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
                       </div>
                     ))}
+                    {(opt.participants||[]).length>0 && (
+                      <div style={{ fontSize:10.5, color:'var(--text2)', textAlign:'right', paddingRight:34 }}>Total: <b>{(opt.participants||[]).reduce((s:number,p:any)=>s+(Number(p.jumlah)||0),0)}</b> orang</div>
+                    )}
                   </div>
                 </div>
 
