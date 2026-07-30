@@ -15,6 +15,26 @@ export default function GoLivePage() {
 
   const [seeding, setSeeding] = useState(false)
   const [editApp, setEditApp] = useState<any|null>(null)
+  const [exporting, setExporting] = useState<'excel'|'pdf'|null>(null)
+
+  // Export mengikuti apa yang sedang tampil (filter grup + pencarian)
+  async function doExport(kind:'excel'|'pdf') {
+    if (!view.length) { toast.error('Tidak ada entitas untuk diexport'); return }
+    setExporting(kind)
+    const t = toast.loading(`Menyiapkan ${kind==='excel'?'Excel':'PDF'}…`)
+    try {
+      const parts:string[] = []
+      if (groupFilter!=='all') parts.push(`Grup: ${groupFilter}`)
+      if (q.trim()) parts.push(`Cari: "${q.trim()}"`)
+      const meta = { filterLabel: parts.join(' · ') || undefined }
+      const mod = await import('@/lib/exportGoLive')
+      if (kind==='excel') await mod.exportGoLiveExcel(apps, view, meta)
+      else await mod.exportGoLivePdf(apps, view, meta)
+      toast.success(`${kind==='excel'?'Excel':'PDF'} berhasil diunduh`, { id:t })
+    } catch (e:any) {
+      toast.error(`Gagal export: ${e?.message||'error'}`, { id:t })
+    } finally { setExporting(null) }
+  }
 
   async function patchApp(id:string, patch:any) {
     setApps(p=>p.map(a=>a._id===id?{...a,...patch}:a))
@@ -70,8 +90,14 @@ export default function GoLivePage() {
     <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
       <div style={{padding:'12px 20px',borderBottom:'1px solid var(--border)',background:'var(--bg2)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',flexShrink:0}}>
         <div><div style={{fontSize:14,fontWeight:600}}>🚀 Go-Live</div><div style={{fontSize:11,color:'var(--text3)'}}>Status go-live entitas per aplikasi · sub-fitur + tanggal</div></div>
-        <div style={{display:'flex',gap:8}}>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
           {entities.length===0 && !loading && <button onClick={doSeed} disabled={seeding} className="btn btn-sm" style={{background:'#f59e0b',color:'#fff',border:'none'}}>{seeding?'Importing…':'📥 Import dari Excel'}</button>}
+          <button onClick={()=>doExport('excel')} disabled={!!exporting||view.length===0} className="btn btn-sm" title="Export tabel ke Excel (data asli, bisa difilter)">
+            {exporting==='excel'?'⏳ Excel…':'📊 Excel'}
+          </button>
+          <button onClick={()=>doExport('pdf')} disabled={!!exporting||view.length===0} className="btn btn-sm" title="Export ke PDF (rapi, otomatis banyak halaman)">
+            {exporting==='pdf'?'⏳ PDF…':'📄 PDF'}
+          </button>
           <button onClick={addApp} className="btn btn-sm">+ App</button>
           <button onClick={addEntity} className="btn btn-primary btn-sm">+ Entitas</button>
         </div>

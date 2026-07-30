@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# file hasil export (jangan ikut ke repo)
+golive-*.pdf
+golive-*.xlsx
+.tmptest/
