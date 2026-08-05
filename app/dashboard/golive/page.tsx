@@ -1,5 +1,5 @@
 'use client'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 
 const GROUPS = ['Holding','SH Upstream','SH Gas','SH C&T','SH PNRE','SH R&P','SH Shipping','Others']
@@ -109,20 +109,45 @@ export default function GoLivePage() {
   const yearTotal = useMemo(()=> yearFilter==='all' ? entities.length : entities.filter(e=>liveYears(e).has(yearFilter)).length
   ,[entities,yearFilter])
 
-  const th:React.CSSProperties={padding:'6px 8px',fontSize:9.5,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:0.3,background:'var(--bg2)',borderBottom:'2px solid var(--border)',whiteSpace:'nowrap',textAlign:'center',position:'sticky',top:0,zIndex:2}
+  // Lapisan: header beku (6) > header biasa (5) > body beku (3) > body biasa (auto)
+  const th:React.CSSProperties={padding:'6px 8px',fontSize:9.5,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:0.3,background:'var(--bg2)',borderBottom:'2px solid var(--border)',whiteSpace:'nowrap',textAlign:'center',position:'sticky',top:0,zIndex:5}
   const td:React.CSSProperties={padding:'4px 6px',fontSize:11.5,borderBottom:'1px solid var(--border)',verticalAlign:'middle'}
 
   // ── Freeze pane: kolom identitas (No…Client) menempel saat scroll ke kanan ──
-  // Offset kiri dihitung kumulatif dari lebar kolom sebelumnya.
-  const ID_W = [30, 280, 52, 100, 60]                                  // No, Company, CoCd, HSH, Client
-  const ID_LEFT = ID_W.reduce<number[]>((acc,w,i)=>[...acc, i===0?0:acc[i-1]+ID_W[i-1]], [])
-  const FROZEN_W = ID_W.reduce((a,b)=>a+b,0)
-  // Garis pemisah di kolom terakhir yang dibekukan
-  const edge = (i:number):React.CSSProperties => i===ID_W.length-1 ? { boxShadow:'2px 0 4px -1px rgba(0,0,0,0.12)', borderRight:'2px solid var(--border)' } : {}
-  // Sel header beku (perlu z-index lebih tinggi: menempel atas DAN kiri)
-  const thFreeze = (i:number):React.CSSProperties => ({ ...th, position:'sticky', top:0, left:ID_LEFT[i], zIndex:5, ...edge(i) })
-  // Sel body beku — latar harus solid supaya isi kolom lain tidak menembus saat digeser
-  const tdFreeze = (i:number, even:boolean):React.CSSProperties => ({ ...td, position:'sticky', left:ID_LEFT[i], zIndex:1, background: even?'var(--bg)':'var(--bg2)', ...edge(i) })
+  // Lebar kolom ditentukan browser (table layout auto), jadi offset TIDAK boleh
+  // di-hardcode — harus diukur dari elemen aslinya, kalau tidak kolom bisa
+  // tumpang tindih saat digeser.
+  const ID_COUNT = 5
+  const idRefs = useRef<(HTMLTableCellElement|null)[]>([])
+  const headRow1 = useRef<HTMLTableRowElement|null>(null)
+  const [idLeft, setIdLeft] = useState<number[]>(()=>Array(ID_COUNT).fill(0))
+  const [row1H, setRow1H] = useState(0)   // tinggi baris header pertama
+
+  useLayoutEffect(()=>{
+    const measure = () => {
+      const w = idRefs.current.slice(0,ID_COUNT).map(el=>el?.offsetWidth ?? 0)
+      const next:number[] = []
+      let acc = 0
+      for (let i=0;i<ID_COUNT;i++){ next.push(acc); acc += w[i] }
+      setIdLeft(prev => prev.length===next.length && prev.every((v,i)=>v===next[i]) ? prev : next)
+      const h = headRow1.current?.offsetHeight ?? 0
+      setRow1H(prev => prev===h ? prev : h)
+    }
+    measure()
+    const ro = typeof ResizeObserver!=='undefined' ? new ResizeObserver(measure) : null
+    idRefs.current.slice(0,ID_COUNT).forEach(el=>{ if(el&&ro) ro.observe(el) })
+    if (headRow1.current && ro) ro.observe(headRow1.current)
+    window.addEventListener('resize', measure)
+    return ()=>{ ro?.disconnect(); window.removeEventListener('resize', measure) }
+  },[apps, view.length, loading])
+
+  const isLastFrozen = (i:number) => i===ID_COUNT-1
+  const edge = (i:number):React.CSSProperties => isLastFrozen(i)
+    ? { borderRight:'2px solid var(--border)', boxShadow:'3px 0 5px -2px rgba(0,0,0,0.13)' } : {}
+  // Header beku: menempel atas DAN kiri -> z-index paling tinggi
+  const thFreeze = (i:number):React.CSSProperties => ({ ...th, position:'sticky', top:0, left:idLeft[i], zIndex:6, ...edge(i) })
+  // Body beku: latar solid supaya kolom lain tidak menembus saat digeser
+  const tdFreeze = (i:number, even:boolean):React.CSSProperties => ({ ...td, position:'sticky', left:idLeft[i], zIndex:3, background: even?'var(--bg)':'var(--bg2)', ...edge(i) })
   const totalSubs = apps.reduce((s:number,a:any)=>(a.subFeatures||[]).length + 1 + s, 0) // +1 for date col
 
   return (
@@ -178,15 +203,15 @@ export default function GoLivePage() {
 
         {loading?<div style={{fontSize:12,color:'var(--text3)'}}>Memuat…</div>:(
         <div className="card" style={{padding:0,overflow:'auto',maxHeight:'calc(100vh - 300px)'}}>
-          <table style={{borderCollapse:'collapse',width:'100%',minWidth:FROZEN_W+80+totalSubs*70}}>
+          <table style={{borderCollapse:'collapse',width:'100%',minWidth:600+totalSubs*70}}>
             <thead>
               {/* Row 1: app group headers */}
-              <tr>
-                <th style={{...thFreeze(0),width:ID_W[0]}} rowSpan={2}>No</th>
-                <th style={{...thFreeze(1),width:ID_W[1],minWidth:ID_W[1],maxWidth:ID_W[1],textAlign:'left'}} rowSpan={2}>Company</th>
-                <th style={{...thFreeze(2),width:ID_W[2]}} rowSpan={2}>CoCd</th>
-                <th style={{...thFreeze(3),width:ID_W[3],textAlign:'left'}} rowSpan={2}>HSH</th>
-                <th style={{...thFreeze(4),width:ID_W[4],textAlign:'left'}} rowSpan={2}>Client</th>
+              <tr ref={headRow1}>
+                <th ref={el=>{idRefs.current[0]=el}} style={{...thFreeze(0),width:30}} rowSpan={2}>No</th>
+                <th ref={el=>{idRefs.current[1]=el}} style={{...thFreeze(1),minWidth:260,textAlign:'left'}} rowSpan={2}>Company</th>
+                <th ref={el=>{idRefs.current[2]=el}} style={{...thFreeze(2),width:52}} rowSpan={2}>CoCd</th>
+                <th ref={el=>{idRefs.current[3]=el}} style={{...thFreeze(3),width:100,textAlign:'left'}} rowSpan={2}>HSH</th>
+                <th ref={el=>{idRefs.current[4]=el}} style={{...thFreeze(4),width:70,textAlign:'left'}} rowSpan={2}>Client</th>
                 {apps.map((a:any,ai:number)=>{
                   const subs=(a.subFeatures||[]); const cols=subs.length+1; // subs + date
                   const color=['#4f8ef7','#8b5cf6','#22c55e','#f59e0b','#ec4899','#14b8a6'][ai%6]
@@ -194,12 +219,12 @@ export default function GoLivePage() {
                 })}
                 <th style={{...th,width:30}} rowSpan={2}></th>
               </tr>
-              {/* Row 2: sub-feature headers */}
+              {/* Row 2: sub-feature headers — menempel DI BAWAH baris 1, bukan menimpanya */}
               <tr>
                 {apps.map((a:any)=>{const subs=(a.subFeatures||[]); return(
                   <Fragment key={a._id||a.key}>
-                    <th style={{...th,borderLeft:'2px solid var(--border)',width:110,fontSize:9}}>Tgl</th>
-                    {subs.map((sf:any)=><th key={sf.key} style={{...th,width:48,fontSize:9}}>{sf.label}</th>)}
+                    <th style={{...th,top:row1H,borderLeft:'2px solid var(--border)',width:110,fontSize:9}}>Tgl</th>
+                    {subs.map((sf:any)=><th key={sf.key} style={{...th,top:row1H,width:48,fontSize:9}}>{sf.label}</th>)}
                   </Fragment>
                 )})}
               </tr>
