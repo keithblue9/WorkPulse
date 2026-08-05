@@ -134,9 +134,10 @@ export default function GoLivePage() {
         {/* Summary */}
         {yearFilter!=='all' && (
           <div className="card" style={{padding:'10px 14px',marginBottom:10,borderLeft:'3px solid var(--brand)',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-            <span style={{fontSize:12}}>📅 Go-Live tahun <b>{yearFilter}</b>:</span>
+            <span style={{fontSize:12}}>📅 Ada go-live di tahun <b>{yearFilter}</b>:</span>
             <span style={{fontSize:20,fontWeight:800,color:'var(--brand)'}}>{yearTotal}</span>
             <span style={{fontSize:11.5,color:'var(--text3)'}}>entitas dari total {entities.length}</span>
+            <span style={{fontSize:10.5,color:'var(--text3)',flexBasis:'100%'}}>Kolom aplikasi yang go-live di tahun lain ditampilkan samar — yang pekat = go-live {yearFilter}.</span>
             <button onClick={()=>setYearFilter('all')} className="btn btn-sm" style={{marginLeft:'auto',fontSize:10.5}}>Tampilkan semua tahun</button>
           </div>
         )}
@@ -201,14 +202,18 @@ export default function GoLivePage() {
                   <td style={{...td,fontSize:10.5}}>
                     <input defaultValue={e.client||''} placeholder="—" onBlur={ev=>{if(ev.target.value!==(e.client||'')) patchEntity(e._id,{client:ev.target.value})}} style={{width:56,border:'none',background:'transparent',fontSize:10.5,color:'var(--text2)',padding:0,outline:'none'}}/>
                   </td>
-                  {apps.map((a:any,ai:number)=>{const ap=(e.apps||{})[a.key]||{}; const subs=(a.subFeatures||[]); const color=['#4f8ef7','#8b5cf6','#22c55e','#f59e0b','#ec4899','#14b8a6'][ai%6]; const dateStr=ap.date||''; return(
+                  {apps.map((a:any,ai:number)=>{const ap=(e.apps||{})[a.key]||{}; const subs=(a.subFeatures||[]); const color=['#4f8ef7','#8b5cf6','#22c55e','#f59e0b','#ec4899','#14b8a6'][ai%6]; const dateStr=ap.date||'';
+                    // Saat filter tahun aktif, redupkan aplikasi yang go-live di tahun LAIN
+                    // supaya jelas kolom mana yang relevan dgn tahun terpilih.
+                    const offYear = yearFilter!=='all' && yearOf(dateStr)!==yearFilter
+                    return(
                     <Fragment key={a._id||a.key}>
-                      <td style={{...td,borderLeft:'2px solid var(--border)',textAlign:'center',padding:'3px 4px'}}>
+                      <td style={{...td,borderLeft:'2px solid var(--border)',textAlign:'center',padding:'3px 4px',opacity:offYear?0.28:1}} title={offYear?`Go-live di tahun lain (${yearOf(dateStr)||'belum diisi'})`:undefined}>
                         <input type="month" value={dateStr!=='Not Yet'?dateStr:''} onChange={ev=>setAppDate(e,a.key,ev.target.value)}
                           style={{width:110,border:'1px solid var(--border)',borderRadius:4,padding:'2px 4px',fontSize:10,background:dateStr&&dateStr!=='Not Yet'?`${color}11`:'var(--bg)',color:dateStr&&dateStr!=='Not Yet'?color:'var(--text3)',fontWeight:dateStr&&dateStr!=='Not Yet'?700:400,outline:'none',cursor:'pointer'}} />
                       </td>
                       {subs.map((sf:any)=>{const checked=!!(ap.subs||{})[sf.key]; return(
-                        <td key={sf.key} style={{...td,textAlign:'center',padding:'3px 2px'}}>
+                        <td key={sf.key} style={{...td,textAlign:'center',padding:'3px 2px',opacity:offYear?0.28:1}}>
                           <input type="checkbox" checked={checked} onChange={ev=>setSub(e,a.key,sf.key,ev.target.checked)} style={{width:14,height:14,cursor:'pointer',accentColor:color}}/>
                         </td>
                       )})}
