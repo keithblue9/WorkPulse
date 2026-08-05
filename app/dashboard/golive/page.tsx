@@ -11,6 +11,7 @@ export default function GoLivePage() {
   const [entities, setEntities] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [groupFilter, setGroupFilter] = useState('all')
+  const [yearFilter, setYearFilter] = useState('all')
   const [q, setQ] = useState('')
 
   const [seeding, setSeeding] = useState(false)
@@ -25,6 +26,7 @@ export default function GoLivePage() {
     try {
       const parts:string[] = []
       if (groupFilter!=='all') parts.push(`Grup: ${groupFilter}`)
+      if (yearFilter!=='all') parts.push(`Go-Live ${yearFilter}`)
       if (q.trim()) parts.push(`Cari: "${q.trim()}"`)
       const meta = { filterLabel: parts.join(' · ') || undefined }
       const mod = await import('@/lib/exportGoLive')
@@ -74,13 +76,38 @@ export default function GoLivePage() {
   function setSub(e:any,appKey:string,subKey:string,val:boolean){ const cur=(e.apps||{})[appKey]||{}; const subs={...(cur.subs||{}), [subKey]:val}; const anyDone=Object.values(subs).some(Boolean); patchEntity(e._id,{apps:{...(e.apps||{}), [appKey]:{...cur,subs,done:anyDone}}}) }
   function setAppDate(e:any,appKey:string,date:string){ const cur=(e.apps||{})[appKey]||{}; patchEntity(e._id,{apps:{...(e.apps||{}), [appKey]:{...cur,date}}}) }
 
-  const view = useMemo(()=>entities.filter(e=>groupFilter==='all'||e.group===groupFilter).filter(e=>!q.trim()||(e.name||'').toLowerCase().includes(q.toLowerCase())||String(e.cocd||'').includes(q)),[entities,groupFilter,q])
+  // ── Filter tahun go-live ──
+  // Tanggal go-live disimpan per aplikasi di e.apps[key].date (format 'YYYY-MM').
+  // yearFilter='all' -> semua entitas. Kalau tahun dipilih, entitas tampil bila
+  // ADA aplikasi yang go-live di tahun itu.
+  const yearOf = (d?:string) => { const m = /^(\d{4})-\d{2}$/.exec(String(d||'')); return m ? m[1] : '' }
+  const liveYears = (e:any) => { const s = new Set<string>(); Object.values(e.apps||{}).forEach((ap:any)=>{ const y = yearOf(ap?.date); if (y) s.add(y) }); return s }
+  // Daftar tahun yang benar-benar ada datanya (urut terbaru dulu)
+  const yearOptions = useMemo(()=>{
+    const s = new Set<string>()
+    entities.forEach(e=>liveYears(e).forEach(y=>s.add(y)))
+    return Array.from(s).sort((a,b)=>b.localeCompare(a))
+  },[entities])
 
-  // Summary: per app count entities where done
+  const view = useMemo(()=>entities
+    .filter(e=>groupFilter==='all'||e.group===groupFilter)
+    .filter(e=>yearFilter==='all'||liveYears(e).has(yearFilter))
+    .filter(e=>!q.trim()||(e.name||'').toLowerCase().includes(q.toLowerCase())||String(e.cocd||'').includes(q))
+  ,[entities,groupFilter,yearFilter,q])
+
+  // Summary per aplikasi. Kalau tahun dipilih: hitung entitas yang go-live DI TAHUN ITU.
   const summary = useMemo(()=>apps.map((a:any,i:number)=>{
-    const done=entities.filter(e=>{const ap=(e.apps||{})[a.key]; return ap?.done || (ap?.subs && Object.values(ap.subs).some(Boolean))}).length
+    const done = entities.filter(e=>{
+      const ap=(e.apps||{})[a.key]
+      if (yearFilter!=='all') return yearOf(ap?.date)===yearFilter
+      return ap?.done || (ap?.subs && Object.values(ap.subs).some(Boolean))
+    }).length
     return {...a, done, color:['#4f8ef7','#8b5cf6','#22c55e','#f59e0b','#ec4899','#14b8a6'][i%6]}
-  }),[apps,entities])
+  }),[apps,entities,yearFilter])
+
+  // Total entitas yang go-live (aplikasi apa pun) di tahun terpilih
+  const yearTotal = useMemo(()=> yearFilter==='all' ? entities.length : entities.filter(e=>liveYears(e).has(yearFilter)).length
+  ,[entities,yearFilter])
 
   const th:React.CSSProperties={padding:'6px 8px',fontSize:9.5,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:0.3,background:'var(--bg2)',borderBottom:'2px solid var(--border)',whiteSpace:'nowrap',textAlign:'center',position:'sticky',top:0,zIndex:2}
   const td:React.CSSProperties={padding:'4px 6px',fontSize:11.5,borderBottom:'1px solid var(--border)',verticalAlign:'middle'}
@@ -105,12 +132,21 @@ export default function GoLivePage() {
 
       <div style={{flex:1,overflow:'auto',padding:'16px 20px'}}>
         {/* Summary */}
+        {yearFilter!=='all' && (
+          <div className="card" style={{padding:'10px 14px',marginBottom:10,borderLeft:'3px solid var(--brand)',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <span style={{fontSize:12}}>📅 Go-Live tahun <b>{yearFilter}</b>:</span>
+            <span style={{fontSize:20,fontWeight:800,color:'var(--brand)'}}>{yearTotal}</span>
+            <span style={{fontSize:11.5,color:'var(--text3)'}}>entitas dari total {entities.length}</span>
+            <button onClick={()=>setYearFilter('all')} className="btn btn-sm" style={{marginLeft:'auto',fontSize:10.5}}>Tampilkan semua tahun</button>
+          </div>
+        )}
         <div style={{display:'flex',gap:10,marginBottom:14,flexWrap:'wrap'}}>
-          {summary.map((a:any)=>{const pct=entities.length>0?Math.round(a.done/entities.length*100):0; return(
+          {summary.map((a:any)=>{const denom=yearFilter==='all'?entities.length:yearTotal; const pct=denom>0?Math.round(a.done/denom*100):0; return(
             <div key={a._id||a.key} className="card" style={{padding:'10px 14px',flex:'1 1 140px',minWidth:140,borderLeft:`3px solid ${a.color}`}}>
               <div style={{fontSize:10,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:0.3,marginBottom:3}}>{a.label}</div>
-              <div style={{display:'flex',alignItems:'baseline',gap:5}}><span style={{fontSize:22,fontWeight:800,color:a.color}}>{a.done}</span><span style={{fontSize:10.5,color:'var(--text3)'}}>/ {entities.length}</span></div>
+              <div style={{display:'flex',alignItems:'baseline',gap:5}}><span style={{fontSize:22,fontWeight:800,color:a.color}}>{a.done}</span><span style={{fontSize:10.5,color:'var(--text3)'}}>/ {denom}</span></div>
               <div style={{height:4,background:'var(--bg3)',borderRadius:2,overflow:'hidden',marginTop:5}}><div style={{width:`${pct}%`,height:'100%',background:a.color,transition:'width .3s'}}/></div>
+              {yearFilter!=='all' && <div style={{fontSize:9.5,color:'var(--text3)',marginTop:3}}>go-live di {yearFilter}</div>}
             </div>
           )})}
         </div>
@@ -120,6 +156,9 @@ export default function GoLivePage() {
           <input className="input" placeholder="🔍 Cari entitas / CoCd…" value={q} onChange={e=>setQ(e.target.value)} style={{maxWidth:220,fontSize:12}}/>
           <select className="input" value={groupFilter} onChange={e=>setGroupFilter(e.target.value)} style={{maxWidth:170,fontSize:12}}>
             <option value="all">Semua Grup</option>{GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
+          </select>
+          <select className="input" value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{maxWidth:150,fontSize:12}} title="Lihat entitas yang go-live di tahun tertentu">
+            <option value="all">Semua Tahun</option>{yearOptions.map(y=><option key={y} value={y}>Go-Live {y}</option>)}
           </select>
           <span style={{fontSize:11,color:'var(--text3)'}}>{view.length} entitas</span>
         </div>
