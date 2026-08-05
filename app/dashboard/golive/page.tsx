@@ -111,6 +111,18 @@ export default function GoLivePage() {
 
   const th:React.CSSProperties={padding:'6px 8px',fontSize:9.5,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:0.3,background:'var(--bg2)',borderBottom:'2px solid var(--border)',whiteSpace:'nowrap',textAlign:'center',position:'sticky',top:0,zIndex:2}
   const td:React.CSSProperties={padding:'4px 6px',fontSize:11.5,borderBottom:'1px solid var(--border)',verticalAlign:'middle'}
+
+  // ── Freeze pane: kolom identitas (No…Client) menempel saat scroll ke kanan ──
+  // Offset kiri dihitung kumulatif dari lebar kolom sebelumnya.
+  const ID_W = [30, 280, 52, 100, 60]                                  // No, Company, CoCd, HSH, Client
+  const ID_LEFT = ID_W.reduce<number[]>((acc,w,i)=>[...acc, i===0?0:acc[i-1]+ID_W[i-1]], [])
+  const FROZEN_W = ID_W.reduce((a,b)=>a+b,0)
+  // Garis pemisah di kolom terakhir yang dibekukan
+  const edge = (i:number):React.CSSProperties => i===ID_W.length-1 ? { boxShadow:'2px 0 4px -1px rgba(0,0,0,0.12)', borderRight:'2px solid var(--border)' } : {}
+  // Sel header beku (perlu z-index lebih tinggi: menempel atas DAN kiri)
+  const thFreeze = (i:number):React.CSSProperties => ({ ...th, position:'sticky', top:0, left:ID_LEFT[i], zIndex:5, ...edge(i) })
+  // Sel body beku — latar harus solid supaya isi kolom lain tidak menembus saat digeser
+  const tdFreeze = (i:number, even:boolean):React.CSSProperties => ({ ...td, position:'sticky', left:ID_LEFT[i], zIndex:1, background: even?'var(--bg)':'var(--bg2)', ...edge(i) })
   const totalSubs = apps.reduce((s:number,a:any)=>(a.subFeatures||[]).length + 1 + s, 0) // +1 for date col
 
   return (
@@ -166,15 +178,15 @@ export default function GoLivePage() {
 
         {loading?<div style={{fontSize:12,color:'var(--text3)'}}>Memuat…</div>:(
         <div className="card" style={{padding:0,overflow:'auto',maxHeight:'calc(100vh - 300px)'}}>
-          <table style={{borderCollapse:'collapse',width:'100%',minWidth:600+totalSubs*70}}>
+          <table style={{borderCollapse:'collapse',width:'100%',minWidth:FROZEN_W+80+totalSubs*70}}>
             <thead>
               {/* Row 1: app group headers */}
               <tr>
-                <th style={{...th,width:30}} rowSpan={2}>No</th>
-                <th style={{...th,minWidth:280,textAlign:'left'}} rowSpan={2}>Company</th>
-                <th style={{...th,width:52}} rowSpan={2}>CoCd</th>
-                <th style={{...th,width:100,textAlign:'left'}} rowSpan={2}>HSH</th>
-                <th style={{...th,width:60,textAlign:'left'}} rowSpan={2}>Client</th>
+                <th style={{...thFreeze(0),width:ID_W[0]}} rowSpan={2}>No</th>
+                <th style={{...thFreeze(1),width:ID_W[1],minWidth:ID_W[1],maxWidth:ID_W[1],textAlign:'left'}} rowSpan={2}>Company</th>
+                <th style={{...thFreeze(2),width:ID_W[2]}} rowSpan={2}>CoCd</th>
+                <th style={{...thFreeze(3),width:ID_W[3],textAlign:'left'}} rowSpan={2}>HSH</th>
+                <th style={{...thFreeze(4),width:ID_W[4],textAlign:'left'}} rowSpan={2}>Client</th>
                 {apps.map((a:any,ai:number)=>{
                   const subs=(a.subFeatures||[]); const cols=subs.length+1; // subs + date
                   const color=['#4f8ef7','#8b5cf6','#22c55e','#f59e0b','#ec4899','#14b8a6'][ai%6]
@@ -193,13 +205,13 @@ export default function GoLivePage() {
               </tr>
             </thead>
             <tbody>
-              {view.map((e:any,i:number)=>(
-                <tr key={e._id} style={{background:i%2===0?'transparent':'var(--bg2)'}}>
-                  <td style={{...td,textAlign:'center',color:'var(--text3)',fontSize:10}}>{i+1}</td>
-                  <td style={td}><input defaultValue={e.name||''} placeholder="—" onBlur={ev=>{if(ev.target.value!==e.name) patchEntity(e._id,{name:ev.target.value})}} style={{width:'100%',border:'none',background:'transparent',fontSize:11.5,fontWeight:600,color:'var(--text)',padding:0,outline:'none'}}/></td>
-                  <td style={{...td,textAlign:'center'}}><input defaultValue={e.cocd||''} onBlur={ev=>{if(ev.target.value!==e.cocd) patchEntity(e._id,{cocd:ev.target.value})}} style={{width:48,border:'none',background:'transparent',fontSize:11,color:'var(--text2)',padding:0,outline:'none',textAlign:'center'}}/></td>
-                  <td style={td}><select value={e.group||''} onChange={ev=>patchEntity(e._id,{group:ev.target.value})} style={{width:'100%',border:'1px solid var(--border)',borderRadius:4,padding:'2px 4px',fontSize:10.5,background:'var(--bg)',color:'var(--text)'}}><option value="">—</option>{GROUPS.map(g=><option key={g} value={g}>{g}</option>)}</select></td>
-                  <td style={{...td,fontSize:10.5}}>
+              {view.map((e:any,i:number)=>{const even=i%2===0; return(
+                <tr key={e._id} style={{background:even?'transparent':'var(--bg2)'}}>
+                  <td style={{...tdFreeze(0,even),textAlign:'center',color:'var(--text3)',fontSize:10}}>{i+1}</td>
+                  <td style={tdFreeze(1,even)}><input defaultValue={e.name||''} placeholder="—" onBlur={ev=>{if(ev.target.value!==e.name) patchEntity(e._id,{name:ev.target.value})}} style={{width:'100%',border:'none',background:'transparent',fontSize:11.5,fontWeight:600,color:'var(--text)',padding:0,outline:'none'}}/></td>
+                  <td style={{...tdFreeze(2,even),textAlign:'center'}}><input defaultValue={e.cocd||''} onBlur={ev=>{if(ev.target.value!==e.cocd) patchEntity(e._id,{cocd:ev.target.value})}} style={{width:48,border:'none',background:'transparent',fontSize:11,color:'var(--text2)',padding:0,outline:'none',textAlign:'center'}}/></td>
+                  <td style={tdFreeze(3,even)}><select value={e.group||''} onChange={ev=>patchEntity(e._id,{group:ev.target.value})} style={{width:'100%',border:'1px solid var(--border)',borderRadius:4,padding:'2px 4px',fontSize:10.5,background:'var(--bg)',color:'var(--text)'}}><option value="">—</option>{GROUPS.map(g=><option key={g} value={g}>{g}</option>)}</select></td>
+                  <td style={{...tdFreeze(4,even),fontSize:10.5}}>
                     <input defaultValue={e.client||''} placeholder="—" onBlur={ev=>{if(ev.target.value!==(e.client||'')) patchEntity(e._id,{client:ev.target.value})}} style={{width:56,border:'none',background:'transparent',fontSize:10.5,color:'var(--text2)',padding:0,outline:'none'}}/>
                   </td>
                   {apps.map((a:any,ai:number)=>{const ap=(e.apps||{})[a.key]||{}; const subs=(a.subFeatures||[]); const color=['#4f8ef7','#8b5cf6','#22c55e','#f59e0b','#ec4899','#14b8a6'][ai%6]; const dateStr=ap.date||'';
@@ -221,7 +233,7 @@ export default function GoLivePage() {
                   )})}
                   <td style={{...td,textAlign:'center'}}><button onClick={()=>delEntity(e)} className="btn btn-icon btn-sm" style={{color:'var(--red)',fontSize:10,opacity:0.5}}>🗑</button></td>
                 </tr>
-              ))}
+              )})}
               {view.length===0&&<tr><td colSpan={5+totalSubs+apps.length+1} style={{padding:24,textAlign:'center',fontSize:12,color:'var(--text3)'}}>Belum ada entitas.</td></tr>}
             </tbody>
           </table>
