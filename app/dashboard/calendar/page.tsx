@@ -204,13 +204,23 @@ export default function CalendarPage() {
             <div style={{ textAlign:'center', padding:20, color:'var(--text3)', fontSize:11 }}>Tidak ada aktivitas</div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {selectedDayActivities.map(a => (
+              {selectedDayActivities.map(a => {
+                const pics = picArray(a.pic).length ? picArray(a.pic) : picArray(a.picName)
+                return (
                 <div key={a._id} onClick={()=>setSelected(a)} style={{ padding:'8px 10px', borderRadius:7, cursor:'pointer', border:`1px solid var(--border)`, borderLeft:`3px solid ${catColor(a.category)}`, background:'var(--bg2)' }}>
                   <div style={{ fontSize:12, fontWeight:600 }}>{a.title}</div>
                   <div style={{ fontSize:10, color:'var(--text3)', marginTop:2 }}>{a.category} · {a.subType}</div>
                   {a.startTime && <div style={{ fontSize:10, color:'var(--text2)' }}>🕐 {a.startTime}{a.endTime?' - '+a.endTime:''}</div>}
+                  {pics.length > 0 && (
+                    <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', marginTop:4 }}>
+                      <span style={{ fontSize:10, color:'var(--text3)' }}>👤</span>
+                      {pics.map((p:string,i:number)=>(
+                        <span key={i} style={{ fontSize:9.5, fontWeight:600, padding:'1px 6px', borderRadius:5, background:'var(--brand-soft)', color:'var(--brand)' }}>{p}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
+              )})}
             </div>
           )}
         </div>

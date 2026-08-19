@@ -1,6 +1,6 @@
 'use client'
 import { getConfig } from '@/lib/configCache'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { AppConfig, AttendanceType } from '@/types'
 import toast from 'react-hot-toast'
@@ -125,9 +125,24 @@ export default function AttendancePage() {
   const [showSlotForm, setShowSlotForm] = useState<string|null>(null)
   const [editingSlot, setEditingSlot] = useState<{date:string; slot:any}|null>(null)
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<'calendar'|'cuti'>('calendar')
+  const [view, setView] = useState<'calendar'|'cuti'|'team'>('calendar')
   const [leave, setLeave] = useState<any[]|null>(null)
+  // View "Tim per Hari": lihat siapa saja WFO/WFH/Dinas/dll pada tanggal tertentu
+  const [teamDate, setTeamDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
+  const [teamDocs, setTeamDocs] = useState<any[]|null>(null)
   const year = month.slice(0,4)
+
+  useEffect(() => {
+    if (view !== 'team') return
+    let cancelled = false
+    setTeamDocs(null)
+    fetch(`/api/attendance/overview?from=${teamDate}&to=${teamDate}`)
+      .then(r=>r.json())
+      .then(d=>{ if(!cancelled) setTeamDocs(d.data||[]) })
+      .catch(()=>{ if(!cancelled) setTeamDocs([]) })
+    return ()=>{ cancelled = true }
+  }, [view, teamDate])
+
 
   useEffect(() => {
     if (view !== 'cuti') return
@@ -159,6 +174,35 @@ export default function AttendancePage() {
     { key:'cuti', label:'Cuti', color:'#142a1e', textColor:'#22c55e', active:true },
     { key:'sakit', label:'Sakit', color:'#2a1010', textColor:'#ef4444', active:true },
   ]
+
+  // Kelompokkan anggota tim per kategori kehadiran pada tanggal terpilih.
+  // 1 orang bisa punya beberapa slot (mis. pagi WFO, siang Dinas) -> muncul di tiap kategori,
+  // tapi tidak dobel dalam kategori yang sama.
+  const teamByType = useMemo(() => {
+    if (!teamDocs) return null
+    const byUser = new Map<string, any[]>()
+    for (const doc of teamDocs) {
+      const list = byUser.get(String(doc.userId)) || []
+      list.push(...(doc.slots||[]))
+      byUser.set(String(doc.userId), list)
+    }
+    const groups = (attTypes||[]).map((t:any) => {
+      const seen = new Set<string>()
+      const people:any[] = []
+      for (const m of team) {
+        const slots = byUser.get(String(m.id)) || []
+        const mine = slots.filter((s:any)=>s?.type===t.key)
+        if (mine.length && !seen.has(m.id)) {
+          seen.add(m.id)
+          people.push({ ...m, slots: mine, fullDay: mine.some((s:any)=>slotIsFullDay(s)) })
+        }
+      }
+      return { ...t, people }
+    })
+    const filledIds = new Set(Array.from(byUser.entries()).filter(([,s])=>s.length>0).map(([id])=>id))
+    const belum = team.filter(m => !filledIds.has(String(m.id)))
+    return { groups, belum }
+  }, [teamDocs, team, attTypes])
 
   function getRecord(day: number) {
     const dateStr = `${month}-${String(day).padStart(2,'0')}`
@@ -248,6 +292,7 @@ export default function AttendancePage() {
           <div><div style={{ fontSize:14, fontWeight:600 }}>Absensi Harian</div><div style={{ fontSize:11, color:'var(--text3)' }}>{view==='calendar'?'Klik tanggal untuk tambah slot kehadiran':'Rekap cuti seluruh member dalam setahun'}</div></div>
           <div style={{ display:'flex', gap:4, background:'var(--bg3)', borderRadius:8, padding:3 }}>
             <button onClick={()=>setView('calendar')} className="btn btn-sm" style={{ background:view==='calendar'?'var(--brand)':'transparent', color:view==='calendar'?'#fff':'var(--text2)', border:'none' }}>📅 Kalender</button>
+            <button onClick={()=>setView('team')} className="btn btn-sm" style={{ background:view==='team'?'var(--brand)':'transparent', color:view==='team'?'#fff':'var(--text2)', border:'none' }}>👥 Tim per Hari</button>
             <button onClick={()=>setView('cuti')} className="btn btn-sm" style={{ background:view==='cuti'?'var(--brand)':'transparent', color:view==='cuti'?'#fff':'var(--text2)', border:'none' }}>🌴 Summary Cuti</button>
           </div>
         </div>
@@ -261,6 +306,8 @@ export default function AttendancePage() {
       <div style={{ flex:1, overflow:'auto', padding:'16px 20px' }}>
         {view === 'cuti' ? (
           <CutiSummary team={team} leave={leave} year={year} attTypes={attTypes} />
+        ) : view === 'team' ? (
+          <TeamDayView date={teamDate} setDate={setTeamDate} data={teamByType} total={team.length} />
         ) : (
         <div className="dash-2col" style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:16 }}>
           {/* Calendar */}
@@ -439,6 +486,87 @@ function CutiSummary({ team, leave, year, attTypes }: { team:any[]; leave:any[]|
         ))}
         {rows.length===0 && <div style={{ fontSize:12, color:'var(--text3)', padding:20, textAlign:'center' }} className="card">Belum ada data member.</div>}
       </div>
+    </div>
+  )
+}
+
+// ── View "Tim per Hari": siapa saja WFO / WFH / Dinas / Cuti / dll pada tanggal terpilih ──
+function TeamDayView({ date, setDate, data, total }:{ date:string; setDate:(d:string)=>void; data:any; total:number }) {
+  // Geser tanggal (bisa maju utk lihat rencana besok/lusa)
+  const shift = (n:number) => {
+    const [y,m,d] = date.split('-').map(Number)
+    const dt = new Date(y, (m||1)-1, (d||1)+n)
+    setDate(`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`)
+  }
+  const today = format(new Date(),'yyyy-MM-dd')
+  const labelHari = (() => {
+    const [y,m,d] = date.split('-').map(Number)
+    const dt = new Date(y,(m||1)-1,d||1)
+    return isNaN(dt.getTime()) ? date : dt.toLocaleDateString('id-ID',{ weekday:'long', day:'numeric', month:'long', year:'numeric' })
+  })()
+
+  return (
+    <div style={{ maxWidth:900 }}>
+      {/* Pemilih tanggal */}
+      <div className="card" style={{ padding:'12px 16px', marginBottom:14, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+        <button onClick={()=>shift(-1)} className="btn btn-sm">◀</button>
+        <input type="date" value={date} onChange={e=>e.target.value && setDate(e.target.value)}
+          style={{ border:'1px solid var(--border)', borderRadius:6, padding:'5px 8px', fontSize:12.5, background:'var(--bg)', color:'var(--text)' }} />
+        <button onClick={()=>shift(1)} className="btn btn-sm">▶</button>
+        <button onClick={()=>setDate(today)} className="btn btn-sm" disabled={date===today} style={{ opacity:date===today?0.5:1 }}>Hari Ini</button>
+        <div style={{ marginLeft:'auto', textAlign:'right' }}>
+          <div style={{ fontSize:13, fontWeight:700 }}>{labelHari}</div>
+          {date>today && <div style={{ fontSize:10, color:'var(--amber)' }}>Rencana ke depan</div>}
+        </div>
+      </div>
+
+      {data === null ? (
+        <div style={{ padding:30, textAlign:'center', color:'var(--text3)', fontSize:12 }}>Memuat…</div>
+      ) : (
+        <>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(250px, 1fr))', gap:12 }}>
+            {data.groups.map((g:any) => (
+              <div key={g.key} className="card" style={{ padding:'12px 14px', borderLeft:`3px solid ${g.textColor||'#4f8ef7'}`, opacity:g.people.length?1:0.6 }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                  <span style={{ fontSize:12, fontWeight:700, color:g.textColor||'var(--text)' }}>{g.label}</span>
+                  <span style={{ fontSize:16, fontWeight:800, color:g.people.length?(g.textColor||'var(--text)'):'var(--text3)' }}>{g.people.length}</span>
+                </div>
+                {g.people.length === 0 ? (
+                  <div style={{ fontSize:11, color:'var(--text3)' }}>— tidak ada —</div>
+                ) : (
+                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                    {g.people.map((p:any) => (
+                      <div key={p.id} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11.5 }}>
+                        <span style={{ width:7, height:7, borderRadius:'50%', background:p.color, flexShrink:0 }} />
+                        <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</span>
+                        <span style={{ fontSize:9.5, color:'var(--text3)', flexShrink:0 }}>
+                          {p.fullDay ? 'Full Day' : p.slots.map((s:any)=>slotTimeLabel(s)).join(', ')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Belum mengisi presensi di tanggal ini */}
+          <div className="card" style={{ padding:'12px 14px', marginTop:12, border:'1px dashed var(--border)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.3, marginBottom:6 }}>
+              ⚠️ Belum isi presensi ({data.belum.length} dari {total})
+            </div>
+            {data.belum.length === 0 ? (
+              <div style={{ fontSize:11.5, color:'var(--green)' }}>Semua anggota sudah mengisi. 🎉</div>
+            ) : (
+              <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                {data.belum.map((m:any) => (
+                  <span key={m.id} style={{ fontSize:11, padding:'2px 8px', borderRadius:5, background:'var(--bg3)', color:'var(--text2)', border:'1px solid var(--border)' }}>{m.name}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
