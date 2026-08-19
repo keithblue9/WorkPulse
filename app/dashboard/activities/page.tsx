@@ -64,12 +64,46 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
     progressNotes: editing?.progressNotes || '',
     nextPlan: editing?.nextPlan || '',
     mode: editing?.mode || 'online',
+    offlineScope: editing?.offlineScope || '',
     location: editing?.location || '',
     startTime: editing?.startTime || '',
     endTime: editing?.endTime || '',
   })
   const [saving, setSaving] = useState(false)
   const set = (k:string, v:any) => setForm(f=>({...f, [k]:v}))
+
+  // Rentang tanggal aktivitas (inklusif) — presensi diisi untuk tiap harinya.
+  function datesOf(start:string, end?:string): string[] {
+    if (!start) return []
+    if (!end || end === start) return [start]
+    const [ys,ms,ds] = start.split('-').map(Number)
+    const [ye,me,de] = end.split('-').map(Number)
+    const a = new Date(ys,(ms||1)-1,ds||1), b = new Date(ye,(me||1)-1,de||1)
+    if (isNaN(a.getTime()) || isNaN(b.getTime()) || b <= a) return [start]
+    const out:string[] = []; const cur = new Date(a); let guard = 0
+    while (cur <= b && guard < 366) {
+      guard++
+      out.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`)
+      cur.setDate(cur.getDate()+1)
+    }
+    return out
+  }
+
+  // Isi/cabut presensi PIC untuk aktivitas offline (best-effort:
+  // kalau gagal, aktivitas tetap tersimpan).
+  async function syncAttendance(activityId:string, f:any, dates:string[]) {
+    try {
+      const r = await fetch('/api/attendance/sync-activity', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ activityId, mode:f.mode, offlineScope:f.offlineScope, pics:f.pic||[], dates,
+          title:f.title, startTime:f.startTime, endTime:f.endTime }) })
+      const info = (await r.json().catch(()=>null))?.data
+      if (info?.created > 0) {
+        const label = f.offlineScope === 'luar' ? 'Dinas Luar Kota' : 'Izin / Meeting Luar Kantor'
+        toast.success(`Presensi ${label} terisi untuk ${info.userIds} PIC`, { duration: 3000 })
+      }
+      if (info?.unmatched?.length) toast(`PIC belum terdaftar di Member: ${info.unmatched.join(', ')}`, { icon:'⚠️' })
+    } catch { /* diamkan */ }
+  }
 
   // Generate the list of start dates for a recurring activity (capped for safety)
   function buildRecurrenceDates(startStr:string, freq:string, endStr:string): string[] {
@@ -104,6 +138,7 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
         const r = await fetch(`/api/projects/${editing._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ ...form, picName: form.pic[0] || '', members: form.pic }) })
         if (!r.ok) { const e = await r.json(); toast.error('Gagal: '+(e.error||r.statusText)); return }
+        await syncAttendance(editing._id, form, datesOf(form.actionDate, form.actionDateEnd))
         toast.success('Diperbarui!'); onSave(); onClose(); return
       }
       // NEW: handle recurrence by creating one activity per occurrence
@@ -117,7 +152,11 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
         const showInList = form.recurrence ? (form.recurrenceShowAll || i === 0) : true
         const r = await fetch('/api/projects', { method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ ...form, actionDate: d, actionDateEnd:'', recurrenceGroupId: groupId, showInList, picName: form.pic[0] || '', members: form.pic }) })
-        if (r.ok) ok++
+        if (r.ok) {
+          ok++
+          // Aktivitas offline -> presensi PIC otomatis terisi (dinas / izin meeting luar kantor)
+          try { const created = await r.json(); if (created?.data?._id) await syncAttendance(created.data._id, form, [d]) } catch {}
+        }
       }
       if (ok === 0) { toast.error('Gagal membuat aktivitas'); return }
       toast.success(dates.length>1 ? `${ok} aktivitas berulang dibuat!` : 'Aktivitas dibuat!'); onSave(); onClose()
@@ -127,6 +166,8 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
   async function del() {
     if (!confirm('Hapus aktivitas ini?')) return
     await fetch(`/api/projects/${editing._id}`, { method:'DELETE' })
+    // Cabut slot presensi yang dibuat otomatis dari aktivitas ini
+    await syncAttendance(editing._id, { ...form, mode:'online' }, [])
     toast.success('Dihapus'); onSave(); onClose()
   }
 
@@ -242,8 +283,26 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
               </div></div>
           </div>
           {form.mode === 'offline' && (
-            <div><label style={lbl}>Lokasi (Offline)</label>
-              <input className="input" value={form.location} onChange={e=>set('location', e.target.value)} placeholder="Gedung, ruangan, kota..." /></div>
+            <>
+              <div><label style={lbl}>Lokasi (Offline)</label>
+                <input className="input" value={form.location} onChange={e=>set('location', e.target.value)} placeholder="Gedung, ruangan, kota..." /></div>
+              <div>
+                <label style={lbl}>Area Offline</label>
+                <div style={{ display:'flex', gap:8 }}>
+                  {([['jakarta','🏙️ Jakarta'],['luar','✈️ Luar Jakarta']] as const).map(([val,label])=>(
+                    <label key={val} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'8px 12px', borderRadius:7, cursor:'pointer', fontSize:12, background:form.offlineScope===val?'var(--brand-soft)':'var(--bg3)', border:`1px solid ${form.offlineScope===val?'var(--brand)':'var(--border2)'}`, color:form.offlineScope===val?'var(--brand)':'var(--text2)' }}>
+                      <input type="radio" checked={form.offlineScope===val} onChange={()=>set('offlineScope',val)} style={{ display:'none' }} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                {form.offlineScope && (
+                  <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:5 }}>
+                    Presensi PIC otomatis diisi <b style={{ color:'var(--brand)' }}>{form.offlineScope==='luar' ? 'Dinas Luar Kota' : 'Izin / Meeting Luar Kantor'}</b> untuk tanggal kegiatan.
+                  </div>
+                )}
+              </div>
+            </>
           )}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
             <div><label style={lbl}>Mulai (opsional)</label>

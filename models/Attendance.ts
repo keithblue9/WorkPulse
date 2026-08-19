@@ -6,6 +6,9 @@ const TimeSlotSchema = new Schema({
   startTime: String,   // "08:00" or "fullday"
   endTime: String,     // "17:00"
   isFullDay: { type: Boolean, default: false },
+  // Diisi kalau slot dibuat otomatis dari aktivitas offline (Activities).
+  // Dipakai untuk mencabut/menyegarkan slot saat aktivitas diubah atau dihapus.
+  sourceActivityId: String,
   note: String,
 }, { _id: true })
 

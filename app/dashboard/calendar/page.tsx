@@ -125,10 +125,16 @@ export default function CalendarPage() {
   const gridEnd = endOfWeek(monthEnd, { weekStartsOn:1 })
   const days = eachDayOfInterval({ start: gridStart, end: gridEnd })
 
+  // Aktivitas yang sudah Delayed / Completed tidak perlu tampil di kalender
+  // (kalender fokus ke agenda yang masih berjalan).
+  const HIDDEN_STATUS = ['delayed','completed','done','finished','closed','selesai']
+  const isHiddenStatus = (a:any) => HIDDEN_STATUS.includes(String(a?.status||'').toLowerCase())
+
   function activitiesOn(d:Date) {
     const ds = format(d,'yyyy-MM-dd')
     return activities.filter(a => {
       if (!a.actionDate) return false
+      if (isHiddenStatus(a)) return false
       const start = a.actionDate
       const end = a.actionDateEnd || a.actionDate   // single-day if no end
       return ds >= start && ds <= end               // string compare works for yyyy-MM-dd

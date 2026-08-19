@@ -26,6 +26,9 @@ const ProjectSchema = new Schema({
   targetWeek: String,
   // NEW: Offline/Online + location
   mode: { type: String, enum:['online','offline'], default:'online' },
+  // Khusus offline: di Jakarta -> presensi "Izin / Meeting Luar Kantor",
+  // luar Jakarta -> presensi "Dinas Luar Kota"
+  offlineScope: { type: String, enum:['jakarta','luar',''], default:'' },
   location: String,
   // For Calendar display
   startTime: String,
