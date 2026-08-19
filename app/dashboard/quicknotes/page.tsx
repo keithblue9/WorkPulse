@@ -26,6 +26,7 @@ export default function QuickNotesPage() {
   const [loading, setLoading] = useState(true)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [shareOpenId, setShareOpenId] = useState<string | null>(null)
+  const [justCreatedId, setJustCreatedId] = useState<string | null>(null)
   const [reminderOpenId, setReminderOpenId] = useState<string | null>(null)
   const checkedOnce = useRef(false)
 
@@ -52,9 +53,11 @@ export default function QuickNotesPage() {
   }, [])
 
   async function createNote() {
-    const res = await fetch('/api/quicknotes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Catatan baru', items: [{ id: uid(), text: '', checked: false, type: 'bullet' }] }) })
+    // Judul sengaja dikosongkan supaya user langsung mengetik (input di-autofocus),
+    // tidak perlu menghapus teks "Catatan baru" dulu.
+    const res = await fetch('/api/quicknotes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: '', items: [{ id: uid(), text: '', checked: false, type: 'bullet' }] }) })
     const d = await res.json()
-    if (d.data) { setNotes(n => [d.data, ...n]); setDetailId(d.data._id) }
+    if (d.data) { setNotes(n => [d.data, ...n]); setDetailId(d.data._id); setJustCreatedId(d.data._id) }
     else toast.error(d.error || 'Gagal membuat catatan')
   }
 
@@ -197,10 +200,11 @@ export default function QuickNotesPage() {
               {/* header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
                 <input value={note.title} disabled={!canEdit}
+                  autoFocus={justCreatedId === note._id}
                   onChange={e => setNotes(n => n.map(x => x._id === note._id ? { ...x, title: e.target.value } : x))}
-                  onBlur={e => patchNote(note._id, { title: e.target.value }, false)}
-                  placeholder="Judul catatan"
-                  style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 16, fontWeight: 700, color: 'var(--text)', outline: 'none' }} />
+                  onBlur={e => { patchNote(note._id, { title: e.target.value }, false); if (justCreatedId === note._id) setJustCreatedId(null) }}
+                  placeholder="Judul catatan…"
+                  style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 18, fontWeight: 700, color: 'var(--text)', outline: 'none', padding: '2px 0' }} />
                 <button onClick={() => { setDetailId(null); setReminderOpenId(null); setShareOpenId(null) }} className="btn btn-icon btn-sm" style={{ marginLeft: 8 }}>✕</button>
               </div>
 
@@ -216,8 +220,8 @@ export default function QuickNotesPage() {
                           onChange={e => { setItemText(note, item.id, e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
                           onBlur={e => { commitItemText(note); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
                           onFocus={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
-                          rows={1} placeholder="Tulis paragraf / catatan bebas…"
-                          style={{ flex: 1, border: 'none', background: 'var(--bg2)', borderRadius: 8, padding: '9px 11px', fontSize: 13, color: 'var(--text)', outline: 'none', resize: 'none', overflow: 'hidden', lineHeight: 1.6, fontFamily: 'inherit', minHeight: '1.6em' }} />
+                          rows={1} placeholder="Tulis catatan…"
+                          style={{ flex: 1, border: 'none', background: 'var(--bg2)', borderRadius: 8, padding: '11px 13px', fontSize: 14.5, color: 'var(--text)', outline: 'none', resize: 'none', overflow: 'hidden', lineHeight: 1.65, fontFamily: 'inherit', minHeight: '1.6em' }} />
                         {canEdit && <button onClick={() => removeItem(note, item.id)} style={{ background: 'transparent', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 12, padding: '4px 2px', opacity: 0.6 }}>✕</button>}
                       </div>
                     )
@@ -225,17 +229,17 @@ export default function QuickNotesPage() {
                   return (
                     <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                       <button onClick={() => canEdit && toggleItemChecked(note, item.id)} style={{
-                        marginTop: 3, width: 17, height: 17, borderRadius: item.type === 'number' ? 4 : '50%',
+                        marginTop: 3, width: 21, height: 21, borderRadius: item.type === 'number' ? 5 : '50%',
                         border: `1.5px solid ${item.checked ? 'var(--brand)' : 'var(--border)'}`,
-                        background: item.checked ? 'var(--brand)' : 'transparent', color: '#fff', fontSize: 10,
+                        background: item.checked ? 'var(--brand)' : 'transparent', color: '#fff', fontSize: 12,
                         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: canEdit ? 'pointer' : 'default', padding: 0,
                       }}>{item.checked ? '✓' : (item.type === 'number' ? numberCounter : '')}</button>
                       <textarea value={item.text} disabled={!canEdit}
                         onChange={e => { setItemText(note, item.id, e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
                         onBlur={e => { commitItemText(note); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
                         onFocus={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
-                        rows={1} placeholder="Item to-do…"
-                        style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 13, color: item.checked ? 'var(--text3)' : 'var(--text)', textDecoration: item.checked ? 'line-through' : 'none', outline: 'none', padding: '2px 0', resize: 'none', overflow: 'hidden', lineHeight: 1.5, fontFamily: 'inherit', minHeight: '1.5em' }} />
+                        rows={1} placeholder="Tulis item to-do…"
+                        style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 14.5, color: item.checked ? 'var(--text3)' : 'var(--text)', textDecoration: item.checked ? 'line-through' : 'none', outline: 'none', padding: '3px 0', resize: 'none', overflow: 'hidden', lineHeight: 1.6, fontFamily: 'inherit', minHeight: '1.6em' }} />
                       {canEdit && <button onClick={() => removeItem(note, item.id)} style={{ background: 'transparent', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 12, padding: '2px', opacity: 0.6, marginTop: 2 }}>✕</button>}
                     </div>
                   )
@@ -252,20 +256,23 @@ export default function QuickNotesPage() {
               )}
 
               {/* footer: reminder + share */}
-              <div style={{ display: 'flex', gap: 6, padding: '10px 18px 14px', borderTop: '1px solid var(--border)', position: 'relative' }}>
+              <div style={{ display: 'flex', gap: 8, padding: '12px 18px 16px', borderTop: '1px solid var(--border)', position: 'relative', flexWrap: 'wrap' }}>
                 <div style={{ position: 'relative' }}>
-                  <button onClick={() => { setReminderOpenId(reminderOpenId === note._id ? null : note._id); setShareOpenId(null) }} className="btn btn-sm" style={{ fontSize: 11 }}>
+                  <button onClick={() => { setReminderOpenId(reminderOpenId === note._id ? null : note._id); setShareOpenId(null) }} className="btn btn-sm" style={{ fontSize: 12.5, padding: '7px 13px' }}>
                     🔔 {note.reminder?.enabled ? reminderLabel(note.reminder) : 'Reminder'}
                   </button>
                   {reminderOpenId === note._id && <ReminderEditor note={note} onSave={r => saveReminder(note, r)} onClose={() => setReminderOpenId(null)} />}
                 </div>
                 {isOwner && (
-                  <div style={{ position: 'relative' }}>
-                    <button onClick={() => { setShareOpenId(shareOpenId === note._id ? null : note._id); setReminderOpenId(null) }} className="btn btn-sm" style={{ fontSize: 11 }}>📤 Share</button>
+                  <>
+                    <button onClick={() => { setShareOpenId(note._id); setReminderOpenId(null) }} className="btn btn-sm"
+                      style={{ fontSize: 12.5, padding: '7px 13px', background: note.sharedWith?.length ? 'var(--brand-soft)' : undefined, color: note.sharedWith?.length ? 'var(--brand)' : undefined, borderColor: note.sharedWith?.length ? 'var(--brand)' : undefined }}>
+                      📤 {note.sharedWith?.length ? `Dishare ke ${note.sharedWith.length}` : 'Share'}
+                    </button>
                     {shareOpenId === note._id && <ShareEditor note={note} members={members} onSave={list => saveShare(note, list)} onClose={() => setShareOpenId(null)} />}
-                  </div>
+                  </>
                 )}
-                {isOwner && <button onClick={() => { deleteNote(note._id); setDetailId(null) }} className="btn btn-sm" style={{ fontSize: 11, marginLeft: 'auto', color: 'var(--red)' }}>🗑️ Hapus</button>}
+                {isOwner && <button onClick={() => { deleteNote(note._id); setDetailId(null) }} className="btn btn-sm" style={{ fontSize: 12.5, padding: '7px 13px', marginLeft: 'auto', color: 'var(--red)' }}>🗑️ Hapus</button>}
               </div>
             </div>
           </div>
@@ -362,28 +369,82 @@ function ReminderEditor({ note, onSave, onClose }: { note: QuickNote; onSave: (r
 
 function ShareEditor({ note, members, onSave, onClose }: { note: QuickNote; members: any[]; onSave: (list: string[]) => void; onClose: () => void }) {
   const [selected, setSelected] = useState<string[]>(note.sharedWith || [])
-  const ref = useRef<HTMLDivElement>(null)
+  const [q, setQ] = useState('')
+
+  // Tutup dengan tombol Esc
   useEffect(() => {
-    function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) onClose() }
-    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
   function toggle(email: string) { setSelected(s => s.includes(email) ? s.filter(x => x !== email) : [...s, email]) }
 
+  const shown = members.filter(m => {
+    const t = q.trim().toLowerCase()
+    return !t || String(m.name || '').toLowerCase().includes(t) || String(m.email || '').toLowerCase().includes(t)
+  })
+  const allShownSelected = shown.length > 0 && shown.every(m => selected.includes(m.email))
+  const initial = (n: string) => String(n || '?').trim().charAt(0).toUpperCase()
+
   return (
-    <div ref={ref} className="card scale-in" style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, width: 240, padding: 10, zIndex: 50, boxShadow: '0 12px 30px rgba(0,0,0,0.18)' }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Share ke member</div>
-      <div style={{ fontSize: 10, color: 'var(--text3)', marginBottom: 8 }}>Member yang dipilih bisa lihat & edit catatan ini.</div>
-      <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {members.map(m => (
-          <label key={m.email} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--text2)', padding: '5px 4px', borderRadius: 6, cursor: 'pointer' }}>
-            <input type="checkbox" checked={selected.includes(m.email)} onChange={() => toggle(m.email)} />
-            {m.name}
-          </label>
-        ))}
-        {members.length === 0 && <div style={{ fontSize: 11, color: 'var(--text3)', padding: 6 }}>Tidak ada member lain</div>}
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal" style={{ width: 460, maxWidth: '100%', display: 'flex', flexDirection: 'column', maxHeight: '85vh' }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>📤 Share Catatan</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 3 }}>Member terpilih bisa melihat &amp; mengedit catatan ini.</div>
+          </div>
+          <button onClick={onClose} className="btn btn-icon">×</button>
+        </div>
+
+        <div style={{ padding: '12px 20px 0' }}>
+          <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="🔍 Cari nama member…"
+            style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px', fontSize: 13.5, background: 'var(--bg)', color: 'var(--text)', outline: 'none' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+              {selected.length > 0 ? <><b style={{ color: 'var(--brand)' }}>{selected.length}</b> member dipilih</> : 'Belum ada yang dipilih'}
+            </span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => setSelected(s => allShownSelected ? s.filter(e => !shown.some(m => m.email === e)) : Array.from(new Set([...s, ...shown.map(m => m.email)])))}
+                className="btn btn-sm" style={{ fontSize: 11.5 }} disabled={shown.length === 0}>
+                {allShownSelected ? 'Batal pilih semua' : 'Pilih semua'}
+              </button>
+              {selected.length > 0 && <button onClick={() => setSelected([])} className="btn btn-sm" style={{ fontSize: 11.5 }}>Kosongkan</button>}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px 4px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {shown.length === 0 && (
+            <div style={{ fontSize: 12.5, color: 'var(--text3)', padding: '24px 6px', textAlign: 'center' }}>
+              {members.length === 0 ? 'Tidak ada member lain.' : 'Tidak ada member yang cocok dengan pencarian.'}
+            </div>
+          )}
+          {shown.map(m => {
+            const on = selected.includes(m.email)
+            return (
+              <label key={m.email} onClick={e => e.preventDefault()} role="button"
+                onMouseDown={() => toggle(m.email)}
+                style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                  background: on ? 'var(--brand-soft)' : 'transparent', border: `1px solid ${on ? 'var(--brand)' : 'transparent'}` }}>
+                <span style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: on ? 'var(--brand)' : 'var(--bg3)', color: on ? '#fff' : 'var(--text2)', fontSize: 14, fontWeight: 700 }}>{initial(m.name)}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name || m.email}</span>
+                  {m.email && <span style={{ display: 'block', fontSize: 11, color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.email}</span>}
+                </span>
+                <span style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: `2px solid ${on ? 'var(--brand)' : 'var(--border2)'}`, background: on ? 'var(--brand)' : 'transparent', color: '#fff', fontSize: 13, fontWeight: 700 }}>{on ? '✓' : ''}</span>
+              </label>
+            )
+          })}
+        </div>
+
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button onClick={onClose} className="btn">Batal</button>
+          <button onClick={() => onSave(selected)} className="btn btn-primary">Simpan</button>
+        </div>
       </div>
-      <button onClick={() => onSave(selected)} className="btn btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}>Simpan</button>
     </div>
   )
 }
