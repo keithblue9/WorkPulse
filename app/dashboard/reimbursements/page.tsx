@@ -386,7 +386,7 @@ function DetailModal({ item, onClose, onDelete, onEdit }: { item:any; onClose:()
             </div>
           )}
           {item.documents?.length > 0 && (
-            <EvidenceList documents={item.documents} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
+            <EvidenceList itemId={item._id} documents={item.documents} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
           )}
         </div>
         {(onDelete || onEdit) && (
@@ -477,7 +477,7 @@ function TransferModal({ item, onClose, onSave }: { item:any; onClose:()=>void; 
           <div>
             <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text3)', marginBottom:4 }}><span>Bill Date: {billStr}</span></div>
             {(item.documents||[]).length>0
-              ? <EvidenceList documents={item.documents} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
+              ? <EvidenceList itemId={item._id} documents={item.documents} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
               : <div style={{ fontSize:11, color:'var(--red)' }}>Belum ada evidence.</div>}
           </div>
 
@@ -636,7 +636,13 @@ function PengajuanTab({ items, loading, reload, user, isAdminish }: { items:any[
       {(showForm||editing) && <ReimburseForm editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={reload} />}
       {viewing && <DetailModal item={viewing} onClose={()=>setViewing(null)}
         onDelete={viewing.status==='rejected'?()=>deleteItem(viewing):undefined}
-        onEdit={viewing.status==='clarification' && (viewing.userName===user?.name || viewing.userId===user?.id || viewing.userId===user?.email) ? ()=>{ setEditing(viewing); setViewing(null) } : undefined} />}
+        onEdit={viewing.status==='clarification' && (viewing.userName===user?.name || viewing.userId===user?.id || viewing.userId===user?.email) ? async ()=>{
+          // Daftar dimuat tanpa isi file — ambil versi lengkap dulu agar evidence lama
+          // tidak hilang saat pengajuan dikirim ulang.
+          const { fetchFullReimbursement } = await import('@/lib/reimbursementDetail')
+          const full = await fetchFullReimbursement(viewing._id)
+          setEditing(full || viewing); setViewing(null)
+        } : undefined} />}
 
       <div style={{ display:'flex', gap:8, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, alignItems:'center', flexWrap:'wrap' }}>
         <button onClick={()=>setStatusTab('all')} style={chip(statusTab==='all')}>Semua ({stats.all})</button>

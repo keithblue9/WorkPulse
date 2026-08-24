@@ -8,16 +8,41 @@ function isPdf(d:any){ const t=(d.type||parseMime(d.url)||'').toLowerCase(); ret
 const SLOT_LABELS: Record<string,string> = { calmeet:'Calmeet', invoice:'Invoice', dokumentasi:'Dokumentasi', buktitf:'Bukti TF' }
 function slotLabel(slot?:string){ return SLOT_LABELS[String(slot||'')] || '' }
 
-export function EvidenceList({ documents, zipName='evidence' }:{ documents:any[]; zipName?:string }) {
+export function EvidenceList({ documents, zipName='evidence', itemId }:{ documents:any[]; zipName?:string; itemId?:string }) {
   const [preview, setPreview] = useState<any>(null)
-  const docs = Array.isArray(documents) ? documents : []
+  const [full, setFull] = useState<any[]|null>(null)
+  const [busy, setBusy] = useState(false)
+  const metaDocs = Array.isArray(documents) ? documents : []
+  const docs = full || metaDocs
+
+  // Daftar dikirim tanpa isi file (documents.url) supaya ringan.
+  // Isi file baru diambil saat benar-benar dibutuhkan (preview / download).
+  async function ensureLoaded(): Promise<any[]> {
+    if (full) return full
+    if (metaDocs.every(d => !!d?.url)) { setFull(metaDocs); return metaDocs }
+    if (!itemId) return metaDocs
+    setBusy(true)
+    try {
+      const { fetchFullReimbursement } = await import('@/lib/reimbursementDetail')
+      const item = await fetchFullReimbursement(itemId)
+      const loaded = Array.isArray(item?.documents) && item.documents.length ? item.documents : metaDocs
+      setFull(loaded)
+      return loaded
+    } finally { setBusy(false) }
+  }
+
+  async function openPreview(idx:number) {
+    const loaded = await ensureLoaded()
+    setPreview(loaded[idx] || metaDocs[idx])
+  }
 
   async function downloadAll() {
-    if (docs.length === 0) return
+    if (metaDocs.length === 0) return
+    const loaded = await ensureLoaded()
     try {
       const JSZip = (await import('jszip')).default
       const zip = new JSZip()
-      docs.forEach((d:any, i:number) => {
+      loaded.forEach((d:any, i:number) => {
         const m = /^data:([^;]+);base64,([\s\S]*)$/.exec(d.url || '')
         const name = (d.name || `evidence_${i+1}`).replace(/[\\/:*?"<>|]+/g, '_')
         if (m) zip.file(name, m[2], { base64:true })
@@ -31,20 +56,21 @@ export function EvidenceList({ documents, zipName='evidence' }:{ documents:any[]
     } catch {}
   }
 
-  if (docs.length === 0) return <div style={{ fontSize:11, color:'var(--red)' }}>Belum ada evidence diupload.</div>
+  if (metaDocs.length === 0) return <div style={{ fontSize:11, color:'var(--red)' }}>Belum ada evidence diupload.</div>
 
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
-        <span style={{ fontSize:11, color:'var(--text3)' }}>Evidence ({docs.length} file) — klik untuk preview</span>
-        <button onClick={downloadAll} className="btn btn-sm" style={{ fontSize:10 }}>⬇ Download semua</button>
+        <span style={{ fontSize:11, color:'var(--text3)' }}>Evidence ({metaDocs.length} file) — klik untuk preview</span>
+        <button onClick={downloadAll} disabled={busy} className="btn btn-sm" style={{ fontSize:10 }}>{busy?'Memuat…':'⬇ Download semua'}</button>
       </div>
       <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-        {docs.map((d:any, i:number) => (
-          <button key={i} onClick={()=>setPreview(d)} className="btn btn-sm" style={{ justifyContent:'flex-start', fontSize:11, textAlign:'left', gap:6 }}>
+        {metaDocs.map((d:any, i:number) => (
+          <button key={i} onClick={()=>openPreview(i)} disabled={busy} className="btn btn-sm" style={{ justifyContent:'flex-start', fontSize:11, textAlign:'left', gap:6 }}>
             {isImg(d)?'🖼':isPdf(d)?'📄':'📎'}
             {slotLabel(d.slot) && <span style={{ fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:4, background:'var(--brand-soft)', color:'var(--brand)', flexShrink:0 }}>{slotLabel(d.slot)}</span>}
             <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.name || `evidence_${i+1}`}</span>
+            {busy && <span style={{ fontSize:9, color:'var(--text3)', marginLeft:'auto' }}>memuat…</span>}
           </button>
         ))}
       </div>

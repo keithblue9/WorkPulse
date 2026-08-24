@@ -312,8 +312,16 @@ function SettlementTab({ user }: { user:any }) {
     if (withDocs.length === 0) { toast.error('Item yang dicentang belum ada evidence'); return }
     setZipping(true)
     try {
+      // Daftar dimuat tanpa isi file (documents.url) supaya ringan.
+      // Untuk export ZIP, ambil isi file per item yang dicentang.
+      const { fetchFullReimbursement } = await import('@/lib/reimbursementDetail')
+      const loaded = await Promise.all(withDocs.map(async (r:any) => {
+        if (Array.isArray(r.documents) && r.documents.every((d:any)=>!!d?.url)) return r
+        const full = await fetchFullReimbursement(r._id)
+        return full && Array.isArray(full.documents) && full.documents.length ? { ...r, documents: full.documents } : r
+      }))
       const JSZip = (await import('jszip')).default; const zip = new JSZip()
-      withDocs.forEach((r, i) => {
+      loaded.forEach((r, i) => {
         const folder = zip.folder(`${String(i+1).padStart(3,'0')}_${safeName(r.title)}`); if (!folder) return
         r.documents.forEach((doc:any, di:number) => {
           const parsed = parseDataUrl(doc.url); const base = safeName(doc.name || `evidence_${di+1}`)
@@ -559,7 +567,7 @@ function DetailModal({ item, onClose, onToggleSource, onVerify, onReverse, onCla
             </div>
           )}
           <div>
-            <EvidenceList documents={item.documents||[]} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
+            <EvidenceList itemId={item._id} documents={item.documents||[]} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
           </div>
           {clarifyMode && (
             <div>

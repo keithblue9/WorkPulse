@@ -12,11 +12,19 @@ export async function GET(req: NextRequest) {
     const query: any = {}
     if (userId) query.userId = userId
     if (status) query.status = status
-    const items = await ReimbursementModel.find(query).sort({ createdAt: -1 }).lean()
+
+    // PENTING: jangan ikutkan isi file (documents.url).
+    // Evidence lama disimpan base64 inline, jadi mengambil semua dokumen sekaligus
+    // bisa puluhan MB -> query timeout & halaman tampak kosong.
+    // Metadata (nama/tipe/ukuran/slot) tetap dikirim supaya jumlah lampiran tetap tampil.
+    // Isi file diambil belakangan lewat GET /api/reimbursements/[id] saat detail dibuka.
+    const items = await ReimbursementModel.find(query)
+      .select({ 'documents.url': 0 })
+      .sort({ createdAt: -1 })
+      .lean()
+
     return NextResponse.json({ data: items })
   } catch (e: any) {
-    // Jangan telan error: kalau koneksi DB bermasalah, tampilan sebelumnya
-    // terlihat seperti "data kosong" padahal sebenarnya gagal memuat.
     console.error('[reimbursements GET] gagal:', e?.message, e)
     return NextResponse.json({ error: e?.message || 'Gagal memuat data reimbursement' }, { status: 500 })
   }
