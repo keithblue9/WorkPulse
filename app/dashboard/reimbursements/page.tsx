@@ -522,11 +522,21 @@ export default function ReimbursementPage() {
   const [tab, setTab] = useState<'pengajuan'|'cashier'>('pengajuan')
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string>('')
 
   async function load() {
-    setLoading(true)
-    const r = await fetch('/api/reimbursements').then(r=>r.json())
-    setItems(r.data||[]); setLoading(false)
+    setLoading(true); setLoadError('')
+    try {
+      const res = await fetch('/api/reimbursements')
+      const r = await res.json().catch(()=>null)
+      if (!res.ok) throw new Error(r?.error || `Server error ${res.status}`)
+      setItems(r?.data || [])
+    } catch (e:any) {
+      // Penting: jangan tampilkan sebagai "data kosong" — data kemungkinan masih ada,
+      // hanya gagal dimuat. Kalau di-set [] user mengira datanya hilang.
+      setLoadError(e?.message || 'Gagal memuat data')
+      toast.error('Gagal memuat data reimbursement')
+    } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
 
@@ -534,6 +544,13 @@ export default function ReimbursementPage() {
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <div style={{ padding:'12px 20px 0', borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
         <div style={{ fontSize:14, fontWeight:600 }}>Reimbursement</div>
+        {loadError && (
+          <div style={{ margin:'10px 0 0', padding:'10px 14px', borderRadius:8, background:'#dc262614', border:'1px solid var(--red)', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, color:'var(--red)', fontWeight:600 }}>⚠️ Gagal memuat data — data kamu tidak hilang, hanya belum berhasil dimuat.</span>
+            <span style={{ fontSize:11, color:'var(--text3)' }}>{loadError}</span>
+            <button onClick={load} className="btn btn-sm" style={{ marginLeft:'auto' }}>🔄 Coba lagi</button>
+          </div>
+        )}
         <div style={{ display:'flex', gap:4, marginTop:10 }}>
           <button onClick={()=>setTab('pengajuan')} style={subtab(tab==='pengajuan')}>Pengajuan</button>
           {isCashierish && <button onClick={()=>setTab('cashier')} style={subtab(tab==='cashier')}>Cashier</button>}

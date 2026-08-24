@@ -74,11 +74,20 @@ function SettlementTab({ user }: { user:any }) {
   const [exporting, setExporting] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [verifying, setVerifying] = useState(false)
+  const [loadError, setLoadError] = useState<string>('')
 
   const load = useCallback(async () => {
-    setLoading(true)
-    try { const r = await fetch('/api/reimbursements').then(r=>r.json()); setItems(r.data || []) }
-    catch { toast.error('Gagal memuat data') } finally { setLoading(false) }
+    setLoading(true); setLoadError('')
+    try {
+      const res = await fetch('/api/reimbursements')
+      const r = await res.json().catch(()=>null)
+      if (!res.ok) throw new Error(r?.error || `Server error ${res.status}`)
+      setItems(r?.data || [])
+    } catch (e:any) {
+      // Jangan kosongkan items saat gagal — supaya tidak terlihat seperti data hilang
+      setLoadError(e?.message || 'Gagal memuat data')
+      toast.error('Gagal memuat data operasional')
+    } finally { setLoading(false) }
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -327,6 +336,14 @@ function SettlementTab({ user }: { user:any }) {
         onVerify={verifyOne}
         onClarify={clarifyItem}
         onReverse={reverseItem} />}
+
+      {loadError && (
+        <div style={{ margin:'10px 20px 0', padding:'10px 14px', borderRadius:8, background:'#dc262614', border:'1px solid var(--red)', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+          <span style={{ fontSize:12, color:'var(--red)', fontWeight:600 }}>⚠️ Gagal memuat data — data kamu tidak hilang, hanya belum berhasil dimuat.</span>
+          <span style={{ fontSize:11, color:'var(--text3)' }}>{loadError}</span>
+          <button onClick={load} className="btn btn-sm" style={{ marginLeft:'auto' }}>🔄 Coba lagi</button>
+        </div>
+      )}
 
       <div style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', flexShrink:0 }}>
         <div style={{ fontSize:11, color:'var(--text3)', maxWidth:520 }}>Alur: <b>centang</b> item Waiting for Verification → <b>Evidence</b> (unduh lampiran yg dicentang, cek manual) → <b>Verify</b> (status jadi Verified) → baru <b>Export Excel/PDF</b> aktif.</div>

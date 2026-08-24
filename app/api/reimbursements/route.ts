@@ -14,7 +14,12 @@ export async function GET(req: NextRequest) {
     if (status) query.status = status
     const items = await ReimbursementModel.find(query).sort({ createdAt: -1 }).lean()
     return NextResponse.json({ data: items })
-  } catch { return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
+  } catch (e: any) {
+    // Jangan telan error: kalau koneksi DB bermasalah, tampilan sebelumnya
+    // terlihat seperti "data kosong" padahal sebenarnya gagal memuat.
+    console.error('[reimbursements GET] gagal:', e?.message, e)
+    return NextResponse.json({ error: e?.message || 'Gagal memuat data reimbursement' }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {
