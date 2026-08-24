@@ -14,17 +14,24 @@ const cache = new Map<string, Entry>()
 const inflight = new Map<string, Promise<any>>()
 const DEFAULT_TTL = 30_000
 
-export async function cachedFetch(url: string, ttl: number = DEFAULT_TTL): Promise<any> {
+export async function cachedFetch(url: string, ttl: number = DEFAULT_TTL, force = false): Promise<any> {
   const hit = cache.get(url)
-  if (hit && Date.now() - hit.at < ttl) return hit.data
+  if (!force && hit && Date.now() - hit.at < ttl) return hit.data
+  if (force) cache.delete(url)
 
   const running = inflight.get(url)
   if (running) return running
 
+  // Penting: response gagal TIDAK boleh ikut di-cache, dan errornya harus
+  // dilempar supaya pemanggil bisa membedakan "gagal memuat" vs "data kosong".
   const p = fetch(url)
-    .then(r => r.json())
+    .then(async r => {
+      const data = await r.json().catch(() => null)
+      if (!r.ok) throw new Error(data?.error || `Server error ${r.status}`)
+      return data
+    })
     .then(data => { cache.set(url, { at: Date.now(), data }); inflight.delete(url); return data })
-    .catch(err => { inflight.delete(url); throw err })
+    .catch(err => { inflight.delete(url); cache.delete(url); throw err })
 
   inflight.set(url, p)
   return p

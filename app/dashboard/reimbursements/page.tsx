@@ -1,4 +1,5 @@
 'use client'
+import { cachedFetch } from '@/lib/fetchCache'
 import { getConfig } from '@/lib/configCache'
 import { OE_CATEGORIES, oeLookup } from '@/lib/defaults'
 import { useSort, sortRows, SortTh } from '@/lib/useSort'
@@ -524,12 +525,12 @@ export default function ReimbursementPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string>('')
 
-  async function load() {
+  async function load(force = false) {
     setLoading(true); setLoadError('')
     try {
-      const res = await fetch('/api/reimbursements')
-      const r = await res.json().catch(()=>null)
-      if (!res.ok) throw new Error(r?.error || `Server error ${res.status}`)
+      // Dipakai bersama dgn halaman Operasional -> cache singkat mencegah
+      // request berulang tiap pindah tab / buka-tutup halaman.
+      const r = await cachedFetch('/api/reimbursements', 30_000, force)
       setItems(r?.data || [])
     } catch (e:any) {
       // Penting: jangan tampilkan sebagai "data kosong" — data kemungkinan masih ada,
@@ -539,6 +540,8 @@ export default function ReimbursementPage() {
     } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
+  // Setelah ada perubahan (submit/verify/hapus) -> ambil data terbaru
+  const reloadFresh = () => load(true)
 
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -548,7 +551,7 @@ export default function ReimbursementPage() {
           <div style={{ margin:'10px 0 0', padding:'10px 14px', borderRadius:8, background:'#dc262614', border:'1px solid var(--red)', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
             <span style={{ fontSize:12, color:'var(--red)', fontWeight:600 }}>⚠️ Gagal memuat data — data kamu tidak hilang, hanya belum berhasil dimuat.</span>
             <span style={{ fontSize:11, color:'var(--text3)' }}>{loadError}</span>
-            <button onClick={load} className="btn btn-sm" style={{ marginLeft:'auto' }}>🔄 Coba lagi</button>
+            <button onClick={reloadFresh} className="btn btn-sm" style={{ marginLeft:"auto" }}>🔄 Coba lagi</button>
           </div>
         )}
         <div style={{ display:'flex', gap:4, marginTop:10 }}>
@@ -557,8 +560,8 @@ export default function ReimbursementPage() {
         </div>
       </div>
       {tab==='pengajuan'
-        ? <PengajuanTab items={items} loading={loading} reload={load} user={user} isAdminish={isCashierish} />
-        : <CashierTab items={items} loading={loading} reload={load} />}
+        ? <PengajuanTab items={items} loading={loading} reload={reloadFresh} user={user} isAdminish={isCashierish} />
+        : <CashierTab items={items} loading={loading} reload={reloadFresh} />}
     </div>
   )
 }

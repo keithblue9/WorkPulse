@@ -13,13 +13,13 @@ export async function GET(req: NextRequest) {
     if (userId) query.userId = userId
     if (status) query.status = status
 
-    // PENTING: jangan ikutkan isi file (documents.url).
-    // Evidence lama disimpan base64 inline, jadi mengambil semua dokumen sekaligus
-    // bisa puluhan MB -> query timeout & halaman tampak kosong.
+    // PENTING: jangan ikutkan isi file.
+    // - documents.url : evidence base64 inline (bisa puluhan MB kalau semua diambil)
+    // - receiptUrl    : field lama yang juga bisa berisi base64 dan TIDAK dipakai di UI
     // Metadata (nama/tipe/ukuran/slot) tetap dikirim supaya jumlah lampiran tetap tampil.
     // Isi file diambil belakangan lewat GET /api/reimbursements/[id] saat detail dibuka.
     const items = await ReimbursementModel.find(query)
-      .select({ 'documents.url': 0 })
+      .select({ 'documents.url': 0, receiptUrl: 0 })
       .sort({ createdAt: -1 })
       .lean()
 

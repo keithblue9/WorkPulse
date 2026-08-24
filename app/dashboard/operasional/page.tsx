@@ -1,4 +1,5 @@
 'use client'
+import { cachedFetch } from '@/lib/fetchCache'
 import { getConfig } from '@/lib/configCache'
 import { oeLookup } from '@/lib/defaults'
 import { allowedMenusFor, userRolesOf } from '@/lib/perms'
@@ -76,12 +77,12 @@ function SettlementTab({ user }: { user:any }) {
   const [verifying, setVerifying] = useState(false)
   const [loadError, setLoadError] = useState<string>('')
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     setLoading(true); setLoadError('')
     try {
-      const res = await fetch('/api/reimbursements')
-      const r = await res.json().catch(()=>null)
-      if (!res.ok) throw new Error(r?.error || `Server error ${res.status}`)
+      // Berbagi cache dgn halaman Reimbursement (API yang sama) -> tidak fetch ulang
+      // tiap pindah tab. Setelah aksi verify/reverse dipanggil dgn force=true.
+      const r = await cachedFetch('/api/reimbursements', 30_000, force)
       setItems(r?.data || [])
     } catch (e:any) {
       // Jangan kosongkan items saat gagal — supaya tidak terlihat seperti data hilang
@@ -89,6 +90,7 @@ function SettlementTab({ user }: { user:any }) {
       toast.error('Gagal memuat data operasional')
     } finally { setLoading(false) }
   }, [])
+  const reloadFresh = useCallback(() => load(true), [load])
   useEffect(() => { load() }, [load])
 
   const yearOptions = useMemo(() => {
@@ -128,7 +130,7 @@ function SettlementTab({ user }: { user:any }) {
       const j = await r.json()
       if (!r.ok) { toast.error(j.error||'Gagal verify'); return }
       toast.success(`${j.data.verified} item verified · Settlement CC = Rp ${fmt(j.data.settlementTotal)}`)
-      clearSel(); await load()
+      clearSel(); await reloadFresh()
     } finally { setVerifying(false) }
   }
 
@@ -142,7 +144,7 @@ function SettlementTab({ user }: { user:any }) {
       const j = await r.json()
       if (!r.ok) { toast.error(j.error||'Gagal verify'); return }
       toast.success(`Verified · Settlement CC = Rp ${fmt(j.data.settlementTotal)}`)
-      setViewing(null); clearSel(); await load()
+      setViewing(null); clearSel(); await reloadFresh()
     } finally { setVerifying(false) }
   }
 
@@ -154,7 +156,7 @@ function SettlementTab({ user }: { user:any }) {
       const j = await r.json()
       if (!r.ok) { toast.error(j.error||'Gagal clarify'); return }
       toast.success(j.pushed ? 'Dibalikin ke member + notif terkirim' : 'Dibalikin ke member (member belum aktifkan notif)')
-      setViewing(null); await load()
+      setViewing(null); await reloadFresh()
     } finally { setVerifying(false) }
   }
 
@@ -170,7 +172,7 @@ function SettlementTab({ user }: { user:any }) {
       payload.status = 'verified'; payload.verifiedAt = new Date().toISOString(); payload.verifiedBy = `${user?.name||'-'} (Petty Cash)`
     }
     await fetch(`/api/reimbursements/${r._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
-    toast.success(!toCC && payload.status==='verified' ? 'Diubah ke Petty Cash & langsung selesai (verified)' : 'Sumber diperbarui'); await load()
+    toast.success(!toCC && payload.status==='verified' ? 'Diubah ke Petty Cash & langsung selesai (verified)' : 'Sumber diperbarui'); await reloadFresh()
   }
 
   async function reverseItem(r:any) {
@@ -179,7 +181,7 @@ function SettlementTab({ user }: { user:any }) {
     const res = await fetch('/api/settlement/reverse', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: r._id }) })
     const j = await res.json()
     if (!res.ok) { toast.error(j.error||'Gagal reverse'); return }
-    toast.success('Reverse berhasil — status kembali Waiting for Verification'); setViewing(null); await load()
+    toast.success('Reverse berhasil — status kembali Waiting for Verification'); setViewing(null); await reloadFresh()
   }
 
   async function exportXLSX() {
@@ -349,7 +351,7 @@ function SettlementTab({ user }: { user:any }) {
         <div style={{ margin:'10px 20px 0', padding:'10px 14px', borderRadius:8, background:'#dc262614', border:'1px solid var(--red)', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
           <span style={{ fontSize:12, color:'var(--red)', fontWeight:600 }}>⚠️ Gagal memuat data — data kamu tidak hilang, hanya belum berhasil dimuat.</span>
           <span style={{ fontSize:11, color:'var(--text3)' }}>{loadError}</span>
-          <button onClick={load} className="btn btn-sm" style={{ marginLeft:'auto' }}>🔄 Coba lagi</button>
+          <button onClick={reloadFresh} className="btn btn-sm" style={{ marginLeft:"auto" }}>🔄 Coba lagi</button>
         </div>
       )}
 
