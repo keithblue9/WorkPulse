@@ -396,8 +396,8 @@ function ShareEditor({ note, members, onSave, onClose }: { note: QuickNote; memb
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal" style={{ width: 460, maxWidth: '100%', display: 'flex', flexDirection: 'column', maxHeight: '85vh' }} onClick={e => e.stopPropagation()}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+      <div className="modal" style={{ width: 460, maxWidth: '100%', display: 'flex', flexDirection: 'column', maxHeight: '85dvh', minHeight: 0 }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexShrink: 0 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700 }}>📤 Share Catatan</div>
             <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 3 }}>Member terpilih bisa melihat &amp; mengedit catatan ini.</div>
@@ -405,8 +405,8 @@ function ShareEditor({ note, members, onSave, onClose }: { note: QuickNote; memb
           <button onClick={onClose} className="btn btn-icon">×</button>
         </div>
 
-        <div style={{ padding: '12px 20px 0' }}>
-          <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="🔍 Cari nama member…"
+        <div style={{ padding: '12px 20px 0', flexShrink: 0 }}>
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="🔍 Cari nama member…"
             style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px', fontSize: 13.5, background: 'var(--bg)', color: 'var(--text)', outline: 'none' }} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, color: 'var(--text2)' }}>
@@ -425,7 +425,7 @@ function ShareEditor({ note, members, onSave, onClose }: { note: QuickNote; memb
           </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px 4px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div data-modal-scroll style={{ flex: 1, minHeight: 90, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '10px 14px 4px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {shown.length === 0 && (
             <div style={{ fontSize: 12.5, color: 'var(--text3)', padding: '24px 6px', textAlign: 'center' }}>
               {members.length === 0 ? 'Tidak ada member lain.' : 'Tidak ada member yang cocok dengan pencarian.'}
@@ -455,7 +455,7 @@ function ShareEditor({ note, members, onSave, onClose }: { note: QuickNote; memb
           })}
         </div>
 
-        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
           <button type="button" onClick={onClose} className="btn">Batal</button>
           <button type="button" onClick={() => onSave(selected.filter(Boolean))} className="btn btn-primary">Simpan</button>
         </div>

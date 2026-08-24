@@ -203,7 +203,12 @@ select.input { cursor:pointer }
 .prog-fill { height:100%; border-radius:3px; transition:width 0.6s ease }
 
 .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:50; display:flex; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(6px) }
-.modal { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow); max-height:90vh; overflow:hidden; display:flex; flex-direction:column; animation:scaleIn 0.2s ease }
+.modal { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow); max-height:90vh; max-height:90dvh; overflow:hidden; display:flex; flex-direction:column; animation:scaleIn 0.2s ease }
+/* Saat keyboard HP/tablet muncul, tinggi layar menyusut drastis. Tanpa ini flexbox
+   menjepit header & footer modal sampai hilang (tombol Simpan tidak terlihat).
+   Anak langsung modal tidak boleh menyusut, kecuali area scroll yang memang diberi flex:1. */
+.modal > *:not([data-modal-scroll]) { flex-shrink:0 }
+.modal [data-modal-scroll] { flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch }
 
 .sidebar-link { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:var(--radius-sm); margin-bottom:2px; cursor:pointer; font-size:13px; color:var(--text2); text-decoration:none; transition:all 0.15s }
 .sidebar-link:hover { background:var(--bg3); color:var(--text) }
