@@ -4,6 +4,9 @@ import React, { useState } from 'react'
 function parseMime(url:string){ const m=/^data:([^;]+)/.exec(url||''); return m?m[1]:'' }
 function isImg(d:any){ const t=(d.type||parseMime(d.url)||'').toLowerCase(); return t.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(d.name||'') }
 function isPdf(d:any){ const t=(d.type||parseMime(d.url)||'').toLowerCase(); return t.includes('pdf') || /\.pdf$/i.test(d.name||'') }
+// Label kategori bukti (khusus Cash Card). 'bukti'/kosong = dokumen umum -> tanpa label.
+const SLOT_LABELS: Record<string,string> = { calmeet:'Calmeet', invoice:'Invoice', dokumentasi:'Dokumentasi', buktitf:'Bukti TF' }
+function slotLabel(slot?:string){ return SLOT_LABELS[String(slot||'')] || '' }
 
 export function EvidenceList({ documents, zipName='evidence' }:{ documents:any[]; zipName?:string }) {
   const [preview, setPreview] = useState<any>(null)
@@ -38,8 +41,10 @@ export function EvidenceList({ documents, zipName='evidence' }:{ documents:any[]
       </div>
       <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
         {docs.map((d:any, i:number) => (
-          <button key={i} onClick={()=>setPreview(d)} className="btn btn-sm" style={{ justifyContent:'flex-start', fontSize:11, textAlign:'left' }}>
-            {isImg(d)?'🖼':isPdf(d)?'📄':'📎'} {d.name || `evidence_${i+1}`}
+          <button key={i} onClick={()=>setPreview(d)} className="btn btn-sm" style={{ justifyContent:'flex-start', fontSize:11, textAlign:'left', gap:6 }}>
+            {isImg(d)?'🖼':isPdf(d)?'📄':'📎'}
+            {slotLabel(d.slot) && <span style={{ fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:4, background:'var(--brand-soft)', color:'var(--brand)', flexShrink:0 }}>{slotLabel(d.slot)}</span>}
+            <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.name || `evidence_${i+1}`}</span>
           </button>
         ))}
       </div>

@@ -2,6 +2,10 @@ import mongoose, { Schema, models } from 'mongoose'
 
 const DocumentSchema = new Schema({
   url:String, name:String, type:String, size:Number,
+  // Kategori bukti. Petty Cash memakai 'bukti' (dokumen pendukung umum).
+  // Cash Card dipecah: calmeet | invoice | dokumentasi | buktitf.
+  // Dokumen lama tanpa slot otomatis dianggap 'bukti'.
+  slot: { type:String, default:'bukti' },
 }, { _id:false })
 
 const ReimbursementSchema = new Schema({

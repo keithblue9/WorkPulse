@@ -96,7 +96,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
     return () => { cancelled = true }
   }, [editing])
 
-  async function handleFileUpload(files: FileList | null) {
+  async function handleFileUpload(files: FileList | null, slot: string = 'bukti') {
     if (!files || files.length === 0) return
     setUploading(true)
     const newDocs: any[] = []
@@ -119,7 +119,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
         const result = await upload(`reimburse/${Date.now()}-${file.name}`, toUpload, {
           access: 'public', handleUploadUrl: '/api/blob/upload', contentType: file.type,
         })
-        uploaded = { url: result.url, name: file.name, type: file.type, size: file.size, blob: true }
+        uploaded = { url: result.url, name: file.name, type: file.type, size: file.size, blob: true, slot }
       } catch (err) {
         // Fallback: base64 inline (untuk file kecil / kalau Blob token belum ada)
         try {
@@ -127,7 +127,7 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
           let dataUrl: string = await new Promise(resolve => { reader.onload = e => resolve(e.target?.result as string); reader.readAsDataURL(file) })
           if (file.type.startsWith('image/') && file.size > 800 * 1024) { try { dataUrl = await compressImage(dataUrl) } catch {} }
           if (dataUrl.length > 4_000_000) { toast.error(`${file.name} terlalu besar & Blob storage belum aktif. Perkecil file dulu.`); continue }
-          uploaded = { url: dataUrl, name: file.name, type: file.type, size: file.size }
+          uploaded = { url: dataUrl, name: file.name, type: file.type, size: file.size, slot }
         } catch { toast.error(`Gagal upload ${file.name}`); continue }
       }
       if (uploaded) newDocs.push(uploaded)
@@ -137,9 +137,23 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
   }
   function removeDoc(i:number) { setForm(f=>({...f, documents: f.documents.filter((_:any,idx:number)=>idx!==i) })) }
 
+  // ── Bukti per kategori ──
+  // Petty Cash: satu area 'bukti' (wajib) — tidak berubah dari sebelumnya.
+  // Cash Card : Calmeet, Details Invoice, Dokumentasi (wajib) + Bukti TF (opsional).
+  const isCC = form.source === 'cash_card'
+  const CC_SLOTS = [
+    { key:'calmeet',     label:'1) Calmeet',        required:true },
+    { key:'invoice',     label:'2) Details Invoice', required:true },
+    { key:'dokumentasi', label:'3) Dokumentasi',    required:true },
+    { key:'buktitf',     label:'4) Bukti TF',       required:false },
+  ]
+  // Dokumen lama tanpa slot dianggap 'bukti' supaya data lama tetap terbaca
+  const docsOf = (slot:string) => (form.documents||[]).filter((d:any)=> (d?.slot || 'bukti') === slot)
+  const idxOf = (d:any) => (form.documents||[]).indexOf(d)
+
   function validate():string[] {
     const e:string[] = []
-    if (!form.title.trim()) e.push('Keperluan')
+    if (!form.title.trim()) e.push(isCC ? 'Nama Calmeet' : 'Keperluan')
     if (!form.amount || form.amount<=0) e.push('Nominal')
     if (!form.billDate) e.push('Tgl Bukti / Bill Date')
     if (!form.category) e.push('Kategori')
@@ -147,7 +161,14 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
     if (!form.bank.trim()) e.push('Bank')
     if (!form.noRekening.trim()) e.push('No. Rekening')
     if (!form.tokoPenjual.trim()) e.push('Toko/Penjual')
-    if (!form.documents || form.documents.length===0) e.push('Evidence / Bukti (minimal 1 file)')
+    if (isCC) {
+      // Bukti TF sengaja tidak divalidasi (opsional)
+      for (const s of CC_SLOTS) {
+        if (s.required && docsOf(s.key).length === 0) e.push(s.label.replace(/^\d\)\s*/,''))
+      }
+    } else {
+      if (!form.documents || form.documents.length===0) e.push('Evidence / Bukti (minimal 1 file)')
+    }
     return e
   }
 
@@ -163,7 +184,6 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
     }
     setSaving(true)
     try {
-      const isCC = form.source === 'cash_card'
       const url = editing ? `/api/reimbursements/${editing._id}` : '/api/reimbursements'
       const isResubmit = editing?.status === 'clarification'
       const body: any = {
@@ -244,29 +264,85 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
             <div><label style={lbl}>No. Rekening * <span style={hintS}>(auto)</span></label><input className="input" style={missing('No. Rekening')?errInput:undefined} value={form.noRekening} onChange={e=>set('noRekening',e.target.value)} placeholder="dari Biodata" /></div>
             <div><label style={lbl}>Nominal (Rp) *</label><MoneyInput currency="IDR" className="input" style={missing('Nominal')?errInput:undefined} value={form.amount} onChange={n=>set('amount',n)} /></div>
           </div>
-          {/* Baris 3: Toko/Penjual | Keperluan */}
+          {/* Baris 3: Toko/Penjual | Keperluan (Cash Card -> Nama Calmeet) */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1.6fr', gap:10, alignItems:'end' }}>
             <div><label style={lbl}>Toko/Penjual *</label><input className="input" style={missing('Toko/Penjual')?errInput:undefined} value={form.tokoPenjual} onChange={e=>set('tokoPenjual',e.target.value)} placeholder="Nama toko/penjual/penerima" /></div>
-            <div><label style={lbl}>Keperluan * <span style={hintS}>(judul meeting/event jika &apos;Cash Card&apos;)</span></label>
-              <input className="input" style={missing('Keperluan')?errInput:undefined} value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Misal: Konsumsi meeting BPD Procurement" /></div>
-          </div>
-          <div>
-            <label style={lbl}>Bukti / Dokumen Pendukung * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(bill/nota/struk + agenda)</span></label>
-            <label style={{ display:'block', padding:'18px', borderRadius:8, border:`2px dashed ${missing('Evidence / Bukti (minimal 1 file)')?'var(--red)':'var(--border2)'}`, background:'var(--bg3)', cursor:'pointer', textAlign:'center', fontSize:11, color:'var(--text2)' }}>
-              <input type="file" multiple accept="image/*,application/pdf" onChange={e=>handleFileUpload(e.target.files)} style={{ display:'none' }} />
-              {uploading ? 'Mengupload...' : '📎 Klik untuk upload (PDF/gambar · maks 15MB/file)'}
-            </label>
-            {form.documents.length > 0 && (
-              <div style={{ marginTop:6, display:'flex', flexDirection:'column', gap:4 }}>
-                {form.documents.map((d:any, i:number) => (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', background:'var(--bg3)', borderRadius:6 }}>
-                    <span style={{ fontSize:11 }}>📄 {d.name} <span style={{ color:'var(--text3)' }}>({Math.round((d.size||0)/1024)}KB)</span></span>
-                    <button onClick={()=>removeDoc(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
-                  </div>
-                ))}
-              </div>
+            {isCC ? (
+              <div><label style={lbl}>Nama Calmeet * <span style={hintS}>(sebelumnya: Keperluan)</span></label>
+                <input className="input" style={missing('Nama Calmeet')?errInput:undefined} value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Masukkan nama Calmeet" /></div>
+            ) : (
+              <div><label style={lbl}>Keperluan *</label>
+                <input className="input" style={missing('Keperluan')?errInput:undefined} value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Misal: Konsumsi meeting BPD Procurement" /></div>
             )}
           </div>
+
+          {isCC ? (
+            /* CASH CARD: 4 kotak bukti terpisah (1-3 wajib, Bukti TF opsional) */
+            <div>
+              <label style={lbl}>Bukti / Dokumen Pendukung <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(wajib 1, 2, 3 · Bukti TF opsional)</span></label>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8 }}>
+                {CC_SLOTS.map(s => {
+                  const docs = docsOf(s.key)
+                  const err = s.required && missing(s.label.replace(/^\d\)\s*/,''))
+                  return (
+                    <div key={s.key}>
+                      <div style={{ fontSize:10.5, fontWeight:600, marginBottom:4, color: err ? 'var(--red)' : 'var(--text2)' }}>
+                        {s.label} {s.required ? <span style={{ color:'var(--red)' }}>*</span> : <span style={{ fontWeight:400, color:'var(--text3)' }}>(Opsional)</span>}
+                      </div>
+                      <label style={{ display:'block', padding:'14px 8px', borderRadius:8, border:`2px dashed ${err?'var(--red)':(docs.length?'var(--brand)':'var(--border2)')}`, background: docs.length?'var(--brand-soft)':'var(--bg3)', cursor:'pointer', textAlign:'center', fontSize:10.5, color: docs.length?'var(--brand)':'var(--text2)' }}>
+                        <input type="file" multiple accept="image/*,application/pdf" onChange={e=>handleFileUpload(e.target.files, s.key)} style={{ display:'none' }} />
+                        {uploading ? 'Mengupload...' : (docs.length ? `✓ ${docs.length} file` : '📎 Klik untuk upload')}
+                        <div style={{ fontSize:9, color:'var(--text3)', marginTop:3 }}>(PDF/gambar · maks 15MB/file)</div>
+                      </label>
+                      {docs.length > 0 && (
+                        <div style={{ marginTop:5, display:'flex', flexDirection:'column', gap:3 }}>
+                          {docs.map((d:any, i:number) => (
+                            <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:4, padding:'4px 7px', background:'var(--bg3)', borderRadius:5 }}>
+                              <span style={{ fontSize:9.5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={d.name}>📄 {d.name}</span>
+                              <button onClick={()=>removeDoc(idxOf(d))} className="btn btn-icon btn-sm" style={{ color:'var(--red)', fontSize:11, flexShrink:0 }}>×</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              {/* Lampiran yang diupload sebelum ganti sumber — ditampilkan agar tidak ada file tersembunyi */}
+              {docsOf('bukti').length > 0 && (
+                <div style={{ marginTop:8 }}>
+                  <div style={{ fontSize:10.5, fontWeight:600, color:'var(--text2)', marginBottom:4 }}>Lampiran lain <span style={{ fontWeight:400, color:'var(--text3)' }}>(diupload sebelum pindah ke Cash Card)</span></div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                    {docsOf('bukti').map((d:any, i:number) => (
+                      <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 9px', background:'var(--bg3)', borderRadius:6 }}>
+                        <span style={{ fontSize:10.5 }}>📄 {d.name}</span>
+                        <button onClick={()=>removeDoc(idxOf(d))} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* PETTY CASH: satu area bukti seperti sebelumnya */
+            <div>
+              <label style={lbl}>Bukti / Dokumen Pendukung * <span style={{ fontWeight:400, color:'var(--text3)', fontSize:9 }}>(bill/nota/struk + agenda)</span></label>
+              <label style={{ display:'block', padding:'18px', borderRadius:8, border:`2px dashed ${missing('Evidence / Bukti (minimal 1 file)')?'var(--red)':'var(--border2)'}`, background:'var(--bg3)', cursor:'pointer', textAlign:'center', fontSize:11, color:'var(--text2)' }}>
+                <input type="file" multiple accept="image/*,application/pdf" onChange={e=>handleFileUpload(e.target.files,'bukti')} style={{ display:'none' }} />
+                {uploading ? 'Mengupload...' : '📎 Klik untuk upload (PDF/gambar · maks 15MB/file)'}
+              </label>
+              {form.documents.length > 0 && (
+                <div style={{ marginTop:6, display:'flex', flexDirection:'column', gap:4 }}>
+                  {form.documents.map((d:any, i:number) => (
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', background:'var(--bg3)', borderRadius:6 }}>
+                      <span style={{ fontSize:11 }}>📄 {d.name} <span style={{ color:'var(--text3)' }}>({Math.round((d.size||0)/1024)}KB)</span></span>
+                      <button onClick={()=>removeDoc(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
           <button onClick={onClose} className="btn">Batal</button>
