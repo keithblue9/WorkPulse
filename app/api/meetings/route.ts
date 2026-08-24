@@ -9,7 +9,13 @@ export async function GET(req: NextRequest) {
     const category = searchParams.get('category')
     const query: any = {}
     if (category) query.category = category
-    const items = await MeetingReportModel.find(query).sort({ meetingDate:-1 }).lean()
+    // Jangan kirim isi file di daftar: evidence & attachment disimpan base64 inline
+    // sehingga bisa puluhan MB. evidenceName tetap dikirim supaya indikator 📎 tetap muncul.
+    // Isi file diambil lewat GET /api/meetings/[id] saat detail dibuka.
+    const items = await MeetingReportModel.find(query)
+      .select({ evidenceUrl: 0, 'attachments.url': 0 })
+      .sort({ meetingDate:-1 })
+      .lean()
     return NextResponse.json({ data: items })
   } catch (e:any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
 }

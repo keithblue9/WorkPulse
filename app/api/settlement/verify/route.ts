@@ -27,7 +27,8 @@ export async function POST(req:NextRequest) {
     )
 
     // Recompute Cash Card settlement bulan ini (slide 6): jumlah reimburse Cash Card yg sudah verified pada bulan ini
-    const verifiedCC = await ReimbursementModel.find({ status:'verified', isCashCard:true }).lean() as any[]
+    // Hanya field yang dipakai — hindari menarik evidence base64
+    const verifiedCC = await ReimbursementModel.find({ status:'verified', isCashCard:true }, 'amount billDate submittedAt createdAt').lean() as any[]
     const settlementTotal = verifiedCC.reduce((s,r)=>{
       const d = periodOf(r); if (!d) return s
       return (d.getFullYear()===year && (d.getMonth()+1)===month) ? s + (r.amount||0) : s

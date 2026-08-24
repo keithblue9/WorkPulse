@@ -35,7 +35,13 @@ export async function GET(req:NextRequest) {
     //  a) nominal reimburse NON cash card yang sudah dibayar (done/verified)
     //  b) biaya antar bank dari SEMUA reimburse (cash card maupun petty) — bank fee selalu dari petty
     //  c) selisih Cash Card |Pengembalian − (TopUp − Settlement)|
-    const reimburses = await ReimbursementModel.find({ status:{ $in:['done','verified'] } }).lean() as any[]
+    // Hanya ambil field yang dipakai perhitungan. Sebelumnya seluruh dokumen ikut
+    // terambil termasuk evidence base64 (documents.url/receiptUrl) -> puluhan MB,
+    // padahal tidak dipakai sama sekali di sini.
+    const reimburses = await ReimbursementModel.find(
+      { status: { $in: ['done', 'verified'] } },
+      'amount biayaAntarBank isCashCard userName title category billDate submittedAt createdAt'
+    ).lean() as any[]
     const inThisPeriod = (r:any) => { const d = periodOf(r); return !!d && d.getFullYear()===year && (d.getMonth()+1) <= month }
 
     const nonCCAmount = reimburses.reduce((s,r)=> (!r.isCashCard && inThisPeriod(r)) ? s + (r.amount||0) : s, 0)

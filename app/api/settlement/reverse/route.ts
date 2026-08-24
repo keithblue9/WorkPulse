@@ -31,7 +31,8 @@ export async function POST(req:NextRequest) {
 
     // Hitung ulang Settlement Cash Card bulan itu (tanpa item yg barusan di-reverse)
     if (month && year) {
-      const verifiedCC = await ReimbursementModel.find({ status:'verified', isCashCard:true }).lean() as any[]
+      // Hanya field yang dipakai — hindari menarik evidence base64
+      const verifiedCC = await ReimbursementModel.find({ status:'verified', isCashCard:true }, 'amount billDate submittedAt createdAt').lean() as any[]
       const settlementTotal = verifiedCC.reduce((s,r)=>{
         const dd = periodOf(r); if (!dd) return s
         return (dd.getFullYear()===year && (dd.getMonth()+1)===month) ? s + (r.amount||0) : s

@@ -134,6 +134,32 @@ export default function MeetingsPage() {
   const [members, setMembers] = useState<any[]>([])
   const [activityCats, setActivityCats] = useState<any[]>([])
 
+  // Daftar dimuat tanpa isi file. Saat detail dibuka, ambil versi lengkap
+  // supaya evidence/attachment tetap tampil. Tampilkan dulu data ringkas
+  // biar modal langsung terbuka (tidak menunggu).
+  // Ambil versi lengkap (berisi evidence) — dipakai sebelum edit supaya
+  // lampiran lama tidak hilang saat disimpan ulang.
+  async function withFullEvidence(m:any) {
+    if (!m?._id || m?.evidenceUrl) return m
+    try {
+      const r = await fetch(`/api/meetings/${m._id}`)
+      if (!r.ok) return m
+      const d = await r.json().catch(()=>null)
+      return d?.data ? { ...m, ...d.data } : m
+    } catch { return m }
+  }
+
+  async function openDetail(m:any) {
+    setViewing(m)
+    if (m?.evidenceUrl) return
+    try {
+      const r = await fetch(`/api/meetings/${m._id}`)
+      if (!r.ok) return
+      const d = await r.json().catch(()=>null)
+      if (d?.data) setViewing((cur:any)=> cur && cur._id===m._id ? { ...cur, ...d.data } : cur)
+    } catch {}
+  }
+
   async function load() {
     setLoading(true)
     const [m, c, u] = await Promise.all([
@@ -205,7 +231,7 @@ export default function MeetingsPage() {
                     <span style={{ fontSize:10, color:'var(--text3)', background:'var(--bg4)', padding:'1px 7px', borderRadius:20 }}>{catMeetings.length}</span>
                   </div>
                   {catMeetings.map(m => (
-                    <div key={m._id} className="kanban-card" onClick={()=>setViewing(m)} style={{ position:'relative' }}>
+                    <div key={m._id} className="kanban-card" onClick={()=>openDetail(m)} style={{ position:'relative' }}>
                       <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', marginBottom:5, lineHeight:1.3 }}>{m.title}</div>
                       <div style={{ fontSize:10, color:'var(--text3)', marginBottom:6 }}>📅 {m.meetingDate}</div>
                       <div style={{ fontSize:11, color:'var(--text2)', marginBottom:7, lineHeight:1.4, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{m.notes}</div>
@@ -215,8 +241,8 @@ export default function MeetingsPage() {
                           <span style={{ fontSize:10, color:'var(--text3)' }}>{m.pic}</span>
                         </div>
                         <div style={{ display:'flex', gap:3 }}>
-                          {m.evidenceUrl && <span title="Ada evidence" style={{ fontSize:11 }}>📎</span>}
-                          <button title="Edit" className="btn btn-icon btn-sm" onClick={(e)=>{e.stopPropagation();setEditing(m)}} style={{ fontSize:10, width:22, height:22 }}>✏️</button>
+                          {(m.evidenceUrl || m.evidenceName) && <span title="Ada evidence" style={{ fontSize:11 }}>📎</span>}
+                          <button title="Edit" className="btn btn-icon btn-sm" onClick={async (e)=>{e.stopPropagation(); setEditing(await withFullEvidence(m))}} style={{ fontSize:10, width:22, height:22 }}>✏️</button>
                           <button title="Hapus" className="btn btn-icon btn-sm" onClick={(e)=>{e.stopPropagation();del(m._id)}} style={{ fontSize:10, width:22, height:22 }}>🗑</button>
                         </div>
                       </div>

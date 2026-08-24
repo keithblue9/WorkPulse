@@ -34,7 +34,7 @@ async function buildSnapshot(): Promise<string> {
     const [budgets, cashcards, reimburses, petty, tpe, users, projects, meetings, config] = await Promise.all([
       BudgetModel.find({}).lean(),
       CashCardModel.find({ year }).sort({ month:1 }).lean(),
-      ReimbursementModel.find({}).sort({ createdAt:-1 }).limit(800).lean(),
+      ReimbursementModel.find({}, { 'documents.url':0, receiptUrl:0 }).sort({ createdAt:-1 }).limit(800).lean(),
       PettyCashModel.findOne({ year }).lean(),
       ThirdPartyEventModel.find({ year }).lean(),
       UserModel.find({}, 'name role roles division active').lean(),
