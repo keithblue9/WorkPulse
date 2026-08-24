@@ -23,6 +23,9 @@ export default function QuickNotesPage() {
 
   const [notes, setNotes] = useState<QuickNote[]>([])
   const [members, setMembers] = useState<any[]>([])
+  // Filter diri sendiri saat render, bukan saat load — sesi bisa belum siap
+  // ketika data pertama kali diambil sehingga diri sendiri ikut muncul.
+  const shareMembers = members.filter((m: any) => !myEmail || m.email !== myEmail)
   const [loading, setLoading] = useState(true)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [shareOpenId, setShareOpenId] = useState<string | null>(null)
@@ -37,7 +40,7 @@ export default function QuickNotesPage() {
         fetch('/api/users').then(r => r.json()),
       ])
       setNotes(n.data || [])
-      setMembers((u.data || []).filter((m: any) => m.email !== myEmail && m.active !== false))
+      setMembers((u.data || []).filter((m: any) => m.active !== false))
     } catch { toast.error('Gagal memuat catatan personal') }
     setLoading(false)
   }
@@ -269,7 +272,7 @@ export default function QuickNotesPage() {
                       style={{ fontSize: 12.5, padding: '7px 13px', background: note.sharedWith?.length ? 'var(--brand-soft)' : undefined, color: note.sharedWith?.length ? 'var(--brand)' : undefined, borderColor: note.sharedWith?.length ? 'var(--brand)' : undefined }}>
                       📤 {note.sharedWith?.length ? `Dishare ke ${note.sharedWith.length}` : 'Share'}
                     </button>
-                    {shareOpenId === note._id && <ShareEditor note={note} members={members} onSave={list => saveShare(note, list)} onClose={() => setShareOpenId(null)} />}
+                    {shareOpenId === note._id && <ShareEditor note={note} members={shareMembers} onSave={list => saveShare(note, list)} onClose={() => setShareOpenId(null)} />}
                   </>
                 )}
                 {isOwner && <button onClick={() => { deleteNote(note._id); setDetailId(null) }} className="btn btn-sm" style={{ fontSize: 12.5, padding: '7px 13px', marginLeft: 'auto', color: 'var(--red)' }}>🗑️ Hapus</button>}
@@ -368,7 +371,7 @@ function ReminderEditor({ note, onSave, onClose }: { note: QuickNote; onSave: (r
 }
 
 function ShareEditor({ note, members, onSave, onClose }: { note: QuickNote; members: any[]; onSave: (list: string[]) => void; onClose: () => void }) {
-  const [selected, setSelected] = useState<string[]>(note.sharedWith || [])
+  const [selected, setSelected] = useState<string[]>(() => (note.sharedWith || []).filter(Boolean))
   const [q, setQ] = useState('')
 
   // Tutup dengan tombol Esc
@@ -377,13 +380,18 @@ function ShareEditor({ note, members, onSave, onClose }: { note: QuickNote; memb
     document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  function toggle(email: string) { setSelected(s => s.includes(email) ? s.filter(x => x !== email) : [...s, email]) }
+  function toggle(email: string) {
+    if (!email) return   // member tanpa email tidak bisa di-share (sharedWith berbasis email)
+    setSelected(s => s.includes(email) ? s.filter(x => x !== email) : [...s, email])
+  }
 
+  // Hanya member yang punya email yang bisa di-tag; sisanya ditampilkan tapi nonaktif
   const shown = members.filter(m => {
     const t = q.trim().toLowerCase()
     return !t || String(m.name || '').toLowerCase().includes(t) || String(m.email || '').toLowerCase().includes(t)
   })
-  const allShownSelected = shown.length > 0 && shown.every(m => selected.includes(m.email))
+  const taggable = shown.filter(m => !!m.email)
+  const allShownSelected = taggable.length > 0 && taggable.every(m => selected.includes(m.email))
   const initial = (n: string) => String(n || '?').trim().charAt(0).toUpperCase()
 
   return (
@@ -405,11 +413,14 @@ function ShareEditor({ note, members, onSave, onClose }: { note: QuickNote; memb
               {selected.length > 0 ? <><b style={{ color: 'var(--brand)' }}>{selected.length}</b> member dipilih</> : 'Belum ada yang dipilih'}
             </span>
             <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={() => setSelected(s => allShownSelected ? s.filter(e => !shown.some(m => m.email === e)) : Array.from(new Set([...s, ...shown.map(m => m.email)])))}
-                className="btn btn-sm" style={{ fontSize: 11.5 }} disabled={shown.length === 0}>
+              <button type="button" disabled={taggable.length === 0}
+                onClick={() => setSelected(s => allShownSelected
+                  ? s.filter(e => !taggable.some(m => m.email === e))
+                  : Array.from(new Set([...s, ...taggable.map(m => m.email)])))}
+                className="btn btn-sm" style={{ fontSize: 11.5 }}>
                 {allShownSelected ? 'Batal pilih semua' : 'Pilih semua'}
               </button>
-              {selected.length > 0 && <button onClick={() => setSelected([])} className="btn btn-sm" style={{ fontSize: 11.5 }}>Kosongkan</button>}
+              {selected.length > 0 && <button type="button" onClick={() => setSelected([])} className="btn btn-sm" style={{ fontSize: 11.5 }}>Kosongkan</button>}
             </div>
           </div>
         </div>
@@ -420,29 +431,33 @@ function ShareEditor({ note, members, onSave, onClose }: { note: QuickNote; memb
               {members.length === 0 ? 'Tidak ada member lain.' : 'Tidak ada member yang cocok dengan pencarian.'}
             </div>
           )}
-          {shown.map(m => {
-            const on = selected.includes(m.email)
+          {shown.map((m, i) => {
+            const canTag = !!m.email
+            const on = canTag && selected.includes(m.email)
             return (
-              <label key={m.email} onClick={e => e.preventDefault()} role="button"
-                onMouseDown={() => toggle(m.email)}
-                style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+              <button key={m.email || m._id || `m-${i}`} type="button" onClick={() => toggle(m.email)} disabled={!canTag}
+                title={canTag ? undefined : 'Member ini belum punya email, tidak bisa di-share'}
+                style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px', borderRadius: 10, width: '100%', textAlign: 'left',
+                  cursor: canTag ? 'pointer' : 'not-allowed', opacity: canTag ? 1 : 0.5,
                   background: on ? 'var(--brand-soft)' : 'transparent', border: `1px solid ${on ? 'var(--brand)' : 'transparent'}` }}>
                 <span style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: on ? 'var(--brand)' : 'var(--bg3)', color: on ? '#fff' : 'var(--text2)', fontSize: 14, fontWeight: 700 }}>{initial(m.name)}</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name || m.email}</span>
-                  {m.email && <span style={{ display: 'block', fontSize: 11, color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.email}</span>}
+                  <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name || m.email || '(tanpa nama)'}</span>
+                  {m.email
+                    ? <span style={{ display: 'block', fontSize: 11, color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.email}</span>
+                    : <span style={{ display: 'block', fontSize: 11, color: 'var(--text3)' }}>belum punya email</span>}
                 </span>
                 <span style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   border: `2px solid ${on ? 'var(--brand)' : 'var(--border2)'}`, background: on ? 'var(--brand)' : 'transparent', color: '#fff', fontSize: 13, fontWeight: 700 }}>{on ? '✓' : ''}</span>
-              </label>
+              </button>
             )
           })}
         </div>
 
         <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onClose} className="btn">Batal</button>
-          <button onClick={() => onSave(selected)} className="btn btn-primary">Simpan</button>
+          <button type="button" onClick={onClose} className="btn">Batal</button>
+          <button type="button" onClick={() => onSave(selected.filter(Boolean))} className="btn btn-primary">Simpan</button>
         </div>
       </div>
     </div>
