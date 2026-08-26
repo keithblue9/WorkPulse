@@ -17,6 +17,7 @@ export default function GoLivePage() {
   const [seeding, setSeeding] = useState(false)
   const [editApp, setEditApp] = useState<any|null>(null)
   const [exporting, setExporting] = useState<'excel'|'pdf'|null>(null)
+  const [newEntityId, setNewEntityId] = useState<string|null>(null)   // sorot baris yg baru ditambah
 
   // Export mengikuti apa yang sedang tampil (filter grup + pencarian)
   async function doExport(kind:'excel'|'pdf') {
@@ -68,13 +69,48 @@ export default function GoLivePage() {
   }
   useEffect(()=>{ load() }, [])
 
-  async function addEntity(){ const r=await fetch('/api/golive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'entity',name:'',cocd:'',group:''})}); const d=await r.json(); if(r.ok) setEntities(p=>[...p,d.data]); else toast.error(d.error||'Gagal') }
+  async function addEntity(){
+    const r=await fetch('/api/golive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'entity',name:'',cocd:'',group:''})})
+    const d=await r.json()
+    if(!r.ok){ toast.error(d.error||'Gagal menambah entitas'); return }
+    // Entitas baru belum punya nama/grup/tanggal go-live, jadi akan tersaring keluar
+    // kalau filter sedang aktif -> terlihat seperti "gagal tambah". Reset filter dulu.
+    const adaFilter = groupFilter!=='all' || yearFilter!=='all' || !!q.trim()
+    if (adaFilter){ setGroupFilter('all'); setYearFilter('all'); setQ('') }
+    setEntities(p=>[...p,d.data])
+    setNewEntityId(d.data?._id||null)
+    toast.success(adaFilter ? 'Entitas ditambahkan (filter direset agar terlihat)' : 'Entitas ditambahkan — isi namanya')
+    // Gulirkan ke baris baru supaya langsung terlihat di daftar yang panjang
+    setTimeout(()=>{ document.getElementById(`ent-${d.data?._id}`)?.scrollIntoView({ behavior:'smooth', block:'center' }) }, 120)
+  }
   async function addApp(){ const label=prompt('Nama aplikasi baru:'); if(!label?.trim()) return; const r=await fetch('/api/golive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'app',label:label.trim()})}); const d=await r.json(); if(r.ok){setApps(p=>[...p,d.data]);toast.success('App ditambahkan')} else toast.error(d.error||'Gagal') }
   async function delEntity(e:any){ if(!confirm(`Hapus "${e.name||'(kosong)'}"?`)) return; await fetch(`/api/golive?kind=entity&id=${e._id}`,{method:'DELETE'}); setEntities(p=>p.filter(x=>x._id!==e._id)) }
 
-  async function patchEntity(id:string,patch:any){ setEntities(p=>p.map(e=>e._id===id?{...e,...patch,apps:{...(e.apps||{}),...(patch.apps||{})}}:e)); try{await fetch('/api/golive',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'entity',id,patch})})}catch{toast.error('Gagal')} }
+  async function patchEntity(id:string,patch:any){
+    const sebelum = entities.find(e=>e._id===id)
+    setEntities(p=>p.map(e=>e._id===id?{...e,...patch,apps:{...(e.apps||{}),...(patch.apps||{})}}:e))
+    try{
+      const r = await fetch('/api/golive',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'entity',id,patch})})
+      if(!r.ok){
+        const d = await r.json().catch(()=>null)
+        throw new Error(d?.error || `Server error ${r.status}`)
+      }
+    }catch(err:any){
+      // Kembalikan tampilan ke kondisi sebelumnya supaya tidak terlihat "tersimpan" padahal gagal
+      if (sebelum) setEntities(p=>p.map(e=>e._id===id?sebelum:e))
+      toast.error('Gagal menyimpan: '+(err?.message||'coba lagi'))
+    }
+  }
   function setSub(e:any,appKey:string,subKey:string,val:boolean){ const cur=(e.apps||{})[appKey]||{}; const subs={...(cur.subs||{}), [subKey]:val}; const anyDone=Object.values(subs).some(Boolean); patchEntity(e._id,{apps:{...(e.apps||{}), [appKey]:{...cur,subs,done:anyDone}}}) }
-  function setAppDate(e:any,appKey:string,date:string){ const cur=(e.apps||{})[appKey]||{}; patchEntity(e._id,{apps:{...(e.apps||{}), [appKey]:{...cur,date}}}) }
+  function setAppDate(e:any,appKey:string,date:string){
+    const cur=(e.apps||{})[appKey]||{}
+    patchEntity(e._id,{apps:{...(e.apps||{}), [appKey]:{...cur,date}}})
+    // Kalau filter tahun aktif dan tanggal barunya tahun lain, baris akan hilang
+    // dari tampilan. Beri tahu supaya tidak dikira gagal tersimpan.
+    if (yearFilter!=='all' && date && yearOf(date)!==yearFilter) {
+      toast(`Tersimpan. Baris disembunyikan karena filter "Go-Live ${yearFilter}" aktif.`, { icon:'ℹ️' })
+    }
+  }
 
   // ── Filter tahun go-live ──
   // Tanggal go-live disimpan per aplikasi di e.apps[key].date (format 'YYYY-MM').
@@ -147,7 +183,7 @@ export default function GoLivePage() {
   // Header beku: menempel atas DAN kiri -> z-index paling tinggi
   const thFreeze = (i:number):React.CSSProperties => ({ ...th, position:'sticky', top:0, left:idLeft[i], zIndex:6, ...edge(i) })
   // Body beku: latar solid supaya kolom lain tidak menembus saat digeser
-  const tdFreeze = (i:number, even:boolean):React.CSSProperties => ({ ...td, position:'sticky', left:idLeft[i], zIndex:3, background: even?'var(--bg)':'var(--bg2)', ...edge(i) })
+  const tdFreeze = (i:number, even:boolean, hl=false):React.CSSProperties => ({ ...td, position:'sticky', left:idLeft[i], zIndex:3, background: hl ? 'var(--brand-soft)' : (even?'var(--bg)':'var(--bg2)'), ...edge(i) })
   const totalSubs = apps.reduce((s:number,a:any)=>(a.subFeatures||[]).length + 1 + s, 0) // +1 for date col
 
   return (
@@ -230,13 +266,13 @@ export default function GoLivePage() {
               </tr>
             </thead>
             <tbody>
-              {view.map((e:any,i:number)=>{const even=i%2===0; return(
-                <tr key={e._id} style={{background:even?'transparent':'var(--bg2)'}}>
-                  <td style={{...tdFreeze(0,even),textAlign:'center',color:'var(--text3)',fontSize:10}}>{i+1}</td>
-                  <td style={tdFreeze(1,even)}><input defaultValue={e.name||''} placeholder="—" onBlur={ev=>{if(ev.target.value!==e.name) patchEntity(e._id,{name:ev.target.value})}} style={{width:'100%',border:'none',background:'transparent',fontSize:11.5,fontWeight:600,color:'var(--text)',padding:0,outline:'none'}}/></td>
-                  <td style={{...tdFreeze(2,even),textAlign:'center'}}><input defaultValue={e.cocd||''} onBlur={ev=>{if(ev.target.value!==e.cocd) patchEntity(e._id,{cocd:ev.target.value})}} style={{width:48,border:'none',background:'transparent',fontSize:11,color:'var(--text2)',padding:0,outline:'none',textAlign:'center'}}/></td>
-                  <td style={tdFreeze(3,even)}><select value={e.group||''} onChange={ev=>patchEntity(e._id,{group:ev.target.value})} style={{width:'100%',border:'1px solid var(--border)',borderRadius:4,padding:'2px 4px',fontSize:10.5,background:'var(--bg)',color:'var(--text)'}}><option value="">—</option>{GROUPS.map(g=><option key={g} value={g}>{g}</option>)}</select></td>
-                  <td style={{...tdFreeze(4,even),fontSize:10.5}}>
+              {view.map((e:any,i:number)=>{const even=i%2===0; const hl=e._id===newEntityId; return(
+                <tr key={e._id} id={`ent-${e._id}`} style={{background: e._id===newEntityId ? 'var(--brand-soft)' : (even?'transparent':'var(--bg2)')}}>
+                  <td style={{...tdFreeze(0,even,hl),textAlign:'center',color:'var(--text3)',fontSize:10}}>{i+1}</td>
+                  <td style={tdFreeze(1,even,hl)}><input defaultValue={e.name||''} placeholder="—" onBlur={ev=>{if(ev.target.value!==e.name) patchEntity(e._id,{name:ev.target.value})}} style={{width:'100%',border:'none',background:'transparent',fontSize:11.5,fontWeight:600,color:'var(--text)',padding:0,outline:'none'}}/></td>
+                  <td style={{...tdFreeze(2,even,hl),textAlign:'center'}}><input defaultValue={e.cocd||''} onBlur={ev=>{if(ev.target.value!==e.cocd) patchEntity(e._id,{cocd:ev.target.value})}} style={{width:48,border:'none',background:'transparent',fontSize:11,color:'var(--text2)',padding:0,outline:'none',textAlign:'center'}}/></td>
+                  <td style={tdFreeze(3,even,hl)}><select value={e.group||''} onChange={ev=>patchEntity(e._id,{group:ev.target.value})} style={{width:'100%',border:'1px solid var(--border)',borderRadius:4,padding:'2px 4px',fontSize:10.5,background:'var(--bg)',color:'var(--text)'}}><option value="">—</option>{GROUPS.map(g=><option key={g} value={g}>{g}</option>)}</select></td>
+                  <td style={{...tdFreeze(4,even,hl),fontSize:10.5}}>
                     <input defaultValue={e.client||''} placeholder="—" onBlur={ev=>{if(ev.target.value!==(e.client||'')) patchEntity(e._id,{client:ev.target.value})}} style={{width:56,border:'none',background:'transparent',fontSize:10.5,color:'var(--text2)',padding:0,outline:'none'}}/>
                   </td>
                   {apps.map((a:any,ai:number)=>{const ap=(e.apps||{})[a.key]||{}; const subs=(a.subFeatures||[]); const color=['#4f8ef7','#8b5cf6','#22c55e','#f59e0b','#ec4899','#14b8a6'][ai%6]; const dateStr=ap.date||'';
