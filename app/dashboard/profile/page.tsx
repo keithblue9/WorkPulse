@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { Empty, Icon, PageHeader } from '@/components/ui'
+import NotifySettings from '@/components/NotifySettings'
 
 const initials = (s: string) => String(s || '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || '?'
 const BIO_KEYS = ['name', 'noPekerja', 'noKtp', 'jabatan', 'birthPlace', 'birthDate', 'alamatJakarta', 'alamatAsal', 'phone', 'phoneLinkAja', 'bank', 'noRekening', 'kontakDaruratNama', 'kontakDaruratHubungan', 'kontakDaruratHp', 'sizeKaos', 'sizeKemeja', 'sizeJaket', 'sizeCelana', 'sizeSepatu']
@@ -101,6 +102,7 @@ export default function ProfilePage() {
               </div>
               <span className="au-xs au-muted" style={{ padding: '0 4px' }}>Alamat, rekening, kontak darurat dan ukuran diubah dari halaman Biodata.</span>
             </section>
+            <NotifySettings />
             <ChangePin />
           </>}
       </div>
