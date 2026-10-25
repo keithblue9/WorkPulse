@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts'
+import { Donut, Icon, Seg, Sheet } from '@/components/ui'
 import { getConfig } from '@/lib/configCache'
 import { cachedFetch } from '@/lib/fetchCache'
 
@@ -216,176 +216,92 @@ export default function TeamAvailability() {
   const donutNonZero = stats.donutData.filter((d: any) => d.value > 0)
 
   return (
-    <div className="card" style={{ padding: 16, width: "100%" }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700 }}>👥 Team Availability</div>
-          <div style={{ fontSize: 11, color: 'var(--text3)' }}>% member WFO · {periodLabel} · {memberCount} member</div>
-        </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Navigasi bulan (selalu ada — mode Minggu pun pilih minggu DALAM bulan ini) */}
-          <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <button onClick={() => shiftMonth(-1)} className="btn btn-sm" style={{ padding: '3px 8px' }}>◀</button>
-            <span style={{ fontSize: 11, fontWeight: 600, minWidth: 70, textAlign: 'center' }}>{BULAN[mm0 - 1].slice(0, 3)} {my}</span>
-            <button onClick={() => shiftMonth(1)} className="btn btn-sm" style={{ padding: '3px 8px' }}>▶</button>
+    <section className="au-card" style={{ width: '100%' }}>
+      <div className="au-row au-between au-wrap" style={{ gap: 8 }}>
+        <div className="au-col"><h2>Ketersediaan tim</h2><span className="au-xs au-muted">% member WFO · {periodLabel} · {memberCount} member</span></div>
+        <div className="au-row au-wrap" style={{ gap: 6 }}>
+          <div className="au-row" style={{ gap: 4 }}>
+            <button type="button" onClick={() => shiftMonth(-1)} className="btn btn-icon btn-sm" aria-label="Bulan sebelumnya"><Icon name="left" size={15} /></button>
+            <b style={{ fontSize: 13, minWidth: 74, textAlign: 'center' }}>{BULAN[mm0 - 1].slice(0, 3)} {my}</b>
+            <button type="button" onClick={() => shiftMonth(1)} className="btn btn-icon btn-sm" aria-label="Bulan berikutnya"><Icon name="right" size={15} /></button>
           </div>
-          {/* Navigasi minggu (hanya mode Minggu) */}
           {scope === 'week' && curWeek && (
-            <div style={{ display: 'flex', gap: 3, alignItems: 'center', background: 'var(--bg3)', borderRadius: 8, padding: 2 }}>
-              <button onClick={() => shiftWeek(-1)} className="btn btn-sm" style={{ padding: '3px 8px' }}>‹</button>
-              <span style={{ fontSize: 11, fontWeight: 700, minWidth: 92, textAlign: 'center', color: 'var(--brand)' }} title={`${fmtShort(curWeek.start)} – ${fmtShort(curWeek.end)}`}>
-                Minggu {curWeek.no} <span style={{ fontWeight: 400, color: 'var(--text3)' }}>({curWeek.start.getDate()}–{curWeek.end.getDate()})</span>
-              </span>
-              <button onClick={() => shiftWeek(1)} className="btn btn-sm" style={{ padding: '3px 8px' }}>›</button>
+            <div className="au-row" style={{ gap: 4 }}>
+              <button type="button" onClick={() => shiftWeek(-1)} className="btn btn-icon btn-sm" aria-label="Minggu sebelumnya"><Icon name="left" size={15} /></button>
+              <b style={{ fontSize: 12.5, minWidth: 96, textAlign: 'center', color: 'var(--accent-ink)' }} title={`${fmtShort(curWeek.start)} – ${fmtShort(curWeek.end)}`}>Minggu {curWeek.no} <span className="au-muted" style={{ fontWeight: 500 }}>({curWeek.start.getDate()}–{curWeek.end.getDate()})</span></b>
+              <button type="button" onClick={() => shiftWeek(1)} className="btn btn-icon btn-sm" aria-label="Minggu berikutnya"><Icon name="right" size={15} /></button>
             </div>
           )}
-          <div style={{ display: 'flex', gap: 3, background: 'var(--bg3)', borderRadius: 8, padding: 3 }}>
-            {(['week', 'month'] as const).map(s => (
-              <button key={s} onClick={() => {
-                setScope(s)
-                if (s === 'week') setViewWeek(isCurrentMonth ? weekIdxOfToday(my, mm0) : 0)
-              }} className="btn btn-sm" style={{ fontSize: 11, background: scope === s ? 'var(--brand)' : 'transparent', color: scope === s ? '#fff' : 'var(--text2)', border: 'none' }}>{s === 'week' ? 'Minggu' : 'Bulan'}</button>
-            ))}
-          </div>
+          <Seg label="Periode" value={scope} onChange={s => { setScope(s); if (s === 'week') setViewWeek(isCurrentMonth ? weekIdxOfToday(my, mm0) : 0) }} options={[['week', 'Minggu'], ['month', 'Bulan']] as const} />
         </div>
       </div>
 
-      {loading ? <div style={{ fontSize: 12, color: 'var(--text3)', padding: '30px 0', textAlign: 'center' }}>Memuat…</div>
+      {loading ? <div className="au-row" style={{ gap: 16 }}><div className="au-skel" style={{ width: 132, height: 132, borderRadius: '50%' }} /><div className="au-col" style={{ flex: 1, gap: 8 }}><div className="au-skel" /><div className="au-skel" style={{ width: '60%' }} /></div></div>
         : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            {/* KIRI: donut komposisi + summary status */}
-            <div>
-              {stats.grandTotal === 0 ? <div style={{ fontSize: 12, color: 'var(--text3)', padding: '30px 0', textAlign: 'center' }}>Belum ada data presensi.</div> : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{ position: 'relative', width: 130, height: 130, flexShrink: 0 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={donutNonZero} dataKey="value" nameKey="name" innerRadius={42} outerRadius={62} paddingAngle={2} stroke="none">
-                          {donutNonZero.map((d: any, i: number) => <Cell key={i} fill={d.color} />)}
-                        </Pie>
-                        <Tooltip content={({ active, payload }: any) => active && payload?.length ? (
-                          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 10px', fontSize: 11, boxShadow: '0 6px 20px rgba(0,0,0,0.15)' }}>
-                            <b>{payload[0].name}</b>: {payload[0].value} member ({memberCount > 0 ? Math.round(payload[0].value / memberCount * 100) : 0}%)
-                          </div>) : null} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green)' }}>{stats.teamPct}%</div>
-                      <div style={{ fontSize: 9, color: 'var(--text3)' }}>WFO</div>
-                    </div>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: '#4f8ef722', color: '#4f8ef7' }}>Pekerja: {stats.pctPekerja}%</span>
-                      <span style={{ fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: '#f59e0b22', color: '#f59e0b' }}>TAD: {stats.pctTAD}%</span>
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--text3)' }}><b style={{ color:'var(--green)' }}>{stats.wfoMembers}</b> dari {memberCount} member WFO · {stats.grandWfo} hari WFO</div>
-                    {/* legend ringkas */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 2 }}>
-                      {stats.donutData.map((d: any) => (
-                        <div key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color, flexShrink: 0 }} />
-                          <span style={{ flex: 1, color: 'var(--text2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</span>
-                          <span style={{ fontWeight: 700 }}>{d.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <button onClick={() => setShowDetail(true)} style={{ fontSize: 10.5, color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', marginTop: 2 }}>Klik detail per member →</button>
+          <div className="au-grid g2" style={{ gap: 18 }}>
+            <div className="au-col" style={{ gap: 10, minWidth: 0 }}>
+              {stats.grandTotal === 0 ? <span className="au-small au-muted" style={{ padding: '24px 0' }}>Belum ada data presensi di periode ini.</span> : (
+                <div className="au-row" style={{ gap: 16, alignItems: 'center' }}>
+                  <Donut data={donutNonZero.map((d: any) => ({ value: d.value, color: d.color, name: d.name }))} size={132} stroke={18} label={`${stats.teamPct}% member WFO`}>
+                    <b style={{ fontSize: 24, color: 'var(--ok)' }}>{stats.teamPct}%</b><span>WFO</span>
+                  </Donut>
+                  <div className="au-col" style={{ flex: 1, minWidth: 0, gap: 6 }}>
+                    <span className="au-row au-wrap" style={{ gap: 6 }}><span className="au-tag">Pekerja {stats.pctPekerja}%</span><span className="au-tag">TAD {stats.pctTAD}%</span></span>
+                    <span className="au-xs au-muted"><b style={{ color: 'var(--ok)' }}>{stats.wfoMembers}</b> dari {memberCount} member WFO · {stats.grandWfo} hari WFO</span>
+                    <div className="au-col" style={{ gap: 3, maxWidth: 240 }}>{stats.donutData.map((d: any) => (
+                      <span key={d.key} className="au-row au-xs" style={{ gap: 6 }}><i style={{ width: 9, height: 9, borderRadius: 3, background: d.color, flexShrink: 0 }} /><span className="au-ink2" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</span><b>{d.value}</b></span>
+                    ))}</div>
+                    <button type="button" className="au-link" style={{ alignSelf: 'flex-start', padding: 0 }} onClick={() => setShowDetail(true)}>Detail per member</button>
                   </div>
                 </div>
               )}
             </div>
-
-            {/* KANAN: siapa yang WFO di periode terpilih + hari-harinya */}
-            <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16, minWidth: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>
-                🏢 WFO · {scope === 'week' && curWeek ? `Minggu ${curWeek.no} ${BULAN[mm0 - 1].slice(0, 3)}` : `${BULAN[mm0 - 1].slice(0, 3)} ${my}`}
-              </div>
-              {wfoList.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'var(--text3)', padding: '14px 0' }}>Belum ada member WFO di periode ini.</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 210, overflowY: 'auto' }}>
-                  {wfoList.map((m: any, i: number) => (
-                    <div key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px', borderRadius: 7, background: 'var(--bg3)' }}>
-                      <span style={{ fontSize: 10, color: 'var(--text3)', minWidth: 12, textAlign: 'right', flexShrink: 0, paddingTop: 1 }}>{i + 1}.</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 12, fontWeight: 600 }}>{m.name}</span>
-                          {m.status === 'TAD' && <span style={{ fontSize: 8.5, color: '#f59e0b', fontWeight: 700 }}>TAD</span>}
-                          <span style={{ fontSize: 9.5, color: 'var(--text3)', marginLeft: 'auto', flexShrink: 0 }}>{m.wfoDates.length} hari</span>
-                        </div>
-                        <div style={{ fontSize: 10, color: 'var(--text2)', marginTop: 1, lineHeight: 1.45 }}>
-                          {m.dayLabels.join(', ')}
-                        </div>
-                      </div>
+            <div className="au-col" style={{ gap: 8, minWidth: 0 }}>
+              <span className="lbl">WFO · {scope === 'week' && curWeek ? `Minggu ${curWeek.no} ${BULAN[mm0 - 1].slice(0, 3)}` : `${BULAN[mm0 - 1].slice(0, 3)} ${my}`}</span>
+              {wfoList.length === 0 ? <span className="au-small au-muted">Belum ada member WFO di periode ini.</span> : (
+                <div className="au-ig" tabIndex={0} role="region" aria-label="Daftar anggota" style={{ maxHeight: 230, overflowY: 'auto' }}>
+                  {wfoList.map((m: any) => (
+                    <div key={m.id} className="au-igr" style={{ alignItems: 'flex-start', padding: '10px 14px' }}>
+                      <span className="au-col" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                        <span className="au-row" style={{ gap: 6 }}><b style={{ fontSize: 14 }}>{m.name}</b>{m.status === 'TAD' && <span className="au-tag">TAD</span>}<span className="au-xs au-muted" style={{ marginLeft: 'auto' }}>{m.wfoDates.length} hari</span></span>
+                        <span className="au-xs au-ink2">{m.dayLabels.join(', ')}</span>
+                      </span>
                     </div>
                   ))}
-                  <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 2 }}>{wfoList.length} dari {memberCount} member pernah WFO</div>
                 </div>
               )}
-
-              {/* Legend: siapa yang belum isi presensi di periode ini */}
               {stats.notFilled.length > 0 && (
-                <div style={{ marginTop: 10, padding: '7px 9px', borderRadius: 7, background: 'var(--bg3)', border: '1px dashed var(--border)' }}>
-                  <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>
-                    ⚠️ Belum isi presensi ({stats.notFilled.length})
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {stats.notFilled.map((m: any) => (
-                      <span key={m.id} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, background: 'var(--bg)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                        {m.name}{m.status === 'TAD' ? ' · TAD' : ''}
-                      </span>
-                    ))}
-                  </div>
+                <div className="au-col" style={{ gap: 6, padding: 10, borderRadius: 14, border: '1px dashed var(--line2)' }}>
+                  <span className="lbl">Belum isi presensi ({stats.notFilled.length})</span>
+                  <span className="au-row au-wrap" style={{ gap: 4 }}>{stats.notFilled.map((m: any) => <span key={m.id} className="au-tag">{m.name}{m.status === 'TAD' ? ' · TAD' : ''}</span>)}</span>
                 </div>
               )}
             </div>
           </div>
         )}
 
-      {/* POPUP DETAIL per member */}
       {showDetail && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowDetail(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div className="card" onClick={e => e.stopPropagation()} style={{ width: 560, maxWidth: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>Detail Kehadiran Tim</div>
-                <div style={{ fontSize: 11, color: 'var(--text3)' }}>{periodLabel} · % = porsi WFO dari hari terisi</div>
-              </div>
-              <button onClick={() => setShowDetail(false)} className="btn btn-icon btn-sm">✕</button>
-            </div>
-            {/* Legend */}
-            <div style={{ padding: '8px 18px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {types.map((t: any) => (
-                <span key={t.key} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: 'var(--text2)' }}>
-                  <span style={{ width: 9, height: 9, borderRadius: 2, background: t.textColor || '#4f8ef7' }} />{t.label}
-                </span>
-              ))}
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 18px' }}>
-              {stats.memberRows.map((r: any) => (
-                <div key={r.id} style={{ marginBottom: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600 }}>{r.name} <span style={{ fontSize: 9.5, color: 'var(--text3)', fontWeight: 400 }}>{r.status === 'TAD' ? 'TAD' : ''}</span></span>
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: '#4f8ef7' }}>{r.pct}% WFO <span style={{ color: 'var(--text3)', fontWeight: 400 }}>· {r.total} hari</span></span>
-                  </div>
-                  {/* stacked bar sama panjang (proporsi dari total hari terisi member itu) */}
-                  <div style={{ display: 'flex', height: 14, borderRadius: 4, overflow: 'hidden', background: 'var(--bg3)' }}>
-                    {r.total === 0 ? <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8.5, color: 'var(--text3)' }}>belum ada data</div>
-                      : PRIORITY.concat(Object.keys(r.days).filter((k: string) => !PRIORITY.includes(k))).filter((cat, idx, arr) => arr.indexOf(cat) === idx && r.days[cat]).map((cat: string) => (
-                        <div key={cat} title={`${labelOf(cat)}: ${r.days[cat]} hari`} style={{ width: `${r.days[cat] / r.total * 100}%`, background: colorOf(cat) }} />
-                      ))}
-                  </div>
+        <Sheet open title="Detail kehadiran tim" onClose={() => setShowDetail(false)}>
+          <p className="au-xs au-muted" style={{ marginTop: -4 }}>{periodLabel} · % = porsi WFO dari hari terisi</p>
+          <div className="au-key">{types.map((t: any) => <span key={t.key}><i style={{ background: t.textColor || 'var(--accent)' }} />{t.label}</span>)}</div>
+          <div className="au-col" style={{ gap: 12 }}>
+            {stats.memberRows.map((r: any) => (
+              <div key={r.id} className="au-col" style={{ gap: 4 }}>
+                <span className="au-row au-between"><b style={{ fontSize: 14 }}>{r.name} {r.status === 'TAD' && <span className="au-tag">TAD</span>}</b><span className="au-small"><b style={{ color: 'var(--accent-ink)' }}>{r.pct}% WFO</b> <span className="au-muted">· {r.total} hari</span></span></span>
+                <div className="au-stack" style={{ height: 12 }}>
+                  {r.total === 0 ? <i style={{ flex: 1, background: 'var(--sunken)' }} />
+                    : PRIORITY.concat(Object.keys(r.days).filter((k: string) => !PRIORITY.includes(k))).filter((cat, idx, arr) => arr.indexOf(cat) === idx && r.days[cat]).map((cat: string) => (
+                      <i key={cat} title={`${labelOf(cat)}: ${r.days[cat]} hari`} style={{ flex: r.days[cat], background: colorOf(cat) }} />
+                    ))}
                 </div>
-              ))}
-            </div>
-            <div style={{ padding: '10px 18px', borderTop: '1px solid var(--border)', fontSize: 11.5, color: 'var(--text2)', display: 'flex', justifyContent: 'space-between' }}>
-              <span>Total tim: <b style={{ color: '#4f8ef7' }}>{stats.grandWfo} WFO</b> / {stats.grandTotal} hari terisi</span>
-              <span>Rata-rata: <b style={{ color: 'var(--green)' }}>{stats.teamPct}%</b></span>
-            </div>
+              </div>
+            ))}
           </div>
-        </div>
+          <div className="au-row au-between au-small" style={{ paddingTop: 10, borderTop: '1px solid var(--line)' }}>
+            <span>Total tim <b>{stats.grandWfo} WFO</b> / {stats.grandTotal} hari terisi</span><span>Rata-rata <b style={{ color: 'var(--ok)' }}>{stats.teamPct}%</b></span>
+          </div>
+        </Sheet>
       )}
-    </div>
+    </section>
   )
 }

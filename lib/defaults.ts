@@ -1,7 +1,7 @@
 // Shared default values used as fallback when config in DB is missing fields.
 // These match the Mongoose schema defaults in models/Config.ts
 
-export const ALL_MENU_KEYS = ['dashboard','activities','mandatory','golive','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','playground','budget','budgetreport','reimbursement','operasional','pettycash','cashcard','cashier','settlementcc','thirdparty','members','config','biodata-export']
+export const ALL_MENU_KEYS = ['dashboard','activities','mandatory','golive','calendar','issues','progress','attendance','biodata','links','notes','quicknotes','budget','budgetreport','reimbursement','operasional','pettycash','cashcard','cashier','settlementcc','thirdparty','members','config','biodata-export']
 
 // Kategori OE untuk Reimbursement + lookup Settlement XLSX (slide 4).
 // code = kolom "Kategori" di Excel, name = kolom "Keterangan Transaksi".
@@ -22,23 +22,26 @@ export const MENU_LABELS: Record<string,string> = {
   mandatory: 'Mandatory',
   golive: 'Go-Live',
   dashboard:'Dashboard', activities:'Activities', calendar:'Calendar', issues:'Issues', progress:'Progress',
-  attendance:'Presensi', biodata:'Biodata', links:'Link Hub', meetings:'Meeting Reports', notes:'[Team] Notes', quicknotes:'[Personal] Notes',
+  attendance:'Presensi', biodata:'Biodata', links:'Link Hub', notes:'[Team] Notes', quicknotes:'[Personal] Notes',
   budget:'Budget Report', budgetreport:'Budget Report', reimbursement:'Reimbursement', operasional:'Operasional', pettycash:'Petty Cash', cashcard:'Cash Card', cashier:'Cashier', settlementcc:'Settlement CC', thirdparty:'[3rd Party] Event',
-  members:'Member', config:'Configuration', playground:'Playground', 'biodata-export':'Export Biodata (Excel)'
+  members:'Member', config:'Configuration', 'biodata-export':'Export Biodata (Excel)'
 }
 
 export const DEFAULT_ROLES = [
   { key:'admin',    label:'Admin',     builtin:true,  allowedMenus:[...ALL_MENU_KEYS] },
   // manager broad access but NOT the CC Holder report, config, pettycash, or biodata-export (admin-only)
   { key:'manager',  label:'Manager',   builtin:true,  allowedMenus:ALL_MENU_KEYS.filter(m=>m!=='config' && m!=='settlementcc' && m!=='pettycash' && m!=='biodata-export') },
-  { key:'member',   label:'Member',    builtin:true,  allowedMenus:['dashboard','activities','mandatory','golive','calendar','issues','progress','attendance','biodata','links','meetings','notes','quicknotes','playground','reimbursement'] },
-  { key:'finance',  label:'Finance',   builtin:true,  allowedMenus:['dashboard','attendance','biodata','links','quicknotes','playground','budget','budgetreport','reimbursement','operasional','cashcard','cashier','thirdparty'] },
-  { key:'cashier',  label:'Cashier',   builtin:true,  allowedMenus:['dashboard','reimbursement','operasional','pettycash','cashier','cashcard','biodata','quicknotes','playground'] },
-  { key:'ccholder', label:'CC Holder', builtin:true,  allowedMenus:['dashboard','reimbursement','operasional','cashcard','settlementcc','quicknotes','playground'] },
+  { key:'member',   label:'Member',    builtin:true,  allowedMenus:['dashboard','activities','mandatory','golive','calendar','issues','progress','attendance','biodata','links','notes','quicknotes','reimbursement'] },
+  { key:'finance',  label:'Finance',   builtin:true,  allowedMenus:['dashboard','attendance','biodata','links','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','thirdparty'] },
+  { key:'cashier',  label:'Cashier',   builtin:true,  allowedMenus:['dashboard','reimbursement','operasional','pettycash','cashier','cashcard','biodata','quicknotes'] },
+  { key:'ccholder', label:'CC Holder', builtin:true,  allowedMenus:['dashboard','reimbursement','operasional','cashcard','settlementcc','quicknotes'] },
   { key:'guest',    label:'Guest',     builtin:true,  allowedMenus:['dashboard','links'] },
 ]
 
 export const DEFAULT_WIDGETS = [
+  { key:'today-summary',      label:'Ringkasan hari ini & laju progress', segment:'main', active:true, order:0, size:'half' },
+  { key:'enhancement-map',    label:'Peta Enhancement', segment:'main', active:true, activeGuest:false, order:10, size:'half' },
+  { key:'pinned-notes',       label:'Catatan disematkan', segment:'main', active:true, activeGuest:false, order:13, size:'half' },
   { key:'stat-kpi',           label:'Stat: KPI',           segment:'stats', active:true, order:1 },
   { key:'stat-nonkpi',        label:'Stat: Non KPI',       segment:'stats', active:true, order:2 },
   { key:'stat-golive',        label:'Stat: Go Live',       segment:'stats', active:true, order:3 },
@@ -55,12 +58,8 @@ export const DEFAULT_WIDGETS = [
   { key:'mandatory-training', label:'Mandatory: Training', segment:'main', active:true, order:7, size:'half' },
   { key:'mandatory-kpi',      label:'Mandatory: Support KPI', segment:'main', active:true, order:8, size:'half' },
   { key:'golive-insights',    label:'Go-Live per Aplikasi', segment:'main', active:true, order:9, size:'full' },
-  { key:'ai-row',             label:'AI Insights (baris)',  segment:'main', active:true, order:10, size:'full' },
-  { key:'progress-chart',     label:'Chart Progress (donut)', segment:'main', active:true, order:11, size:'half' },
+  { key:'progress-chart',     label:'Status Progress Project', segment:'main', active:true, order:11, size:'half' },
   { key:'upcoming-agenda',    label:'Agenda Mendatang',    segment:'main', active:true, order:12, size:'half' },
-  { key:'ai-quotes',          label:'AI Quotes (daily)',   segment:'ai',    active:true, order:1 },
-  { key:'ai-insight-personal',label:'AI Insight Personal', segment:'ai',    active:true, order:2 },
-  { key:'ai-insight-team',    label:'AI Insight Team',     segment:'ai',    active:true, order:3 },
 ]
 
 export const DEFAULT_LINK_CATEGORIES = [
@@ -70,12 +69,6 @@ export const DEFAULT_LINK_CATEGORIES = [
   { key:'others',  label:'Others',      color:'#9aa6b3', active:true },
 ]
 
-export const DEFAULT_FONNTE = {
-  apiUrl: 'https://api.fonnte.com/send',
-  cashierUserId: '',
-  messageToCashier: '🔔 Reimbursement Baru\n\nDari: {memberName}\nKeperluan: {purpose}\nNominal: {amount}\nKategori: {category}\n\nMohon segera diproses di menu Cashier.',
-  messageToMember: '✅ Reimbursement Disetujui\n\nHi {memberName}, pengajuan reimburse "{purpose}" senilai {amount} telah ditransfer ke:\n\n🏦 {bank}\n💳 {noRekening}\n\nTerima kasih.',
-}
 
 // Coerce pic field: legacy data might have it as String, new schema is String[]
 export function picArray(p: any): string[] {

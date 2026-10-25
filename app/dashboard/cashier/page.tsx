@@ -5,5 +5,5 @@ import { useRouter } from 'next/navigation'
 export default function CashierRedirect() {
   const router = useRouter()
   useEffect(() => { router.replace('/dashboard/reimbursements') }, [router])
-  return <div style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>Mengalihkan ke Reimbursement…</div>
+  return <div className="au-page"><div className="au-view au-muted au-small" style={{ alignItems:'center', paddingTop:40 }}>Mengalihkan ke Reimbursement…</div></div>
 }

@@ -1,5 +1,6 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { Icon } from '@/components/ui'
 
 function parseMime(url:string){ const m=/^data:([^;]+)/.exec(url||''); return m?m[1]:'' }
 function isImg(d:any){ const t=(d.type||parseMime(d.url)||'').toLowerCase(); return t.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(d.name||'') }
@@ -56,21 +57,21 @@ export function EvidenceList({ documents, zipName='evidence', itemId }:{ documen
     } catch {}
   }
 
-  if (metaDocs.length === 0) return <div style={{ fontSize:11, color:'var(--red)' }}>Belum ada evidence diupload.</div>
+  if (metaDocs.length === 0) return <div className="au-xs" style={{ color: 'var(--bad)', fontWeight: 600 }}>Belum ada evidence diupload.</div>
 
   return (
-    <div>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
-        <span style={{ fontSize:11, color:'var(--text3)' }}>Evidence ({metaDocs.length} file) — klik untuk preview</span>
-        <button onClick={downloadAll} disabled={busy} className="btn btn-sm" style={{ fontSize:10 }}>{busy?'Memuat…':'⬇ Download semua'}</button>
+    <div className="au-col" style={{ gap: 8 }}>
+      <div className="au-row au-between" style={{ gap: 8 }}>
+        <span className="lbl">Evidence · {metaDocs.length} file</span>
+        <button type="button" onClick={downloadAll} disabled={busy} className="btn btn-sm"><Icon name="down" size={14} />{busy ? 'Memuat…' : 'Unduh semua'}</button>
       </div>
-      <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+      <div className="au-ig">
         {metaDocs.map((d:any, i:number) => (
-          <button key={i} onClick={()=>openPreview(i)} disabled={busy} className="btn btn-sm" style={{ justifyContent:'flex-start', fontSize:11, textAlign:'left', gap:6 }}>
-            {isImg(d)?'🖼':isPdf(d)?'📄':'📎'}
-            {slotLabel(d.slot) && <span style={{ fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:4, background:'var(--brand-soft)', color:'var(--brand)', flexShrink:0 }}>{slotLabel(d.slot)}</span>}
-            <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.name || `evidence_${i+1}`}</span>
-            {busy && <span style={{ fontSize:9, color:'var(--text3)', marginLeft:'auto' }}>memuat…</span>}
+          <button type="button" key={i} onClick={()=>openPreview(i)} disabled={busy} className="au-igr" style={{ minHeight: 46, padding: '8px 14px' }} aria-label={`Lihat ${d.name || `evidence ${i+1}`}`}>
+            <span className="au-evic"><Icon name={isImg(d) ? 'eye' : 'file'} size={15} /></span>
+            {slotLabel(d.slot) && <span className="au-tag" style={{ flexShrink:0 }}>{slotLabel(d.slot)}</span>}
+            <span className="au-small" style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex: 1, minWidth: 0 }}>{d.name || `evidence_${i+1}`}</span>
+            <span className="au-xs au-muted">{busy ? 'memuat…' : isPdf(d) ? 'PDF' : isImg(d) ? 'Gambar' : ''}</span>
           </button>
         ))}
       </div>
@@ -80,20 +81,24 @@ export function EvidenceList({ documents, zipName='evidence', itemId }:{ documen
 }
 
 function PreviewModal({ doc, onClose }:{ doc:any; onClose:()=>void }) {
+  useEffect(() => {
+    // Esc hanya menutup pratinjau (sheet di bawahnya tetap terbuka).
+    const onKey = (e:KeyboardEvent) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); onClose() } }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [onClose])
   return (
-    <div className="modal-overlay" style={{ zIndex:2000 }} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:'min(920px,94vw)', height:'88vh', display:'flex', flexDirection:'column' }}>
-        <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
-          <span style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.name || 'Evidence'}</span>
-          <div style={{ display:'flex', gap:8, flexShrink:0 }}>
-            <a href={doc.url} download={doc.name} className="btn btn-sm" style={{ textDecoration:'none' }}>⬇ Download</a>
-            <button onClick={onClose} className="btn btn-icon">×</button>
-          </div>
+    <div className="modal-overlay" style={{ zIndex:2000 }} onMouseDown={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={doc.name || 'Evidence'} style={{ width:'min(920px,94vw)', height:'88vh', display:'flex', flexDirection:'column' }}>
+        <div className="au-sheet-h">
+          <button type="button" className="au-link" onClick={onClose}>Tutup</button>
+          <h2 style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{doc.name || 'Evidence'}</h2>
+          <a href={doc.url} download={doc.name} className="au-link" style={{ textDecoration:'none', fontWeight:800 }}>Unduh</a>
         </div>
-        <div style={{ flex:1, overflow:'auto', background:'var(--bg3)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ flex:1, overflow:'auto', background:'var(--sunken)', display:'flex', alignItems:'center', justifyContent:'center' }}>
           {isImg(doc) ? <img src={doc.url} alt={doc.name} style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain' }} />
            : isPdf(doc) ? <iframe src={doc.url} title={doc.name} style={{ width:'100%', height:'100%', border:'none' }} />
-           : <div style={{ padding:30, textAlign:'center', fontSize:12, color:'var(--text2)' }}>Preview tidak tersedia untuk tipe file ini.<br/><a href={doc.url} download={doc.name} className="btn btn-sm" style={{ marginTop:10, textDecoration:'none' }}>⬇ Download</a></div>}
+           : <div className="au-col au-small au-ink2" style={{ padding:30, alignItems:'center', gap:12 }}>Pratinjau tidak tersedia untuk tipe file ini.<a href={doc.url} download={doc.name} className="btn btn-sm" style={{ textDecoration:'none' }}><Icon name="down" size={14} />Unduh</a></div>}
         </div>
       </div>
     </div>

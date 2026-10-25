@@ -5,6 +5,8 @@ import { useSession } from 'next-auth/react'
 import { AppConfig, AttendanceType } from '@/types'
 import toast from 'react-hot-toast'
 import { format, getDaysInMonth, getDay, startOfMonth } from 'date-fns'
+import { Empty, Icon, PageHeader, Seg, Sheet } from '@/components/ui'
+import { useYear } from '@/lib/year'
 
 // External/guest collaborators are not internal staff → excluded from presensi & biodata
 const NON_STAFF_ROLES = ['external', 'guest']
@@ -28,7 +30,10 @@ function slotTimeLabel(slot:any): string {
   return `${slot.startTime}–${slot.endTime}`
 }
 
-const TEAM_COLORS = ['#2563d4','#7c3aed','#0d9488','#d97706','#16a34a','#dc2626','#0891b2','#7c2d12']
+const TEAM_COLORS = ['#4B3BFF','#7B6BFF','#0FA898','#F2A33A','#16a34a','#FF5D3B','#0891b2','#8C89A6']
+// Warna tipe presensi dari Configuration (dibuat untuk tema gelap) → latar lembut yang aman di terang & gelap.
+const tint = (c?:string, pct=16) => c ? `color-mix(in srgb, ${c} ${pct}%, var(--surface))` : 'var(--sunken)'
+const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 
 function SlotForm({ date, editing, attTypes, team, selfId, onClose, onSave }: { date:string; editing?:any; attTypes:AttendanceType[]; team?:any[]; selfId?:string; onClose:()=>void; onSave:(slot:any, taggedIds:string[])=>void }) {
   const isEdit = !!editing
@@ -52,71 +57,46 @@ function SlotForm({ date, editing, attTypes, team, selfId, onClose, onSave }: { 
   }
 
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:400 }}>
-        <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:13, fontWeight:600 }}>{isEdit?'Edit':'+ Tambah'} Kehadiran — {date}</span>
-          <button onClick={onClose} className="btn btn-icon">×</button>
+    <Sheet open title={`${isEdit ? 'Edit' : 'Tambah'} kehadiran`} onClose={onClose} onSave={save} saveLabel={isEdit ? 'Simpan' : 'Tambah'}>
+      <p className="au-small au-ink2" style={{ marginTop:-6, textAlign:'center' }}>{new Date(date+'T00:00:00').toLocaleDateString('id-ID',{ weekday:'long', day:'numeric', month:'long', year:'numeric' })}</p>
+      <div className="au-col" style={{ gap:8 }}><span className="lbl">Tipe kehadiran</span>
+        <div className="au-row au-wrap" style={{ gap:6 }}>
+          {attTypes.map(t => (
+            <button key={t.key} type="button" onClick={()=>setType(t.key)} className="au-chip" aria-pressed={type===t.key}
+              style={type===t.key ? { background:t.textColor, borderColor:t.textColor, color:'#fff' } : { background:tint(t.textColor, 10) }}>{t.label}</button>
+          ))}
+        </div></div>
+      <label className="au-igr" style={{ border:'1px solid var(--line)', borderRadius:16 }}><span className="k">Seharian (full day)</span><input type="checkbox" className="au-sw" style={{ marginLeft:'auto' }} checked={isFullDay} onChange={()=>setIsFullDay(!isFullDay)} /></label>
+      {!isFullDay && (
+        <div className="au-grid" style={{ gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:10 }}>
+          <label className="au-col" style={{ gap:6 }}><span className="lbl">Mulai</span><input type="time" className="input" value={startTime} onChange={e=>setStartTime(e.target.value)} /></label>
+          <label className="au-col" style={{ gap:6 }}><span className="lbl">Selesai</span><input type="time" className="input" value={endTime} onChange={e=>setEndTime(e.target.value)} /></label>
         </div>
-        <div style={{ padding:'14px 18px', display:'flex', flexDirection:'column', gap:12 }}>
-          <div><label style={lbl}>Tipe Kehadiran</label>
-            <div className="chip-row" style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-              {attTypes.map(t => (
-                <button key={t.key} onClick={()=>setType(t.key)} style={{ padding:'5px 12px', borderRadius:6, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${type===t.key?t.textColor:'var(--border)'}`, background:type===t.key?t.color:' var(--bg3)', color:type===t.key?t.textColor:'var(--text2)' }}>{t.label}</button>
-              ))}
-            </div></div>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <div className={`toggle-wrap${isFullDay?' on':''}`} onClick={()=>setIsFullDay(!isFullDay)} />
-            <span style={{ fontSize:12, color:'var(--text2)' }}>Full Day</span>
+      )}
+      <label className="au-col" style={{ gap:6 }}><span className="lbl">Catatan (opsional)</span><input className="input" value={note} onChange={e=>setNote(e.target.value)} placeholder="Mis. WFO pagi, dinas sore" /></label>
+      {!isEdit && !isHoliday && others.length > 0 && (
+        <div className="au-col" style={{ gap:8 }}><span className="lbl">Tag member lain (opsional)</span>
+          <div className="au-row au-wrap" style={{ gap:6 }}>
+            {others.map(m => { const on = tagged.includes(m.id); return (
+              <button key={m.id} type="button" className="au-chip" aria-pressed={on} onClick={()=>setTagged(prev => on ? prev.filter(x=>x!==m.id) : [...prev, m.id])}>{m.name}</button>
+            ) })}
           </div>
-          {!isFullDay && (
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-              <div><label style={lbl}>Mulai</label><input type="time" className="input" value={startTime} onChange={e=>setStartTime(e.target.value)} /></div>
-              <div><label style={lbl}>Selesai</label><input type="time" className="input" value={endTime} onChange={e=>setEndTime(e.target.value)} /></div>
-            </div>
-          )}
-          <div><label style={lbl}>Catatan (opsional)</label><input className="input" value={note} onChange={e=>setNote(e.target.value)} placeholder="cth: WFO pagi, Dinas sore" /></div>
-
-          {/* Tag member lain — hanya saat tambah baru, & bukan hari libur (libur otomatis ke semua) */}
-          {!isEdit && !isHoliday && others.length > 0 && (
-            <div>
-              <label style={lbl}>Tag member lain (opsional) — agenda bareng, isi sekali untuk semua</label>
-              <div className="chip-row" style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                {others.map(m => {
-                  const on = tagged.includes(m.id)
-                  return (
-                    <button key={m.id} onClick={()=>setTagged(prev => on ? prev.filter(x=>x!==m.id) : [...prev, m.id])}
-                      style={{ padding:'5px 11px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${on?m.color:'var(--border)'}`, background:on?m.color+'22':'var(--bg3)', color:on?m.color:'var(--text2)' }}>
-                      {on?'✓ ':''}{m.name}
-                    </button>
-                  )
-                })}
-              </div>
-              {tagged.length>0 && <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:5 }}>Kehadiran ini akan ditambahkan juga ke {tagged.length} member lain.</div>}
-            </div>
-          )}
-          {isHoliday && !isEdit && (
-            <div style={{ fontSize:10.5, color:'#b45309', background:'#fff3e0', border:'1px solid #f0c07a', borderRadius:7, padding:'7px 10px' }}>Hari Libur otomatis diterapkan ke <b>semua member</b> & muncul di Calendar.</div>
-          )}
-
-          {typeDef && (
-            <div style={{ padding:'8px 12px', background:typeDef.color, borderRadius:7, fontSize:12, fontWeight:600, color:typeDef.textColor }}>
-              Preview: {typeDef.label} {isFullDay ? '(Full Day)' : `${startTime}–${endTime}`}
-            </div>
-          )}
+          {tagged.length>0 && <span className="au-xs au-muted">Kehadiran ini ditambahkan juga ke {tagged.length} member lain.</span>}
         </div>
-        <div style={{ padding:'12px 18px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
-          <button onClick={onClose} className="btn">Batal</button>
-          <button onClick={save} className="btn btn-primary">{isEdit?'Simpan':'Tambah'}</button>
-        </div>
-      </div>
-    </div>
+      )}
+      {isHoliday && !isEdit && <div className="p-warn" style={{ borderRadius:12, padding:'10px 12px', fontSize:13 }}>Hari libur otomatis diterapkan ke <b>semua member</b> dan tampil di Calendar.</div>}
+      {typeDef && <div style={{ padding:'10px 14px', background:tint(typeDef.textColor, 18), borderRadius:14, fontWeight:600, color:'var(--ink)', display:'flex', alignItems:'center', gap:8 }}><i style={{ width:10, height:10, borderRadius:3, background:typeDef.textColor, display:'inline-block' }} />{typeDef.label} · {isFullDay ? 'Seharian' : `${startTime}–${endTime}`}</div>}
+    </Sheet>
   )
 }
 
 export default function AttendancePage() {
   const { data:session } = useSession(); const user = session?.user as any
   const [month, setMonth] = useState(() => format(new Date(), 'yyyy-MM'))
+  const { year: gYear, setYear: setGYear } = useYear()
+  // Tahun global ↔ bulan yang ditampilkan.
+  useEffect(() => { setMonth(m => (Number(m.slice(0,4)) === gYear ? m : `${gYear}-${m.slice(5,7)}`)) }, [gYear])
+  const goMonth = (m:string) => { setMonth(m); const y = Number(m.slice(0,4)); if (y !== gYear) setGYear(y) }
   const [records, setRecords] = useState<any[]>([])
   const [config, setConfig] = useState<AppConfig|null>(null)
   const [summary, setSummary] = useState<any>(null)
@@ -234,7 +214,8 @@ export default function AttendancePage() {
     }
     const r = await fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ userId:selectedUserId, date:dateStr, slot }) })
-    const d = await r.json()
+    const d = await r.json().catch(()=>({}))
+    if (!r.ok || !d.data) { toast.error(d.error || 'Gagal menyimpan presensi'); return }
     setRecords(prev => { const filtered=prev.filter(r=>r.date!==dateStr); return [...filtered, d.data] })
     if (taggedIds.length) {
       await Promise.all(taggedIds.map(uid => fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'},
@@ -255,7 +236,8 @@ export default function AttendancePage() {
       toast.success('Hari Libur dihapus dari semua member')
       return
     }
-    await fetch(`/api/attendance?userId=${selectedUserId}&date=${dateStr}&slotId=${slotId}`, { method:'DELETE' })
+    const r = await fetch(`/api/attendance?userId=${selectedUserId}&date=${dateStr}&slotId=${slotId}`, { method:'DELETE' })
+    if (!r.ok) { toast.error('Gagal menghapus slot'); return }
     setRecords(prev => prev.map(r => r.date===dateStr ? {...r, slots:r.slots.filter((s:any)=>s._id!==slotId)} : r))
     toast.success('Slot dihapus')
   }
@@ -282,140 +264,91 @@ export default function AttendancePage() {
     return [format(p,'yyyy-MM'),format(n,'yyyy-MM')]
   })()
 
+  const selMember = team.find(t=>t.id===selectedUserId)
+  const monthLabel = `${BULAN[Number(month.slice(5,7))-1]} ${month.slice(0,4)}`
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+    <div className="au-page">
       {showSlotForm && <SlotForm date={showSlotForm} attTypes={attTypes} team={team} selfId={selectedUserId} onClose={()=>setShowSlotForm(null)} onSave={(slot, tagged) => { const day=parseInt(showSlotForm.split('-')[2]); addSlot(day,slot,tagged); setShowSlotForm(null) }} />}
       {editingSlot && <SlotForm date={editingSlot.date} editing={editingSlot.slot} attTypes={attTypes} onClose={()=>setEditingSlot(null)} onSave={async (slot)=>{ const day=parseInt(editingSlot.date.split('-')[2]); await updateSlot(day, editingSlot.slot._id, slot); setEditingSlot(null) }} />}
+      <div className="au-view au-anim">
+        <PageHeader eyebrow={`Team · ${view==='calendar' ? 'ketuk tanggal untuk menambah kehadiran' : view==='team' ? 'siapa di mana per hari' : 'rekap cuti setahun'}`} title="Presensi" actions={<>
+          <Seg label="Tampilan presensi" value={view} onChange={setView} options={[['calendar', <><Icon name="cal" size={15} />Kalender</>], ['team', <><Icon name="team" size={15} />Tim per hari</>], ['cuti', <><Icon name="sun" size={15} />Rekap cuti</>]] as const} />
+          {view !== 'team' && <div className="au-row" style={{ gap:6 }}>
+            <button type="button" onClick={()=>goMonth(view==='cuti' ? `${Number(year)-1}-${month.slice(5,7)}` : prevM)} className="btn btn-icon" aria-label={view==='cuti' ? 'Tahun sebelumnya' : 'Bulan sebelumnya'}><Icon name="left" size={18} /></button>
+            <b style={{ minWidth:130, textAlign:'center', font:'700 16px var(--disp)' }} aria-live="polite">{view==='cuti' ? year : monthLabel}</b>
+            <button type="button" onClick={()=>goMonth(view==='cuti' ? `${Number(year)+1}-${month.slice(5,7)}` : nextM)} className="btn btn-icon" aria-label={view==='cuti' ? 'Tahun berikutnya' : 'Bulan berikutnya'}><Icon name="right" size={18} /></button>
+          </div>}
+        </>} />
 
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, gap:12, flexWrap:'wrap' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
-          <div><div style={{ fontSize:14, fontWeight:600 }}>Absensi Harian</div><div style={{ fontSize:11, color:'var(--text3)' }}>{view==='calendar'?'Klik tanggal untuk tambah slot kehadiran':'Rekap cuti seluruh member dalam setahun'}</div></div>
-          <div style={{ display:'flex', gap:4, background:'var(--bg3)', borderRadius:8, padding:3 }}>
-            <button onClick={()=>setView('calendar')} className="btn btn-sm" style={{ background:view==='calendar'?'var(--brand)':'transparent', color:view==='calendar'?'#fff':'var(--text2)', border:'none' }}>📅 Kalender</button>
-            <button onClick={()=>setView('team')} className="btn btn-sm" style={{ background:view==='team'?'var(--brand)':'transparent', color:view==='team'?'#fff':'var(--text2)', border:'none' }}>👥 Tim per Hari</button>
-            <button onClick={()=>setView('cuti')} className="btn btn-sm" style={{ background:view==='cuti'?'var(--brand)':'transparent', color:view==='cuti'?'#fff':'var(--text2)', border:'none' }}>🌴 Summary Cuti</button>
-          </div>
-        </div>
-        <div style={{ display:'flex', gap:8 }}>
-          <button onClick={()=>setMonth(prevM)} className="btn btn-sm">◀</button>
-          <span style={{ padding:'5px 14px', background:'var(--bg3)', borderRadius:6, fontSize:13, fontWeight:600, color:'var(--text)' }}>{view==='cuti'?year:month}</span>
-          <button onClick={()=>setMonth(nextM)} className="btn btn-sm">▶</button>
-        </div>
-      </div>
-
-      <div style={{ flex:1, overflow:'auto', padding:'16px 20px' }}>
-        {view === 'cuti' ? (
-          <CutiSummary team={team} leave={leave} year={year} attTypes={attTypes} />
-        ) : view === 'team' ? (
-          <TeamDayView date={teamDate} setDate={setTeamDate} data={teamByType} total={team.length} />
-        ) : (
-        <div className="dash-2col" style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:16 }}>
-          {/* Calendar */}
-          <div>
-            {/* User selector — horizontal scroll on mobile */}
-            <div className="chip-row" style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
-              {team.map(m => (
-                <button key={m.id} onClick={()=>setSelectedUserId(m.id)} style={{ padding:'6px 14px', borderRadius:20, fontSize:12, fontWeight:500, cursor:'pointer', whiteSpace:'nowrap', border:`1px solid ${selectedUserId===m.id?m.color:'var(--border)'}`, background:selectedUserId===m.id?m.color+'33':'var(--bg3)', color:selectedUserId===m.id?m.color:'var(--text2)' }}>
-                  {m.name}
-                </button>
-              ))}
+        {view === 'cuti' ? <CutiSummary team={team} leave={leave} year={year} attTypes={attTypes} />
+        : view === 'team' ? <TeamDayView date={teamDate} setDate={setTeamDate} data={teamByType} total={team.length} />
+        : (
+        <div className="au-cal-wrap">
+          <div className="au-col" style={{ gap:12, minWidth:0 }}>
+            <div className="au-chips" role="group" aria-label="Pilih member">
+              {team.map(m => <button key={m.id} type="button" className="au-chip" aria-pressed={selectedUserId===m.id} onClick={()=>setSelectedUserId(m.id)}>{m.name}</button>)}
             </div>
-
-            <div className="card" style={{ padding:14 }}>
-              {/* Day labels */}
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4, marginBottom:8 }}>
-                {DAY_LABELS.map(d => <div key={d} style={{ textAlign:'center', fontSize:10, fontWeight:600, color:'var(--text3)', padding:'3px 0' }}>{d}</div>)}
-              </div>
-
-              {/* Days */}
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4 }}>
+            <section className="au-card" style={{ padding:14, gap:8 }}>
+              <div className="au-cal-head">{DAY_LABELS.map(d => <span key={d}>{d}</span>)}</div>
+              {loading ? <div className="au-skel" style={{ height:300, borderRadius:16 }} /> : (
+              <div className="au-cal-grid">
                 {Array.from({length:firstDayDow}).map((_,i)=><div key={`e${i}`} />)}
                 {Array.from({length:daysInMonth}).map((_,i) => {
                   const day = i+1
                   const dow = (firstDayDow+i)%7
                   const isWeekend = dow >= 5
                   const dateStr = `${month}-${String(day).padStart(2,'0')}`
-                  const rec = getRecord(day)
-                  const slots = rec?.slots || []
+                  const slots = getRecord(day)?.slots || []
                   const isToday = dateStr === today
-                  const primarySlot = slots[0]
-                  const primaryType = primarySlot ? attTypes.find(t=>t.key===primarySlot.type) : null
-
+                  const pt = slots[0] ? attTypes.find(t=>t.key===slots[0].type) : null
                   return (
-                    <div key={day} onClick={()=>!isWeekend&&setShowSlotForm(dateStr)}
-                      title={slots.length>0 ? slots.map((s:any)=>`${s.label||s.type} ${slotTimeLabel(s)}`).join('\n') : 'Klik untuk tambah kehadiran'}
-                      style={{ minHeight:52, borderRadius:7, cursor:isWeekend?'default':'pointer', border:`${isToday?'2px':'1px'} solid ${isToday?'var(--blue)':primaryType?primaryType.textColor+'44':'var(--border)'}`, background:primaryType?primaryType.color:isWeekend?'var(--bg3)':'var(--bg4)', opacity:isWeekend&&!primaryType?0.4:1, transition:'all 0.1s', position:'relative', overflow:'hidden' }}
-                      onMouseEnter={e=>!isWeekend&&((e.currentTarget as HTMLElement).style.transform='scale(1.04)')}
-                      onMouseLeave={e=>((e.currentTarget as HTMLElement).style.transform='scale(1)')}>
-                      <div style={{ padding:'4px 5px 2px', fontSize:11, fontWeight:isToday?700:400, color:primaryType?primaryType.textColor:'var(--text2)' }}>{day}</div>
+                    <div key={day}
+                      className={`au-cal-day au-att-day${isToday ? ' today' : ''}${isWeekend && !pt ? ' out' : ''}`}
+                      style={pt ? { background:tint(pt.textColor, 18), borderColor:tint(pt.textColor, 45) } : isWeekend ? { cursor:'default' } : undefined}>
+                      {/* Tombol tambah menutupi sel; tombol edit/hapus slot berada di atasnya (tidak bersarang). */}
+                      {!isWeekend && <button type="button" className="add" onClick={()=>setShowSlotForm(dateStr)}
+                        aria-label={`${day} ${monthLabel}${slots.length ? ': ' + slots.map((sl:any)=>`${sl.label||sl.type} ${slotTimeLabel(sl)}`).join(', ') + ', tambah kehadiran' : ', tambah kehadiran'}`} />}
+                      <span className="n">{day}</span>
                       {slots.slice(0,3).map((slot:any, si:number) => {
                         const t = attTypes.find(x=>x.key===slot.type)
                         return (
-                          <div key={si} style={{ margin:'1px 3px', padding:'1px 4px', borderRadius:3, fontSize:9, fontWeight:600, background:t?t.textColor+'33':'var(--bg5)', color:t?t.textColor:'var(--text3)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', display:'flex', justifyContent:'space-between', alignItems:'center', gap:2 }}>
-                            <span title="Klik untuk edit" onClick={e=>{e.stopPropagation();setEditingSlot({date:dateStr, slot})}} style={{ cursor:'pointer', flex:1, overflow:'hidden', textOverflow:'ellipsis' }}>{t?.label||slot.type}{!slotIsFullDay(slot)?` ${slot.startTime}`:''}</span>
-                            <span title="Hapus" onClick={e=>{e.stopPropagation();removeSlot(day,slot._id)}} style={{ cursor:'pointer', opacity:0.6 }}>×</span>
-                          </div>
+                          <span key={si} className="au-att-slot" style={{ ['--tc' as any]: t?.textColor || 'var(--muted)' }}>
+                            <button type="button" onClick={e=>{e.stopPropagation();setEditingSlot({date:dateStr, slot})}} aria-label={`Edit ${t?.label||slot.type} ${day}`}>{t?.label||slot.type}{!slotIsFullDay(slot)?` ${slot.startTime}`:''}</button>
+                            <button type="button" className="x" onClick={e=>{e.stopPropagation();removeSlot(day,slot._id)}} aria-label={`Hapus ${t?.label||slot.type} ${day}`}><Icon name="x" size={11} stroke={2.6} /></button>
+                          </span>
                         )
                       })}
-                      {slots.length>3 && <div style={{ margin:'1px 3px', fontSize:8, color:'var(--text3)' }}>+{slots.length-3} lagi</div>}
+                      {slots.length>3 && <span className="more">+{slots.length-3} lagi</span>}
                     </div>
                   )
                 })}
-              </div>
-
-              {/* Legend */}
-              <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:12, paddingTop:10, borderTop:'1px solid var(--border)' }}>
-                {attTypes.map(t => (
-                  <div key={t.key} style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--text2)' }}>
-                    <div style={{ width:10, height:10, borderRadius:2, background:t.textColor }} />{t.label}
-                  </div>
-                ))}
-              </div>
-            </div>
+              </div>)}
+              <div className="au-key" style={{ paddingTop:10, borderTop:'1px solid var(--line)' }}>{attTypes.map(t => <span key={t.key}><i style={{ background:t.textColor }} />{t.label}</span>)}</div>
+            </section>
           </div>
-
-          {/* Sidebar */}
-          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-            {/* Selected user detail */}
-            <div className="card" style={{ padding:14 }}>
-              <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', marginBottom:10 }}>
-                Detail — {team.find(t=>t.id===selectedUserId)?.name} · {month}
-              </div>
-              {/* Type summary */}
-              {attTypes.map(t => {
-                const count = records.reduce((s,r) => s + (r.slots||[]).filter((sl:any)=>sl.type===t.key).length, 0)
-                const fullDayCount = records.reduce((s,r) => s + (r.slots||[]).filter((sl:any)=>sl.type===t.key&&sl.isFullDay).length, 0)
-                if (count===0) return null
-                return (
-                  <div key={t.key} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:7 }}>
-                    <div style={{ width:8, height:8, borderRadius:2, background:t.textColor, flexShrink:0 }} />
-                    <span style={{ flex:1, fontSize:12, color:'var(--text2)' }}>{t.label}</span>
-                    <span style={{ fontSize:12, fontWeight:600, color:t.textColor }}>{count}x</span>
-                    <span style={{ fontSize:10, color:'var(--text3)' }}>{fullDayCount} full day</span>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Today's slots for selected user */}
+          <div className="au-col" style={{ gap:12 }}>
+            <section className="au-card">
+              <div className="au-col" style={{ gap:2 }}><span className="lbl">{monthLabel}</span><h2>{selMember?.name || 'Member'}</h2></div>
+              {(() => {
+                const rows = attTypes.map(t => ({ t, count: records.reduce((acc,r) => acc + (r.slots||[]).filter((sl:any)=>sl.type===t.key).length, 0), full: records.reduce((acc,r) => acc + (r.slots||[]).filter((sl:any)=>sl.type===t.key&&slotIsFullDay(sl)).length, 0) })).filter(x => x.count)
+                const tot = rows.reduce((a,x)=>a+x.count,0)
+                return rows.length ? <>
+                  <div className="au-stack" style={{ height:12 }}>{rows.map(x => <i key={x.t.key} style={{ flex:x.count, background:x.t.textColor }} />)}</div>
+                  <div className="au-ig" style={{ border:0 }}>{rows.map(x => (
+                    <div key={x.t.key} className="au-igr" style={{ padding:'10px 0' }}><i style={{ width:10, height:10, borderRadius:3, background:x.t.textColor, flexShrink:0 }} /><span className="k">{x.t.label}</span><span className="v">{x.count}× <span className="au-xs au-muted">{x.full} seharian</span></span></div>
+                  ))}</div>
+                  <span className="au-xs au-muted">{tot} slot bulan ini</span>
+                </> : <span className="au-small au-muted">Belum ada kehadiran bulan ini.</span>
+              })()}
+            </section>
             {(() => {
-              const todayRec = getRecord(parseInt(today.split('-')[2]))
-              const todaySlots = todayRec?.slots || []
+              const todaySlots = month === today.slice(0,7) ? (getRecord(parseInt(today.split('-')[2]))?.slots || []) : []
               return todaySlots.length > 0 ? (
-                <div className="card" style={{ padding:14 }}>
-                  <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', marginBottom:8 }}>Hari Ini</div>
-                  {todaySlots.map((slot:any, i:number) => {
-                    const t = attTypes.find(x=>x.key===slot.type)
-                    return (
-                      <div key={i} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6, padding:'6px 10px', background:t?t.color:'var(--bg3)', borderRadius:6 }}>
-                        <div style={{ fontSize:11, fontWeight:600, color:t?t.textColor:'var(--text2)', flex:1 }}>{t?.label||slot.type}</div>
-                        <div style={{ fontSize:10, color:t?t.textColor+'aa':'var(--text3)' }}>
-                          {slotTimeLabel(slot)}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                <section className="au-card"><h2>Hari ini</h2>
+                  {todaySlots.map((slot:any, i:number) => { const t = attTypes.find(x=>x.key===slot.type); return (
+                    <div key={i} className="au-row au-between" style={{ padding:'10px 12px', background:tint(t?.textColor, 18), borderRadius:12 }}><b style={{ fontSize:14 }}>{t?.label||slot.type}</b><span className="au-small au-ink2">{slotTimeLabel(slot)}</span></div>
+                  ) })}
+                </section>
               ) : null
             })()}
           </div>
@@ -425,11 +358,10 @@ export default function AttendancePage() {
     </div>
   )
 }
-const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }
 
 function CutiSummary({ team, leave, year, attTypes }: { team:any[]; leave:any[]|null; year:string; attTypes:AttendanceType[] }) {
   const cutiDef = attTypes.find(t => t.key === 'cuti')
-  if (leave === null) return <div style={{ fontSize:12.5, color:'var(--text3)', padding:20 }}>Memuat rekap cuti…</div>
+  if (leave === null) return <div className="au-card"><div className="au-skel" /><div className="au-skel" style={{ width:'60%' }} /></div>
 
   const byUser: Record<string, any> = {}
   for (const l of leave) byUser[l.userId] = l
@@ -446,46 +378,30 @@ function CutiSummary({ team, leave, year, attTypes }: { team:any[]; leave:any[]|
   }
   const MON=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 
+  const maxT = Math.max(1, ...rows.map(r=>r.entry.total))
   return (
-    <div style={{ maxWidth:900 }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
-        <div style={{ fontSize:15, fontWeight:700 }}>🌴 Rekap Cuti {year}</div>
-        <div style={{ fontSize:12, color:'var(--text3)' }}>Total cuti tim tahun ini: <b style={{ color:'var(--text)' }}>{grandTotal} hari</b></div>
-      </div>
-
-      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+    <div className="au-col" style={{ gap:12, maxWidth:960 }}>
+      <div className="au-row au-between au-wrap"><h2 style={{ font:'700 20px var(--disp)' }}>Rekap cuti {year}</h2><span className="au-small au-ink2">Total cuti tim: <b style={{ color:'var(--ink)' }}>{grandTotal} hari</b></span></div>
+      {rows.length === 0 ? <div className="au-card"><Empty title="Belum ada data member" /></div> : <div className="au-ig">
         {rows.map(({ member, entry }) => (
-          <div key={member.id} className="card" style={{ padding:0, overflow:'hidden' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'11px 14px', borderBottom: entry.total>0?'1px solid var(--border)':'none' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:9 }}>
-                <span style={{ width:9, height:9, borderRadius:'50%', background:member.color, display:'inline-block' }} />
-                <span style={{ fontSize:13, fontWeight:600 }}>{member.name}</span>
-                <span style={{ fontSize:10.5, color:'var(--text3)' }}>{member.division}</span>
-              </div>
-              <span style={{ fontSize:12, fontWeight:700, padding:'3px 10px', borderRadius:20, background: entry.total>0?(cutiDef?.color||'var(--greenbg)'):'var(--bg3)', color: entry.total>0?(cutiDef?.textColor||'var(--green)'):'var(--text3)' }}>
-                {entry.total>0 ? `${entry.total} hari cuti` : 'Belum ada cuti'}
-              </span>
-            </div>
-            {entry.total>0 && (
-              <div style={{ padding:'10px 14px', display:'flex', flexDirection:'column', gap:7 }}>
-                {groupByMonth(entry.dates).map(([mo, list]:any) => (
-                  <div key={mo} style={{ display:'flex', gap:8, alignItems:'flex-start' }}>
-                    <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', minWidth:74 }}>{MON[parseInt(mo.slice(5,7))-1]} <span style={{ color:'var(--text3)' }}>({list.length})</span></div>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                      {list.map((d:any,i:number)=>(
-                        <span key={i} title={d.note||''} style={{ fontSize:11, padding:'2px 8px', borderRadius:6, background:'var(--bg3)', color:'var(--text2)', border:'1px solid var(--border)' }}>
-                          {fmtDate(d.date)}{!d.fullDay && ' ½'}{d.note?` · ${d.note}`:''}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <details key={member.id} className="au-cuti" open={entry.total > 0 && rows.length <= 4}>
+            <summary className="au-igr">
+              <span className="au-av s" style={{ background:member.color, color:'#fff' }}>{String(member.name||'?')[0]}</span>
+              <span className="au-col" style={{ minWidth:0, flex:'0 1 220px' }}><b style={{ fontSize:14 }}>{member.name}</b><span className="au-xs au-muted">{member.division}</span></span>
+              <span className="au-track" style={{ flex:1, height:8, minWidth:60 }}><i className="a" style={{ width:`${entry.total/maxT*100}%`, background: cutiDef?.textColor || 'var(--aqua)' }} /></span>
+              <b style={{ minWidth:70, textAlign:'right' }}>{entry.total ? `${entry.total} hari` : <span className="au-muted" style={{ fontWeight:500 }}>–</span>}</b>
+            </summary>
+            {entry.total>0 && <div className="au-col" style={{ gap:8, padding:'4px 16px 14px 60px' }}>
+              {groupByMonth(entry.dates).map(([mo, list]:any) => (
+                <div key={mo} className="au-row" style={{ alignItems:'flex-start', gap:10 }}>
+                  <span className="au-xs au-muted" style={{ minWidth:84, fontWeight:600, paddingTop:3 }}>{MON[parseInt(mo.slice(5,7))-1]} ({list.length})</span>
+                  <span className="au-row au-wrap" style={{ gap:5 }}>{list.map((d:any,i:number)=><span key={i} className="au-tag" title={d.note||''}>{fmtDate(d.date)}{!d.fullDay && ' ½'}{d.note?` · ${d.note}`:''}</span>)}</span>
+                </div>
+              ))}
+            </div>}
+          </details>
         ))}
-        {rows.length===0 && <div style={{ fontSize:12, color:'var(--text3)', padding:20, textAlign:'center' }} className="card">Belum ada data member.</div>}
-      </div>
+      </div>}
     </div>
   )
 }
@@ -506,67 +422,37 @@ function TeamDayView({ date, setDate, data, total }:{ date:string; setDate:(d:st
   })()
 
   return (
-    <div style={{ maxWidth:900 }}>
-      {/* Pemilih tanggal */}
-      <div className="card" style={{ padding:'12px 16px', marginBottom:14, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-        <button onClick={()=>shift(-1)} className="btn btn-sm">◀</button>
-        <input type="date" value={date} onChange={e=>e.target.value && setDate(e.target.value)}
-          style={{ border:'1px solid var(--border)', borderRadius:6, padding:'5px 8px', fontSize:12.5, background:'var(--bg)', color:'var(--text)' }} />
-        <button onClick={()=>shift(1)} className="btn btn-sm">▶</button>
-        <button onClick={()=>setDate(today)} className="btn btn-sm" disabled={date===today} style={{ opacity:date===today?0.5:1 }}>Hari Ini</button>
-        <div style={{ marginLeft:'auto', textAlign:'right' }}>
-          <div style={{ fontSize:13, fontWeight:700 }}>{labelHari}</div>
-          {date>today && <div style={{ fontSize:10, color:'var(--amber)' }}>Rencana ke depan</div>}
-        </div>
-      </div>
-
-      {data === null ? (
-        <div style={{ padding:30, textAlign:'center', color:'var(--text3)', fontSize:12 }}>Memuat…</div>
-      ) : (
-        <>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(250px, 1fr))', gap:12 }}>
-            {data.groups.map((g:any) => (
-              <div key={g.key} className="card" style={{ padding:'12px 14px', borderLeft:`3px solid ${g.textColor||'#4f8ef7'}`, opacity:g.people.length?1:0.6 }}>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
-                  <span style={{ fontSize:12, fontWeight:700, color:g.textColor||'var(--text)' }}>{g.label}</span>
-                  <span style={{ fontSize:16, fontWeight:800, color:g.people.length?(g.textColor||'var(--text)'):'var(--text3)' }}>{g.people.length}</span>
-                </div>
-                {g.people.length === 0 ? (
-                  <div style={{ fontSize:11, color:'var(--text3)' }}>— tidak ada —</div>
-                ) : (
-                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                    {g.people.map((p:any) => (
-                      <div key={p.id} style={{ display:'flex', alignItems:'center', gap:6, fontSize:11.5 }}>
-                        <span style={{ width:7, height:7, borderRadius:'50%', background:p.color, flexShrink:0 }} />
-                        <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</span>
-                        <span style={{ fontSize:9.5, color:'var(--text3)', flexShrink:0 }}>
-                          {p.fullDay ? 'Full Day' : p.slots.map((s:any)=>slotTimeLabel(s)).join(', ')}
-                        </span>
-                      </div>
-                    ))}
+    <div className="au-col" style={{ gap:14, maxWidth:1100 }}>
+      <section className="au-card" style={{ flexDirection:'row', alignItems:'center', flexWrap:'wrap', gap:10, padding:14 }}>
+        <button type="button" onClick={()=>shift(-1)} className="btn btn-icon" aria-label="Hari sebelumnya"><Icon name="left" size={18} /></button>
+        <input type="date" className="input" value={date} onChange={e=>e.target.value && setDate(e.target.value)} aria-label="Tanggal" style={{ width:170 }} />
+        <button type="button" onClick={()=>shift(1)} className="btn btn-icon" aria-label="Hari berikutnya"><Icon name="right" size={18} /></button>
+        <button type="button" onClick={()=>setDate(today)} className="btn" disabled={date===today}>Hari ini</button>
+        <span className="au-col" style={{ marginLeft:'auto', alignItems:'flex-end' }}><b style={{ font:'700 16px var(--disp)' }}>{labelHari}</b>{date>today && <span className="au-xs" style={{ color:'var(--warn)' }}>Rencana ke depan</span>}</span>
+      </section>
+      {data === null ? <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:12 }}>{[0,1,2].map(k=><div key={k} className="au-card"><div className="au-skel" style={{ width:'40%' }} /><div className="au-skel" /></div>)}</div> : <>
+        <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:12 }}>
+          {data.groups.map((g:any) => (
+            <section key={g.key} className="au-card" style={{ gap:10, opacity:g.people.length?1:.6 }}>
+              <div className="au-row au-between"><span className="au-row" style={{ gap:8 }}><i style={{ width:10, height:10, borderRadius:3, background:g.textColor||'var(--accent)', display:'inline-block' }} /><b style={{ fontSize:15 }}>{g.label}</b></span><b style={{ font:'700 24px var(--disp)' }}>{g.people.length}</b></div>
+              {g.people.length === 0 ? <span className="au-xs au-muted">Tidak ada</span> : <div className="au-col" style={{ gap:6 }}>
+                {g.people.map((p:any) => (
+                  <div key={p.id} className="au-row" style={{ gap:8 }}>
+                    <span className="au-av s" style={{ background:p.color, color:'#fff' }}>{String(p.name||'?')[0]}</span>
+                    <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontSize:14 }}>{p.name}</span>
+                    <span className="au-xs au-muted">{p.fullDay ? 'Seharian' : p.slots.map((sl:any)=>slotTimeLabel(sl)).join(', ')}</span>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Belum mengisi presensi di tanggal ini */}
-          <div className="card" style={{ padding:'12px 14px', marginTop:12, border:'1px dashed var(--border)' }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:0.3, marginBottom:6 }}>
-              ⚠️ Belum isi presensi ({data.belum.length} dari {total})
-            </div>
-            {data.belum.length === 0 ? (
-              <div style={{ fontSize:11.5, color:'var(--green)' }}>Semua anggota sudah mengisi. 🎉</div>
-            ) : (
-              <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                {data.belum.map((m:any) => (
-                  <span key={m.id} style={{ fontSize:11, padding:'2px 8px', borderRadius:5, background:'var(--bg3)', color:'var(--text2)', border:'1px solid var(--border)' }}>{m.name}</span>
                 ))}
-              </div>
-            )}
-          </div>
-        </>
-      )}
+              </div>}
+            </section>
+          ))}
+        </div>
+        <section className="au-card" style={{ borderStyle:'dashed' }}>
+          <div className="au-row au-between"><b>Belum isi presensi</b><span className="au-pill p-warn">{data.belum.length} dari {total}</span></div>
+          {data.belum.length === 0 ? <span className="au-small" style={{ color:'var(--ok)', fontWeight:600 }}>Semua anggota sudah mengisi.</span>
+            : <div className="au-row au-wrap" style={{ gap:6 }}>{data.belum.map((m:any) => <span key={m.id} className="au-tag">{m.name}</span>)}</div>}
+        </section>
+      </>}
     </div>
   )
 }

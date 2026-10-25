@@ -4,6 +4,8 @@ import { MoneyInput } from '@/components/MoneyInput'
 import { fmtMoney } from '@/lib/money'
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import toast from 'react-hot-toast'
+import { useYear } from '@/lib/year'
+import { Empty, Icon, PageHeader, Seg } from '@/components/ui'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(Math.round(n||0))
 const pct = (n:number) => (isFinite(n)?n:0).toFixed(1) + '%'
@@ -16,19 +18,20 @@ const COST_ELEMENTS = [
 
 export default function BudgetReportPage() {
   const [tab, setTab] = useState<'yield'|'realisasi'>('yield')
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
+  const { year } = useYear()
   const [cur, setCur] = useState<any[]>([])
   const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [c, b] = await Promise.all([
-      getConfig(),
-      fetch(`/api/budget?year=${year}`).then(r=>r.json()),
-    ])
-    setConfig(c); setCur(b.data||[]); setLoading(false)
+    try {
+      const [c, b] = await Promise.all([
+        getConfig(),
+        fetch(`/api/budget?year=${year}`).then(r=>{ if (!r.ok) throw new Error(); return r.json() }),
+      ])
+      setConfig(c); setCur(b.data||[])
+    } catch { toast.error('Gagal memuat budget') } finally { setLoading(false) }
   }, [year])
   useEffect(()=>{ load() }, [load])
 
@@ -36,25 +39,15 @@ export default function BudgetReportPage() {
   const realIDRof = (r:any)=> r.annualRealIDR || (r.monthly||[]).reduce((s:number,m:any)=>s+(m.realisasiIDR||0),0)
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ padding:'12px 20px 0', borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <div style={{ fontSize:14, fontWeight:600 }}>Budget Report</div>
-          {tab==='realisasi' && (
-            <select className="input input-sm" style={{ width:100 }} value={year} onChange={e=>setYear(Number(e.target.value))}>
-              {[now.getFullYear()+1, now.getFullYear(), now.getFullYear()-1, now.getFullYear()-2].map(y=><option key={y} value={y}>{y}</option>)}
-            </select>
-          )}
-        </div>
-        <div style={{ display:'flex', gap:4, marginTop:10 }}>
-          <button onClick={()=>setTab('yield')} style={subtab(tab==='yield')}>Yield</button>
-          <button onClick={()=>setTab('realisasi')} style={subtab(tab==='realisasi')}>Prognosa</button>
-        </div>
+    <div className="au-page">
+      <div className="au-view au-anim">
+        <PageHeader eyebrow={tab === 'yield' ? 'Finance · multi-tahun' : `Finance · ${year}`} title="Budget Report" />
+        <div className="rise"><Seg label="Tampilan" value={tab} onChange={setTab} options={[['yield','Yield'],['realisasi','Prognosa']] as const} /></div>
+        {tab==='yield'
+          ? <YieldTab />
+          : (loading ? <div className="au-card">{[0,1,2].map(k => <div key={k} className="au-skel" />)}</div>
+              : <RealisasiTab year={year} cur={cur} config={config} setConfig={setConfig} rowFor={rowFor} realIDRof={realIDRof} reload={load} />)}
       </div>
-      {tab==='yield'
-        ? <YieldTab />
-        : (loading ? <div style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>Memuat...</div>
-            : <RealisasiTab year={year} cur={cur} config={config} setConfig={setConfig} rowFor={rowFor} realIDRof={realIDRof} reload={load} />)}
     </div>
   )
 }
@@ -74,7 +67,9 @@ function YieldTab() {
     const start = 2024
     const end = Math.max(now.getFullYear(), start)
     const yrs:number[] = []; for (let y=start; y<=end; y++) yrs.push(y)
-    const results = await Promise.all(yrs.map(y => fetch(`/api/budget?year=${y}`).then(r=>r.json()).then(j=>({ y, data:j.data||[] }))))
+    let results: { y:number; data:any[] }[] = []
+    try { results = await Promise.all(yrs.map(y => fetch(`/api/budget?year=${y}`).then(r=>{ if (!r.ok) throw new Error(); return r.json() }).then(j=>({ y, data:j.data||[] })))) }
+    catch { toast.error('Gagal memuat yield'); setLoading(false); return }
     const map:Record<number, any> = {}
     results.forEach(({y,data}) => {
       const d:any = {}
@@ -101,12 +96,13 @@ function YieldTab() {
       for (const y of years) {
         for (const ce of COST_ELEMENTS) {
           const d = byYear[y]?.[ce.key] || {}
-          await fetch('/api/budget', { method:'PUT', headers:{'Content-Type':'application/json'},
+          const r = await fetch('/api/budget', { method:'PUT', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ year:y, category:ce.key, budget:{ annualBudgetIDR:d.planIDR||0, annualBudgetUSD:d.planUSD||0, annualRealIDR:d.realIDR||0, annualRealUSD:d.realUSD||0, monthly:d.monthly||[] } }) })
+          if (!r.ok) throw new Error(`Gagal menyimpan ${ce.short} ${y}`)
         }
       }
       toast.success('Yield tersimpan'); load()
-    } finally { setSaving(false) }
+    } catch (e:any) { toast.error(e?.message || 'Gagal menyimpan') } finally { setSaving(false) }
   }
 
   const [exporting, setExporting] = useState(false)
@@ -115,7 +111,7 @@ function YieldTab() {
     try {
       const _xl:any = await import('exceljs'); const ExcelJS = _xl.default || _xl
       const wb = new ExcelJS.Workbook()
-      wb.creator = 'WinS'; wb.created = new Date()
+      wb.creator = 'WINS'; wb.created = new Date()
       const ws = wb.addWorksheet('Budget Yield', { views:[{ showGridLines:false }] })
       ws.columns = [{ width:32 },{ width:15 },{ width:15 },{ width:19 },{ width:19 },{ width:11 },{ width:11 },{ width:11 },{ width:11 },{ width:11 },{ width:11 }]
       const box = () => ({ top:{style:'thin' as const, color:{argb:'FFD0D5DD'}}, left:{style:'thin' as const, color:{argb:'FFD0D5DD'}}, bottom:{style:'thin' as const, color:{argb:'FFD0D5DD'}}, right:{style:'thin' as const, color:{argb:'FFD0D5DD'}} })
@@ -194,37 +190,35 @@ function YieldTab() {
   }
 
   return (
-    <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }} className="safe-bottom page-pad">
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10, gap:8, flexWrap:'wrap' }}>
-        <div style={{ fontSize:12, color:'var(--text3)' }}>Plan &amp; Realisasi per cost element (USD &amp; IDR) dari tahun ke tahun. Yield YoY = pertumbuhan vs tahun sebelumnya.</div>
-        <div style={{ display:'flex', gap:8 }}>
-          <button onClick={addYear} className="btn btn-sm">+ Tahun</button>
-          <button onClick={exportXLSX} disabled={exporting||loading} className="btn btn-sm">{exporting?'...':'⬇ Excel'}</button>
-          <button onClick={saveAll} disabled={saving} className="btn btn-sm btn-primary">{saving?'...':'Simpan'}</button>
-        </div>
+    <>
+      <div className="au-row au-wrap rise" style={{ gap: 8 }}>
+        <span className="au-small au-ink2" style={{ flex: 1, minWidth: 220 }}>Plan &amp; realisasi per cost element (USD &amp; IDR) dari tahun ke tahun. Yield YoY = pertumbuhan vs tahun sebelumnya.</span>
+        <button type="button" onClick={addYear} className="btn"><Icon name="plus" size={15} />Tahun</button>
+        <button type="button" onClick={exportXLSX} disabled={exporting||loading} className="btn"><Icon name="down" size={15} />{exporting?'Menyiapkan…':'Excel'}</button>
+        <button type="button" onClick={saveAll} disabled={saving} className="btn btn-primary">{saving?'Menyimpan…':'Simpan'}</button>
       </div>
 
-      {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
+      {loading ? <div className="au-card">{[0,1,2].map(k => <div key={k} className="au-skel" />)}</div> :
        years.map(y => {
         const d = byYear[y] || emptyCE(); const prevD = byYear[y-1]
         return (
-          <div key={y} style={{ marginBottom:18 }}>
-            <div style={{ fontSize:13, fontWeight:700, marginBottom:6 }}>Tahun {y}</div>
-            <div className="card" style={{ overflow:'auto' }}>
-              <table className="wp-table" style={{ minWidth:1360 }}>
+          <section key={y} className="au-col rise" style={{ gap: 8 }}>
+            <span className="lbl">Tahun {y}</span>
+            <div className="au-tblw">
+              <table className="wp-table au-btbl" style={{ minWidth:1360 }}>
                 <thead>
                   <tr>
                     <th rowSpan={2}>Cost Element</th>
-                    <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>USD</th>
-                    <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>IDR</th>
-                    <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>% Realisasi<br/><span style={{ fontWeight:400, fontSize:9, color:'var(--text3)' }}>(Real ÷ Plan)</span></th>
-                    <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--border)' }}>Yield YoY (%)</th>
+                    <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--line)' }}>USD</th>
+                    <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--line)' }}>IDR</th>
+                    <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--line)' }}>% Realisasi<br/><span style={{ fontWeight:400, fontSize:9, color:'var(--muted)' }}>(Real ÷ Plan)</span></th>
+                    <th colSpan={2} style={{ textAlign:'center', borderLeft:'1px solid var(--line)' }}>Yield YoY (%)</th>
                   </tr>
                   <tr>
-                    <th style={{ borderLeft:'1px solid var(--border)', textAlign:'right' }}>Plan<div style={subF}>(a)</div></th><th style={{ textAlign:'right' }}>Realisasi<div style={subF}>(b)</div></th>
-                    <th style={{ borderLeft:'1px solid var(--border)', textAlign:'right' }}>Plan<div style={subF}>(c)</div></th><th style={{ textAlign:'right' }}>Realisasi<div style={subF}>(d)</div></th>
-                    <th style={{ borderLeft:'1px solid var(--border)', textAlign:'center' }}>USD<div style={subF}>(e)=(b)/(a)</div></th><th style={{ textAlign:'center' }}>IDR<div style={subF}>(f)=(d)/(c)</div></th>
-                    <th style={{ borderLeft:'1px solid var(--border)', textAlign:'center' }}>Plan<div style={subF}>(g)</div></th><th style={{ textAlign:'center' }}>Realisasi<div style={subF}>(h)</div></th>
+                    <th style={{ borderLeft:'1px solid var(--line)', textAlign:'right' }}>Plan<div style={subF}>(a)</div></th><th style={{ textAlign:'right' }}>Realisasi<div style={subF}>(b)</div></th>
+                    <th style={{ borderLeft:'1px solid var(--line)', textAlign:'right' }}>Plan<div style={subF}>(c)</div></th><th style={{ textAlign:'right' }}>Realisasi<div style={subF}>(d)</div></th>
+                    <th style={{ borderLeft:'1px solid var(--line)', textAlign:'center' }}>USD<div style={subF}>(e)=(b)/(a)</div></th><th style={{ textAlign:'center' }}>IDR<div style={subF}>(f)=(d)/(c)</div></th>
+                    <th style={{ borderLeft:'1px solid var(--line)', textAlign:'center' }}>Plan<div style={subF}>(g)</div></th><th style={{ textAlign:'center' }}>Realisasi<div style={subF}>(h)</div></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -236,22 +230,22 @@ function YieldTab() {
                     const yRealUSD = pv ? yoy(v.realUSD||0, pv.realUSD||0) : null
                     const realPctUSD = (v.planUSD||0)>0 ? (v.realUSD||0)/(v.planUSD||0)*100 : 0
                     const realPctIDR = (v.planIDR||0)>0 ? (v.realIDR||0)/(v.planIDR||0)*100 : 0
-                    const yoyCell = (idr:number|null, usd:number|null) => idr===null ? <span style={{ color:'var(--text3)' }}>—</span> : (
+                    const yoyCell = (idr:number|null, usd:number|null) => idr===null ? <span style={{ color:'var(--muted)' }}>—</span> : (
                       <div style={{ lineHeight:1.25 }}>
-                        <div style={{ color: idr>=0?'var(--green)':'var(--red)', fontWeight:600 }}>IDR {idr>=0?'+':''}{pct(idr)}</div>
-                        <div style={{ color: (usd??0)>=0?'var(--green)':'var(--red)', fontSize:10, opacity:0.85 }}>USD {(usd??0)>=0?'+':''}{pct(usd??0)}</div>
+                        <div style={{ color: idr>=0?'var(--ok)':'var(--bad)', fontWeight:600 }}>IDR {idr>=0?'+':''}{pct(idr)}</div>
+                        <div style={{ color: (usd??0)>=0?'var(--ok)':'var(--bad)', fontSize:10, opacity:0.85 }}>USD {(usd??0)>=0?'+':''}{pct(usd??0)}</div>
                       </div>
                     )
                     return (
                       <tr key={ce.key}>
-                        <td style={{ fontSize:11 }}><div style={{ fontWeight:600 }}>{ce.short}</div><div style={{ color:'var(--text3)', fontSize:10 }}>{ce.code} · {ce.name}</div></td>
-                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'right' }}><MoneyInput currency="USD" style={{ width:110, textAlign:'right' }} value={v.planUSD||0} onChange={n=>setVal(y,ce.key,'planUSD',n)} /></td>
-                        <td style={{ textAlign:'right' }}><MoneyInput currency="USD" style={{ width:110, textAlign:'right' }} value={v.realUSD||0} onChange={n=>setVal(y,ce.key,'realUSD',n)} /></td>
-                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'right' }}><MoneyInput currency="IDR" style={{ width:140, textAlign:'right' }} value={v.planIDR||0} onChange={n=>setVal(y,ce.key,'planIDR',n)} /></td>
-                        <td style={{ textAlign:'right' }}><MoneyInput currency="IDR" style={{ width:140, textAlign:'right' }} value={v.realIDR||0} onChange={n=>setVal(y,ce.key,'realIDR',n)} /></td>
-                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'center', fontWeight:600, color: realPctUSD>=100?'var(--green)':'var(--text)' }}>{pct(realPctUSD)}</td>
-                        <td style={{ textAlign:'center', fontWeight:600, color: realPctIDR>=100?'var(--green)':'var(--text)' }}>{pct(realPctIDR)}</td>
-                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'center' }}>{yoyCell(yPlanIDR, yPlanUSD)}</td>
+                        <td style={{ fontSize:11 }}><div style={{ fontWeight:600 }}>{ce.short}</div><div style={{ color:'var(--muted)', fontSize:10 }}>{ce.code} · {ce.name}</div></td>
+                        <td style={{ borderLeft:'1px solid var(--line)', textAlign:'right' }}><MoneyInput ariaLabel={`Plan USD ${ce.short} ${y}`} currency="USD" className="input input-sm" style={{ width:120, textAlign:'right' }} value={v.planUSD||0} onChange={n=>setVal(y,ce.key,'planUSD',n)} /></td>
+                        <td style={{ textAlign:'right' }}><MoneyInput ariaLabel={`Realisasi USD ${ce.short} ${y}`} currency="USD" className="input input-sm" style={{ width:120, textAlign:'right' }} value={v.realUSD||0} onChange={n=>setVal(y,ce.key,'realUSD',n)} /></td>
+                        <td style={{ borderLeft:'1px solid var(--line)', textAlign:'right' }}><MoneyInput ariaLabel={`Plan IDR ${ce.short} ${y}`} currency="IDR" className="input input-sm" style={{ width:150, textAlign:'right' }} value={v.planIDR||0} onChange={n=>setVal(y,ce.key,'planIDR',n)} /></td>
+                        <td style={{ textAlign:'right' }}><MoneyInput ariaLabel={`Realisasi IDR ${ce.short} ${y}`} currency="IDR" className="input input-sm" style={{ width:150, textAlign:'right' }} value={v.realIDR||0} onChange={n=>setVal(y,ce.key,'realIDR',n)} /></td>
+                        <td style={{ borderLeft:'1px solid var(--line)', textAlign:'center', fontWeight:600, color: realPctUSD>=100?'var(--ok)':'var(--ink)' }}>{pct(realPctUSD)}</td>
+                        <td style={{ textAlign:'center', fontWeight:600, color: realPctIDR>=100?'var(--ok)':'var(--ink)' }}>{pct(realPctIDR)}</td>
+                        <td style={{ borderLeft:'1px solid var(--line)', textAlign:'center' }}>{yoyCell(yPlanIDR, yPlanUSD)}</td>
                         <td style={{ textAlign:'center' }}>{yoyCell(yRealIDR, yRealUSD)}</td>
                       </tr>
                     )
@@ -266,22 +260,22 @@ function YieldTab() {
                     const tyRealIDR = prevD ? yoy(tRealIDR, psum('realIDR')) : null
                     const tyPlanUSD = prevD ? yoy(tPlanUSD, psum('planUSD')) : null
                     const tyRealUSD = prevD ? yoy(tRealUSD, psum('realUSD')) : null
-                    const tYoyCell = (idr:number|null, usd:number|null) => idr===null ? <span style={{ color:'var(--text3)' }}>—</span> : (
+                    const tYoyCell = (idr:number|null, usd:number|null) => idr===null ? <span style={{ color:'var(--muted)' }}>—</span> : (
                       <div style={{ lineHeight:1.25 }}>
-                        <div style={{ color: idr>=0?'var(--green)':'var(--red)' }}>IDR {idr>=0?'+':''}{pct(idr)}</div>
-                        <div style={{ color: (usd??0)>=0?'var(--green)':'var(--red)', fontSize:10, opacity:0.85 }}>USD {(usd??0)>=0?'+':''}{pct(usd??0)}</div>
+                        <div style={{ color: idr>=0?'var(--ok)':'var(--bad)' }}>IDR {idr>=0?'+':''}{pct(idr)}</div>
+                        <div style={{ color: (usd??0)>=0?'var(--ok)':'var(--bad)', fontSize:10, opacity:0.85 }}>USD {(usd??0)>=0?'+':''}{pct(usd??0)}</div>
                       </div>
                     )
                     return (
-                      <tr style={{ borderTop:'2px solid var(--border)', background:'var(--bg3)', fontWeight:800 }}>
+                      <tr className="au-totrow">
                         <td>TOTAL</td>
-                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'right' }}>{fmtMoney(tPlanUSD,'USD')}</td>
+                        <td style={{ borderLeft:'1px solid var(--line)', textAlign:'right' }}>{fmtMoney(tPlanUSD,'USD')}</td>
                         <td style={{ textAlign:'right' }}>{fmtMoney(tRealUSD,'USD')}</td>
-                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'right' }}>{fmtMoney(tPlanIDR,'IDR')}</td>
+                        <td style={{ borderLeft:'1px solid var(--line)', textAlign:'right' }}>{fmtMoney(tPlanIDR,'IDR')}</td>
                         <td style={{ textAlign:'right' }}>{fmtMoney(tRealIDR,'IDR')}</td>
-                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'center', color: tRealPctUSD>=100?'var(--green)':'var(--text)' }}>{pct(tRealPctUSD)}</td>
-                        <td style={{ textAlign:'center', color: tRealPctIDR>=100?'var(--green)':'var(--text)' }}>{pct(tRealPctIDR)}</td>
-                        <td style={{ borderLeft:'1px solid var(--border)', textAlign:'center' }}>{tYoyCell(tyPlanIDR, tyPlanUSD)}</td>
+                        <td style={{ borderLeft:'1px solid var(--line)', textAlign:'center', color: tRealPctUSD>=100?'var(--ok)':'var(--ink)' }}>{pct(tRealPctUSD)}</td>
+                        <td style={{ textAlign:'center', color: tRealPctIDR>=100?'var(--ok)':'var(--ink)' }}>{pct(tRealPctIDR)}</td>
+                        <td style={{ borderLeft:'1px solid var(--line)', textAlign:'center' }}>{tYoyCell(tyPlanIDR, tyPlanUSD)}</td>
                         <td style={{ textAlign:'center' }}>{tYoyCell(tyRealIDR, tyRealUSD)}</td>
                       </tr>
                     )
@@ -289,11 +283,11 @@ function YieldTab() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </section>
         )
       })}
-      <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Yield YoY membandingkan tiap tahun dengan tahun sebelumnya. Tahun paling awal (2024) tidak punya pembanding (—). Klik &quot;+ Tahun&quot; untuk menambah tahun.</div>
-    </div>
+      <span className="au-xs au-muted">Yield YoY membandingkan tiap tahun dengan tahun sebelumnya. Tahun paling awal (2024) tidak punya pembanding (—). Ketuk &quot;Tahun&quot; untuk menambah tahun.</span>
+    </>
   )
 }
 
@@ -333,13 +327,14 @@ function RealisasiTab({ year, cur, config, setConfig, rowFor }: any) {
         { ...findOr('accommodation','External Accommodation'), threshold: externalPct },
         ...others,
       ]
-      await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ budgetCategories:newCats, budgetThresholdTotal: totalPct }) })
+      const r = await fetch('/api/config', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ budgetCategories:newCats, budgetThresholdTotal: totalPct }) })
+      if (!r.ok) { toast.error('Gagal menyimpan threshold'); return }
       invalidateConfig()
       const fresh = await getConfig(true)
       setConfig(fresh)
       // jangan reset input dari config — pertahankan nilai yg barusan disimpan
       toast.success('Threshold tersimpan')
-    } finally { setSavingThr(false) }
+    } catch { toast.error('Gagal menyimpan threshold') } finally { setSavingThr(false) }
   }
 
   // Hitung total per kolom
@@ -351,26 +346,34 @@ function RealisasiTab({ year, cur, config, setConfig, rowFor }: any) {
   const totUsed = tot.plan>0 ? tot.rl/tot.plan*100 : 0
 
   return (
-    <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }} className="safe-bottom page-pad">
-      <div className="card" style={{ padding:'12px 16px', marginBottom:14 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-          <div style={{ fontSize:12, fontWeight:600 }}>Threshold Prognosa</div>
-          <button onClick={saveThreshold} disabled={savingThr} className="btn btn-sm btn-primary">{savingThr?'...':'Simpan Threshold'}</button>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
-          <div><label style={lbl}>Total %</label><input type="number" className="input input-sm" value={totalPct} onChange={e=>setTotalPct(Number(e.target.value))} /></div>
-          <div><label style={lbl}>Travel %</label><input type="number" className="input input-sm" value={travelPct} onChange={e=>setTravelPct(Number(e.target.value))} /></div>
-          <div><label style={lbl}>External %</label><input type="number" className="input input-sm" value={externalPct} onChange={e=>setExternalPct(Number(e.target.value))} /></div>
-        </div>
+    <>
+      <div className="au-row au-wrap rise" style={{ gap: 8 }}>
+        <Seg label="Mata uang" value={curr} onChange={setCurr} options={['IDR','USD'] as const} />
       </div>
+      {tot.plan === 0 ? <div className="au-card"><Empty title={`Belum ada plan ${year}`} text="Isi Plan (RKAP) dan realisasi di tab Yield." /></div> : (
+        <div className="au-grid au-bgauges">
+          {[...rows.map(r => ({ key: r.ce.key, label: r.ce.short, code: r.ce.code, plan: r.plan, rl: r.rl, used: r.used, thr: thrFor(r.ce.key) })), { key: 'total', label: 'Total', code: 'Semua cost element', plan: tot.plan, rl: tot.rl, used: totUsed, thr: totalPct }].map(g => (
+            <section key={g.key} className={`au-card au-gauge rise${g.key === 'total' ? ' tot' : ''}`}>
+              <span className="au-row au-between" style={{ gap: 8 }}><span className="au-col" style={{ minWidth: 0 }}><b className="au-small">{g.label}</b><span className="au-xs au-muted">{g.code}</span></span>
+                <b className="pct" style={{ color: g.used > g.thr ? 'var(--bad)' : 'var(--ok)' }}>{pct(g.used)}</b></span>
+              <span className="au-track" role="img" aria-label={`Terpakai ${pct(g.used)}, threshold ${g.thr}%`}><i className="a" style={{ width: `${Math.min(100, g.used)}%`, background: g.used > g.thr ? 'var(--bad)' : undefined }} /><i className="tick" style={{ left: `calc(${Math.min(100, g.thr)}% - 1px)` }} /></span>
+              <span className="au-row au-between au-xs au-muted" style={{ gap: 8 }}><span>Real {money(g.rl)}</span><span>Plan {money(g.plan)}</span></span>
+            </section>
+          ))}
+        </div>
+      )}
+      <section className="au-card rise" style={{ gap: 12 }}>
+        <span className="au-row au-between au-wrap" style={{ gap: 8 }}><span className="lbl">Threshold prognosa</span>
+          <button type="button" onClick={saveThreshold} disabled={savingThr} className="btn btn-sm btn-primary">{savingThr?'Menyimpan…':'Simpan threshold'}</button></span>
+        <div className="au-grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 10 }}>
+          <label className="au-col" style={{ gap: 6 }}><span className="lbl">Total %</span><input type="number" inputMode="decimal" className="input" value={totalPct} onChange={e=>setTotalPct(Number(e.target.value))} /></label>
+          <label className="au-col" style={{ gap: 6 }}><span className="lbl">Travel %</span><input type="number" inputMode="decimal" className="input" value={travelPct} onChange={e=>setTravelPct(Number(e.target.value))} /></label>
+          <label className="au-col" style={{ gap: 6 }}><span className="lbl">External %</span><input type="number" inputMode="decimal" className="input" value={externalPct} onChange={e=>setExternalPct(Number(e.target.value))} /></label>
+        </div>
+      </section>
 
-      <div style={{ display:'flex', gap:5, marginBottom:10 }}>
-        <button onClick={()=>setCurr('IDR')} style={curChip(curr==='IDR')}>IDR</button>
-        <button onClick={()=>setCurr('USD')} style={curChip(curr==='USD')}>USD</button>
-      </div>
-
-      <div className="card" style={{ overflow:'auto' }}>
-        <table className="wp-table" style={{ minWidth:1040 }}>
+      <div className="au-tblw rise">
+        <table className="wp-table au-ctbl au-btbl" style={{ minWidth:1040 }}>
           <thead><tr>
             <th>Cost Element</th>
             <th style={{ textAlign:'right' }}>Plan (RKAP) {curr}<div style={subF}>(a)</div></th>
@@ -383,33 +386,30 @@ function RealisasiTab({ year, cur, config, setConfig, rowFor }: any) {
           <tbody>
             {rows.map(({ce,plan,rl,used,available,prognosa,estAvail}) => (
               <tr key={ce.key}>
-                <td style={{ fontSize:11 }}><div style={{ fontWeight:600 }}>{ce.short}</div><div style={{ color:'var(--text3)', fontSize:10 }}>{ce.code}</div></td>
-                <td style={{ textAlign:'right' }}>{money(plan)}</td>
-                <td style={{ textAlign:'right', fontWeight:600 }}>{money(rl)}</td>
-                <td style={{ textAlign:'center', fontWeight:600, color: used>thrFor(ce.key)?'var(--red)':'var(--green)' }}>{pct(used)}</td>
-                <td style={{ textAlign:'right', color: available<0?'var(--red)':'var(--text)' }}>{money(available)}</td>
-                <td style={{ textAlign:'right', color:'var(--amber)' }}>{money(prognosa)}</td>
-                <td style={{ textAlign:'right', fontWeight:600 }}>{money(estAvail)}</td>
+                <td className="c-main au-small"><b>{ce.short}</b><span className="au-xs au-muted" style={{ marginLeft: 6 }}>{ce.code}</span></td>
+                <td data-l="Plan (a)" style={{ textAlign:'right' }}>{money(plan)}</td>
+                <td data-l="Realisasi (b)" style={{ textAlign:'right', fontWeight:600 }}>{money(rl)}</td>
+                <td data-l="% Used (c)" style={{ textAlign:'center', fontWeight:600, color: used>thrFor(ce.key)?'var(--bad)':'var(--ok)' }}>{pct(used)}</td>
+                <td data-l="Available (d)" style={{ textAlign:'right', color: available<0?'var(--bad)':'var(--ink)' }}>{money(available)}</td>
+                <td data-l="Prognosa (e)" style={{ textAlign:'right', color:'var(--warn)' }}>{money(prognosa)}</td>
+                <td data-l="Est. EoY (f)" style={{ textAlign:'right', fontWeight:600 }}>{money(estAvail)}</td>
               </tr>
             ))}
-            <tr style={{ borderTop:'2px solid var(--border)', background:'var(--bg3)' }}>
-              <td style={{ fontWeight:800 }}>TOTAL</td>
-              <td style={{ textAlign:'right', fontWeight:800 }}>{money(tot.plan)}</td>
-              <td style={{ textAlign:'right', fontWeight:800 }}>{money(tot.rl)}</td>
-              <td style={{ textAlign:'center', fontWeight:800, color: totUsed>totalPct?'var(--red)':'var(--green)' }}>{pct(totUsed)}</td>
-              <td style={{ textAlign:'right', fontWeight:800, color: tot.available<0?'var(--red)':'var(--text)' }}>{money(tot.available)}</td>
-              <td style={{ textAlign:'right', fontWeight:800, color:'var(--amber)' }}>{money(tot.prognosa)}</td>
-              <td style={{ textAlign:'right', fontWeight:800 }}>{money(tot.estAvail)}</td>
+            <tr className="au-totrow">
+              <td className="c-main" style={{ fontWeight:800 }}>TOTAL</td>
+              <td data-l="Plan (a)" style={{ textAlign:'right', fontWeight:800 }}>{money(tot.plan)}</td>
+              <td data-l="Realisasi (b)" style={{ textAlign:'right', fontWeight:800 }}>{money(tot.rl)}</td>
+              <td data-l="% Used (c)" style={{ textAlign:'center', fontWeight:800, color: totUsed>totalPct?'var(--bad)':'var(--ok)' }}>{pct(totUsed)}</td>
+              <td data-l="Available (d)" style={{ textAlign:'right', fontWeight:800, color: tot.available<0?'var(--bad)':'var(--ink)' }}>{money(tot.available)}</td>
+              <td data-l="Prognosa (e)" style={{ textAlign:'right', fontWeight:800, color:'var(--warn)' }}>{money(tot.prognosa)}</td>
+              <td data-l="Est. EoY (f)" style={{ textAlign:'right', fontWeight:800 }}>{money(tot.estAvail)}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div style={{ fontSize:10, color:'var(--text3)', marginTop:8 }}>Plan (RKAP) &amp; Realisasi {curr} <b>otomatis dari tab Yield</b> tahun {year} (tidak diinput ulang). % Used = Realisasi ÷ Plan. Prognosa = threshold × RKAP. Est. Available EoY = RKAP − Prognosa.</div>
-    </div>
+      <span className="au-xs au-muted">Plan (RKAP) &amp; realisasi {curr} <b>otomatis dari tab Yield</b> tahun {year} (tidak diinput ulang). % Used = Realisasi ÷ Plan. Prognosa = threshold × RKAP. Est. Available EoY = RKAP − Prognosa.</span>
+    </>
   )
 }
-function curChip(active:boolean):React.CSSProperties { return { padding:'4px 14px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${active?'var(--brand)':'var(--border)'}`, background:active?'var(--brand-soft)':'var(--bg3)', color:active?'var(--brand)':'var(--text2)' } }
 
-const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }
-const subF: React.CSSProperties = { fontWeight:400, fontSize:9, color:'var(--text3)', marginTop:2 }
-function subtab(active:boolean):React.CSSProperties { return { padding:'8px 16px', fontSize:12.5, fontWeight:600, cursor:'pointer', border:'none', borderBottom:`2px solid ${active?'var(--brand)':'transparent'}`, background:'transparent', color:active?'var(--brand)':'var(--text3)' } }
+const subF: React.CSSProperties = { fontWeight:400, fontSize:9, color:'var(--muted)', marginTop:2, textTransform:'none', letterSpacing:0 }

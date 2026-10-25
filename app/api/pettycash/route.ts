@@ -19,8 +19,8 @@ export async function GET(req:NextRequest) {
     const year = Number(searchParams.get('year')) || new Date().getFullYear()
     const month = Number(searchParams.get('month')) || 12   // cumulative s/d bulan ini
 
-    let pc = await PettyCashModel.findOne({ year }).lean() as any
-    if (!pc) { const c = await PettyCashModel.create({ year, inflows:[] }); pc = c.toObject() }
+    // Read-only: a year without a petty cash document gets an in-memory default (PATCH upserts by year).
+    const pc = (await PettyCashModel.findOne({ year }).lean() as any) || { year, inflows:[] }
 
     // Pemasukan kumulatif s/d bulan dipilih (berdasarkan tanggal inflow, dalam tahun ini)
     const inflows = (pc.inflows||[]) as any[]

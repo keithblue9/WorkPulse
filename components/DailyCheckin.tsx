@@ -9,7 +9,7 @@ function localToday() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-// Small daily attendance check-in (formerly inside the Wibi bubble). Shows only when
+// Small daily attendance check-in . Shows only when
 // today's attendance isn't recorded yet. No chat — just a quick prompt + type buttons.
 export default function DailyCheckin() {
   const { data: session } = useSession()

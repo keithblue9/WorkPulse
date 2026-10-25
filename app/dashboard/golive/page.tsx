@@ -1,9 +1,12 @@
 'use client'
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
+import { Empty, Icon, PageHeader, Seg, Sheet } from '@/components/ui'
+import { useYear } from '@/lib/year'
 
 const GROUPS = ['Holding','SH Upstream','SH Gas','SH C&T','SH PNRE','SH R&P','SH Shipping','Others']
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
+const APP_COLORS = ['#4B3BFF','#7B6BFF','#0FA898','#F2A33A','#FF5D3B','#14b8a6']
 function fmtDate(v:string){ if(!v||v==='Not Yet') return v||''; const [y,m]=v.split('-'); return m&&y? `${MONTHS[parseInt(m)-1]}-${y.slice(2)}` : v }
 
 export default function GoLivePage() {
@@ -11,10 +14,15 @@ export default function GoLivePage() {
   const [entities, setEntities] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [groupFilter, setGroupFilter] = useState('all')
-  const [yearFilter, setYearFilter] = useState('all')
+  const { year } = useYear()
+  const [yearMode, setYearMode] = useState<'all'|'year'>('all')
+  const yearFilter = yearMode === 'all' ? 'all' : String(year)
+  const setYearFilter = (v:string) => setYearMode(v === 'all' ? 'all' : 'year')
+  const [newApp, setNewApp] = useState<string|null>(null)
+  const [confirmDelApp, setConfirmDelApp] = useState(false)
+  const [pendingDel, setPendingDel] = useState<string|null>(null)
   const [q, setQ] = useState('')
 
-  const [seeding, setSeeding] = useState(false)
   const [editApp, setEditApp] = useState<any|null>(null)
   const [exporting, setExporting] = useState<'excel'|'pdf'|null>(null)
   const [newEntityId, setNewEntityId] = useState<string|null>(null)   // sorot baris yg baru ditambah
@@ -41,25 +49,13 @@ export default function GoLivePage() {
 
   async function patchApp(id:string, patch:any) {
     setApps(p=>p.map(a=>a._id===id?{...a,...patch}:a))
-    try { await fetch('/api/golive',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'app',id,patch})}) }
-    catch { toast.error('Gagal') }
+    try { const r = await fetch('/api/golive',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'app',id,patch})}); if (!r.ok) throw new Error() }
+    catch { toast.error('Gagal menyimpan aplikasi'); load() }
   }
   async function delApp(app:any) {
-    if(!confirm(`Hapus aplikasi "${app.label}" beserta semua data centangnya?`)) return
-    await fetch(`/api/golive?kind=app&id=${app._id}`,{method:'DELETE'})
-    setApps(p=>p.filter(a=>a._id!==app._id)); setEditApp(null); toast.success('App dihapus')
-  }
-
-  async function doSeed() {
-    setSeeding(true)
-    try {
-      const sr = await fetch('/api/golive/seed', { method:'POST' })
-      const sd = await sr.json()
-      if (!sr.ok) { toast.error(sd.error || 'Seed gagal'); setSeeding(false); return }
-      toast.success(`Berhasil import ${sd.entities} entitas`)
-      await load()
-    } catch { toast.error('Seed gagal') }
-    setSeeding(false)
+    const r = await fetch(`/api/golive?kind=app&id=${app._id}`,{method:'DELETE'})
+    if (!r.ok) { toast.error('Gagal menghapus aplikasi'); return }
+    setApps(p=>p.filter(a=>a._id!==app._id)); setEditApp(null); setConfirmDelApp(false); toast.success('Aplikasi dihapus')
   }
 
   async function load() {
@@ -76,15 +72,22 @@ export default function GoLivePage() {
     // Entitas baru belum punya nama/grup/tanggal go-live, jadi akan tersaring keluar
     // kalau filter sedang aktif -> terlihat seperti "gagal tambah". Reset filter dulu.
     const adaFilter = groupFilter!=='all' || yearFilter!=='all' || !!q.trim()
-    if (adaFilter){ setGroupFilter('all'); setYearFilter('all'); setQ('') }
+    if (adaFilter){ setGroupFilter('all'); setYearMode('all'); setQ('') }
     setEntities(p=>[...p,d.data])
     setNewEntityId(d.data?._id||null)
     toast.success(adaFilter ? 'Entitas ditambahkan (filter direset agar terlihat)' : 'Entitas ditambahkan — isi namanya')
     // Gulirkan ke baris baru supaya langsung terlihat di daftar yang panjang
     setTimeout(()=>{ document.getElementById(`ent-${d.data?._id}`)?.scrollIntoView({ behavior:'smooth', block:'center' }) }, 120)
   }
-  async function addApp(){ const label=prompt('Nama aplikasi baru:'); if(!label?.trim()) return; const r=await fetch('/api/golive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'app',label:label.trim()})}); const d=await r.json(); if(r.ok){setApps(p=>[...p,d.data]);toast.success('App ditambahkan')} else toast.error(d.error||'Gagal') }
-  async function delEntity(e:any){ if(!confirm(`Hapus "${e.name||'(kosong)'}"?`)) return; await fetch(`/api/golive?kind=entity&id=${e._id}`,{method:'DELETE'}); setEntities(p=>p.filter(x=>x._id!==e._id)) }
+  async function addApp(label:string){ if(!label.trim()) { toast.error('Nama aplikasi wajib diisi'); return } const r=await fetch('/api/golive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'app',label:label.trim()})}); const d=await r.json().catch(()=>({})); if(r.ok){setApps(p=>[...p,d.data]);setNewApp(null);toast.success('Aplikasi ditambahkan')} else toast.error(d.error||'Gagal') }
+  // Hapus entitas: ketuk sekali untuk konfirmasi, ketuk lagi untuk menghapus (tanpa dialog browser).
+  async function delEntity(e:any){
+    if (pendingDel !== e._id) { setPendingDel(e._id); setTimeout(()=>setPendingDel(p=>p===e._id?null:p), 3500); return }
+    setPendingDel(null)
+    const r = await fetch(`/api/golive?kind=entity&id=${e._id}`,{method:'DELETE'})
+    if (!r.ok) { toast.error('Gagal menghapus entitas'); return }
+    setEntities(p=>p.filter(x=>x._id!==e._id)); toast.success('Entitas dihapus')
+  }
 
   async function patchEntity(id:string,patch:any){
     const sebelum = entities.find(e=>e._id===id)
@@ -108,7 +111,7 @@ export default function GoLivePage() {
     // Kalau filter tahun aktif dan tanggal barunya tahun lain, baris akan hilang
     // dari tampilan. Beri tahu supaya tidak dikira gagal tersimpan.
     if (yearFilter!=='all' && date && yearOf(date)!==yearFilter) {
-      toast(`Tersimpan. Baris disembunyikan karena filter "Go-Live ${yearFilter}" aktif.`, { icon:'ℹ️' })
+      toast(`Tersimpan. Baris disembunyikan karena filter "Go-Live ${yearFilter}" aktif.`)
     }
   }
 
@@ -138,7 +141,7 @@ export default function GoLivePage() {
       if (yearFilter!=='all') return yearOf(ap?.date)===yearFilter
       return ap?.done || (ap?.subs && Object.values(ap.subs).some(Boolean))
     }).length
-    return {...a, done, color:['#4f8ef7','#8b5cf6','#22c55e','#f59e0b','#ec4899','#14b8a6'][i%6]}
+    return {...a, done, color:APP_COLORS[i%6]}
   }),[apps,entities,yearFilter])
 
   // Total entitas yang go-live (aplikasi apa pun) di tahun terpilih
@@ -146,8 +149,8 @@ export default function GoLivePage() {
   ,[entities,yearFilter])
 
   // Lapisan: header beku (6) > header biasa (5) > body beku (3) > body biasa (auto)
-  const th:React.CSSProperties={padding:'6px 8px',fontSize:9.5,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:0.3,background:'var(--bg2)',borderBottom:'2px solid var(--border)',whiteSpace:'nowrap',textAlign:'center',position:'sticky',top:0,zIndex:5}
-  const td:React.CSSProperties={padding:'4px 6px',fontSize:11.5,borderBottom:'1px solid var(--border)',verticalAlign:'middle'}
+  const th:React.CSSProperties={padding:'8px 8px',font:'500 10.5px var(--mono)',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.05em',background:'var(--surface)',borderBottom:'1px solid var(--line)',whiteSpace:'nowrap',textAlign:'center',position:'sticky',top:0,zIndex:5}
+  const td:React.CSSProperties={padding:'6px 8px',fontSize:13,borderBottom:'1px solid var(--line)',verticalAlign:'middle'}
 
   // ── Freeze pane: kolom identitas (No…Client) menempel saat scroll ke kanan ──
   // Lebar kolom ditentukan browser (table layout auto), jadi offset TIDAK boleh
@@ -179,66 +182,45 @@ export default function GoLivePage() {
 
   const isLastFrozen = (i:number) => i===ID_COUNT-1
   const edge = (i:number):React.CSSProperties => isLastFrozen(i)
-    ? { borderRight:'2px solid var(--border)', boxShadow:'3px 0 5px -2px rgba(0,0,0,0.13)' } : {}
+    ? { borderRight:'1px solid var(--line2)', boxShadow:'6px 0 10px -8px rgba(11,13,23,.25)' } : {}
   // Header beku: menempel atas DAN kiri -> z-index paling tinggi
   const thFreeze = (i:number):React.CSSProperties => ({ ...th, position:'sticky', top:0, left:idLeft[i], zIndex:6, ...edge(i) })
   // Body beku: latar solid supaya kolom lain tidak menembus saat digeser
-  const tdFreeze = (i:number, even:boolean, hl=false):React.CSSProperties => ({ ...td, position:'sticky', left:idLeft[i], zIndex:3, background: hl ? 'var(--brand-soft)' : (even?'var(--bg)':'var(--bg2)'), ...edge(i) })
+  const tdFreeze = (i:number, even:boolean, hl=false):React.CSSProperties => ({ ...td, position:'sticky', left:idLeft[i], zIndex:3, background: hl ? 'var(--accent-soft)' : (even?'var(--surface)':'var(--sunken)'), ...edge(i) })
   const totalSubs = apps.reduce((s:number,a:any)=>(a.subFeatures||[]).length + 1 + s, 0) // +1 for date col
 
   return (
-    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      <div style={{padding:'12px 20px',borderBottom:'1px solid var(--border)',background:'var(--bg2)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',flexShrink:0}}>
-        <div><div style={{fontSize:14,fontWeight:600}}>🚀 Go-Live</div><div style={{fontSize:11,color:'var(--text3)'}}>Status go-live entitas per aplikasi · sub-fitur + tanggal</div></div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-          {entities.length===0 && !loading && <button onClick={doSeed} disabled={seeding} className="btn btn-sm" style={{background:'#f59e0b',color:'#fff',border:'none'}}>{seeding?'Importing…':'📥 Import dari Excel'}</button>}
-          <button onClick={()=>doExport('excel')} disabled={!!exporting||view.length===0} className="btn btn-sm" title="Export tabel ke Excel (data asli, bisa difilter)">
-            {exporting==='excel'?'⏳ Excel…':'📊 Excel'}
-          </button>
-          <button onClick={()=>doExport('pdf')} disabled={!!exporting||view.length===0} className="btn btn-sm" title="Export ke PDF (rapi, otomatis banyak halaman)">
-            {exporting==='pdf'?'⏳ PDF…':'📄 PDF'}
-          </button>
-          <button onClick={addApp} className="btn btn-sm">+ App</button>
-          <button onClick={addEntity} className="btn btn-primary btn-sm">+ Entitas</button>
-        </div>
-      </div>
-
-      <div style={{flex:1,overflow:'auto',padding:'16px 20px'}}>
-        {/* Summary */}
-        {yearFilter!=='all' && (
-          <div className="card" style={{padding:'10px 14px',marginBottom:10,borderLeft:'3px solid var(--brand)',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-            <span style={{fontSize:12}}>📅 Ada go-live di tahun <b>{yearFilter}</b>:</span>
-            <span style={{fontSize:20,fontWeight:800,color:'var(--brand)'}}>{yearTotal}</span>
-            <span style={{fontSize:11.5,color:'var(--text3)'}}>entitas dari total {entities.length}</span>
-            <span style={{fontSize:10.5,color:'var(--text3)',flexBasis:'100%'}}>Kolom aplikasi yang go-live di tahun lain ditampilkan samar — yang pekat = go-live {yearFilter}.</span>
-            <button onClick={()=>setYearFilter('all')} className="btn btn-sm" style={{marginLeft:'auto',fontSize:10.5}}>Tampilkan semua tahun</button>
-          </div>
-        )}
-        <div style={{display:'flex',gap:10,marginBottom:14,flexWrap:'wrap'}}>
-          {summary.map((a:any)=>{const denom=yearFilter==='all'?entities.length:yearTotal; const pct=denom>0?Math.round(a.done/denom*100):0; return(
-            <div key={a._id||a.key} className="card" style={{padding:'10px 14px',flex:'1 1 140px',minWidth:140,borderLeft:`3px solid ${a.color}`}}>
-              <div style={{fontSize:10,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:0.3,marginBottom:3}}>{a.label}</div>
-              <div style={{display:'flex',alignItems:'baseline',gap:5}}><span style={{fontSize:22,fontWeight:800,color:a.color}}>{a.done}</span><span style={{fontSize:10.5,color:'var(--text3)'}}>/ {denom}</span></div>
-              <div style={{height:4,background:'var(--bg3)',borderRadius:2,overflow:'hidden',marginTop:5}}><div style={{width:`${pct}%`,height:'100%',background:a.color,transition:'width .3s'}}/></div>
-              {yearFilter!=='all' && <div style={{fontSize:9.5,color:'var(--text3)',marginTop:3}}>go-live di {yearFilter}</div>}
-            </div>
+    <div className="au-page">
+      <div className="au-view au-anim">
+        <PageHeader eyebrow={`Activities · ${entities.length} entitas · ${apps.length} aplikasi`} title="Go-Live" actions={<>
+          <button type="button" onClick={()=>doExport('excel')} disabled={!!exporting||view.length===0} className="btn btn-ghost" title="Export tabel ke Excel"><Icon name="file" size={15} />{exporting==='excel'?'Menyiapkan…':'Excel'}</button>
+          <button type="button" onClick={()=>doExport('pdf')} disabled={!!exporting||view.length===0} className="btn btn-ghost" title="Export ke PDF"><Icon name="file" size={15} />{exporting==='pdf'?'Menyiapkan…':'PDF'}</button>
+          <button type="button" onClick={()=>setNewApp('')} className="btn"><Icon name="plus" size={15} />Aplikasi</button>
+          <button type="button" onClick={addEntity} className="btn btn-primary"><Icon name="plus" size={16} stroke={2.2} />Entitas</button>
+        </>} />
+        <div className="au-grid au-tiles" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))' }}>
+          {summary.map((a:any)=>{ const denom=yearFilter==='all'?entities.length:yearTotal; const pct=denom>0?Math.round(a.done/denom*100):0; return (
+            <button type="button" key={a._id||a.key} className="au-tile" onClick={()=>setEditApp({...a})} title="Edit aplikasi & sub-fitur">
+              <span className="au-row au-between"><span className="lbl">{a.label}</span><span className="au-xs au-muted">{pct}%</span></span>
+              <b className="v" style={{ color:a.color }}>{a.done}<small style={{ fontSize:14, color:'var(--muted)', fontWeight:600 }}> / {denom}</small></b>
+              <span className="au-track" style={{ height:8 }}><i className="a" style={{ width:`${pct}%`, background:a.color }} /></span>
+              <span className="l au-xs">{yearFilter!=='all' ? `go-live di ${yearFilter}` : 'sudah go-live'}</span>
+            </button>
           )})}
         </div>
-
-        {/* Filter */}
-        <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
-          <input className="input" placeholder="🔍 Cari entitas / CoCd…" value={q} onChange={e=>setQ(e.target.value)} style={{maxWidth:220,fontSize:12}}/>
-          <select className="input" value={groupFilter} onChange={e=>setGroupFilter(e.target.value)} style={{maxWidth:170,fontSize:12}}>
-            <option value="all">Semua Grup</option>{GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
+        <div className="au-row au-wrap" style={{ gap:8 }}>
+          <label className="input au-row" style={{ gap:8, padding:'0 12px', flex:'1 1 220px', maxWidth:320 }}><Icon name="search" size={16} />
+            <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cari entitas / CoCd" aria-label="Cari entitas" style={{ border:0, background:'transparent', flex:1, minHeight:40, outline:0, color:'var(--ink)' }} /></label>
+          <select className="input" value={groupFilter} onChange={e=>setGroupFilter(e.target.value)} style={{ width:'auto', minWidth:160 }} aria-label="Filter grup">
+            <option value="all">Semua grup</option>{GROUPS.map(g=><option key={g} value={g}>{g}</option>)}
           </select>
-          <select className="input" value={yearFilter} onChange={e=>setYearFilter(e.target.value)} style={{maxWidth:150,fontSize:12}} title="Lihat entitas yang go-live di tahun tertentu">
-            <option value="all">Semua Tahun</option>{yearOptions.map(y=><option key={y} value={y}>Go-Live {y}</option>)}
-          </select>
-          <span style={{fontSize:11,color:'var(--text3)'}}>{view.length} entitas</span>
+          <Seg label="Tahun go-live" value={yearMode} onChange={setYearMode} options={[['all','Semua tahun'],['year',`Go-live ${year}`]] as const} />
+          <span className="au-xs au-muted">{view.length} entitas{yearFilter!=='all' ? ` · ${yearTotal} go-live di ${yearFilter}` : ''}{yearOptions.length ? ` · ada data: ${yearOptions.join(', ')}` : ''}</span>
         </div>
+        {yearFilter!=='all' && <span className="au-xs au-muted" style={{ marginTop:-8 }}>Kolom aplikasi yang go-live di tahun lain ditampilkan samar.</span>}
 
-        {loading?<div style={{fontSize:12,color:'var(--text3)'}}>Memuat…</div>:(
-        <div className="card" style={{padding:0,overflow:'auto',maxHeight:'calc(100vh - 300px)'}}>
+        {loading?<div className="au-card"><div className="au-skel" /><div className="au-skel" style={{ width:'70%' }} /></div>:(
+        <div className="au-tblw" style={{overflow:'auto',maxHeight:'calc(100dvh - 330px)', minHeight:260}}>
           <table style={{borderCollapse:'collapse',width:'100%',minWidth:600+totalSubs*70}}>
             <thead>
               {/* Row 1: app group headers */}
@@ -250,8 +232,8 @@ export default function GoLivePage() {
                 <th ref={el=>{idRefs.current[4]=el}} style={{...thFreeze(4),width:70,textAlign:'left'}} rowSpan={2}>Client</th>
                 {apps.map((a:any,ai:number)=>{
                   const subs=(a.subFeatures||[]); const cols=subs.length+1; // subs + date
-                  const color=['#4f8ef7','#8b5cf6','#22c55e','#f59e0b','#ec4899','#14b8a6'][ai%6]
-                  return <th key={a._id||a.key} style={{...th,borderLeft:'2px solid var(--border)',color,cursor:'pointer'}} colSpan={cols} onClick={()=>setEditApp({...a})} title="Klik untuk edit app & sub-fitur">{a.label} <span style={{fontSize:8,opacity:0.6}}>✎</span></th>
+                  const color=APP_COLORS[ai%6]
+                  return <th key={a._id||a.key} style={{...th,borderLeft:'1px solid var(--line2)',color:`color-mix(in srgb, ${color} 62%, var(--ink))`,cursor:'pointer'}} colSpan={cols} onClick={()=>setEditApp({...a})} title="Klik untuk edit aplikasi & sub-fitur">{a.label} <Icon name="pnote" size={11} /></th>
                 })}
                 <th style={{...th,width:30}} rowSpan={2}></th>
               </tr>
@@ -259,99 +241,74 @@ export default function GoLivePage() {
               <tr>
                 {apps.map((a:any)=>{const subs=(a.subFeatures||[]); return(
                   <Fragment key={a._id||a.key}>
-                    <th style={{...th,top:row1H,borderLeft:'2px solid var(--border)',width:110,fontSize:9}}>Tgl</th>
-                    {subs.map((sf:any)=><th key={sf.key} style={{...th,top:row1H,width:48,fontSize:9}}>{sf.label}</th>)}
+                    <th style={{...th,top:row1H,borderLeft:'1px solid var(--line2)',width:150}}>Tgl</th>
+                    {subs.map((sf:any)=><th key={sf.key} style={{...th,top:row1H,width:56}}>{sf.label}</th>)}
                   </Fragment>
                 )})}
               </tr>
             </thead>
             <tbody>
               {view.map((e:any,i:number)=>{const even=i%2===0; const hl=e._id===newEntityId; return(
-                <tr key={e._id} id={`ent-${e._id}`} style={{background: e._id===newEntityId ? 'var(--brand-soft)' : (even?'transparent':'var(--bg2)')}}>
-                  <td style={{...tdFreeze(0,even,hl),textAlign:'center',color:'var(--text3)',fontSize:10}}>{i+1}</td>
-                  <td style={tdFreeze(1,even,hl)}><input defaultValue={e.name||''} placeholder="—" onBlur={ev=>{if(ev.target.value!==e.name) patchEntity(e._id,{name:ev.target.value})}} style={{width:'100%',border:'none',background:'transparent',fontSize:11.5,fontWeight:600,color:'var(--text)',padding:0,outline:'none'}}/></td>
-                  <td style={{...tdFreeze(2,even,hl),textAlign:'center'}}><input defaultValue={e.cocd||''} onBlur={ev=>{if(ev.target.value!==e.cocd) patchEntity(e._id,{cocd:ev.target.value})}} style={{width:48,border:'none',background:'transparent',fontSize:11,color:'var(--text2)',padding:0,outline:'none',textAlign:'center'}}/></td>
-                  <td style={tdFreeze(3,even,hl)}><select value={e.group||''} onChange={ev=>patchEntity(e._id,{group:ev.target.value})} style={{width:'100%',border:'1px solid var(--border)',borderRadius:4,padding:'2px 4px',fontSize:10.5,background:'var(--bg)',color:'var(--text)'}}><option value="">—</option>{GROUPS.map(g=><option key={g} value={g}>{g}</option>)}</select></td>
+                <tr key={e._id} id={`ent-${e._id}`} style={{background: e._id===newEntityId ? 'var(--accent-soft)' : (even?'transparent':'var(--sunken)')}}>
+                  <td style={{...tdFreeze(0,even,hl),textAlign:'center',color:'var(--muted)',fontSize:11}}>{i+1}</td>
+                  <td style={tdFreeze(1,even,hl)}><input defaultValue={e.name||''} placeholder="—" onBlur={ev=>{if(ev.target.value!==e.name) patchEntity(e._id,{name:ev.target.value})}} aria-label="Nama entitas" style={{width:'100%',border:'none',background:'transparent',fontSize:13,fontWeight:600,color:'var(--ink)',padding:'4px 0',outline:'none'}}/></td>
+                  <td style={{...tdFreeze(2,even,hl),textAlign:'center'}}><input defaultValue={e.cocd||''} onBlur={ev=>{if(ev.target.value!==e.cocd) patchEntity(e._id,{cocd:ev.target.value})}} aria-label="CoCd" style={{width:52,border:'none',background:'transparent',fontSize:12.5,color:'var(--ink2)',padding:'4px 0',outline:'none',textAlign:'center'}}/></td>
+                  <td style={tdFreeze(3,even,hl)}><select value={e.group||''} onChange={ev=>patchEntity(e._id,{group:ev.target.value})} aria-label="Grup" style={{width:'100%',border:'1px solid var(--line)',borderRadius:8,padding:'4px 6px',fontSize:12,background:'var(--surface)',color:'var(--ink)'}}><option value="">—</option>{GROUPS.map(g=><option key={g} value={g}>{g}</option>)}</select></td>
                   <td style={{...tdFreeze(4,even,hl),fontSize:10.5}}>
-                    <input defaultValue={e.client||''} placeholder="—" onBlur={ev=>{if(ev.target.value!==(e.client||'')) patchEntity(e._id,{client:ev.target.value})}} style={{width:56,border:'none',background:'transparent',fontSize:10.5,color:'var(--text2)',padding:0,outline:'none'}}/>
+                    <input defaultValue={e.client||''} placeholder="—" onBlur={ev=>{if(ev.target.value!==(e.client||'')) patchEntity(e._id,{client:ev.target.value})}} aria-label="Client" style={{width:60,border:'none',background:'transparent',fontSize:12,color:'var(--ink2)',padding:'4px 0',outline:'none'}}/>
                   </td>
-                  {apps.map((a:any,ai:number)=>{const ap=(e.apps||{})[a.key]||{}; const subs=(a.subFeatures||[]); const color=['#4f8ef7','#8b5cf6','#22c55e','#f59e0b','#ec4899','#14b8a6'][ai%6]; const dateStr=ap.date||'';
+                  {apps.map((a:any,ai:number)=>{const ap=(e.apps||{})[a.key]||{}; const subs=(a.subFeatures||[]); const color=APP_COLORS[ai%6]; const dateStr=ap.date||'';
                     // Saat filter tahun aktif, redupkan aplikasi yang go-live di tahun LAIN
                     // supaya jelas kolom mana yang relevan dgn tahun terpilih.
                     const offYear = yearFilter!=='all' && yearOf(dateStr)!==yearFilter
                     return(
                     <Fragment key={a._id||a.key}>
-                      <td style={{...td,borderLeft:'2px solid var(--border)',textAlign:'center',padding:'3px 4px',opacity:offYear?0.28:1}} title={offYear?`Go-live di tahun lain (${yearOf(dateStr)||'belum diisi'})`:undefined}>
+                      <td style={{...td,borderLeft:'1px solid var(--line2)',textAlign:'center',padding:'4px',opacity:offYear?0.28:1}} title={offYear?`Go-live di tahun lain (${yearOf(dateStr)||'belum diisi'})`:undefined}>
                         <input type="month" value={dateStr!=='Not Yet'?dateStr:''} onChange={ev=>setAppDate(e,a.key,ev.target.value)}
-                          style={{width:110,border:'1px solid var(--border)',borderRadius:4,padding:'2px 4px',fontSize:10,background:dateStr&&dateStr!=='Not Yet'?`${color}11`:'var(--bg)',color:dateStr&&dateStr!=='Not Yet'?color:'var(--text3)',fontWeight:dateStr&&dateStr!=='Not Yet'?700:400,outline:'none',cursor:'pointer'}} />
+                          aria-label={`Tanggal go-live ${a.label} ${e.name||''}`} style={{width:146,border:'1px solid var(--line)',borderRadius:8,padding:'4px 6px',fontSize:11.5,background:dateStr&&dateStr!=='Not Yet'?`color-mix(in srgb, ${color} 10%, var(--surface))`:'var(--surface)',color:dateStr&&dateStr!=='Not Yet'?'var(--ink)':'var(--muted)',fontWeight:dateStr&&dateStr!=='Not Yet'?700:400,outline:'none',cursor:'pointer'}} />
                       </td>
                       {subs.map((sf:any)=>{const checked=!!(ap.subs||{})[sf.key]; return(
                         <td key={sf.key} style={{...td,textAlign:'center',padding:'3px 2px',opacity:offYear?0.28:1}}>
-                          <input type="checkbox" checked={checked} onChange={ev=>setSub(e,a.key,sf.key,ev.target.checked)} style={{width:14,height:14,cursor:'pointer',accentColor:color}}/>
+                          <input type="checkbox" className="au-chk" aria-label={`${sf.label} ${a.label} ${e.name||''}`} checked={checked} onChange={ev=>setSub(e,a.key,sf.key,ev.target.checked)} style={{width:20,height:20,borderRadius:6}}/>
                         </td>
                       )})}
                     </Fragment>
                   )})}
-                  <td style={{...td,textAlign:'center'}}><button onClick={()=>delEntity(e)} className="btn btn-icon btn-sm" style={{color:'var(--red)',fontSize:10,opacity:0.5}}>🗑</button></td>
+                  <td style={{...td,textAlign:'center'}}><button type="button" onClick={()=>delEntity(e)} className={`btn btn-sm${pendingDel===e._id?' btn-danger':' btn-icon'}`} aria-label={pendingDel===e._id ? `Konfirmasi hapus ${e.name||'entitas'}` : `Hapus ${e.name||'entitas'}`} style={pendingDel===e._id?undefined:{color:'var(--bad)'}}>{pendingDel===e._id ? 'Hapus?' : <Icon name="trash" size={14} />}</button></td>
                 </tr>
               )})}
-              {view.length===0&&<tr><td colSpan={5+totalSubs+apps.length+1} style={{padding:24,textAlign:'center',fontSize:12,color:'var(--text3)'}}>Belum ada entitas.</td></tr>}
+              {view.length===0&&<tr><td colSpan={5+totalSubs+apps.length+1}><Empty title={entities.length ? 'Tidak ada yang cocok' : 'Belum ada entitas'} text={entities.length ? 'Ubah pencarian, grup atau tahun.' : 'Tambah entitas untuk mulai mencatat go-live.'} /></td></tr>}
             </tbody>
           </table>
         </div>
         )}
       </div>
 
-      {/* Edit App Modal */}
       {editApp && (
-        <div className="modal-overlay" onClick={ev=>{if(ev.target===ev.currentTarget) setEditApp(null)}}>
-          <div className="modal" style={{width:420,maxWidth:'100%'}}>
-            <div style={{padding:'14px 18px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <span style={{fontSize:14,fontWeight:700}}>Edit Aplikasi</span>
-              <button onClick={()=>setEditApp(null)} className="btn btn-icon">×</button>
-            </div>
-            <div style={{padding:'14px 18px',display:'flex',flexDirection:'column',gap:14}}>
-              {/* App label */}
-              <div>
-                <label style={{display:'block',fontSize:11,fontWeight:600,color:'var(--text3)',marginBottom:4}}>Nama Aplikasi</label>
-                <input className="input" value={editApp.label||''} onChange={ev=>setEditApp((p:any)=>({...p,label:ev.target.value}))} />
+        <Sheet open title="Edit aplikasi" onClose={()=>{ setEditApp(null); setConfirmDelApp(false) }} onSave={async ()=>{
+          if (!String(editApp.label||'').trim()) { toast.error('Nama aplikasi wajib diisi'); return }
+          const patch = { label: editApp.label, subFeatures: (editApp.subFeatures||[]).filter((sf:any)=>sf.label?.trim()).map((sf:any,i:number)=>({...sf, key:sf.key||sf.label.toLowerCase().replace(/[^a-z0-9]+/g,'-'), order:i+1})) }
+          await patchApp(editApp._id, patch); setEditApp(null); toast.success('Aplikasi diperbarui')
+        }}>
+          <label className="au-col" style={{ gap:6 }}><span className="lbl">Nama aplikasi</span><input className="input" value={editApp.label||''} onChange={ev=>setEditApp((p:any)=>({...p,label:ev.target.value}))} /></label>
+          <div className="au-col" style={{ gap:8 }}><span className="lbl">Sub-fitur (kolom centang)</span>
+            {(editApp.subFeatures||[]).map((sf:any, i:number)=>(
+              <div key={sf.key||i} className="au-row" style={{ gap:8 }}>
+                <input className="input" value={sf.label||''} aria-label={`Sub-fitur ${i+1}`} onChange={ev=>{ const next=[...(editApp.subFeatures||[])]; next[i]={...next[i],label:ev.target.value}; setEditApp((p:any)=>({...p,subFeatures:next})) }} placeholder="Nama sub-fitur" />
+                <button type="button" aria-label="Hapus sub-fitur" onClick={()=>{ const next=(editApp.subFeatures||[]).filter((_:any,j:number)=>j!==i); setEditApp((p:any)=>({...p,subFeatures:next})) }} className="btn btn-icon btn-sm" style={{ color:'var(--bad)' }}><Icon name="x" size={14} /></button>
               </div>
-
-              {/* Sub-features list */}
-              <div>
-                <label style={{display:'block',fontSize:11,fontWeight:600,color:'var(--text3)',marginBottom:6}}>Sub-fitur (kolom checkbox)</label>
-                <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                  {(editApp.subFeatures||[]).map((sf:any, i:number)=>(
-                    <div key={sf.key||i} style={{display:'flex',gap:8,alignItems:'center'}}>
-                      <input className="input" value={sf.label||''} onChange={ev=>{
-                        const next=[...(editApp.subFeatures||[])]; next[i]={...next[i],label:ev.target.value}; setEditApp((p:any)=>({...p,subFeatures:next}))
-                      }} style={{flex:1}} placeholder="Nama sub-fitur" />
-                      <button onClick={()=>{
-                        const next=(editApp.subFeatures||[]).filter((_:any,j:number)=>j!==i); setEditApp((p:any)=>({...p,subFeatures:next}))
-                      }} className="btn btn-icon btn-sm" style={{color:'var(--red)'}}>✕</button>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={()=>{
-                  const key='sf'+Date.now().toString(36)
-                  const next=[...(editApp.subFeatures||[]),{key,label:'',order:(editApp.subFeatures||[]).length+1}]
-                  setEditApp((p:any)=>({...p,subFeatures:next}))
-                }} className="btn btn-sm" style={{marginTop:8,fontSize:11}}>+ Sub-fitur</button>
-              </div>
-            </div>
-            <div style={{padding:'12px 18px',borderTop:'1px solid var(--border)',display:'flex',justifyContent:'space-between',gap:8}}>
-              <button onClick={()=>delApp(editApp)} className="btn btn-sm" style={{color:'var(--red)'}}>🗑 Hapus App</button>
-              <div style={{display:'flex',gap:8}}>
-                <button onClick={()=>setEditApp(null)} className="btn btn-sm">Batal</button>
-                <button onClick={async ()=>{
-                  const patch = { label: editApp.label, subFeatures: (editApp.subFeatures||[]).filter((sf:any)=>sf.label?.trim()).map((sf:any,i:number)=>({...sf, key:sf.key||sf.label.toLowerCase().replace(/[^a-z0-9]+/g,'-'), order:i+1})) }
-                  await patchApp(editApp._id, patch)
-                  setEditApp(null); toast.success('App diperbarui')
-                }} className="btn btn-primary btn-sm">Simpan</button>
-              </div>
-            </div>
+            ))}
+            <button type="button" onClick={()=>{ const key='sf'+Date.now().toString(36); const next=[...(editApp.subFeatures||[]),{key,label:'',order:(editApp.subFeatures||[]).length+1}]; setEditApp((p:any)=>({...p,subFeatures:next})) }} className="btn btn-sm" style={{ alignSelf:'flex-start' }}><Icon name="plus" size={13} />Sub-fitur</button>
           </div>
-        </div>
+          {confirmDelApp
+            ? <div className="au-row au-wrap p-bad" style={{ borderRadius:14, padding:12, gap:8 }}><span className="au-small" style={{ flex:1 }}>Hapus “{editApp.label}” beserta semua data centangnya?</span><button type="button" className="btn btn-sm" onClick={()=>setConfirmDelApp(false)}>Batal</button><button type="button" className="btn btn-danger btn-sm" onClick={()=>delApp(editApp)}>Ya, hapus</button></div>
+            : <button type="button" onClick={()=>setConfirmDelApp(true)} className="btn btn-danger" style={{ alignSelf:'flex-start' }}><Icon name="trash" size={15} />Hapus aplikasi</button>}
+        </Sheet>
+      )}
+      {newApp !== null && (
+        <Sheet open title="Aplikasi baru" onClose={()=>setNewApp(null)} onSave={()=>addApp(newApp)} saveLabel="Tambah">
+          <label className="au-col" style={{ gap:6 }}><span className="lbl">Nama aplikasi</span><input className="input" value={newApp} onChange={e=>setNewApp(e.target.value)} onKeyDown={e=>{ if (e.key==='Enter') addApp(newApp) }} placeholder="Mis. iPROVE" /></label>
+        </Sheet>
       )}
     </div>
   )

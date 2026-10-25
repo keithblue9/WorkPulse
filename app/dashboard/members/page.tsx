@@ -1,236 +1,178 @@
 'use client'
-import { getConfig } from '@/lib/configCache'
-import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
+import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { getConfig } from '@/lib/configCache'
 import { DEFAULT_ROLES } from '@/lib/defaults'
+import { Empty, Icon, PageHeader, Pill, Sheet, Tile, type Tone } from '@/components/ui'
 
-const ROLE_COLORS: Record<string,string> = { admin:'var(--red)', manager:'var(--brand)', member:'var(--green)', guest:'var(--text3)', finance:'var(--amber)', cashier:'var(--purple)' }
+type User = Record<string, any>
+const ROLE_TONE: Record<string, Tone> = { admin: 'bad', manager: 'accent', member: 'ok', finance: 'warn', cashier: 'warn', guest: 'none' }
+const rolesOf = (u: User): string[] => (u.roles && u.roles.length ? u.roles : u.role ? [u.role] : [])
+const initials = (s: string) => String(s || '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || '?'
 
-function MemberModal({ editing, onClose, onSave, allRoles }: { editing?:any; onClose:()=>void; onSave:()=>void; allRoles:any[] }) {
+async function send(url: string, method: string, body?: unknown) {
+  const res = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data?.error || 'Gagal menyimpan, coba lagi')
+  return data
+}
+
+function MemberSheet({ editing, allRoles, onClose, onSaved }: { editing: User | null; allRoles: any[]; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
-    name: editing?.name || '',
-    password: '',
-    roles: editing?.roles && editing.roles.length ? editing.roles : (editing?.role ? [editing.role] : ['member']),
-    division: editing?.division || '',
-    status: editing?.status || 'pekerja',
-    phone: editing?.phone || '',
-    fonnteToken: editing?.fonnteToken || '',
+    name: editing?.name || '', password: '', roles: editing ? rolesOf(editing) : ['member'],
+    division: editing?.division || '', status: editing?.status || 'pekerja', phone: editing?.phone || '',
   })
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const set = (k:string,v:any) => setForm(f=>({...f,[k]:v}))
-
-  function toggleRole(roleKey:string) {
-    setForm(f=>({...f, roles: f.roles.includes(roleKey) ? f.roles.filter((r:string)=>r!==roleKey) : [...f.roles, roleKey] }))
-  }
+  const [saving, setSaving] = useState(false), [tried, setTried] = useState(false), [confirmDel, setConfirmDel] = useState(false)
+  const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
+  const toggleRole = (k: string) => setForm(f => ({ ...f, roles: f.roles.includes(k) ? f.roles.filter(r => r !== k) : [...f.roles, k] }))
+  const errName = tried && !form.name.trim() ? 'Nama wajib diisi' : ''
+  const errRole = tried && !form.roles.length ? 'Pilih minimal 1 role' : ''
+  const errPin = !tried ? '' : (!editing && !form.password) ? 'PIN wajib untuk member baru' : form.password && form.password.length !== 6 ? 'PIN harus 6 digit' : ''
 
   async function save() {
-    if (!form.name) { toast.error('Nama wajib'); return }
-    if (form.roles.length === 0) { toast.error('Pilih minimal 1 role'); return }
-    if (!editing && !form.password) { toast.error('PIN/Password wajib untuk member baru'); return }
+    setTried(true)
+    if (!form.name.trim() || !form.roles.length || (!editing && !form.password) || (form.password && form.password.length !== 6)) { toast.error('Periksa isian yang ditandai'); return }
     setSaving(true)
     try {
-      const body: any = {
-        name: form.name,
-        roles: form.roles,
-        role: form.roles[0], // back-compat: first role as primary
-        division: form.division,
-        status: form.status,
-        phone: form.phone,
-        fonnteToken: form.fonnteToken,
-      }
-      if (!editing) {
-        // generate email from name slug
-        body.email = `${form.name.toLowerCase().replace(/[^a-z0-9]+/g,'.').replace(/^\.|\.$/g,'')}@workpulse.local`
-      }
+      const body: Record<string, unknown> = { name: form.name.trim(), roles: form.roles, role: form.roles[0], division: form.division, status: form.status, phone: form.phone }
+      if (!editing) body.email = `${form.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '')}@workpulse.local`
       if (form.password) body.password = form.password
-      const url = editing ? `/api/users/${editing._id}` : '/api/users'
-      const r = await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
-      if (!r.ok) { const e = await r.json(); throw new Error(e.error) }
-      toast.success(editing ? 'Diperbarui!' : 'Ditambahkan!'); onSave(); onClose()
-    } catch(e:any) { toast.error(e.message||'Gagal') } finally { setSaving(false) }
+      await send(editing ? `/api/users/${editing._id}` : '/api/users', editing ? 'PATCH' : 'POST', body)
+      toast.success(editing ? 'Member diperbarui' : 'Member ditambahkan'); onSaved(); onClose()
+    } catch (e: any) { toast.error(e.message) } finally { setSaving(false) }
   }
-
   async function del() {
     if (!editing) return
-    if (!confirm(`Hapus ${editing.name}? Tindakan ini permanen.`)) return
-    setDeleting(true)
-    try {
-      const r = await fetch(`/api/users/${editing._id}`, { method:'DELETE' })
-      if (!r.ok) throw new Error('Gagal hapus')
-      toast.success('Member dihapus'); onSave(); onClose()
-    } catch(e:any) { toast.error(e.message||'Gagal') } finally { setDeleting(false) }
+    setSaving(true)
+    try { await send(`/api/users/${editing._id}`, 'DELETE'); toast.success('Member dihapus'); onSaved(); onClose() } catch (e: any) { toast.error(e.message) } finally { setSaving(false) }
   }
-
-  const hasCashierRole = form.roles.includes('cashier')
+  const err = (m: string) => m ? <span role="alert" className="au-xs" style={{ color: 'var(--bad)', fontWeight: 600 }}>{m}</span> : null
 
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:520 }}>
-        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:600 }}>{editing ? 'Edit Member' : '+ Tambah Member'}</span>
-          <button onClick={onClose} className="btn btn-icon">×</button>
-        </div>
-        <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:11 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Nama *</label><input className="input" value={form.name} onChange={e=>set('name',e.target.value)} /></div>
-            <div><label style={lbl}>Divisi</label><input className="input" value={form.division} onChange={e=>set('division',e.target.value)} placeholder="BPD Proc, TnD" /></div>
-          </div>
-          <div><label style={lbl}>Status Kepegawaian</label>
-            <select className="input" value={form.status} onChange={e=>set('status',e.target.value)}>
-              <option value="pekerja">Pekerja</option>
-              <option value="TAD">TAD</option>
-            </select>
-          </div>
-          <div><label style={lbl}>No. HP (untuk WhatsApp / Fonnte)</label><input className="input" value={form.phone} onChange={e=>set('phone',e.target.value)} placeholder="08xxxxxxxxxx" /></div>
-          <div>
-            <label style={lbl}>Role (boleh pilih lebih dari 1)</label>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-              {allRoles.map((r:any) => {
-                const checked = form.roles.includes(r.key)
-                const color = ROLE_COLORS[r.key] || 'var(--brand)'
-                return (
-                  <button key={r.key} onClick={()=>toggleRole(r.key)} style={{ padding:'5px 12px', borderRadius:6, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${checked?color:'var(--border)'}`, background: checked?color+'22':'var(--bg3)', color: checked?color:'var(--text2)' }}>
-                    {checked ? '✓ ' : ''}{r.label || r.key}
-                  </button>
-                )
-              })}
-            </div>
-            <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Klik untuk toggle. Hak akses menu sesuai konfigurasi role di Configuration.</div>
-          </div>
-          {hasCashierRole && (
-            <div className="card" style={{ padding:'10px 12px', background:'var(--brand-soft)', border:'1px dashed var(--brand)' }}>
-              <div style={{ fontSize:11, fontWeight:600, color:'var(--brand)', marginBottom:6 }}>💰 Cashier Settings</div>
-              <label style={lbl}>Token Fonnte (untuk auto WhatsApp)</label>
-              <input className="input" value={form.fonnteToken} onChange={e=>set('fonnteToken',e.target.value)} placeholder="Paste token dari fonnte.com" />
-              <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Get token: <a href="https://fonnte.com" target="_blank" style={{ color:'var(--brand)' }}>fonnte.com</a> → Device → Token. Test kirim bisa dari menu Configuration.</div>
-            </div>
-          )}
-          <div><label style={lbl}>{editing ? 'PIN Baru (6 digit, kosongkan jika tidak diubah)' : 'PIN 6 Digit *'}</label>
-            <input type="password" maxLength={6} className="input" value={form.password} onChange={e=>set('password',e.target.value.replace(/\D/g,''))} placeholder={editing ? '...' : 'Default: 123456'} /></div>
-        </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          {editing ? <button onClick={del} disabled={deleting} className="btn btn-danger btn-sm">{deleting?'...':'🗑 Hapus'}</button> : <div />}
-          <div style={{ display:'flex', gap:8 }}>
-            <button onClick={onClose} className="btn">Batal</button>
-            <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'Menyimpan...':'Simpan'}</button>
-          </div>
-        </div>
+    <Sheet open title={editing ? 'Edit member' : 'Member baru'} onClose={onClose} onSave={save} saveDisabled={saving} saveLabel={saving ? 'Menyimpan…' : 'Simpan'}>
+      <div className="au-grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10 }}>
+        <label className="au-col" style={{ gap: 6 }}><span className="lbl">Nama *</span><input className="input" value={form.name} maxLength={120} onChange={e => set('name', e.target.value)} aria-invalid={!!errName} />{err(errName)}</label>
+        <label className="au-col" style={{ gap: 6 }}><span className="lbl">Divisi</span><input className="input" value={form.division} onChange={e => set('division', e.target.value)} placeholder="BPD Proc, TnD" /></label>
+        <label className="au-col" style={{ gap: 6 }}><span className="lbl">No. HP</span><input className="input" type="tel" inputMode="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="08xxxxxxxxxx" /></label>
+        <div className="au-col" style={{ gap: 6 }}><span className="lbl">Status kepegawaian</span>
+          <div className="au-seg au-segf" role="group" aria-label="Status kepegawaian">{[['pekerja', 'Pekerja'], ['TAD', 'TAD']].map(([v, l]) => <button key={v} type="button" aria-pressed={form.status === v} onClick={() => set('status', v)}>{l}</button>)}</div></div>
       </div>
-    </div>
+      <div className="au-col" style={{ gap: 6 }}><span className="lbl">Role (boleh lebih dari satu)</span>
+        <div className="au-chips wrap" role="group" aria-label="Role">{allRoles.map((r: any) => <button key={r.key} type="button" className="au-chip" aria-pressed={form.roles.includes(r.key)} onClick={() => toggleRole(r.key)}>{form.roles.includes(r.key) && <Icon name="check" size={13} stroke={2.6} style={{ marginRight: 4, verticalAlign: '-2px' }} />}{r.label || r.key}</button>)}</div>
+        {err(errRole) || <span className="au-xs au-muted">Hak akses menu mengikuti konfigurasi role di Configuration.</span>}</div>
+      <label className="au-col" style={{ gap: 6 }}><span className="lbl">{editing ? 'PIN baru (kosongkan bila tidak diubah)' : 'PIN 6 digit *'}</span>
+        <input className="input" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={form.password} onChange={e => set('password', e.target.value.replace(/\D/g, ''))} aria-invalid={!!errPin} placeholder="••••••" style={{ fontFamily: 'var(--mono)', letterSpacing: '.3em' }} />{err(errPin)}</label>
+      {editing && (confirmDel
+        ? <div className="au-row au-wrap p-bad" style={{ borderRadius: 14, padding: 12, gap: 10 }}><span className="au-small" style={{ flex: 1 }}>Hapus {editing.name}? Tindakan ini permanen.</span><button type="button" className="btn btn-sm" onClick={() => setConfirmDel(false)}>Batal</button><button type="button" className="btn btn-danger btn-sm" disabled={saving} onClick={del}>Ya, hapus</button></div>
+        : <button type="button" className="btn btn-danger" style={{ alignSelf: 'flex-start' }} onClick={() => setConfirmDel(true)}><Icon name="trash" size={15} />Hapus member</button>)}
+    </Sheet>
+  )
+}
+
+function ResetPinSheet({ user, onClose }: { user: User; onClose: () => void }) {
+  const [busy, setBusy] = useState(false)
+  async function reset() {
+    setBusy(true)
+    try { await send(`/api/users/${user._id}`, 'PATCH', { password: '123456' }); toast.success(`PIN ${user.name} di-reset ke 123456`); onClose() } catch { toast.error('Gagal reset PIN') } finally { setBusy(false) }
+  }
+  return (
+    <Sheet open title="Reset PIN" onClose={onClose}>
+      <div className="au-row" style={{ gap: 12 }}><span className="au-av">{initials(user.name)}</span><span className="au-col" style={{ minWidth: 0 }}><b>{user.name}</b><span className="au-xs au-muted">{user.division || rolesOf(user).join(', ')}</span></span></div>
+      <p className="au-small au-ink2" style={{ margin: 0 }}>PIN akan dikembalikan ke default <b style={{ fontFamily: 'var(--mono)' }}>123456</b>. Member harus login memakai PIN ini lalu menggantinya di My Profile.</p>
+      <div className="au-row" style={{ gap: 8, justifyContent: 'flex-end' }}><button type="button" className="btn" onClick={onClose}>Batal</button><button type="button" className="btn btn-danger" disabled={busy} onClick={reset}><Icon name="key" size={15} />{busy ? 'Mereset…' : 'Reset PIN'}</button></div>
+    </Sheet>
   )
 }
 
 export default function MembersPage() {
-  const [users, setUsers] = useState<any[]>([])
+  const [users, setUsers] = useState<User[] | null>(null)
+  const [failed, setFailed] = useState(false)
   const [config, setConfig] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState<any>(null)
-  const [search, setSearch] = useState('')
+  const [sheet, setSheet] = useState<{ user: User | null } | null>(null)
+  const [pinFor, setPinFor] = useState<User | null>(null)
+  const [q, setQ] = useState('')
+  const [role, setRole] = useState('all')
 
-  async function load() {
-    setLoading(true)
-    const [u,c] = await Promise.all([fetch('/api/users').then(r=>r.json()), getConfig().then((data:any)=>({ data }))])
-    setUsers(u.data||[]); setConfig(c.data); setLoading(false)
-  }
-  useEffect(() => { load() }, [])
+  const load = useCallback(async () => {
+    setFailed(false)
+    try { const d = await send('/api/users', 'GET'); setUsers(Array.isArray(d?.data) ? d.data : []) } catch { setFailed(true); setUsers(u => u ?? []) }
+  }, [])
+  useEffect(() => { load(); getConfig().then(setConfig).catch(() => {}) }, [load])
 
-  async function moveMember(idx:number, dir:number) {
-    const newIdx = idx + dir
-    if (newIdx < 0 || newIdx >= users.length) return
-    const reordered = [...users]
-    const [moved] = reordered.splice(idx, 1)
-    reordered.splice(newIdx, 0, moved)
-    setUsers(reordered)
-    // Persist new order via sortOrder field
+  async function move(idx: number, dir: number) {
+    const list = users || [], to = idx + dir
+    if (to < 0 || to >= list.length) return
+    const prev = list, next = [...list]
+    const [m] = next.splice(idx, 1); next.splice(to, 0, m)
+    setUsers(next)
     try {
-      await Promise.all(reordered.map((u, i) =>
-        fetch(`/api/users/${u._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ sortOrder: i }) })
-      ))
+      await Promise.all(next.map((u, i) => send(`/api/users/${u._id}`, 'PATCH', { sortOrder: i })))
       toast.success('Urutan disimpan')
-    } catch { toast.error('Gagal simpan urutan') }
-  }
-
-  async function resetPin(u:any, e:any) {
-    e.stopPropagation()
-    if (!confirm(`Reset PIN milik ${u.name} ke default 123456? Member harus login pakai PIN baru.`)) return
-    try {
-      const r = await fetch(`/api/users/${u._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ password: '123456' }) })
-      if (!r.ok) { toast.error('Gagal reset PIN'); return }
-      toast.success(`PIN ${u.name} di-reset ke 123456`)
-    } catch { toast.error('Gagal reset PIN') }
+    } catch { setUsers(prev); toast.error('Gagal simpan urutan') }
   }
 
   const allRoles = (config?.roleDefs && config.roleDefs.length > 0) ? config.roleDefs : DEFAULT_ROLES
-  const filtered = users.filter(u => !search || u.name?.toLowerCase().includes(search.toLowerCase()))
+  const roleLabel = (k: string) => allRoles.find((r: any) => r.key === k)?.label || k
+  const all = users || []
+  const needle = q.trim().toLowerCase()
+  const filtering = !!needle || role !== 'all'
+  const shown = all.filter(u => (!needle || [u.name, u.division, u.jabatan, u.phone].some(s => String(s || '').toLowerCase().includes(needle))) && (role === 'all' || rolesOf(u).includes(role)))
+  const usedRoles = allRoles.filter((r: any) => all.some(u => rolesOf(u).includes(r.key)))
+  const active = all.filter(u => u.active !== false).length, tad = all.filter(u => u.status === 'TAD').length
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      {(showForm||editing) && <MemberModal editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} allRoles={allRoles.filter((r:any)=>r.key!=='guest')} />}
-
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
-        <div>
-          <div style={{ fontSize:14, fontWeight:600 }}>Member Management</div>
-          <div style={{ fontSize:11, color:'var(--text3)' }}>{users.length} member · Multi-role · Configurable permissions</div>
+    <div className="au-page">
+      {sheet && <MemberSheet editing={sheet.user} allRoles={allRoles.filter((r: any) => r.key !== 'guest')} onClose={() => setSheet(null)} onSaved={load} />}
+      {pinFor && <ResetPinSheet user={pinFor} onClose={() => setPinFor(null)} />}
+      <div className="au-view au-anim">
+        <PageHeader eyebrow="Workspace · Multi-role" title="Member" actions={
+          <button type="button" className="btn btn-primary" onClick={() => setSheet({ user: null })}><Icon name="plus" size={16} stroke={2.2} />Member baru</button>} />
+        <div className="au-grid g4 au-tiles">
+          <Tile icon="team" color="var(--accent)" value={users ? all.length : '–'} label="Total member" />
+          <Tile icon="check" color="var(--aqua)" value={users ? active : '–'} label="Aktif" />
+          <Tile icon="user" color="var(--hot)" value={users ? all.length - tad : '–'} label="Pekerja" />
+          <Tile icon="id" color="var(--volt)" iconInk="var(--on-volt)" value={users ? tad : '–'} label="TAD" />
         </div>
-        <div style={{ display:'flex', gap:8 }}>
-          <input className="input" value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Cari..." style={{ width:200 }} />
-          <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Tambah</button>
+        <div className="au-col rise" style={{ gap: 10 }}>
+          <label className="input au-row" style={{ gap: 8, padding: '0 12px', maxWidth: 520 }}><Icon name="search" size={16} />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari nama, divisi atau no. HP" aria-label="Cari member" style={{ border: 0, background: 'transparent', flex: 1, minHeight: 42, outline: 0, color: 'var(--ink)' }} /></label>
+          {usedRoles.length > 1 && <div className="au-chips" role="group" aria-label="Filter role">
+            <button type="button" className="au-chip" aria-pressed={role === 'all'} onClick={() => setRole('all')}>Semua</button>
+            {usedRoles.map((r: any) => <button key={r.key} type="button" className="au-chip" aria-pressed={role === r.key} onClick={() => setRole(r.key)}>{r.label || r.key}</button>)}</div>}
         </div>
-      </div>
+        {failed && <div className="au-row au-wrap p-bad" role="alert" style={{ borderRadius: 14, padding: 12 }}><span className="au-small" style={{ flex: 1 }}>Data member gagal dimuat.</span><button type="button" className="btn btn-sm" onClick={load}>Coba lagi</button></div>}
 
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
-        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> : (
-          <div className="card" style={{ overflow:'auto' }}>
-            <div className="table-scroll"><table className="wp-table">
-              <thead><tr><th style={{width:40}}>#</th><th>Nama</th><th>Roles</th><th>No. HP</th><th>Status</th><th style={{width:120}}>Urutan</th><th></th></tr></thead>
+        {users === null ? <div className="au-card">{[0, 1, 2].map(k => <div key={k} className="au-skel" />)}</div>
+          : !shown.length ? <div className="au-card"><Empty title={all.length ? 'Tidak ada yang cocok' : 'Belum ada member'} text={all.length ? 'Ubah kata kunci atau filter role.' : undefined}
+            action={all.length ? <button type="button" className="btn" onClick={() => { setQ(''); setRole('all') }}>Reset filter</button> : undefined} /></div>
+          : <div className="au-tblw rise">
+            <table className="wp-table au-mtbl">
+              <thead><tr><th style={{ width: 44 }}>#</th><th>Nama</th><th>Role</th><th>No. HP</th><th>Status</th><th style={{ width: 96 }}>{filtering ? '' : 'Urutan'}</th><th style={{ width: 96 }}><span className="sr-only">Aksi</span></th></tr></thead>
               <tbody>
-                {filtered.map((u, idx) => {
-                  const roles = u.roles && u.roles.length ? u.roles : (u.role ? [u.role] : [])
-                  const canReorder = !search
-                  return (
-                    <tr key={u._id} style={{ cursor:'pointer' }}>
-                      <td style={{ fontSize:11, color:'var(--text3)', textAlign:'center' }} onClick={()=>setEditing(u)}>{idx+1}</td>
-                      <td onClick={()=>setEditing(u)}>
-                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                          <div style={{ width:30, height:30, borderRadius:'50%', background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff' }}>{u.name?.[0]}</div>
-                          <div>
-                            <div style={{ fontSize:12, fontWeight:600 }}>{u.name}</div>
-                            {u.jabatan && <div style={{ fontSize:10, color:'var(--text3)' }}>{u.jabatan}</div>}
-                            <span className="badge" style={{ background: u.status==='TAD'?'#fef3c7':'var(--brand-soft)', color: u.status==='TAD'?'#b45309':'var(--brand)', fontSize:9, marginTop:2, display:'inline-block' }}>{u.status==='TAD'?'TAD':'Pekerja'}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td onClick={()=>setEditing(u)}>
-                        <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                          {roles.map((r:string) => (
-                            <span key={r} className="badge" style={{ background:(ROLE_COLORS[r]||'var(--brand)')+'22', color:ROLE_COLORS[r]||'var(--brand)', fontSize:9 }}>{r}</span>
-                          ))}
-                        </div>
-                      </td>
-                      <td style={{ fontSize:11 }} onClick={()=>setEditing(u)}>{u.phone||'—'}</td>
-                      <td onClick={()=>setEditing(u)}><span className="badge" style={{ background: u.active!==false?'var(--greenbg)':'var(--redbg)', color: u.active!==false?'var(--green)':'var(--red)', fontSize:9 }}>{u.active!==false?'Active':'Inactive'}</span></td>
-                      <td>
-                        <div style={{ display:'flex', gap:3 }}>
-                          <button onClick={(e)=>{e.stopPropagation(); moveMember(idx, -1)}} disabled={!canReorder || idx===0} className="btn btn-icon btn-sm" title="Naik" style={{ opacity:(!canReorder||idx===0)?0.3:1 }}>▲</button>
-                          <button onClick={(e)=>{e.stopPropagation(); moveMember(idx, 1)}} disabled={!canReorder || idx===filtered.length-1} className="btn btn-icon btn-sm" title="Turun" style={{ opacity:(!canReorder||idx===filtered.length-1)?0.3:1 }}>▼</button>
-                        </div>
-                      </td>
-                      <td style={{ display:'flex', gap:4, justifyContent:'flex-end' }} onClick={e=>e.stopPropagation()}>
-                          <button title="Reset PIN ke 123456" onClick={(e)=>resetPin(u,e)} className="btn btn-icon btn-sm">🔑</button>
-                          <button title="Edit" onClick={()=>setEditing(u)} className="btn btn-icon btn-sm">✏️</button>
-                        </td>
-                    </tr>
-                  )
-                })}
+                {shown.map((u, idx) => (
+                  <tr key={u._id}>
+                    <td className="au-xs au-muted" style={{ textAlign: 'center', fontFamily: 'var(--mono)' }}>{idx + 1}</td>
+                    <td>
+                      <button type="button" className="au-mname" onClick={() => setSheet({ user: u })} aria-label={`Edit ${u.name}`}>
+                        <span className={`au-av c${(idx % 7) + 1}`}>{initials(u.name)}</span>
+                        <span className="au-col" style={{ minWidth: 0, gap: 2 }}><b>{u.name}</b><span className="au-xs au-muted">{[u.jabatan, u.division].filter(Boolean).join(' · ') || (u.status === 'TAD' ? 'TAD' : 'Pekerja')}</span></span>
+                      </button>
+                    </td>
+                    <td><span className="au-row au-wrap" style={{ gap: 4 }}>{rolesOf(u).map(r => <Pill key={r} tone={ROLE_TONE[r] || 'none'}>{roleLabel(r)}</Pill>)}</span></td>
+                    <td className="au-small" style={{ fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>{u.phone || '—'}</td>
+                    <td><span className="au-row au-wrap" style={{ gap: 4 }}><Pill tone={u.active !== false ? 'ok' : 'bad'}>{u.active !== false ? 'Aktif' : 'Nonaktif'}</Pill>{u.status === 'TAD' && <span className="au-tag">TAD</span>}</span></td>
+                    <td>{!filtering && <span className="au-row" style={{ gap: 4 }}>
+                      <button type="button" className="btn btn-icon btn-sm" disabled={idx === 0} aria-label={`Naikkan ${u.name}`} title="Naik" onClick={() => move(idx, -1)}><Icon name="up" size={15} /></button>
+                      <button type="button" className="btn btn-icon btn-sm" disabled={idx === shown.length - 1} aria-label={`Turunkan ${u.name}`} title="Turun" onClick={() => move(idx, 1)}><Icon name="up" size={15} style={{ transform: 'rotate(180deg)' }} /></button></span>}</td>
+                    <td><span className="au-row" style={{ gap: 4, justifyContent: 'flex-end' }}>
+                      <button type="button" className="btn btn-icon btn-sm" aria-label={`Reset PIN ${u.name}`} title="Reset PIN ke 123456" onClick={() => setPinFor(u)}><Icon name="key" size={15} /></button>
+                      <button type="button" className="btn btn-icon btn-sm" aria-label={`Edit ${u.name}`} title="Edit" onClick={() => setSheet({ user: u })}><Icon name="edit" size={15} /></button></span></td>
+                  </tr>
+                ))}
               </tbody>
-            </table></div>
-          </div>
-        )}
+            </table>
+          </div>}
       </div>
     </div>
   )
 }
-const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }

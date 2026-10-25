@@ -18,16 +18,13 @@ const DEFAULT_APPS = [
 export async function GET() {
   try {
     await connectDB()
-    let apps = await GoLiveAppModel.find().sort({ order: 1 }).lean()
-    if (!apps.length) { await GoLiveAppModel.insertMany(DEFAULT_APPS); apps = await GoLiveAppModel.find().sort({ order: 1 }).lean() }
-    // Backfill subFeatures from defaults if DB apps are missing them
-    for (const app of apps as any[]) {
+    // Read-only: default apps / sub-features are filled in memory, never written here.
+    let apps = await GoLiveAppModel.find().sort({ order: 1 }).lean() as any[]
+    if (!apps.length) apps = DEFAULT_APPS.map(a => ({ ...a, _id: 'default-' + a.key, isDefault: true }))
+    apps = apps.map((app: any) => {
       const def = DEFAULT_APPS.find(d => d.key === app.key)
-      if (def && (!app.subFeatures || !app.subFeatures.length) && def.subFeatures.length) {
-        await GoLiveAppModel.updateOne({ _id: app._id }, { $set: { subFeatures: def.subFeatures } })
-        app.subFeatures = def.subFeatures
-      }
-    }
+      return def && (!app.subFeatures || !app.subFeatures.length) ? { ...app, subFeatures: def.subFeatures } : app
+    })
     const entities = await GoLiveEntityModel.find().sort({ order: 1, createdAt: 1 }).lean()
     return NextResponse.json({ apps, entities })
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
@@ -59,6 +56,14 @@ export async function PATCH(req: NextRequest) {
     await connectDB()
     const { kind, id, patch } = await req.json()
     if (!id || !patch) return NextResponse.json({ error: 'id & patch wajib' }, { status: 400 })
+    if (kind === 'app' && String(id).startsWith('default-')) {
+      // First edit of a default app that only existed in memory: save it now (explicit user action).
+      const def = DEFAULT_APPS.find(d => 'default-' + d.key === id)
+      if (!def) return NextResponse.json({ error: 'app tidak ditemukan' }, { status: 404 })
+      const onInsert = Object.fromEntries(Object.entries(def).filter(([k]) => !(k in patch)))
+      const doc = await GoLiveAppModel.findOneAndUpdate({ key: def.key }, { $setOnInsert: onInsert, $set: patch }, { new: true, upsert: true }).lean()
+      return NextResponse.json({ data: doc })
+    }
     const Model: any = kind === 'app' ? GoLiveAppModel : GoLiveEntityModel
     const doc = await Model.findByIdAndUpdate(id, { $set: patch }, { new: true }).lean()
     return NextResponse.json({ data: doc })

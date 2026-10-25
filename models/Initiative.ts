@@ -12,6 +12,11 @@ const PhaseSchema = new Schema({
   planStartMonth: Number, planEndMonth: Number,
   actualStartMonth: Number, actualEndMonth: Number,
   progressNotes: String,
+  // Format baru (opsional, ditulis hanya saat user menyimpan dari form baru). Sel minggu lama tetap disimpan.
+  start: String,   // YYYY-MM-DD
+  end: String,     // YYYY-MM-DD
+  weight: Number,  // bobot %, opsional
+  pct: Number,     // % selesai 0-100
 }, { _id:false })
 
 const InitiativeSchema = new Schema({

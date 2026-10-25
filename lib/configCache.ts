@@ -1,7 +1,7 @@
 // Client-side cache for /api/config — drastically reduces repeat fetches
 // Config rarely changes; cache across page navigations in sessionStorage.
 
-const CACHE_KEY = 'wp_config_cache_v1'
+const CACHE_KEY = 'wp_config_cache_v2'
 const TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 type Cached = { data:any; ts:number }

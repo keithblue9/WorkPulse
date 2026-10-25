@@ -12,5 +12,6 @@ const NotesSchema = new Schema({
   attachments: { type:[{url:String,name:String,type:String,size:Number}], default:[] },
   evidenceUrl: String, evidenceName: String,
   authorId: String, authorName: String,
+  pinned: Boolean,         // opsional: disematkan di atas grup (catatan lama tanpa field = tidak di-pin)
 }, { timestamps:true })
 export const NotesModel = models.Notes || mongoose.model('Notes', NotesSchema)

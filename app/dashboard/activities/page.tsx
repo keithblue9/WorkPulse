@@ -5,9 +5,12 @@ function normKey(s:any):string { return String(s||'').toLowerCase().replace(/[\s
 
 import { picArray } from '@/lib/defaults'
 import RichTextarea from '@/components/RichTextarea'
-import { useEffect, useState } from 'react'
+import { startTransition, useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
+import { Empty, Icon, PageHeader, Pill, Sheet, Tile } from '@/components/ui'
+import { useYear } from '@/lib/year'
+import { activityInYear } from '@/lib/dashboard'
 
 function PicTagInput({ value, onChange, members }: { value:string[]; onChange:(v:string[])=>void; members:any[] }) {
   const [input, setInput] = useState('')
@@ -17,27 +20,22 @@ function PicTagInput({ value, onChange, members }: { value:string[]; onChange:(v
   function removeTag(name:string) { onChange(value.filter(v=>v!==name)) }
   return (
     <div style={{ position:'relative' }}>
-      <div className="input" style={{ display:'flex', flexWrap:'wrap', gap:5, alignItems:'center', minHeight:38, cursor:'text' }} onClick={()=>setShowSuggest(true)}>
+      <div className="input au-row au-wrap" style={{ gap:6, minHeight:44, cursor:'text' }} onClick={()=>setShowSuggest(true)}>
         {value.map(name => (
-          <span key={name} style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'3px 8px', background:'var(--brand-soft)', color:'var(--brand)', borderRadius:14, fontSize:11, fontWeight:600 }}>
-            {name} <span style={{ cursor:'pointer' }} onClick={(e)=>{e.stopPropagation();removeTag(name)}}>×</span>
-          </span>
+          <span key={name} className="au-tag" style={{ background:'var(--accent-soft)', color:'var(--accent-ink)' }}>{name}
+            <button type="button" aria-label={`Hapus ${name}`} onClick={(e)=>{e.stopPropagation();removeTag(name)}} style={{ border:0, background:'none', color:'inherit', cursor:'pointer', padding:0, display:'grid' }}><Icon name="x" size={12} /></button></span>
         ))}
-        <input style={{ border:'none', background:'transparent', outline:'none', flex:1, minWidth:80, color:'var(--text)', fontSize:12 }}
-          value={input} onChange={e=>{setInput(e.target.value);setShowSuggest(true)}} onFocus={()=>setShowSuggest(true)}
+        <input aria-label="Tambah PIC" style={{ border:'none', background:'transparent', outline:'none', flex:1, minWidth:100, color:'var(--ink)', minHeight:28 }}
+          value={input} onChange={e=>{setInput(e.target.value);setShowSuggest(true)}} onFocus={()=>setShowSuggest(true)} onBlur={()=>setTimeout(()=>setShowSuggest(false), 150)}
           onKeyDown={e=>{ if(e.key==='Enter'){e.preventDefault();if(suggestions[0])addTag(suggestions[0].name);else if(input)addTag(input)} }}
-          placeholder={value.length?'':'+ Tag PIC'} />
+          placeholder={value.length?'':'Ketik nama PIC'} />
       </div>
       {showSuggest && suggestions.length > 0 && (
-        <div className="glass-strong" style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, borderRadius:8, padding:5, zIndex:10, maxHeight:200, overflowY:'auto' }}>
-          {suggestions.map(m => (
-            <div key={m._id} onClick={()=>addTag(m.name)} style={{ padding:'6px 9px', borderRadius:6, cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', gap:8 }}
-              onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='var(--bg3)'}
-              onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
-              <div style={{ width:22, height:22, borderRadius:'50%', background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff' }}>{m.name[0]}</div>
-              <span>{m.name}</span>
-              <span style={{ marginLeft:'auto', fontSize:9, color:'var(--text3)' }}>{m.division||m.role}</span>
-            </div>
+        <div className="au-ig" style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:10, maxHeight:240, overflowY:'auto', boxShadow:'var(--shadow-s2)' }}>
+          {suggestions.map((m, i) => (
+            <button type="button" key={m._id} className="au-igr" onMouseDown={e=>e.preventDefault()} onClick={()=>addTag(m.name)} style={{ minHeight:44 }}>
+              <span className={`au-av s c${(i % 7) + 1}`}>{String(m.name||'?')[0]}</span><span>{m.name}</span><span className="v au-xs au-muted">{m.division||m.role}</span>
+            </button>
           ))}
         </div>
       )}
@@ -70,6 +68,7 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
     endTime: editing?.endTime || '',
   })
   const [saving, setSaving] = useState(false)
+  const [confirmDel, setConfirmDel] = useState<null|'one'|'all'>(null)
   const set = (k:string, v:any) => setForm(f=>({...f, [k]:v}))
 
   // Rentang tanggal aktivitas (inklusif) — presensi diisi untuk tiap harinya.
@@ -101,7 +100,7 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
         const label = f.offlineScope === 'luar' ? 'Dinas Luar Kota' : 'Izin / Meeting Luar Kantor'
         toast.success(`Presensi ${label} terisi untuk ${info.userIds} PIC`, { duration: 3000 })
       }
-      if (info?.unmatched?.length) toast(`PIC belum terdaftar di Member: ${info.unmatched.join(', ')}`, { icon:'⚠️' })
+      if (info?.unmatched?.length) toast(`PIC belum terdaftar di Member: ${info.unmatched.join(', ')}`)
     } catch { /* diamkan */ }
   }
 
@@ -164,8 +163,8 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
   }
 
   async function del() {
-    if (!confirm('Hapus aktivitas ini?')) return
-    await fetch(`/api/projects/${editing._id}`, { method:'DELETE' })
+    const r = await fetch(`/api/projects/${editing._id}`, { method:'DELETE' })
+    if (!r.ok) { toast.error('Gagal menghapus'); return }
     // Cabut slot presensi yang dibuat otomatis dari aktivitas ini
     await syncAttendance(editing._id, { ...form, mode:'online' }, [])
     toast.success('Dihapus'); onSave(); onClose()
@@ -173,7 +172,6 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
 
   async function delAll() {
     if (!editing?.recurrenceGroupId) return del()
-    if (!confirm('Hapus SEMUA pengulangan agenda ini (termasuk yg di Calendar)?')) return
     const r = await fetch(`/api/projects/recurring?groupId=${editing.recurrenceGroupId}`, { method:'DELETE' })
     const d = await r.json()
     toast.success(`${d.deleted||0} agenda berulang dihapus`); onSave(); onClose()
@@ -198,149 +196,97 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
   const cats = config?.activityCategories?.filter((c:any)=>c.active) || []
   const subs = config?.activitySubTypes?.filter((s:any)=>s.active) || []
   const statuses = config?.issueStatuses?.filter((s:any)=>s.active) || []
+  const opt = (v:string, cur:string, label:React.ReactNode, onPick:()=>void) => <button key={v} type="button" className="au-chip" aria-pressed={cur===v} onClick={onPick} style={{ flex:1, justifyContent:'center', display:'inline-flex', alignItems:'center', gap:6 }}>{label}</button>
 
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:620 }}>
-        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <div>
-            <div style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit':'+ Aktivitas Baru'}</div>
-            <div style={{ fontSize:10, color:'var(--text3)' }}>Akan muncul juga di Issues & Calendar</div>
-          </div>
-          <button onClick={onClose} className="btn btn-icon">×</button>
-        </div>
-        <div style={{ padding:'14px 20px', overflowY:'auto', maxHeight:'76vh', display:'flex', flexDirection:'column', gap:11 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Kategori</label>
-              <select className="input" value={form.category} onChange={e=>set('category', e.target.value)}>
-                {cats.map((c:any)=><option key={c.key} value={c.key}>{c.label}</option>)}
-              </select></div>
-            <div><label style={lbl}>Sub Tipe</label>
-              <select className="input" value={form.subType} onChange={e=>set('subType', e.target.value)}>
-                {subs.map((s:any)=><option key={s.key} value={s.key}>{s.label}</option>)}
-              </select></div>
-          </div>
-          <div><label style={lbl}>Judul Aktivitas *</label>
-            <input className="input" value={form.title} onChange={e=>set('title', e.target.value)} placeholder="Title singkat..." /></div>
-          <div><label style={lbl}>Aktivitas (Narasi / Point-Point Progress)</label>
-            <RichTextarea rows={4} value={form.description} onChange={v=>set('description', v)}
-              placeholder="Isi narasi atau point-point progress aktivitas. Klik tombol • atau 1. untuk bullet/numbering" /></div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Status</label>
-              <select className="input" value={form.status} onChange={e=>set('status', e.target.value)}>
-                {statuses.map((s:any)=><option key={s.key} value={s.key}>{s.label}</option>)}
-              </select></div>
-            <div><label style={lbl}>Priority</label>
-              <select className="input" value={form.priority} onChange={e=>set('priority', e.target.value)}>
-                <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
-              </select></div>
-            <div><label style={lbl}>Action Date (Dari) *</label>
-              <input type="date" className="input" value={form.actionDate} onChange={e=>set('actionDate', e.target.value)} /></div>
-            <div><label style={lbl}>Sampai (opsional)</label>
-              <input type="date" className="input" value={form.actionDateEnd} min={form.actionDate||undefined} onChange={e=>set('actionDateEnd', e.target.value)} disabled={!!form.recurrence} />
-              <div style={{ fontSize:9, color:'var(--text3)', marginTop:3 }}>Isi kalau kegiatan lebih dari 1 hari — muncul di kalender sepanjang rentang</div></div>
-          </div>
-          {!editing && (
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, padding:'10px 12px', background:'var(--bg3)', borderRadius:8 }}>
-              <div><label style={lbl}>🔁 Berulang</label>
-                <select className="input" value={form.recurrence} onChange={e=>set('recurrence', e.target.value)}>
-                  <option value="">Tidak berulang</option>
-                  <option value="weekly">Tiap minggu</option>
-                  <option value="biweekly">Tiap 2 minggu</option>
-                  <option value="monthly">Tiap bulan</option>
-                </select></div>
-              <div><label style={lbl}>Berulang sampai {form.recurrence && <span style={{ color:'var(--red)' }}>*</span>}</label>
-                <input type="date" className="input" value={form.recurrenceEnd} min={form.actionDate||undefined} onChange={e=>set('recurrenceEnd', e.target.value)} disabled={!form.recurrence} />
-                <div style={{ fontSize:9, color:'var(--text3)', marginTop:3 }}>Agenda otomatis muncul di kalender tiap pengulangan</div></div>
-            </div>
-          )}
-          {form.recurrence && (
-            <label style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'9px 11px', background:'var(--bg3)', borderRadius:8, cursor:'pointer', fontSize:11.5 }}>
-              <input type="checkbox" checked={form.recurrenceShowAll} onChange={e=>set('recurrenceShowAll', e.target.checked)} style={{ marginTop:1, cursor:'pointer' }} />
-              <span style={{ color:'var(--text2)' }}>Tampilkan <b>semua pengulangan</b> di list Activities.
-                <span style={{ display:'block', fontSize:10, color:'var(--text3)', marginTop:1 }}>Default: hanya agenda pertama yg muncul di list biar rapi — sisanya tetap tampil di <b>Calendar</b>.</span>
-              </span>
-            </label>
-          )}
-          <div><label style={lbl}>PIC (multi tag)</label>
-            <PicTagInput value={form.pic} onChange={v=>set('pic', v)} members={members} /></div>
-          <div><label style={lbl}>Next Plan (Narasi / Point-Point)</label>
-            <RichTextarea rows={3} value={form.nextPlan} onChange={v=>set('nextPlan', v)}
-              placeholder="Plan kedepannya. Klik • atau 1. untuk bullet/numbering" /></div>
-          <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10 }}>
-            <div><label style={lbl}>Target Week</label>
-              <input className="input" value={form.targetWeek} onChange={e=>set('targetWeek', e.target.value)} placeholder="W23" /></div>
-            <div><label style={lbl}>Mode</label>
-              <div style={{ display:'flex', gap:8 }}>
-                <label style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'8px 12px', borderRadius:7, cursor:'pointer', fontSize:12, background:form.mode==='online'?'var(--brand-soft)':'var(--bg3)', border:`1px solid ${form.mode==='online'?'var(--brand)':'var(--border2)'}`, color:form.mode==='online'?'var(--brand)':'var(--text2)' }}>
-                  <input type="radio" checked={form.mode==='online'} onChange={()=>set('mode','online')} style={{ display:'none' }} />
-                  💻 Online
-                </label>
-                <label style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'8px 12px', borderRadius:7, cursor:'pointer', fontSize:12, background:form.mode==='offline'?'var(--brand-soft)':'var(--bg3)', border:`1px solid ${form.mode==='offline'?'var(--brand)':'var(--border2)'}`, color:form.mode==='offline'?'var(--brand)':'var(--text2)' }}>
-                  <input type="radio" checked={form.mode==='offline'} onChange={()=>set('mode','offline')} style={{ display:'none' }} />
-                  📍 Offline
-                </label>
-              </div></div>
-          </div>
-          {form.mode === 'offline' && (
-            <>
-              <div><label style={lbl}>Lokasi (Offline)</label>
-                <input className="input" value={form.location} onChange={e=>set('location', e.target.value)} placeholder="Gedung, ruangan, kota..." /></div>
-              <div>
-                <label style={lbl}>Area Offline</label>
-                <div style={{ display:'flex', gap:8 }}>
-                  {([['jakarta','🏙️ Jakarta'],['luar','✈️ Luar Jakarta']] as const).map(([val,label])=>(
-                    <label key={val} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'8px 12px', borderRadius:7, cursor:'pointer', fontSize:12, background:form.offlineScope===val?'var(--brand-soft)':'var(--bg3)', border:`1px solid ${form.offlineScope===val?'var(--brand)':'var(--border2)'}`, color:form.offlineScope===val?'var(--brand)':'var(--text2)' }}>
-                      <input type="radio" checked={form.offlineScope===val} onChange={()=>set('offlineScope',val)} style={{ display:'none' }} />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-                {form.offlineScope && (
-                  <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:5 }}>
-                    Presensi PIC otomatis diisi <b style={{ color:'var(--brand)' }}>{form.offlineScope==='luar' ? 'Dinas Luar Kota' : 'Izin / Meeting Luar Kantor'}</b> untuk tanggal kegiatan.
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Mulai (opsional)</label>
-              <input type="time" className="input" value={form.startTime} onChange={e=>set('startTime', e.target.value)} /></div>
-            <div><label style={lbl}>Selesai (opsional)</label>
-              <input type="time" className="input" value={form.endTime} onChange={e=>set('endTime', e.target.value)} /></div>
-          </div>
-        </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
-          {editing ? (
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-              <button onClick={del} className="btn btn-danger btn-sm">🗑 Hapus{editing.recurrenceGroupId?' ini':''}</button>
-              {editing.recurrenceGroupId && <button onClick={delAll} className="btn btn-sm" style={{ color:'var(--red)', borderColor:'var(--red)' }}>🗑 Hapus semua rutin</button>}
-            </div>
-          ) : <div />}
-          <div style={{ display:'flex', gap:8 }}>
-            <button onClick={onClose} className="btn">Batal</button>
-            {editing?.recurrenceGroupId && <button onClick={saveEditAll} disabled={saving} className="btn btn-sm" style={{ background:'#8b5cf6', color:'#fff' }}>{saving?'...':'Simpan ke semua rutin'}</button>}
-            <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'Menyimpan...':editing?'Simpan':'Buat Aktivitas'}</button>
-          </div>
-        </div>
+    <Sheet open wide title={editing ? 'Edit aktivitas' : 'Aktivitas baru'} onClose={onClose} onSave={save} saveDisabled={saving} saveLabel={saving ? 'Menyimpan…' : editing ? 'Simpan' : 'Buat'}>
+      <p className="au-xs au-muted" style={{ marginTop:-4 }}>Tampil juga di Issues &amp; Calendar.</p>
+      <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))', gap:10 }}>
+        <label className="au-col" style={{ gap:6 }}><span className="lbl">Kategori</span>
+          <select className="input" value={form.category} onChange={e=>set('category', e.target.value)}>{cats.map((c:any)=><option key={c.key} value={c.key}>{c.label}</option>)}</select></label>
+        <label className="au-col" style={{ gap:6 }}><span className="lbl">Sub tipe</span>
+          <select className="input" value={form.subType} onChange={e=>set('subType', e.target.value)}>{subs.map((s:any)=><option key={s.key} value={s.key}>{s.label}</option>)}</select></label>
       </div>
-    </div>
+      <label className="au-col" style={{ gap:6 }}><span className="lbl">Judul aktivitas *</span>
+        <input className="input" value={form.title} onChange={e=>set('title', e.target.value)} placeholder="Judul singkat" /></label>
+      <div className="au-col" style={{ gap:6 }}><span className="lbl">Narasi / poin progress</span>
+        <RichTextarea rows={4} value={form.description} onChange={v=>set('description', v)} placeholder="Narasi atau poin progress. Ketuk • atau 1. untuk bullet/penomoran" /></div>
+      <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:10 }}>
+        <label className="au-col" style={{ gap:6 }}><span className="lbl">Status</span>
+          <select className="input" value={form.status} onChange={e=>set('status', e.target.value)}>{statuses.map((s:any)=><option key={s.key} value={s.key}>{s.label}</option>)}</select></label>
+        <label className="au-col" style={{ gap:6 }}><span className="lbl">Prioritas</span>
+          <select className="input" value={form.priority} onChange={e=>set('priority', e.target.value)}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+        <label className="au-col" style={{ gap:6 }}><span className="lbl">Tanggal (dari) *</span>
+          <input type="date" className="input" value={form.actionDate} onChange={e=>set('actionDate', e.target.value)} /></label>
+        <label className="au-col" style={{ gap:6 }}><span className="lbl">Sampai (opsional)</span>
+          <input type="date" className="input" value={form.actionDateEnd} min={form.actionDate||undefined} onChange={e=>set('actionDateEnd', e.target.value)} disabled={!!form.recurrence} /></label>
+      </div>
+      <span className="au-xs au-muted" style={{ marginTop:-6 }}>Isi “Sampai” bila kegiatan lebih dari 1 hari; tampil di kalender sepanjang rentang.</span>
+      {!editing && (
+        <div className="au-box" style={{ padding:14, gap:10 }}>
+          <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))', gap:10 }}>
+            <label className="au-col" style={{ gap:6 }}><span className="lbl">Berulang</span>
+              <select className="input" value={form.recurrence} onChange={e=>set('recurrence', e.target.value)}>
+                <option value="">Tidak berulang</option><option value="weekly">Tiap minggu</option><option value="biweekly">Tiap 2 minggu</option><option value="monthly">Tiap bulan</option>
+              </select></label>
+            <label className="au-col" style={{ gap:6 }}><span className="lbl">Berulang sampai {form.recurrence && <span style={{ color:'var(--bad)' }}>*</span>}</span>
+              <input type="date" className="input" value={form.recurrenceEnd} min={form.actionDate||undefined} onChange={e=>set('recurrenceEnd', e.target.value)} disabled={!form.recurrence} /></label>
+          </div>
+          {form.recurrence && <label className="au-row au-small" style={{ gap:10, cursor:'pointer', alignItems:'flex-start' }}>
+            <input type="checkbox" className="au-chk" checked={form.recurrenceShowAll} onChange={e=>set('recurrenceShowAll', e.target.checked)} />
+            <span>Tampilkan <b>semua pengulangan</b> di daftar Activities.<span className="au-xs au-muted" style={{ display:'block' }}>Default hanya agenda pertama yang tampil; sisanya tetap ada di Calendar.</span></span>
+          </label>}
+        </div>
+      )}
+      <div className="au-col" style={{ gap:6 }}><span className="lbl">PIC</span><PicTagInput value={form.pic} onChange={v=>set('pic', v)} members={members} /></div>
+      <div className="au-col" style={{ gap:6 }}><span className="lbl">Next plan</span>
+        <RichTextarea rows={3} value={form.nextPlan} onChange={v=>set('nextPlan', v)} placeholder="Rencana berikutnya. Ketuk • atau 1. untuk bullet/penomoran" /></div>
+      <div className="au-grid" style={{ gridTemplateColumns:'minmax(110px,140px) minmax(0,1fr)', gap:10 }}>
+        <label className="au-col" style={{ gap:6 }}><span className="lbl">Target week</span><input className="input" value={form.targetWeek} onChange={e=>set('targetWeek', e.target.value)} placeholder="W23" /></label>
+        <div className="au-col" style={{ gap:6 }}><span className="lbl">Mode</span>
+          <div className="au-row" style={{ gap:8 }}>{opt('online', form.mode, <><Icon name="link" size={15} />Online</>, ()=>set('mode','online'))}{opt('offline', form.mode, <><Icon name="pin" size={15} />Offline</>, ()=>set('mode','offline'))}</div></div>
+      </div>
+      {form.mode === 'offline' && (
+        <div className="au-box" style={{ padding:14, gap:10 }}>
+          <label className="au-col" style={{ gap:6 }}><span className="lbl">Lokasi</span><input className="input" value={form.location} onChange={e=>set('location', e.target.value)} placeholder="Gedung, ruangan, kota" /></label>
+          <div className="au-col" style={{ gap:6 }}><span className="lbl">Area offline</span>
+            <div className="au-row" style={{ gap:8 }}>{opt('jakarta', form.offlineScope, 'Jakarta', ()=>set('offlineScope','jakarta'))}{opt('luar', form.offlineScope, 'Luar Jakarta', ()=>set('offlineScope','luar'))}</div>
+            {form.offlineScope && <span className="au-xs au-muted">Presensi PIC otomatis diisi <b style={{ color:'var(--accent-ink)' }}>{form.offlineScope==='luar' ? 'Dinas Luar Kota' : 'Izin / Meeting Luar Kantor'}</b> untuk tanggal kegiatan.</span>}
+          </div>
+        </div>
+      )}
+      <div className="au-grid" style={{ gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:10 }}>
+        <label className="au-col" style={{ gap:6 }}><span className="lbl">Mulai (opsional)</span><input type="time" className="input" value={form.startTime} onChange={e=>set('startTime', e.target.value)} /></label>
+        <label className="au-col" style={{ gap:6 }}><span className="lbl">Selesai (opsional)</span><input type="time" className="input" value={form.endTime} onChange={e=>set('endTime', e.target.value)} /></label>
+      </div>
+      {editing?.recurrenceGroupId && <button type="button" onClick={saveEditAll} disabled={saving} className="btn" style={{ alignSelf:'flex-start' }}><Icon name="check" size={15} />Simpan ke semua pengulangan</button>}
+      {editing && (confirmDel
+        ? <div className="au-row au-wrap p-bad" style={{ borderRadius:14, padding:12, gap:8 }}>
+            <span className="au-small" style={{ flex:1, minWidth:180 }}>{confirmDel === 'all' ? 'Hapus SEMUA pengulangan agenda ini (termasuk di Calendar)?' : 'Hapus aktivitas ini?'}</span>
+            <button type="button" className="btn btn-sm" onClick={()=>setConfirmDel(null)}>Batal</button>
+            <button type="button" className="btn btn-danger btn-sm" disabled={saving} onClick={()=> confirmDel === 'all' ? delAll() : del()}>Ya, hapus</button>
+          </div>
+        : <div className="au-row au-wrap" style={{ gap:8 }}>
+            <button type="button" onClick={()=>setConfirmDel('one')} className="btn btn-danger"><Icon name="trash" size={15} />Hapus{editing.recurrenceGroupId ? ' yang ini' : ''}</button>
+            {editing.recurrenceGroupId && <button type="button" onClick={()=>setConfirmDel('all')} className="btn"><Icon name="trash" size={15} />Hapus semua pengulangan</button>}
+          </div>)}
+    </Sheet>
   )
 }
 
-const PRIORITY_CFG: Record<string,{label:string;color:string;bg:string}> = {
-  high:{label:'High', color:'var(--red)', bg:'var(--redbg)'},
-  medium:{label:'Medium', color:'var(--amber)', bg:'var(--amberbg)'},
-  low:{label:'Low', color:'var(--green)', bg:'var(--greenbg)'},
+const PRIORITY_CFG: Record<string,{label:string;tone:'bad'|'warn'|'ok'}> = {
+  high:{label:'High', tone:'bad'}, medium:{label:'Medium', tone:'warn'}, low:{label:'Low', tone:'ok'},
 }
 
 export default function ActivitiesPage() {
   const { data:session } = useSession()
+  const { year } = useYear()
+  const nowYear = new Date().getFullYear()
   const [activities, setActivities] = useState<any[]>([])
   const [config, setConfig] = useState<any>(null)
   const [members, setMembers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [filterCat, setFilterCat] = useState('All')
@@ -354,13 +300,15 @@ export default function ActivitiesPage() {
   useEffect(() => { if (typeof window !== 'undefined') { const sp = new URLSearchParams(window.location.search); const cat = sp.get('cat'); const sub = sp.get('sub'); if (cat) setFilterCat(cat); if (sub) setFilterSub(sub) } }, [])
 
   async function load() {
-    setLoading(true)
-    const [a,c,m] = await Promise.all([
-      fetch('/api/projects').then(r=>r.json()),
-      getConfig().then((data:any)=>({ data })),
-      fetch('/api/users').then(r=>r.json()),
-    ])
-    setActivities(a.data||[]); setConfig(c.data); setMembers((m.data||[]).filter((u:any)=>u.active!==false)); setLoading(false)
+    setLoading(true); setFailed(false)
+    try {
+      const [a,c,m] = await Promise.all([
+        fetch('/api/projects').then(r=>{ if (!r.ok) throw new Error(); return r.json() }),
+        getConfig().then((data:any)=>({ data })),
+        fetch('/api/users').then(r=>r.ok ? r.json() : { data: [] }),
+      ])
+      startTransition(() => { setActivities(a.data||[]); setConfig(c.data); setMembers((m.data||[]).filter((u:any)=>u.active!==false)) })
+    } catch { setFailed(true) } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
 
@@ -370,9 +318,10 @@ export default function ActivitiesPage() {
   const statusOrder: Record<string,number> = {}
   statuses.forEach((s:any,i:number)=>{ statusOrder[s.key]=i })
 
-  const filtered = activities.filter(a => {
-    if (a.showInList === false) return false // occurrence berulang yg disembunyikan (tetap di Calendar)
-    if (search && !a.title.toLowerCase().includes(search.toLowerCase())) return false
+  // Tahun global: aktivitas tahun terpilih; yang belum selesai dari tahun lalu ikut tampil di tahun berjalan.
+  const inYear = activities.filter(a => a.showInList !== false && activityInYear(a, year, nowYear))
+  const filtered = inYear.filter(a => {
+    if (search && !String(a.title||'').toLowerCase().includes(search.toLowerCase())) return false
     if (filterCat !== 'All' && normKey(a.category) !== normKey(filterCat) && normKey(a.subType) !== normKey(filterCat)) return false
     if (filterSub && normKey(a.subType) !== normKey(filterSub)) return false
     if (filterStatus !== 'All' && normKey(a.status) !== normKey(filterStatus)) return false
@@ -383,81 +332,72 @@ export default function ActivitiesPage() {
     const da = a.actionDate || '', db = b.actionDate || ''
     return sortBy === 'date_asc' ? da.localeCompare(db) : db.localeCompare(da)
   })
+  const hiddenRec = activities.filter(a => a.showInList === false && activityInYear(a, year, nowYear)).length
+  const filtersOn = filterCat !== 'All' || !!filterSub || filterStatus !== 'All' || filterPic !== 'All' || !!search
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+    <div className="au-page">
       {(showForm||editing) && <ActivityForm editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} config={config} members={members} />}
-
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-        <div>
-          <div style={{ fontSize:14, fontWeight:600 }}>Activities</div>
-          <div style={{ fontSize:11, color:'var(--text3)' }}>Trigger Issues &amp; Calendar · {filtered.length} tampil{activities.length>filtered.length ? ` · ${activities.length-filtered.length} agenda rutin disembunyikan (cek Calendar)` : ''}</div>
+      <div className="au-view au-anim">
+        <PageHeader eyebrow={`Activities · ${filtered.length} tampil${hiddenRec ? ` · ${hiddenRec} agenda rutin di Calendar` : ''}`} title="Activities" actions={
+          <button type="button" onClick={()=>setShowForm(true)} className="btn btn-primary"><Icon name="plus" size={16} stroke={2.2} />Aktivitas baru</button>
+        } />
+        {statuses.length > 0 && (
+          <div className="au-grid au-tiles" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))' }}>
+            <Tile icon="act" color="var(--accent)" value={inYear.length} label="Semua" hint={String(year)} active={filterStatus==='All'} onClick={()=>setFilterStatus('All')} />
+            {statuses.map((st:any) => <Tile key={st.key} icon={/complete|done/i.test(st.key) ? 'check' : /delay|late/i.test(st.key) ? 'bolt' : /risk/i.test(st.key) ? 'clock' : 'prog'} color={st.color} value={inYear.filter(a=>normKey(a.status)===normKey(st.key)).length} label={st.label} active={filterStatus===st.key} onClick={()=>setFilterStatus(filterStatus===st.key ? 'All' : st.key)} />)}
+          </div>
+        )}
+        <div className="au-row au-wrap" style={{ gap:8 }}>
+          <label className="input au-row" style={{ gap:8, padding:'0 12px', flex:'1 1 220px', maxWidth:360 }}><Icon name="search" size={16} />
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari judul" aria-label="Cari aktivitas" style={{ border:0, background:'transparent', flex:1, minHeight:40, outline:0, color:'var(--ink)' }} /></label>
+          <select className="input" style={{ width:'auto', minWidth:150 }} value={filterPic} onChange={e=>setFilterPic(e.target.value)} aria-label="Filter PIC">
+            <option value="All">Semua PIC</option>{members.map(m => <option key={m._id} value={m.name}>{m.name}</option>)}
+          </select>
+          <select className="input" style={{ width:'auto', minWidth:170 }} value={sortBy} onChange={e=>setSortBy(e.target.value as any)} aria-label="Urutkan">
+            <option value="date_desc">Tanggal terbaru</option><option value="date_asc">Tanggal terlama</option><option value="status">Per status</option>
+          </select>
+          {filtersOn && <button type="button" className="au-link" onClick={()=>{ setFilterCat('All'); setFilterSub(''); setFilterStatus('All'); setFilterPic('All'); setSearch('') }}>Reset filter</button>}
         </div>
-        <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Aktivitas Baru</button>
-      </div>
+        {cats.length > 0 && <div className="au-chips" role="group" aria-label="Filter kategori">
+          <button type="button" className="au-chip" aria-pressed={filterCat==='All'} onClick={()=>setFilterCat('All')}>Semua kategori</button>
+          {cats.map((c:any) => <button key={c.key} type="button" className="au-chip" aria-pressed={filterCat===c.key} onClick={()=>setFilterCat(filterCat===c.key ? 'All' : c.key)}>{c.label}</button>)}
+        </div>}
+        {failed && <div className="au-row au-wrap p-bad" role="alert" style={{ borderRadius:14, padding:12 }}><span className="au-small" style={{ flex:1 }}>Aktivitas gagal dimuat.</span><button type="button" className="btn btn-sm" onClick={load}>Coba lagi</button></div>}
 
-      <div style={{ display:'flex', gap:8, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, flexWrap:'wrap', alignItems:'center' }}>
-        <input className="input" style={{ width:180 }} value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Cari..." />
-        <select className="input" style={{ width:160 }} value={filterPic} onChange={e=>setFilterPic(e.target.value)}>
-          <option value="All">👤 Semua PIC</option>
-          {members.map(m => <option key={m._id} value={m.name}>{m.name}</option>)}
-        </select>
-        <select className="input" style={{ width:160 }} value={sortBy} onChange={e=>setSortBy(e.target.value as any)}>
-          <option value="date_desc">📅 Tanggal Terbaru</option>
-          <option value="date_asc">📅 Tanggal Terlama</option>
-          <option value="status">🚦 Urutkan per Status</option>
-        </select>
-        <div className="chip-row" style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-          <button onClick={()=>setFilterStatus('All')} style={chip(filterStatus==='All')}>Semua Status</button>
-          {statuses.map((s:any) => (
-            <button key={s.key} onClick={()=>setFilterStatus(s.key)} style={chip(filterStatus===s.key, s.color)}>{s.label}</button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
-        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
-         filtered.length === 0 ? (
-           <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>
-             <div style={{ fontSize:34, marginBottom:8 }}>📋</div>
-             <div>Belum ada aktivitas</div>
-           </div>
-         ) : (
-           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-             {filtered.map(a => {
-               const catColor = cats.find((c:any)=>c.key===a.category)?.color || 'var(--brand)'
-               const subColor = subs.find((s:any)=>s.key===a.subType)?.color || 'var(--text3)'
-               const statusDef = statuses.find((s:any)=>normKey(s.key)===normKey(a.status))
-               return (
-                 <div key={a._id} className="card" style={{ padding:'12px 14px', borderLeft:`3px solid ${statusDef?.color || catColor}`, cursor:'pointer' }} onClick={()=>setEditing(a)}>
-                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10 }}>
-                     <div style={{ flex:1, minWidth:0 }}>
-                       <div style={{ display:'flex', flexWrap:'wrap', gap:5, alignItems:'center', marginBottom:5 }}>
-                         <span style={{ fontSize:13, fontWeight:600 }}>{a.title}</span>
-                         {statusDef && <span className="badge" style={{ background:statusDef.color+'22', color:statusDef.color, fontSize:10, fontWeight:700 }}>{statusDef.label}</span>}
-                         {a.recurrenceGroupId && <span className="badge" style={{ background:'#8b5cf622', color:'#8b5cf6', fontSize:10, fontWeight:700 }} title="Agenda berulang — pengulangan lain ada di Calendar">🔁 Rutin</span>}
-                         <span className="badge" style={{ background:catColor+'22', color:catColor, fontSize:10 }}>{a.category}</span>
-                         <span className="badge" style={{ background:subColor+'22', color:subColor, fontSize:10 }}>{a.subType}</span>
-                         {a.priority && <span className="badge" style={{ background:PRIORITY_CFG[a.priority]?.bg, color:PRIORITY_CFG[a.priority]?.color, fontSize:10 }}>{PRIORITY_CFG[a.priority]?.label}</span>}
-                         {a.mode === 'offline' && a.location && <span style={{ fontSize:10, color:'var(--text3)' }}>📍 {a.location}</span>}
-                       </div>
-                       {a.description && <div style={{ fontSize:11, color:'var(--text2)', lineHeight:1.5, marginBottom:5, whiteSpace:'pre-wrap' }}>{a.description.substring(0, 180)}{a.description.length>180?'...':''}</div>}
-                       <div style={{ display:'flex', flexWrap:'wrap', gap:10, fontSize:10, color:'var(--text3)' }}>
-                         {a.actionDate && <span>📅 {a.actionDate}</span>}
-                         {a.targetWeek && <span>🗓 {a.targetWeek}</span>}
-                         {picArray(a.pic).length > 0 && <span>👤 {picArray(a.pic).join(', ')}</span>}
-                       </div>
-                     </div>
-                   </div>
-                 </div>
-               )
-             })}
-           </div>
-         )
-        }
+        {loading ? <div className="au-col" style={{ gap:10 }}>{[0,1,2].map(k=><div key={k} className="au-card"><div className="au-skel" style={{ width:'45%' }} /><div className="au-skel" style={{ width:'80%' }} /></div>)}</div>
+          : filtered.length === 0 ? <div className="au-card"><Empty title={inYear.length ? 'Tidak ada yang cocok' : `Belum ada aktivitas di ${year}`} text={inYear.length ? 'Ubah atau reset filter.' : 'Buat aktivitas baru; otomatis tampil di Issues & Calendar.'} action={<button type="button" className="btn btn-primary" onClick={()=>setShowForm(true)}>Aktivitas baru</button>} /></div>
+          : <div className="au-ig">
+              {filtered.map(a => {
+                const catColor = cats.find((c:any)=>c.key===a.category)?.color || 'var(--accent)'
+                const statusDef = statuses.find((st:any)=>normKey(st.key)===normKey(a.status))
+                const pr = PRIORITY_CFG[a.priority]
+                return (
+                  <button type="button" key={a._id} className="au-igr au-actrow" onClick={()=>setEditing(a)} style={{ ['--sc' as any]: statusDef?.color || catColor }}>
+                    <span className="au-col" style={{ gap:6, minWidth:0, flex:1 }}>
+                      <span className="au-row au-wrap" style={{ gap:6 }}>
+                        <b style={{ fontSize:15 }}>{a.title}</b>
+                        {a.recurrenceGroupId && <span className="au-tag" title="Agenda berulang; pengulangan lain di Calendar"><Icon name="clock" size={12} />Rutin</span>}
+                      </span>
+                      {a.description && <span className="au-small au-ink2" style={{ whiteSpace:'pre-wrap', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{a.description}</span>}
+                      <span className="au-row au-wrap au-xs au-muted" style={{ gap:6 }}>
+                        <span className="au-tag"><i style={{ background:catColor }} />{a.category}</span>
+                        {a.subType && <span className="au-tag">{a.subType}</span>}
+                        {a.actionDate && <span>{a.actionDate}{a.actionDateEnd && a.actionDateEnd !== a.actionDate ? ` – ${a.actionDateEnd}` : ''}</span>}
+                        {a.targetWeek && <span>· {a.targetWeek}</span>}
+                        {picArray(a.pic).length > 0 && <span>· {picArray(a.pic).join(', ')}</span>}
+                        {a.mode === 'offline' && a.location && <span>· {a.location}</span>}
+                      </span>
+                    </span>
+                    <span className="au-col" style={{ alignItems:'flex-end', gap:6, flexShrink:0 }}>
+                      {statusDef && <span className="au-pill" style={{ background:`color-mix(in srgb, ${statusDef.color} 16%, transparent)`, color:'var(--ink)' }}><i style={{ width:8, height:8, borderRadius:3, background:statusDef.color, display:'inline-block' }} />{statusDef.label}</span>}
+                      {pr && <Pill tone={pr.tone}>{pr.label}</Pill>}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>}
       </div>
     </div>
   )
 }
-function chip(active:boolean, color:string='var(--brand)'):React.CSSProperties { return { padding:'4px 11px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${active?color:'var(--border)'}`, background:active?color+'1a':'var(--bg3)', color:active?color:'var(--text2)' } }
-const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }

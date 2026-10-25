@@ -23,16 +23,17 @@ export default function BirthdayPopup() {
     }).catch(()=>{})
   }, [session])
 
-  async function generatePantun(person:any) {
+  // Ucapan tetap (tanpa AI): variasi per orang supaya tidak monoton.
+  function generatePantun(person:any) {
     if (!person) return
-    setGenerating(true); setPantun('')
-    try {
-      const r = await fetch('/api/ai-insight', { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ type:'birthday', birthdayName: person.name, age: person.age }) })
-      const d = await r.json()
-      setPantun(d.data?.insight || d.error || '🎂 Selamat ulang tahun! Semoga panjang umur, sehat selalu, dan rezeki melimpah.')
-    } catch { setPantun('🎂 Selamat ulang tahun! Semoga panjang umur, sehat selalu, dan rezeki melimpah.') }
-    finally { setGenerating(false) }
+    const first = String(person.name || '').split(' ')[0] || 'kamu'
+    const wishes = [
+      `Selamat ulang tahun, ${first}! Semoga sehat selalu, makin bahagia, dan semua rencana tahun ini lancar.`,
+      `Happy birthday, ${first}! Terima kasih sudah jadi bagian tim yang luar biasa. Semoga panjang umur dan penuh berkah.`,
+      `Selamat bertambah usia, ${first}! Semoga rezeki melimpah, karier makin bersinar, dan selalu dikelilingi orang baik.`,
+    ]
+    setGenerating(false)
+    setPantun('🎂 ' + wishes[first.length % wishes.length])
   }
 
   function close() {

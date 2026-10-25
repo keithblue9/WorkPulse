@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { MoneyInput } from '@/components/MoneyInput'
+import { useYear } from '@/lib/year'
+import { ConfirmSheet, Empty, Icon, PageHeader, Pill, Seg, Sheet, Tile } from '@/components/ui'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
@@ -52,59 +54,73 @@ const clampNum = (v:any) => Math.max(0, Number(v)||0)
 const fmtTgl = (d:string)=> d ? new Date(d).toLocaleDateString('id-ID',{ day:'numeric', month:'short', year:'numeric' }) : '—'
 
 export default function ThirdPartyPage() {
-  const [tab, setTab] = useState<'rencana'|'realisasi'|'suvenir'>('rencana')
+  const [tab, setTab] = useState<'rencana'|'suvenir'>('rencana')
+  const { year } = useYear()
+  const [month, setMonth] = useState<number>(-1)
+  const [adding, setAdding] = useState(0)
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ padding:'12px 20px 0', borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
-        <div style={{ fontSize:14, fontWeight:600 }}>[3rd Party] Event</div>
-        <div style={{ display:'flex', gap:4, marginTop:10 }}>
-          <button onClick={()=>setTab('rencana')} style={subtab(tab==='rencana')}>Rencana</button>
-          <button onClick={()=>setTab('realisasi')} style={subtab(tab==='realisasi')}>Realisasi</button>
-          <button onClick={()=>setTab('suvenir')} style={subtab(tab==='suvenir')}>🎁 Suvenir</button>
-        </div>
+    <div className="au-page">
+      <div className="au-view au-anim">
+        <PageHeader eyebrow={tab === 'rencana' ? `Finance · ${month >= 0 ? MONTHS[month] + ' ' : ''}${year}` : 'Finance · suvenir'} title="[3rd Party] Event" actions={<>
+          {tab === 'rencana' && <select className="input" aria-label="Bulan" style={{ width: 'auto', minHeight: 40 }} value={month} onChange={e=>setMonth(Number(e.target.value))}>
+            <option value={-1}>Semua bulan</option>{MONTHS.map((m,i)=><option key={i} value={i}>{m}</option>)}
+          </select>}
+          <button type="button" className="btn btn-primary" onClick={() => setAdding(n => n + 1)}><Icon name="plus" size={16} stroke={2.2} />{tab === 'rencana' ? 'Rencana event' : 'Suvenir'}</button>
+        </>} />
+        <div className="rise"><Seg label="Tampilan" value={tab} onChange={setTab} options={[['rencana','Rencana'],['suvenir','Suvenir']] as const} /></div>
+        {tab==='rencana' ? <RencanaTab year={year} month={month} adding={adding} /> : <SuvenirTab adding={adding} />}
       </div>
-      {tab==='rencana' ? <RencanaTab/> : tab==='realisasi' ? <RealisasiTab/> : <SuvenirTab/>}
     </div>
   )
 }
 
 // =====================  RENCANA  =====================
-function RencanaTab() {
+function RencanaTab({ year, month, adding }: { year:number; month:number; adding:number }) {
   const { data:session } = useSession(); const user = session?.user as any
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState<number>(-1)
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
   const [finalFor, setFinalFor] = useState<any>(null)
+  const [delFor, setDelFor] = useState<any>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
-    const qs = new URLSearchParams({ kind:'rencana', year:String(year) }); if (month>=0) qs.set('month', String(month+1))
-    const r = await fetch(`/api/thirdparty?${qs}`).then(r=>r.json()); setItems(r.data||[]); setLoading(false)
+    setLoading(true); setFailed(false)
+    try {
+      const qs = new URLSearchParams({ kind:'rencana', year:String(year) }); if (month>=0) qs.set('month', String(month+1))
+      const r = await fetch(`/api/thirdparty?${qs}`); if (!r.ok) throw new Error()
+      setItems((await r.json()).data||[])
+    } catch { setFailed(true) } finally { setLoading(false) }
   }, [year, month])
   useEffect(()=>{ load() }, [load])
+  useEffect(()=>{ if (adding) setShowForm(true) }, [adding])
+  async function del(it:any) {
+    const r = await fetch(`/api/thirdparty/${it._id}`,{method:'DELETE'}).catch(()=>null)
+    if (!r?.ok) { toast.error('Gagal menghapus'); return }
+    toast.success('Rencana dihapus'); setDelFor(null); load()
+  }
+  const recTotal = (it:any) => { const o = optionsOf(it); const i = Math.min(Math.max(Number(it.recommendedIndex)||0,0), o.length-1); return estimasiOf(o[i])*(1+FEE_RATE) }
+  const executed = items.filter(i=>i.executed).length
+  const estSum = items.reduce((s,i)=>s+recTotal(i),0)
+  const finSum = items.reduce((s,i)=>s+(Number(i.finalTotal)||0),0)
+  const short = (n:number) => { const a = Math.abs(n||0); const f = (v:number, u:string) => `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(v)} ${u}`; return a >= 1e9 ? f(n/1e9,'M') : a >= 1e6 ? f(n/1e6,'jt') : a >= 1e3 ? f(n/1e3,'rb') : fmt(n) }
 
   return (
     <>
       {(showForm||editing) && <RencanaForm editing={editing} user={user} onClose={()=>{setShowForm(false);setEditing(null)}} onSaved={()=>{setShowForm(false);setEditing(null);load()}} />}
       {finalFor && <RealisasiFinalModal it={finalFor} user={user} onClose={()=>setFinalFor(null)} onSaved={()=>{setFinalFor(null);load()}} />}
-      <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexWrap:'wrap', alignItems:'center', flexShrink:0 }}>
-        <select className="input input-sm" style={{ width:130 }} value={month} onChange={e=>setMonth(Number(e.target.value))}>
-          <option value={-1}>Semua Bulan</option>{MONTHS.map((m,i)=><option key={i} value={i}>{m}</option>)}
-        </select>
-        <select className="input input-sm" style={{ width:90 }} value={year} onChange={e=>setYear(Number(e.target.value))}>
-          {[now.getFullYear()+1, now.getFullYear(), now.getFullYear()-1].map(y=><option key={y} value={y}>{y}</option>)}
-        </select>
-        <button onClick={()=>setShowForm(true)} className="btn btn-sm btn-primary" style={{ marginLeft:'auto' }}>+ Rencana Event</button>
+      {delFor && <ConfirmSheet danger icon="trash" title="Hapus rencana" confirmLabel="Ya, hapus" text={<>Hapus rencana <b>“{delFor.judulKegiatan||delFor.namaEO||''}”</b> beserta semua opsinya?</>} onConfirm={() => del(delFor)} onClose={() => setDelFor(null)} />}
+      <div className="au-grid g4 au-tiles">
+        <Tile icon="ev" color="var(--accent)" value={loading ? '–' : items.length} label="Rencana event" />
+        <Tile icon="check" color="var(--aqua)" value={loading ? '–' : executed} label="Sudah dilaksanakan" />
+        <Tile icon="budget" color="var(--warn)" value={loading ? '–' : `Rp ${short(estSum)}`} label="Estimasi (rekomendasi)" />
+        <Tile icon="wallet" color="var(--hot)" value={loading ? '–' : `Rp ${short(finSum)}`} label="Realisasi final" />
       </div>
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px', display:'flex', flexDirection:'column', gap:12 }} className="safe-bottom page-pad">
-        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
-         items.length===0 ? <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>🎪</div><div>Belum ada rencana event</div></div> :
-         items.map(it => <RABCard key={it._id} it={it} onReload={load} onFinal={()=>setFinalFor(it)} onEdit={()=>setEditing(it)} onDelete={async()=>{ if(!confirm(`Hapus rencana "${it.judulKegiatan||it.namaEO||''}"?`))return; await fetch(`/api/thirdparty/${it._id}`,{method:'DELETE'}); toast.success('Rencana dihapus'); load() }} />)}
-      </div>
+      {failed && <div className="au-row au-wrap p-bad" role="alert" style={{ borderRadius: 14, padding: 12 }}><span className="au-small" style={{ flex: 1 }}>Rencana event gagal dimuat.</span><button type="button" className="btn btn-sm" onClick={load}>Coba lagi</button></div>}
+      {loading ? <div className="au-card">{[0,1,2].map(k => <div key={k} className="au-skel" />)}</div> :
+       items.length===0 ? <div className="au-card"><Empty title="Belum ada rencana event" text={`Belum ada rencana pada ${month >= 0 ? MONTHS[month] + ' ' : ''}${year}.`} action={<button type="button" className="btn btn-primary" onClick={()=>setShowForm(true)}>Buat rencana</button>} /></div> :
+       <div className="au-col" style={{ gap: 12 }}>{items.map(it => <RABCard key={it._id} it={it} onReload={load} onFinal={()=>setFinalFor(it)} onEdit={()=>setEditing(it)} onDelete={()=>setDelFor(it)} />)}</div>}
     </>
   )
 }
@@ -118,6 +134,9 @@ function RABCard({ it, onEdit, onDelete, onReload, onFinal }: { it:any; onEdit:(
   const [pesertaItem, setPesertaItem] = useState<{title:string; list:any[]}|null>(null)
   const [expanded, setExpanded] = useState(false)   // default ringkas; klik utk lihat rincian
   const recIdx = Math.min(Math.max(Number(it.recommendedIndex)||0, 0), opts.length-1)
+  // Optimistis: sakelar langsung berubah, dikembalikan bila gagal disimpan
+  const [exec, setExec] = useState(!!it.executed)
+  useEffect(() => { setExec(!!it.executed) }, [it.executed])
 
   // Hitung biaya tiap opsi
   const calc = useMemo(()=>opts.map((o:any)=>{
@@ -156,97 +175,104 @@ function RABCard({ it, onEdit, onDelete, onReload, onFinal }: { it:any; onEdit:(
   const cellNum:React.CSSProperties = { fontSize:11, textAlign:'right', whiteSpace:'nowrap' }
   const headOpt = (i:number):React.CSSProperties => ({
     textAlign:'right', minWidth:120,
-    background: i===recIdx ? 'var(--brand-soft)' : undefined,
-    color: i===recIdx ? 'var(--brand)' : undefined,
+    background: i===recIdx ? 'var(--accent-soft)' : undefined,
+    color: i===recIdx ? 'var(--accent-ink)' : undefined,
   })
 
   return (
-    <div className="card" style={{ padding:'14px 16px' }}>
-      {/* Header agenda — klik utk buka/tutup rincian */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, marginBottom:expanded?10:0 }}>
-        <div onClick={()=>setExpanded(v=>!v)} style={{ cursor:'pointer', flex:1, minWidth:0 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:7, flexWrap:'wrap' }}>
-            <span style={{ fontSize:11, color:'var(--text3)' }}>{expanded?'▾':'▸'}</span>
-            <span style={{ fontSize:13, fontWeight:700 }}>{it.judulKegiatan||'(tanpa judul)'}</span>
-            <span className="badge" style={{ fontSize:9, background:'var(--bg3)', color:'var(--text2)', fontWeight:700 }}>{opts.length} opsi</span>
-          </div>
-          <div style={{ fontSize:11, color:'var(--text3)', marginTop:3, paddingLeft:18 }}>📅 {range}{it.durasiHari?` (${it.durasiHari} hari)`:''} · 👥 {it.jumlahPeserta||0} peserta</div>
-          {it.picInternal && <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:2, paddingLeft:18 }}>PIC: {it.picInternal}</div>}
-        </div>
-        <div style={{ display:'flex', gap:6 }}>
-          <button onClick={onEdit} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>
-          <button onClick={onDelete} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑 Hapus</button>
-        </div>
+    <section className="au-card au-rab rise">
+      {/* Header agenda — ketuk untuk buka/tutup rincian */}
+      <div className="au-row" style={{ alignItems:'flex-start', gap:10 }}>
+        <button type="button" className="au-rabhd" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)}>
+          <span className="au-row au-wrap" style={{ gap:8 }}>
+            <Icon name="chev" size={16} style={{ transform:`rotate(${expanded?0:-90}deg)`, transition:'transform .2s', color:'var(--muted)' }} />
+            <b className="t">{it.judulKegiatan||'(tanpa judul)'}</b>
+            <span className="au-tag">{opts.length} opsi</span>
+            {it.executed && <Pill tone="ok">Terlaksana</Pill>}
+          </span>
+          <span className="au-row au-wrap au-xs au-ink2" style={{ gap:12, paddingLeft:24 }}>
+            <span className="au-row" style={{ gap:4 }}><Icon name="cal" size={13} />{range}{it.durasiHari?` · ${it.durasiHari} hari`:''}</span>
+            <span className="au-row" style={{ gap:4 }}><Icon name="team" size={13} />{it.jumlahPeserta||0} peserta</span>
+            {it.picInternal && <span className="au-row" style={{ gap:4 }}><Icon name="user" size={13} />PIC {it.picInternal}</span>}
+          </span>
+        </button>
+        <span className="au-row" style={{ gap:4 }}>
+          <button type="button" onClick={onEdit} className="btn btn-icon btn-sm" aria-label={`Edit ${it.judulKegiatan||'rencana'}`} title="Edit"><Icon name="edit" size={15} /></button>
+          <button type="button" onClick={onDelete} className="btn btn-icon btn-sm" aria-label={`Hapus ${it.judulKegiatan||'rencana'}`} title="Hapus"><Icon name="trash" size={15} /></button>
+        </span>
       </div>
 
       {/* Checklist pelaksanaan + realisasi final */}
-      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', marginTop:8, paddingLeft:18, paddingTop:8, borderTop:'1px dashed var(--border)' }}>
-        <label style={{ display:'flex', alignItems:'center', gap:7, fontSize:11.5, cursor:'pointer', fontWeight:600 }}>
-          <input type="checkbox" checked={!!it.executed} onChange={async e=>{
+      <div className="au-row au-wrap au-rabexec">
+        <label className="au-row" style={{ gap:10, cursor:'pointer' }}>
+          <input type="checkbox" className="au-sw" checked={exec} onChange={async e=>{
             const checked = e.target.checked
-            await fetch(`/api/thirdparty/${it._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ executed:checked, executedAt: checked ? new Date().toISOString().slice(0,10) : '' }) })
+            setExec(checked)
+            const r = await fetch(`/api/thirdparty/${it._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ executed:checked, executedAt: checked ? new Date().toISOString().slice(0,10) : '' }) }).catch(()=>null)
+            if (!r?.ok) { setExec(!checked); toast.error('Gagal menyimpan'); return }
             toast.success(checked ? 'Ditandai sudah dilaksanakan' : 'Tanda pelaksanaan dilepas'); onReload()
-          }} style={{ cursor:'pointer', width:15, height:15 }} />
-          <span style={{ color: it.executed ? 'var(--green)' : 'var(--text2)' }}>{it.executed ? '✅ Sudah dilaksanakan' : 'Tandai sudah dilaksanakan'}</span>
-          {it.executed && it.executedAt && <span style={{ fontSize:10, color:'var(--text3)', fontWeight:400 }}>({fmtTgl(it.executedAt)})</span>}
+          }} />
+          <span className="au-small" style={{ fontWeight:600, color: exec ? 'var(--ok)' : 'var(--ink2)' }}>{exec ? 'Sudah dilaksanakan' : 'Tandai sudah dilaksanakan'}</span>
+          {it.executed && it.executedAt && <span className="au-xs au-muted">{fmtTgl(it.executedAt)}</span>}
         </label>
         {it.executed && (
           it.finalTotal > 0 ? (
-            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-              <span style={{ fontSize:11, color:'var(--text3)' }}>Realisasi final:</span>
-              <span style={{ fontSize:12.5, fontWeight:800, color:'var(--green)' }}>Rp {fmt(it.finalTotal)}</span>
+            <span className="au-row au-wrap" style={{ gap:8 }}>
+              <span className="au-xs au-muted">Realisasi final</span>
+              <b style={{ color:'var(--ok)', fontVariantNumeric:'tabular-nums' }}>Rp {fmt(it.finalTotal)}</b>
               {it.estimasiBiaya>0 && (()=>{ const est = calc[recIdx]?.total || it.estimasiBiaya; const diff = it.finalTotal - est; return (
-                <span style={{ fontSize:10, fontWeight:700, color: diff>0?'var(--red)':'var(--green)' }}>{diff>0?'▲':'▼'} Rp {fmt(Math.abs(diff))} vs estimasi</span>
+                <Pill tone={diff>0?'bad':'ok'}>{diff>0?'Lebih':'Hemat'} Rp {fmt(Math.abs(diff))} vs estimasi</Pill>
               )})()}
-              <button onClick={onFinal} className="btn btn-sm" style={{ fontSize:10 }}>Ubah realisasi</button>
-            </div>
+              <button type="button" onClick={onFinal} className="btn btn-sm">Ubah realisasi</button>
+            </span>
           ) : (
-            <button onClick={onFinal} className="btn btn-sm btn-primary" style={{ fontSize:10.5 }}>+ Input Realisasi Final</button>
+            <button type="button" onClick={onFinal} className="btn btn-sm btn-primary"><Icon name="plus" size={14} />Realisasi final</button>
           )
         )}
       </div>
 
       {/* Ringkasan opsi (selalu tampil) — total tiap opsi berdampingan */}
       {!expanded && (
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:8, paddingLeft:18 }}>
+        <div className="au-optgrid">
           {opts.map((o:any,i:number)=>(
-            <div key={i} onClick={()=>setExpanded(true)} style={{ cursor:'pointer', border:`1px solid ${i===recIdx?'var(--brand)':'var(--border)'}`, background:i===recIdx?'var(--brand-soft)':'var(--bg2)', borderRadius:8, padding:'6px 11px', minWidth:130 }}>
-              <div style={{ fontSize:10, color:'var(--text3)', display:'flex', alignItems:'center', gap:4 }}>
-                {o.label||`Opsi ${i+1}`}{i===recIdx && <span title="Rekomendasi tim">⭐</span>}
-                {i===cheapestIdx && <span style={{ fontSize:8, fontWeight:700, color:'var(--green)' }}>· TERMURAH</span>}
-              </div>
-              <div style={{ fontSize:10, color:'var(--text3)', margin:'1px 0' }}>{o.venue||o.kota||'—'}</div>
-              <div style={{ fontSize:13, fontWeight:800, color:i===recIdx?'var(--brand)':i===cheapestIdx?'var(--green)':'var(--text)' }}>Rp {fmt(calc[i].total)}</div>
-            </div>
+            <button type="button" key={i} onClick={()=>setExpanded(true)} className="au-optc" data-rec={i===recIdx || undefined}>
+              <span className="au-row au-wrap" style={{ gap:6 }}>
+                <span className="au-xs" style={{ fontWeight:700 }}>{o.label||`Opsi ${i+1}`}</span>
+                {i===recIdx && <span className="au-pin">REKOMENDASI</span>}
+                {i===cheapestIdx && <Pill tone="ok">Termurah</Pill>}
+              </span>
+              <span className="au-xs au-muted">{o.venue||o.kota||'—'}</span>
+              <b className="v">Rp {fmt(calc[i].total)}</b>
+            </button>
           ))}
         </div>
       )}
 
       {expanded && <>
       {/* Tabel perbandingan antar opsi */}
-      <div style={{ overflowX:'auto' }}>
-        <table className="wp-table" style={{ minWidth: 320 + opts.length*130 }}>
+      <div className="au-tblw">
+        <table className="wp-table au-btbl" style={{ minWidth: 320 + opts.length*130 }}>
           <thead>
             <tr>
               <th style={{ minWidth:150 }}>Uraian</th>
               {opts.map((o:any,i:number)=>(
                 <th key={i} style={headOpt(i)}>
-                  {o.label||`Opsi ${i+1}`}{i===recIdx && <span title="Rekomendasi tim"> ⭐</span>}
+                  {o.label||`Opsi ${i+1}`}{i===recIdx && <span className="au-pin" style={{ marginLeft:6 }} title="Rekomendasi tim">REK</span>}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td style={{ fontSize:11, color:'var(--text3)' }}>Venue</td>
+              <td style={{ fontSize:11, color:'var(--muted)' }}>Venue</td>
               {opts.map((o:any,i:number)=><td key={i} style={{ fontSize:11, textAlign:'right', fontWeight:600 }}>{o.venue||'—'}</td>)}
             </tr>
             <tr>
-              <td style={{ fontSize:11, color:'var(--text3)' }}>Kota</td>
+              <td style={{ fontSize:11, color:'var(--muted)' }}>Kota</td>
               {opts.map((o:any,i:number)=><td key={i} style={{ fontSize:11, textAlign:'right' }}>{o.kota||'—'}</td>)}
             </tr>
             <tr>
-              <td style={{ fontSize:11, color:'var(--text3)' }}>EO</td>
+              <td style={{ fontSize:11, color:'var(--muted)' }}>EO</td>
               {opts.map((o:any,i:number)=><td key={i} style={{ fontSize:11, textAlign:'right' }}>{o.namaEO||'—'}</td>)}
             </tr>
             <tr>
@@ -259,18 +285,18 @@ function RABCard({ it, onEdit, onDelete, onReload, onFinal }: { it:any; onEdit:(
             </tr>
             {otherRows.map(([key, disp])=>(
               <tr key={key}>
-                <td style={{ fontSize:11, color:'var(--text2)', paddingLeft:14 }}>↳ {disp}</td>
+                <td style={{ fontSize:11, color:'var(--ink2)', paddingLeft:22 }}>{disp}</td>
                 {opts.map((o:any,i:number)=>{
                   const v = otherValOf(o,key)
                   const items = (o.others||[]).filter((x:any)=>String(x?.label||x?.key||'').trim().toLowerCase()===key)
                   const hasDetail = items.some((x:any)=>x.detail?.trim() || x.link?.trim())
-                  if (!v) return <td key={i} style={{ ...cellNum, color:'var(--text3)' }}>—</td>
+                  if (!v) return <td key={i} style={{ ...cellNum, color:'var(--muted)' }}>—</td>
                   return (
                     <td key={i} style={cellNum}>
                       {hasDetail ? (
                         <button onClick={()=>setDetailItem({ title:`${disp} · ${o.label||`Opsi ${i+1}`}`, items })}
-                          style={{ background:'var(--brand-soft)', color:'var(--brand)', border:'1px solid var(--brand)', borderRadius:6, padding:'2px 8px', fontSize:10.5, fontWeight:600, cursor:'pointer' }}
-                          title="Klik lihat rincian">📄 Rp {fmt(v)}</button>
+                          className="au-tag au-srcbtn" style={{ background:'var(--accent-soft)', color:'var(--accent-ink)' }}
+                          title="Lihat rincian"><Icon name="file" size={12} />Rp {fmt(v)}</button>
                       ) : `Rp ${fmt(v)}`}
                     </td>
                   )
@@ -280,32 +306,31 @@ function RABCard({ it, onEdit, onDelete, onReload, onFinal }: { it:any; onEdit:(
             {/* Peserta (kalau ada di salah satu opsi) */}
             {opts.some((o:any)=>(o.participants||[]).length>0) && (
               <tr>
-                <td style={{ fontSize:11, color:'var(--text2)', paddingLeft:14 }}>↳ Peserta</td>
+                <td style={{ fontSize:11, color:'var(--ink2)', paddingLeft:22 }}>Peserta</td>
                 {opts.map((o:any,i:number)=>{
                   const list = o.participants||[]
                   const total = pesertaTotal(list)
                   return <td key={i} style={cellNum}>{list.length>0 ? (
                     <button onClick={()=>setPesertaItem({ title:`Peserta · ${o.label||`Opsi ${i+1}`}`, list })}
-                      style={{ background:'var(--bg3)', color:'var(--text)', border:'1px solid var(--border)', borderRadius:6, padding:'2px 8px', fontSize:10.5, fontWeight:600, cursor:'pointer' }}
-                      title="Klik lihat rincian peserta">👥 {total} orang</button>
+                      className="au-tag au-srcbtn" title="Lihat rincian peserta"><Icon name="team" size={12} />{total} orang</button>
                   ) : '—'}</td>
                 })}
               </tr>
             )}
-            <tr style={{ borderTop:'2px solid var(--border)' }}>
+            <tr style={{ borderTop:'2px solid var(--line)' }}>
               <td style={{ fontSize:11, fontWeight:700 }}>Subtotal</td>
               {opts.map((_o:any,i:number)=><td key={i} style={{ ...cellNum, fontWeight:700 }}>Rp {fmt(calc[i].sub)}</td>)}
             </tr>
             <tr>
-              <td style={{ fontSize:11, color:'var(--amber)' }}>EO Handling &amp; Mgmt Fee (10%)</td>
-              {opts.map((_o:any,i:number)=><td key={i} style={{ ...cellNum, color:'var(--amber)' }}>Rp {fmt(calc[i].fee)}</td>)}
+              <td style={{ fontSize:11, color:'var(--warn)' }}>EO Handling &amp; Mgmt Fee (10%)</td>
+              {opts.map((_o:any,i:number)=><td key={i} style={{ ...cellNum, color:'var(--warn)' }}>Rp {fmt(calc[i].fee)}</td>)}
             </tr>
-            <tr style={{ background:'var(--brand-soft)' }}>
-              <td style={{ fontSize:12, fontWeight:800, color:'var(--brand)' }}>TOTAL</td>
+            <tr style={{ background:'var(--accent-soft)' }}>
+              <td style={{ fontSize:12, fontWeight:800, color:'var(--accent-ink)' }}>TOTAL</td>
               {opts.map((_o:any,i:number)=>(
-                <td key={i} style={{ ...cellNum, fontWeight:800, color: i===cheapestIdx ? 'var(--green)' : 'var(--brand)' }}>
+                <td key={i} style={{ ...cellNum, fontWeight:800, color: i===cheapestIdx ? 'var(--ok)' : 'var(--accent-ink)' }}>
                   Rp {fmt(calc[i].total)}
-                  {i===cheapestIdx && <div style={{ fontSize:8.5, fontWeight:700, color:'var(--green)' }}>TERMURAH</div>}
+                  {i===cheapestIdx && <div style={{ fontSize:8.5, fontWeight:700, color:'var(--ok)' }}>TERMURAH</div>}
                 </td>
               ))}
             </tr>
@@ -317,7 +342,7 @@ function RABCard({ it, onEdit, onDelete, onReload, onFinal }: { it:any; onEdit:(
       {opts.some((o:any)=>o.catatan?.trim()) && (
         <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:4 }}>
           {opts.map((o:any,i:number)=> o.catatan?.trim() ? (
-            <div key={i} style={{ fontSize:10.5, color:'var(--text2)' }}><b>{o.label||`Opsi ${i+1}`}:</b> {o.catatan}</div>
+            <div key={i} style={{ fontSize:10.5, color:'var(--ink2)' }}><b>{o.label||`Opsi ${i+1}`}:</b> {o.catatan}</div>
           ) : null)}
         </div>
       )}
@@ -325,74 +350,52 @@ function RABCard({ it, onEdit, onDelete, onReload, onFinal }: { it:any; onEdit:(
       {/* Detail RAB per opsi (collapsible) */}
       <div style={{ marginTop:10, display:'flex', gap:6, flexWrap:'wrap' }}>
         {opts.map((o:any,i:number)=>(
-          <button key={i} onClick={()=>setOpenDetail(openDetail===i?null:i)} className="btn btn-sm" style={{ fontSize:10 }}>
-            {openDetail===i?'▾':'▸'} Detail {o.label||`Opsi ${i+1}`}
+          <button type="button" key={i} onClick={()=>setOpenDetail(openDetail===i?null:i)} className="au-chip" aria-pressed={openDetail===i}>
+            Detail {o.label||`Opsi ${i+1}`}
           </button>
         ))}
       </div>
       {openDetail!==null && opts[openDetail] && (
-        <div style={{ marginTop:8, overflowX:'auto' }}>
+        <div className="au-tblw" style={{ marginTop:8 }}>
           <OptionDetailTable o={opts[openDetail]} c={calc[openDetail]} />
         </div>
       )}
       </>}
 
-      {/* Popup rincian item (souvenir/oleh-oleh/dll) */}
       {detailItem && (
-        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setDetailItem(null)}>
-          <div className="modal" style={{ width:460, maxWidth:'100%' }}>
-            <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ fontSize:13.5, fontWeight:700 }}>{detailItem.title}</span>
-              <button onClick={()=>setDetailItem(null)} className="btn btn-icon">×</button>
+        <Sheet open title={detailItem.title} onClose={()=>setDetailItem(null)}>
+          {detailItem.items.map((x:any,i:number)=>(
+            <div key={i} className="au-box" style={{ padding:14, gap:6 }}>
+              <span className="au-row au-between" style={{ gap:8 }}><b className="au-small">{x.label||x.key}</b><b style={{ color:'var(--accent-ink)' }}>Rp {fmt(otherTotal(x))}</b></span>
+              <span className="au-xs au-muted">{x.pax||0} pax × {x.times||1} = {(Number(x.pax)||0)*(Number(x.times)||1)} unit · @ Rp {fmt(x.price||0)}</span>
+              {x.detail?.trim() && <span className="au-small au-ink2" style={{ whiteSpace:'pre-wrap', lineHeight:1.5 }}>{x.detail}</span>}
+              {x.link?.trim() && <a href={x.link} target="_blank" rel="noopener noreferrer" className="au-link au-row au-xs" style={{ gap:4, wordBreak:'break-all' }}><Icon name="ext" size={13} />{x.link}</a>}
             </div>
-            <div style={{ padding:'14px 18px', maxHeight:'70vh', overflowY:'auto', display:'flex', flexDirection:'column', gap:10 }}>
-              {detailItem.items.map((x:any,i:number)=>(
-                <div key={i} style={{ border:'1px solid var(--border)', borderRadius:10, padding:12 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', gap:8, marginBottom:4 }}>
-                    <span style={{ fontSize:12.5, fontWeight:700 }}>{x.label||x.key}</span>
-                    <span style={{ fontSize:12, fontWeight:700, color:'var(--brand)' }}>Rp {fmt(otherTotal(x))}</span>
-                  </div>
-                  <div style={{ fontSize:10.5, color:'var(--text3)', marginBottom:x.detail||x.link?6:0 }}>{x.pax||0} pax × {x.times||1} = {(Number(x.pax)||0)*(Number(x.times)||1)} unit · @ Rp {fmt(x.price||0)}</div>
-                  {x.detail?.trim() && <div style={{ fontSize:11.5, color:'var(--text2)', lineHeight:1.5, whiteSpace:'pre-wrap' }}>{x.detail}</div>}
-                  {x.link?.trim() && <a href={x.link} target="_blank" rel="noopener noreferrer" style={{ fontSize:11, color:'var(--brand)', display:'inline-block', marginTop:6, wordBreak:'break-all' }}>🔗 {x.link}</a>}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+          ))}
+        </Sheet>
       )}
 
-      {/* Popup rincian peserta */}
       {pesertaItem && (
-        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setPesertaItem(null)}>
-          <div className="modal" style={{ width:520, maxWidth:'100%' }}>
-            <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ fontSize:13.5, fontWeight:700 }}>{pesertaItem.title} <span style={{ fontSize:11, fontWeight:400, color:'var(--text3)' }}>({pesertaTotal(pesertaItem.list)} orang)</span></span>
-              <button onClick={()=>setPesertaItem(null)} className="btn btn-icon">×</button>
-            </div>
-            <div style={{ padding:'8px 0', maxHeight:'70vh', overflowY:'auto' }}>
-              <table className="wp-table" style={{ width:'100%' }}>
-                <thead><tr><th style={{ width:30, textAlign:'center' }}>No</th><th>Fungsi / Bagian</th><th style={{ textAlign:'center', width:70 }}>Jumlah</th><th>Keterangan</th></tr></thead>
-                <tbody>
-                  {pesertaItem.list.map((p:any,i:number)=>(
-                    <tr key={i}>
-                      <td style={{ textAlign:'center', fontSize:11, color:'var(--text3)' }}>{i+1}</td>
-                      <td style={{ fontSize:11.5, fontWeight:600 }}>{p.fungsi ?? p.instansi ?? '—'}</td>
-                      <td style={{ textAlign:'center', fontSize:11.5 }}>{p.jumlah || (p.nama?1:0) || '—'}</td>
-                      <td style={{ fontSize:11, color:'var(--text2)' }}>{p.keterangan ?? p.jabatan ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot><tr style={{ background:'var(--bg3)' }}>
-                  <td/><td style={{ fontSize:11.5, fontWeight:700 }}>Total</td>
-                  <td style={{ textAlign:'center', fontSize:12, fontWeight:800 }}>{pesertaTotal(pesertaItem.list)}</td><td/>
-                </tr></tfoot>
-              </table>
-            </div>
+        <Sheet open title={pesertaItem.title} onClose={()=>setPesertaItem(null)}>
+          <span className="au-xs au-muted">{pesertaTotal(pesertaItem.list)} orang</span>
+          <div className="au-tblw">
+            <table className="wp-table au-ctbl">
+              <thead><tr><th style={{ width:40, textAlign:'center' }}>No</th><th>Fungsi / bagian</th><th style={{ textAlign:'center', width:80 }}>Jumlah</th><th>Keterangan</th></tr></thead>
+              <tbody>
+                {pesertaItem.list.map((p:any,i:number)=>(
+                  <tr key={i}>
+                    <td data-l="No" className="au-xs au-muted" style={{ textAlign:'center' }}>{i+1}</td>
+                    <td className="c-main au-small" style={{ fontWeight:600 }}>{p.fungsi ?? p.instansi ?? '—'}</td>
+                    <td data-l="Jumlah" style={{ textAlign:'center' }}>{p.jumlah || (p.nama?1:0) || '—'}</td>
+                    <td data-l="Keterangan" className="au-small au-ink2">{p.keterangan ?? p.jabatan ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+        </Sheet>
       )}
-    </div>
+    </section>
   )
 }
 
@@ -410,7 +413,7 @@ function OptionDetailTable({ o, c }: { o:any; c:any }) {
   )
   const others = (o.others||[]).map((x:any)=>({ ...x, jumlah: otherTotal(x) }))
   return (
-    <table className="wp-table" style={{ minWidth:680 }}>
+    <table className="wp-table au-btbl" style={{ minWidth:680 }}>
       <thead><tr>
         <th style={{ width:34, textAlign:'center' }}>No</th><th>Uraian</th>
         <th style={{ textAlign:'center' }}>Volume</th><th style={{ textAlign:'center' }}>Satuan</th>
@@ -422,13 +425,13 @@ function OptionDetailTable({ o, c }: { o:any; c:any }) {
         <Line no="2" uraian={<b>Bedroom</b>} />
         <Line no="" uraian={`${o.brRooms||0} kamar × ${o.brNights||0} malam`} vol={(Number(o.brRooms)||0)*(Number(o.brNights)||0)} sat="kamar·malam" harga={o.brPrice||0} jumlah={c.br} />
         <Line no="3" uraian={<b>Others</b>} />
-        {others.length===0 && <Line no="" uraian={<span style={{ color:'var(--text3)' }}>— tidak ada item —</span>} />}
+        {others.length===0 && <Line no="" uraian={<span style={{ color:'var(--muted)' }}>Tidak ada item</span>} />}
         {others.map((x:any,i:number)=>(
           <Line key={i} no="" uraian={x.label||x.key} vol={`${x.pax||0}×${x.times||1}`} sat="pax·kali" harga={x.price||0} jumlah={x.jumlah} />
         ))}
-        <tr style={{ borderTop:'2px solid var(--border)' }}><td/><td colSpan={4} style={{ textAlign:'right', fontWeight:700, fontSize:11 }}>Subtotal</td><td style={{ textAlign:'right', fontWeight:700 }}>Rp {fmt(c.sub)}</td></tr>
-        <tr><td/><td colSpan={4} style={{ textAlign:'right', fontSize:11, color:'var(--amber)' }}>EO Handling &amp; Management Fee (10%)</td><td style={{ textAlign:'right', color:'var(--amber)' }}>Rp {fmt(c.fee)}</td></tr>
-        <tr style={{ background:'var(--brand-soft)' }}><td/><td colSpan={4} style={{ textAlign:'right', fontWeight:800, fontSize:12, color:'var(--brand)' }}>TOTAL (termasuk fee)</td><td style={{ textAlign:'right', fontWeight:800, color:'var(--brand)' }}>Rp {fmt(c.total)}</td></tr>
+        <tr className="au-totrow"><td/><td colSpan={4} style={{ textAlign:'right', fontWeight:700, fontSize:11 }}>Subtotal</td><td style={{ textAlign:'right', fontWeight:700 }}>Rp {fmt(c.sub)}</td></tr>
+        <tr><td/><td colSpan={4} style={{ textAlign:'right', fontSize:11, color:'var(--warn)' }}>EO Handling &amp; Management Fee (10%)</td><td style={{ textAlign:'right', color:'var(--warn)' }}>Rp {fmt(c.fee)}</td></tr>
+        <tr style={{ background:'var(--accent-soft)' }}><td/><td colSpan={4} style={{ textAlign:'right', fontWeight:800, fontSize:12, color:'var(--accent-ink)' }}>TOTAL (termasuk fee)</td><td style={{ textAlign:'right', fontWeight:800, color:'var(--accent-ink)' }}>Rp {fmt(c.total)}</td></tr>
       </tbody>
     </table>
   )
@@ -454,6 +457,7 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
   })
   const [active, setActive] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [delOptAsk, setDelOptAsk] = useState(false)
 
   const set = (k:string,v:any)=>setF((p:any)=>({...p,[k]:v}))
   const opt = f.options[active] || f.options[0]
@@ -482,7 +486,7 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
   }
   function delOpt(i:number) {
     if (f.options.length <= 1) { toast.error('Minimal harus ada 1 opsi'); return }
-    if (!confirm(`Hapus ${f.options[i]?.label||`Opsi ${i+1}`}?`)) return
+    setDelOptAsk(false)
     setF((p:any)=>{
       const opts = p.options.filter((_:any,j:number)=>j!==i)
       let rec = Number(p.recommendedIndex)||0
@@ -543,63 +547,59 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
   }
 
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:760, maxWidth:'100%' }}>
-        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit Rencana':'+ Rencana Event'}</span>
-          <button onClick={onClose} className="btn btn-icon">×</button>
-        </div>
-        <div style={{ padding:'14px 20px', maxHeight:'74vh', overflowY:'auto', display:'flex', flexDirection:'column', gap:11 }}>
+    <Sheet open wide title={editing ? 'Edit rencana' : 'Rencana event'} onClose={onClose} onSave={save} saveDisabled={saving} saveLabel={saving ? 'Menyimpan…' : 'Simpan'}>
           {/* ── Info agenda (berlaku utk semua opsi) ── */}
-          <div><label style={lbl}>Judul Kegiatan</label><input className="input" value={f.judulKegiatan||''} onChange={e=>set('judulKegiatan',e.target.value)} /></div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr auto', gap:10, alignItems:'end' }}>
-            <div><label style={lbl}>Tanggal Mulai</label><input type="date" className="input" value={f.tanggalMulai||''} onChange={e=>{ set('tanggalMulai',e.target.value); if(!f.tanggalSelesai||new Date(f.tanggalSelesai)<new Date(e.target.value)) set('tanggalSelesai',e.target.value) }} /></div>
-            <div><label style={lbl}>Tanggal Selesai</label><input type="date" className="input" min={f.tanggalMulai||undefined} value={f.tanggalSelesai||''} onChange={e=>set('tanggalSelesai',e.target.value)} /></div>
-            <div style={{ paddingBottom:9, fontSize:11.5, color:'var(--text2)', whiteSpace:'nowrap' }}>{durasiHari>0 ? <><b style={{ color:'var(--brand)' }}>{durasiHari}</b> hari</> : '—'}</div>
+          <label style={{ display:'block' }}><span style={lbl}>Judul Kegiatan</span><input className="input" value={f.judulKegiatan||''} onChange={e=>set('judulKegiatan',e.target.value)} /></label>
+          <div className="au-grid" style={{ gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr) auto', gap:10, alignItems:'end' }}>
+            <label style={{ display:'block' }}><span style={lbl}>Tanggal Mulai</span><input type="date" className="input" value={f.tanggalMulai||''} onChange={e=>{ set('tanggalMulai',e.target.value); if(!f.tanggalSelesai||new Date(f.tanggalSelesai)<new Date(e.target.value)) set('tanggalSelesai',e.target.value) }} /></label>
+            <label style={{ display:'block' }}><span style={lbl}>Tanggal Selesai</span><input type="date" className="input" min={f.tanggalMulai||undefined} value={f.tanggalSelesai||''} onChange={e=>set('tanggalSelesai',e.target.value)} /></label>
+            <div className="au-small au-ink2" style={{ paddingBottom:12, whiteSpace:'nowrap' }}>{durasiHari>0 ? <><b style={{ color:'var(--accent-ink)' }}>{durasiHari}</b> hari</> : '—'}</div>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Jumlah Peserta</label><input type="number" min={0} className="input" value={f.jumlahPeserta||0} onChange={e=>set('jumlahPeserta',clampNum(e.target.value))} /></div>
-            <div><label style={lbl}>PIC Internal (opsional)</label><input className="input" value={f.picInternal||''} onChange={e=>set('picInternal',e.target.value)} placeholder="Penanggung jawab dari tim" /></div>
+            <label style={{ display:'block' }}><span style={lbl}>Jumlah Peserta</span><input type="number" min={0} className="input" value={f.jumlahPeserta||0} onChange={e=>set('jumlahPeserta',clampNum(e.target.value))} /></label>
+            <label style={{ display:'block' }}><span style={lbl}>PIC Internal (opsional)</span><input className="input" value={f.picInternal||''} onChange={e=>set('picInternal',e.target.value)} placeholder="Penanggung jawab dari tim" /></label>
           </div>
 
           {/* ── Tab opsi ── */}
-          <div style={{ borderTop:'1px solid var(--border)', paddingTop:11 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:7, flexWrap:'wrap', gap:6 }}>
-              <span style={{ fontSize:12, fontWeight:700 }}>Opsi Usulan <span style={{ fontSize:10, fontWeight:400, color:'var(--text3)' }}>· tiap opsi bisa beda venue, item &amp; biaya</span></span>
-              <div style={{ display:'flex', gap:6 }}>
-                <button onClick={dupOpt} className="btn btn-sm" style={{ fontSize:10.5 }}>⧉ Duplikat opsi ini</button>
-                <button onClick={addOpt} className="btn btn-sm btn-primary" style={{ fontSize:10.5 }}>+ Opsi</button>
-              </div>
+          <div className="au-col" style={{ gap:10, borderTop:'1px solid var(--line)', paddingTop:14 }}>
+            <div className="au-row au-between au-wrap" style={{ gap:6 }}>
+              <span className="lbl">Opsi usulan <span className="au-muted" style={{ textTransform:'none', letterSpacing:0 }}>· tiap opsi bisa beda venue, item &amp; biaya</span></span>
+              <span className="au-row" style={{ gap:6 }}>
+                <button type="button" onClick={dupOpt} className="btn btn-sm">Duplikat opsi ini</button>
+                <button type="button" onClick={addOpt} className="btn btn-sm btn-primary"><Icon name="plus" size={14} />Opsi</button>
+              </span>
             </div>
-            <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:10 }}>
+            <div className="au-chips wrap" role="tablist" aria-label="Opsi">
               {f.options.map((o:any,i:number)=>(
-                <button key={i} onClick={()=>setActive(i)} style={optTab(active===i)}>
-                  {o.label||`Opsi ${i+1}`}{i===f.recommendedIndex && ' ⭐'}
-                  <span style={{ fontSize:9, opacity:0.75, marginLeft:5 }}>Rp {fmt(estimasiOf(o)*(1+FEE_RATE))}</span>
+                <button type="button" role="tab" key={i} onClick={()=>{ setActive(i); setDelOptAsk(false) }} className="au-chip" aria-selected={active===i}>
+                  {o.label||`Opsi ${i+1}`}{i===f.recommendedIndex && ' · rek'}
+                  <span style={{ opacity:0.7, marginLeft:6, fontWeight:500 }}>Rp {fmt(estimasiOf(o)*(1+FEE_RATE))}</span>
                 </button>
               ))}
             </div>
 
             {opt && (
-              <div style={{ display:'flex', flexDirection:'column', gap:11, border:'1px solid var(--border)', borderRadius:10, padding:12, background:'var(--bg2)' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1.2fr auto auto', gap:10, alignItems:'end' }}>
-                  <div><label style={lbl}>Nama Opsi</label><input className="input input-sm" value={opt.label||''} onChange={e=>setOpt('label',e.target.value)} placeholder={`Opsi ${active+1}`} /></div>
-                  <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:11, cursor:'pointer', paddingBottom:8, whiteSpace:'nowrap' }}>
-                    <input type="radio" name="recOpt" checked={f.recommendedIndex===active} onChange={()=>set('recommendedIndex',active)} />
-                    ⭐ Rekomendasi tim
+              <div className="au-box" style={{ padding:14, gap:12 }}>
+                <div className="au-row au-wrap" style={{ gap:10, alignItems:'flex-end' }}>
+                  <div style={{ flex:'1 1 180px' }}><label style={lbl}>Nama opsi</label><input className="input" aria-label="Nama opsi" value={opt.label||''} onChange={e=>setOpt('label',e.target.value)} placeholder={`Opsi ${active+1}`} /></div>
+                  <label className="au-row au-small" style={{ gap:8, cursor:'pointer', paddingBottom:10, whiteSpace:'nowrap' }}>
+                    <input type="checkbox" className="au-sw" checked={f.recommendedIndex===active} onChange={()=>set('recommendedIndex',active)} />
+                    Rekomendasi tim
                   </label>
-                  <button onClick={()=>delOpt(active)} className="btn btn-sm btn-danger" style={{ fontSize:10, marginBottom:6 }} disabled={f.options.length<=1}>🗑 Hapus opsi</button>
+                  {f.options.length>1 && (delOptAsk
+                    ? <span className="au-row p-bad" style={{ gap:6, borderRadius:12, padding:'6px 8px', marginBottom:4 }}><span className="au-xs">Hapus {opt.label||`Opsi ${active+1}`}?</span><button type="button" className="btn btn-sm" onClick={()=>setDelOptAsk(false)}>Batal</button><button type="button" className="btn btn-sm btn-danger" onClick={()=>delOpt(active)}>Hapus</button></span>
+                    : <button type="button" onClick={()=>setDelOptAsk(true)} className="btn btn-sm" style={{ marginBottom:6 }}><Icon name="trash" size={14} />Hapus opsi</button>)}
                 </div>
 
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                  <div><label style={lbl}>Nama EO</label>
+                <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:10 }}>
+                  <label style={{ display:'block' }}><span style={lbl}>Nama EO</span>
                     <input className="input input-sm" list="eo-list" value={opt.namaEO||''} onChange={e=>setOpt('namaEO',e.target.value)} placeholder="PTC / Kinanti / MTT / Others" />
-                    <datalist id="eo-list"><option value="PTC"/><option value="Kinanti"/><option value="MTT"/><option value="Others"/></datalist></div>
-                  <div><label style={lbl}>Kontak EO (opsional)</label><input className="input input-sm" value={opt.kontakEO||''} onChange={e=>setOpt('kontakEO',e.target.value)} placeholder="Nama PIC / No. HP EO" /></div>
+                    <datalist id="eo-list"><option value="PTC"/><option value="Kinanti"/><option value="MTT"/><option value="Others"/></datalist></label>
+                  <label style={{ display:'block' }}><span style={lbl}>Kontak EO (opsional)</span><input className="input input-sm" value={opt.kontakEO||''} onChange={e=>setOpt('kontakEO',e.target.value)} placeholder="Nama PIC / No. HP EO" /></label>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                  <div><label style={lbl}>Kota</label><input className="input input-sm" value={opt.kota||''} onChange={e=>setOpt('kota',e.target.value)} /></div>
-                  <div><label style={lbl}>Venue</label><input className="input input-sm" value={opt.venue||''} onChange={e=>setOpt('venue',e.target.value)} /></div>
+                <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:10 }}>
+                  <label style={{ display:'block' }}><span style={lbl}>Kota</span><input className="input input-sm" value={opt.kota||''} onChange={e=>setOpt('kota',e.target.value)} /></label>
+                  <label style={{ display:'block' }}><span style={lbl}>Venue</span><input className="input input-sm" value={opt.venue||''} onChange={e=>setOpt('venue',e.target.value)} /></label>
                 </div>
 
                 <Section title="Meeting Room" total={mr}>
@@ -611,22 +611,22 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
 
                 <div>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-                    <span style={{ fontSize:12, fontWeight:600 }}>Others</span>
-                    <button onClick={addOther} className="btn btn-sm">+ Item</button>
+                    <span className="lbl">Others</span>
+                    <button type="button" onClick={addOther} className="btn btn-sm"><Icon name="plus" size={14} />Item</button>
                   </div>
                   <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                    {(opt.others||[]).length===0 && <div style={{ fontSize:10.5, color:'var(--text3)' }}>Belum ada item. Klik <b>+ Item</b> untuk menambah.</div>}
+                    {(opt.others||[]).length===0 && <div className="au-xs au-muted">Belum ada item. Ketuk <b>Item</b> untuk menambah.</div>}
                     {(opt.others||[]).map((o:any,i:number)=>(
-                      <div key={i} style={{ border:'1px solid var(--border)', borderRadius:8, padding:8, background:'var(--bg2)' }}>
-                        <div style={{ display:'grid', gridTemplateColumns:'1.3fr 70px 70px 110px 90px 28px', gap:6, alignItems:'center' }}>
+                      <div key={i} className="au-box" style={{ padding:10, gap:6 }}>
+                        <div className="au-othrow">
                           <input className="input input-sm" placeholder="Label" value={o.label||''} onChange={e=>setOptOther(i,'label',e.target.value)} />
                           <input type="number" min={0} className="input input-sm" placeholder="Pax" value={o.pax||0} onChange={e=>setOptOther(i,'pax',clampNum(e.target.value))} />
                           <input type="number" min={0} className="input input-sm" placeholder="Times" value={o.times||0} onChange={e=>setOptOther(i,'times',clampNum(e.target.value))} />
                           <MoneyInput currency="IDR" className="input input-sm" placeholder="Price" value={o.price||0} onChange={n=>setOptOther(i,'price',clampNum(n))} />
-                          <span style={{ fontSize:10, color:'var(--text2)', textAlign:'right' }}>Rp {fmt(otherTotal(o))}</span>
-                          <button onClick={()=>delOther(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
+                          <span className="au-xs au-ink2 sum">Rp {fmt(otherTotal(o))}</span>
+                          <button type="button" onClick={()=>delOther(i)} className="btn btn-icon btn-sm del" aria-label={`Hapus item ${o.label||i+1}`}><Icon name="x" size={13} /></button>
                         </div>
-                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:6 }}>
+                        <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:6 }}>
                           <input className="input input-sm" placeholder="Rincian (mis. UGREEN UNO Robot + Keychain)" value={o.detail||''} onChange={e=>setOptOther(i,'detail',e.target.value)} />
                           <input className="input input-sm" placeholder="Link e-commerce (opsional)" value={o.link||''} onChange={e=>setOptOther(i,'link',e.target.value)} />
                         </div>
@@ -638,44 +638,38 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
                 {/* Peserta */}
                 <div>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-                    <span style={{ fontSize:12, fontWeight:600 }}>Peserta <span style={{ fontSize:10, fontWeight:400, color:'var(--text3)' }}>({(opt.participants||[]).length})</span></span>
-                    <button onClick={addPeserta} className="btn btn-sm">+ Peserta</button>
+                    <span className="lbl">Peserta · {(opt.participants||[]).length}</span>
+                    <button type="button" onClick={addPeserta} className="btn btn-sm"><Icon name="plus" size={14} />Peserta</button>
                   </div>
                   <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                    {(opt.participants||[]).length===0 && <div style={{ fontSize:10.5, color:'var(--text3)' }}>Belum ada peserta. Klik <b>+ Peserta</b> untuk menambah.</div>}
+                    {(opt.participants||[]).length===0 && <div className="au-xs au-muted">Belum ada peserta. Ketuk <b>Peserta</b> untuk menambah.</div>}
                     {(opt.participants||[]).map((p:any,i:number)=>(
-                      <div key={i} style={{ display:'grid', gridTemplateColumns:'1.4fr 80px 1.4fr 28px', gap:6, alignItems:'center' }}>
+                      <div key={i} className="au-psrow">
                         <input className="input input-sm" placeholder="Fungsi / Bagian" value={p.fungsi ?? p.instansi ?? ''} onChange={e=>setPeserta(i,'fungsi',e.target.value)} />
                         <input type="number" min={0} className="input input-sm" placeholder="Jumlah" value={p.jumlah||0} onChange={e=>setPeserta(i,'jumlah',clampNum(e.target.value))} />
                         <input className="input input-sm" placeholder="Keterangan (opsional)" value={p.keterangan ?? p.jabatan ?? ''} onChange={e=>setPeserta(i,'keterangan',e.target.value)} />
-                        <button onClick={()=>delPeserta(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
+                        <button type="button" onClick={()=>delPeserta(i)} className="btn btn-icon btn-sm" aria-label={`Hapus peserta ${i+1}`}><Icon name="x" size={13} /></button>
                       </div>
                     ))}
                     {(opt.participants||[]).length>0 && (
-                      <div style={{ fontSize:10.5, color:'var(--text2)', textAlign:'right', paddingRight:34 }}>Total: <b>{(opt.participants||[]).reduce((s:number,p:any)=>s+(Number(p.jumlah)||0),0)}</b> orang</div>
+                      <div style={{ fontSize:10.5, color:'var(--ink2)', textAlign:'right', paddingRight:34 }}>Total: <b>{(opt.participants||[]).reduce((s:number,p:any)=>s+(Number(p.jumlah)||0),0)}</b> orang</div>
                     )}
                   </div>
                 </div>
 
-                <div><label style={lbl}>Catatan Opsi (opsional)</label><textarea className="input input-sm" rows={2} value={opt.catatan||''} onChange={e=>setOpt('catatan',e.target.value)} placeholder="Kelebihan/kekurangan opsi ini, rundown, dsb." style={{ resize:'vertical' }} /></div>
+                <label style={{ display:'block' }}><span style={lbl}>Catatan Opsi (opsional)</span><textarea className="input input-sm" rows={2} value={opt.catatan||''} onChange={e=>setOpt('catatan',e.target.value)} placeholder="Kelebihan/kekurangan opsi ini, rundown, dsb." style={{ resize:'vertical' }} /></label>
 
-                <div style={{ padding:'12px 14px', background:'var(--brand-soft)', borderRadius:10, border:'1px solid var(--brand)' }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                    <div><div style={{ fontSize:10, color:'var(--brand)', textTransform:'uppercase', fontWeight:600 }}>Estimasi {opt.label||`Opsi ${active+1}`}</div>
-                      <div style={{ fontSize:9, color:'var(--amber)' }}>Belum termasuk EO Handling &amp; Management Fee (10%)</div></div>
-                    <div style={{ textAlign:'right' }}>
-                      <div style={{ fontSize:20, fontWeight:800, color:'var(--brand)' }}>Rp {fmt(estimasi)}</div>
-                      <div style={{ fontSize:10, color:'var(--text3)' }}>Termasuk fee 10%: Rp {fmt(withFee)}</div>
-                    </div>
-                  </div>
+                <div className="au-total" style={{ flexWrap:'wrap' }}>
+                  <span className="au-col" style={{ gap:2 }}><span className="lbl">Estimasi {opt.label||`Opsi ${active+1}`}</span><span className="au-xs">Belum termasuk EO handling &amp; management fee (10%)</span></span>
+                  <span className="au-col" style={{ alignItems:'flex-end', gap:2 }}><b>Rp {fmt(estimasi)}</b><span className="au-xs">Termasuk fee: Rp {fmt(withFee)}</span></span>
                 </div>
               </div>
             )}
 
             {/* Ringkasan perbandingan cepat */}
             {f.options.length > 1 && (
-              <div style={{ marginTop:10, padding:'10px 12px', border:'1px dashed var(--border)', borderRadius:10 }}>
-                <div style={{ fontSize:10, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', marginBottom:6 }}>Perbandingan (termasuk fee)</div>
+              <div className="au-box" style={{ padding:12, gap:6, borderStyle:'dashed' }}>
+                <span className="lbl">Perbandingan (termasuk fee)</span>
                 <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                   {f.options.map((o:any,i:number)=>{
                     const t = estimasiOf(o)*(1+FEE_RATE)
@@ -683,8 +677,8 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
                     const min = totals.length?Math.min(...totals):0
                     return (
                       <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:11 }}>
-                        <span style={{ color:'var(--text2)' }}>{o.label||`Opsi ${i+1}`}{i===f.recommendedIndex && ' ⭐'} {o.venue?`· ${o.venue}`:''}</span>
-                        <b style={{ color: t>0 && t===min ? 'var(--green)' : 'var(--text)' }}>Rp {fmt(t)}{t>0 && t===min ? ' · termurah' : ''}</b>
+                        <span style={{ color:'var(--ink2)' }}>{o.label||`Opsi ${i+1}`}{i===f.recommendedIndex && ' · rekomendasi'} {o.venue?`· ${o.venue}`:''}</span>
+                        <b style={{ color: t>0 && t===min ? 'var(--ok)' : 'var(--ink)' }}>Rp {fmt(t)}{t>0 && t===min ? ' · termurah' : ''}</b>
                       </div>
                     )
                   })}
@@ -692,26 +686,20 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
               </div>
             )}
           </div>
-        </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
-          <button onClick={onClose} className="btn">Batal</button>
-          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Simpan'}</button>
-        </div>
-      </div>
-    </div>
+    </Sheet>
   )
 }
 function Section({ title, total, children }: { title:string; total:number; children:any }) {
   return (
-    <div className="card" style={{ padding:'10px 12px', background:'var(--bg3)' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}><span style={{ fontSize:12, fontWeight:600 }}>{title}</span><span style={{ fontSize:11, color:'var(--text2)' }}>Rp {fmt(total)}</span></div>
+    <div className="au-box" style={{ padding:12, gap:8, background:'var(--sunken)' }}>
+      <div className="au-row au-between"><span className="lbl">{title}</span><b className="au-small" style={{ fontVariantNumeric:'tabular-nums' }}>Rp {fmt(total)}</b></div>
       {children}
     </div>
   )
 }
 function Trio({ a, b, c, obj, setK }: { a:[string,string]; b:[string,string]; c:[string,string]; obj:any; setK:(k:string,v:any)=>void }) {
   return (
-    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1.3fr', gap:8 }}>
+    <div className="au-grid" style={{ gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr) minmax(0,1.4fr)', gap:8 }}>
       {[a,b].map(([label,key])=>(
         <div key={key}><label style={{ ...lbl, fontSize:10 }}>{label}</label><input type="number" min={0} className="input input-sm" value={obj?.[key]||0} onChange={e=>setK(key,clampNum(e.target.value))} /></div>
       ))}
@@ -719,126 +707,14 @@ function Trio({ a, b, c, obj, setK }: { a:[string,string]; b:[string,string]; c:
     </div>
   )
 }
-function optTab(active:boolean):React.CSSProperties {
-  return { padding:'5px 11px', fontSize:11, fontWeight:600, cursor:'pointer', borderRadius:8,
-    border:`1px solid ${active?'var(--brand)':'var(--border)'}`,
-    background: active?'var(--brand-soft)':'var(--bg3)', color: active?'var(--brand)':'var(--text2)' }
-}
-
 // =====================  REALISASI  =====================
-function RealisasiTab() {
-  const { data:session } = useSession(); const user = session?.user as any
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState<number>(-1)
-  const [items, setItems] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState<any>(null)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    const qs = new URLSearchParams({ kind:'realisasi', year:String(year) }); if (month>=0) qs.set('month', String(month+1))
-    const r = await fetch(`/api/thirdparty?${qs}`).then(r=>r.json()); setItems(r.data||[]); setLoading(false)
-  }, [year, month])
-  useEffect(()=>{ load() }, [load])
-
-  return (
-    <>
-      {(showForm||editing) && <RealisasiForm editing={editing} user={user} onClose={()=>{setShowForm(false);setEditing(null)}} onSaved={()=>{setShowForm(false);setEditing(null);load()}} />}
-      <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexWrap:'wrap', alignItems:'center', flexShrink:0 }}>
-        <select className="input input-sm" style={{ width:130 }} value={month} onChange={e=>setMonth(Number(e.target.value))}>
-          <option value={-1}>Semua Bulan</option>{MONTHS.map((m,i)=><option key={i} value={i}>{m}</option>)}
-        </select>
-        <select className="input input-sm" style={{ width:90 }} value={year} onChange={e=>setYear(Number(e.target.value))}>
-          {[now.getFullYear()+1, now.getFullYear(), now.getFullYear()-1].map(y=><option key={y} value={y}>{y}</option>)}
-        </select>
-        <button onClick={()=>setShowForm(true)} className="btn btn-sm btn-primary" style={{ marginLeft:'auto' }}>+ Realisasi</button>
-      </div>
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
-        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
-         items.length===0 ? <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>📑</div><div>Belum ada realisasi</div></div> : (
-          <div className="card" style={{ overflow:'auto' }}>
-            <table className="wp-table" style={{ minWidth:1000 }}>
-              <thead><tr><th>Nama EO</th><th>Nominal Tagihan</th><th>Nomor PO</th><th>Tgl Vendor BAST</th><th>Tgl Approve BAST</th><th>Nomor Invoice</th><th>Tgl Invoice</th><th></th></tr></thead>
-              <tbody>{items.map(it=>(
-                <tr key={it._id}>
-                  <td style={{ fontSize:11, fontWeight:600 }}>{it.namaEO||'—'}</td>
-                  <td style={{ fontWeight:600 }}>Rp {fmt(it.nominalTagihan)}</td>
-                  <td style={{ fontSize:11 }}>{it.nomorPO||'—'}</td>
-                  <td style={{ fontSize:11 }}>{it.tglVendorBAST?new Date(it.tglVendorBAST).toLocaleDateString('id-ID'):'—'}</td>
-                  <td style={{ fontSize:11 }}>{it.tglApproveBAST?new Date(it.tglApproveBAST).toLocaleDateString('id-ID'):'—'}</td>
-                  <td style={{ fontSize:11 }}>{it.nomorInvoice||'—'}</td>
-                  <td style={{ fontSize:11 }}>{it.tglInvoice?new Date(it.tglInvoice).toLocaleDateString('id-ID'):'—'}</td>
-                  <td style={{ display:'flex', gap:5 }}>
-                    <button onClick={()=>setEditing(it)} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>
-                    <button onClick={async()=>{ if(!confirm(`Hapus realisasi "${it.namaEO||''}"?`))return; await fetch(`/api/thirdparty/${it._id}`,{method:'DELETE'}); toast.success('Realisasi dihapus'); load() }} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑</button>
-                  </td>
-                </tr>
-              ))}</tbody>
-            </table>
-          </div>
-         )}
-      </div>
-    </>
-  )
-}
-
-function RealisasiForm({ editing, user, onClose, onSaved }: { editing?:any; user:any; onClose:()=>void; onSaved:()=>void }) {
-  const now = new Date()
-  const [f, setF] = useState<any>(editing ? {...editing} : { namaEO:'', nominalTagihan:0, nomorPO:'', tglVendorBAST:'', tglApproveBAST:'', nomorInvoice:'', tglInvoice:'', year:now.getFullYear(), month:now.getMonth()+1 })
-  const [saving, setSaving] = useState(false)
-  const set = (k:string,v:any)=>setF((p:any)=>({...p,[k]:v}))
-  async function save() {
-    if (!f.namaEO?.trim()) { toast.error('Isi Nama EO'); return }
-    setSaving(true)
-    try {
-      const d = f.tglInvoice||f.tglVendorBAST ? new Date(f.tglInvoice||f.tglVendorBAST) : null
-      const body = { ...f, kind:'realisasi', nominalTagihan:Number(f.nominalTagihan)||0, createdBy:user?.name, year: d?d.getFullYear():f.year, month: d?d.getMonth()+1:f.month }
-      const url = editing ? `/api/thirdparty/${editing._id}` : '/api/thirdparty'
-      const r = await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
-      if (!r.ok) { toast.error('Gagal menyimpan'); return }
-      toast.success(editing?'Diperbarui':'Realisasi tersimpan'); onSaved()
-    } finally { setSaving(false) }
-  }
-  return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:560 }}>
-        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit Realisasi':'+ Realisasi Event'}</span>
-          <button onClick={onClose} className="btn btn-icon">×</button>
-        </div>
-        <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:11 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Nama EO</label><input className="input" value={f.namaEO} onChange={e=>set('namaEO',e.target.value)} /></div>
-            <div><label style={lbl}>Nominal Tagihan (Rp)</label><MoneyInput currency="IDR" className="input" value={f.nominalTagihan||0} onChange={n=>set('nominalTagihan',n)} /></div>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Nomor PO</label><input className="input" value={f.nomorPO} onChange={e=>set('nomorPO',e.target.value)} /></div>
-            <div><label style={lbl}>Nomor Invoice</label><input className="input" value={f.nomorInvoice} onChange={e=>set('nomorInvoice',e.target.value)} /></div>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Tgl Vendor BAST</label><input type="date" className="input" value={f.tglVendorBAST} onChange={e=>set('tglVendorBAST',e.target.value)} /></div>
-            <div><label style={lbl}>Tgl Approve BAST</label><input type="date" className="input" value={f.tglApproveBAST} onChange={e=>set('tglApproveBAST',e.target.value)} /></div>
-            <div><label style={lbl}>Tgl Invoice</label><input type="date" className="input" value={f.tglInvoice} onChange={e=>set('tglInvoice',e.target.value)} /></div>
-          </div>
-        </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
-          <button onClick={onClose} className="btn">Batal</button>
-          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Simpan'}</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }
-function subtab(active:boolean):React.CSSProperties { return { padding:'8px 16px', fontSize:12.5, fontWeight:600, cursor:'pointer', border:'none', borderBottom:`2px solid ${active?'var(--brand)':'transparent'}`, background:'transparent', color:active?'var(--brand)':'var(--text3)' } }
+// Label gaya .lbl Aurora (mono kecil, huruf besar)
+const lbl: React.CSSProperties = { display:'block', font:'500 11px var(--mono)', letterSpacing:'.06em', textTransform:'uppercase', color:'var(--muted)', marginBottom:6 }
 
 // =====================  SUVENIR (ide usulan + stok)  =====================
 function stockOf(s:any){ return (s.moves||[]).reduce((n:number,m:any)=> n + (m.type==='in' ? Number(m.qty)||0 : -(Number(m.qty)||0)), 0) }
 
-function SuvenirTab() {
+function SuvenirTab({ adding }: { adding:number }) {
   const { data:session } = useSession(); const user = session?.user as any
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -846,106 +722,88 @@ function SuvenirTab() {
   const [editing, setEditing] = useState<any>(null)
   const [moveFor, setMoveFor] = useState<any>(null)
   const [view, setView] = useState<'usulan'|'stok'>('usulan')
+  const [delFor, setDelFor] = useState<any>(null)
+  const first = useState(adding)[0]
 
   const load = useCallback(async () => {
     setLoading(true)
     const r = await fetch('/api/souvenir').then(r=>r.json()).catch(()=>({data:[]})); setItems(r.data||[]); setLoading(false)
   }, [])
   useEffect(()=>{ load() }, [load])
+  useEffect(()=>{ if (adding && adding !== first) setShowForm(true) }, [adding, first])
 
   // Pisahkan berdasarkan kind: usulan vs stok. Barang lama tanpa kind:
   // kalau punya moves -> stok, selain itu -> usulan (biar data lama ga hilang).
   const kindOf = (s:any) => s.kind || ((s.moves||[]).length > 0 ? 'stok' : 'usulan')
+
   const usulanRows = items.filter(s => kindOf(s) === 'usulan')
   const stokRows = items.filter(s => kindOf(s) === 'stok')
 
-  async function del(id:string, nama:string) {
-    if (!confirm(`Hapus suvenir "${nama}"?`)) return
-    await fetch(`/api/souvenir/${id}`, { method:'DELETE' }); toast.success('Dihapus'); load()
+  async function del(id:string) {
+    const r = await fetch(`/api/souvenir/${id}`, { method:'DELETE' }).catch(()=>null)
+    if (!r?.ok) { toast.error('Gagal menghapus'); return }
+    toast.success('Dihapus'); setDelFor(null); load()
   }
 
   return (
     <>
       {(showForm||editing) && <SuvenirForm editing={editing} mode={view} user={user} onClose={()=>{setShowForm(false);setEditing(null)}} onSaved={()=>{setShowForm(false);setEditing(null);load()}} />}
       {moveFor && <StockMoveModal item={moveFor} user={user} onClose={()=>setMoveFor(null)} onSaved={()=>{setMoveFor(null);load()}} />}
-      <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexWrap:'wrap', alignItems:'center', flexShrink:0 }}>
-        <div style={{ display:'flex', gap:3, background:'var(--bg3)', borderRadius:8, padding:3 }}>
-          {(['usulan','stok'] as const).map(v=>(
-            <button key={v} onClick={()=>setView(v)} className="btn btn-sm" style={{ fontSize:11.5, textTransform:'capitalize', background:view===v?'var(--brand)':'transparent', color:view===v?'#fff':'var(--text2)', border:'none' }}>{v==='usulan'?'💡 Usulan':'📦 Stok'}</button>
-          ))}
-        </div>
-        <button onClick={()=>setShowForm(true)} className="btn btn-sm btn-primary" style={{ marginLeft:'auto' }}>+ Suvenir</button>
+      {delFor && <ConfirmSheet danger icon="trash" title="Hapus suvenir" confirmLabel="Ya, hapus" text={<>Hapus suvenir <b>“{delFor.nama}”</b>{kindOf(delFor) === 'stok' ? ' beserta riwayat stoknya' : ''}?</>} onConfirm={() => del(delFor._id)} onClose={() => setDelFor(null)} />}
+      <div className="au-row au-wrap rise" style={{ gap:8 }}>
+        <Seg label="Jenis suvenir" value={view} onChange={setView} options={[['usulan',`Usulan · ${usulanRows.length}`],['stok',`Stok · ${stokRows.length}`]] as const} />
       </div>
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
-        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
-         view==='usulan' ? (
-           usulanRows.length===0 ? <EmptyS text="Belum ada usulan suvenir" /> : (
-             <div className="card" style={{ padding:0, overflowX:'auto' }}>
-               <table className="wp-table" style={{ width:'100%' }}>
-                 <thead><tr>
-                   <th style={{ width:34, textAlign:'center' }}>No</th>
-                   <th>Nama Barang</th>
-                   <th style={{ textAlign:'center', width:90 }}>Jumlah</th>
-                   <th style={{ textAlign:'right', width:130 }}>Harga Satuan</th>
-                   <th style={{ width:120 }}>Link</th>
-                   <th style={{ width:110 }}></th>
-                 </tr></thead>
-                 <tbody>
-                   {usulanRows.map((s,i)=>(
-                     <tr key={s._id}>
-                       <td style={{ textAlign:'center', fontSize:11, color:'var(--text3)' }}>{i+1}</td>
-                       <td>
-                         <div style={{ fontSize:12.5, fontWeight:600 }}>{s.nama}</div>
-                         {s.deskripsi && <div style={{ fontSize:10.5, color:'var(--text3)' }}>{s.deskripsi}</div>}
-                       </td>
-                       <td style={{ textAlign:'center', fontSize:12 }}>{s.jumlahUsulan||0}</td>
-                       <td style={{ textAlign:'right', fontSize:12 }}>{s.hargaSatuan>0?`Rp ${fmt(s.hargaSatuan)}`:'—'}</td>
-                       <td>{s.link ? <a href={s.link} target="_blank" rel="noopener noreferrer" style={{ fontSize:10.5, color:'var(--brand)' }}>🔗 Buka</a> : <span style={{ fontSize:11, color:'var(--text3)' }}>—</span>}</td>
-                       <td style={{ textAlign:'right' }}>
-                         <button onClick={()=>setEditing(s)} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>{' '}
-                         <button onClick={()=>del(s._id,s.nama)} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑</button>
-                       </td>
-                     </tr>
-                   ))}
-                 </tbody>
-               </table>
-             </div>
-           )
-         ) : (
-           stokRows.length===0 ? <EmptyS text="Belum ada barang stok. Klik + Suvenir untuk menambah." /> : (
-             <div className="card" style={{ padding:0, overflowX:'auto' }}>
-               <table className="wp-table" style={{ width:'100%' }}>
-                 <thead><tr>
-                   <th style={{ width:34, textAlign:'center' }}>No</th>
-                   <th>Nama Barang</th>
-                   <th style={{ textAlign:'center', width:120 }}>Stok Tersedia</th>
-                   <th style={{ width:160 }}></th>
-                 </tr></thead>
-                 <tbody>
-                   {stokRows.map((s,i)=>{ const stock = stockOf(s); return (
-                     <tr key={s._id}>
-                       <td style={{ textAlign:'center', fontSize:11, color:'var(--text3)' }}>{i+1}</td>
-                       <td style={{ fontSize:12.5, fontWeight:600 }}>{s.nama}</td>
-                       <td style={{ textAlign:'center', fontSize:15, fontWeight:800, color: stock>0?'var(--green)':stock<0?'var(--red)':'var(--text3)' }}>{stock}</td>
-                       <td style={{ textAlign:'right' }}>
-                         <button onClick={()=>setMoveFor(s)} className="btn btn-sm" style={{ fontSize:10 }}>📥 Stok In/Out</button>{' '}
-                         <button onClick={()=>del(s._id,s.nama)} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑</button>
-                       </td>
-                     </tr>
-                   )})}
-                 </tbody>
-               </table>
-             </div>
-           )
-         )}
-      </div>
+      {loading ? <div className="au-card">{[0,1,2].map(k => <div key={k} className="au-skel" />)}</div> :
+       view==='usulan' ? (
+         usulanRows.length===0 ? <div className="au-card"><Empty title="Belum ada usulan suvenir" action={<button type="button" className="btn btn-primary" onClick={()=>setShowForm(true)}>Tambah usulan</button>} /></div> : (
+           <div className="au-tblw rise">
+             <table className="wp-table au-ctbl">
+               <thead><tr>
+                 <th style={{ width:44, textAlign:'center' }}>No</th>
+                 <th>Nama barang</th>
+                 <th style={{ textAlign:'center', width:90 }}>Jumlah</th>
+                 <th style={{ textAlign:'right', width:140 }}>Harga satuan</th>
+                 <th style={{ textAlign:'right', width:150 }}>Total</th>
+                 <th style={{ width:90 }}>Link</th>
+                 <th style={{ width:100 }}><span className="sr-only">Aksi</span></th>
+               </tr></thead>
+               <tbody>
+                 {usulanRows.map((s,i)=>(
+                   <tr key={s._id}>
+                     <td data-l="No" className="au-xs au-muted" style={{ textAlign:'center' }}>{i+1}</td>
+                     <td className="c-main"><span className="au-col" style={{ gap:2 }}><b className="au-small">{s.nama}</b>{s.deskripsi && <span className="au-xs au-muted">{s.deskripsi}</span>}</span></td>
+                     <td data-l="Jumlah" style={{ textAlign:'center' }}>{s.jumlahUsulan||0}</td>
+                     <td data-l="Harga satuan" style={{ textAlign:'right', whiteSpace:'nowrap' }}>{s.hargaSatuan>0?`Rp ${fmt(s.hargaSatuan)}`:'—'}</td>
+                     <td data-l="Total" style={{ textAlign:'right', fontWeight:700, whiteSpace:'nowrap' }}>{s.hargaSatuan>0 && s.jumlahUsulan>0 ? `Rp ${fmt(s.hargaSatuan*s.jumlahUsulan)}` : '—'}</td>
+                     <td data-l="Link">{s.link ? <a href={s.link} target="_blank" rel="noopener noreferrer" className="au-link au-row au-xs" style={{ gap:4 }}><Icon name="ext" size={13} />Buka</a> : <span className="au-xs au-muted">—</span>}</td>
+                     <td className="c-act"><span className="au-row" style={{ gap:4, justifyContent:'flex-end' }}>
+                       <button type="button" onClick={()=>setEditing(s)} className="btn btn-icon btn-sm" aria-label={`Edit ${s.nama}`} title="Edit"><Icon name="edit" size={15} /></button>
+                       <button type="button" onClick={()=>setDelFor(s)} className="btn btn-icon btn-sm" aria-label={`Hapus ${s.nama}`} title="Hapus"><Icon name="trash" size={15} /></button>
+                     </span></td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+           </div>
+         )
+       ) : (
+         stokRows.length===0 ? <div className="au-card"><Empty title="Belum ada barang stok" text="Tambahkan barang beserta stok awalnya." action={<button type="button" className="btn btn-primary" onClick={()=>setShowForm(true)}>Tambah barang</button>} /></div> : (
+           <div className="au-sgrid">
+             {stokRows.map(s=>{ const stock = stockOf(s); return (
+               <article key={s._id} className="au-card au-stock rise">
+                 <span className="au-row au-between" style={{ gap:8, alignItems:'flex-start' }}><b className="au-small" style={{ overflowWrap:'anywhere' }}>{s.nama}</b>
+                   <button type="button" onClick={()=>setDelFor(s)} className="btn btn-icon btn-sm" aria-label={`Hapus ${s.nama}`} title="Hapus"><Icon name="trash" size={14} /></button></span>
+                 <span className="au-col" style={{ gap:0 }}><b className="n" style={{ color: stock>0?'var(--ok)':stock<0?'var(--bad)':'var(--muted)' }}>{stock}</b><span className="au-xs au-muted">stok tersedia · {(s.moves||[]).length} catatan</span></span>
+                 <button type="button" onClick={()=>setMoveFor(s)} className="btn btn-sm" style={{ alignSelf:'flex-start' }}><Icon name="arrow" size={14} />Stok masuk / keluar</button>
+               </article>
+             )})}
+           </div>
+         )
+       )}
     </>
   )
 }
 
-function EmptyS({ text }: { text:string }) {
-  return <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>🎁</div><div style={{ fontSize:12 }}>{text}</div></div>
-}
 
 function SuvenirForm({ editing, mode, user, onClose, onSaved }: { editing?:any; mode:'usulan'|'stok'; user:any; onClose:()=>void; onSaved:()=>void }) {
   const isStok = mode === 'stok' && !editing   // form stok cuma buat tambah baru
@@ -968,36 +826,24 @@ function SuvenirForm({ editing, mode, user, onClose, onSaved }: { editing?:any; 
     } catch { toast.error('Gagal') } finally { setSaving(false) }
   }
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:isStok?420:500, maxWidth:'100%' }}>
-        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit Suvenir':isStok?'+ Barang Stok':'+ Usulan Suvenir'}</span>
-          <button onClick={onClose} className="btn btn-icon">×</button>
-        </div>
-        <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:11, maxHeight:'70vh', overflowY:'auto' }}>
-          <div><label style={lbl}>Nama Barang *</label><input className="input" value={f.nama} onChange={e=>set('nama',e.target.value)} placeholder="mis. Omron Wrist" /></div>
+    <Sheet open title={editing?'Edit suvenir':isStok?'Barang stok baru':'Usulan suvenir'} onClose={onClose} onSave={save} saveDisabled={saving} saveLabel={saving ? 'Menyimpan…' : 'Simpan'}>
+          <label style={{ display:'block' }}><span style={lbl}>Nama Barang *</span><input className="input" value={f.nama} onChange={e=>set('nama',e.target.value)} placeholder="mis. Omron Wrist" /></label>
           {isStok ? (
             // Form STOK: cukup nama + jumlah stok awal
-            <div><label style={lbl}>Jumlah Stok Awal</label><input type="number" min={0} className="input" value={stokAwal} onChange={e=>setStokAwal(Math.max(0,Number(e.target.value)||0))} placeholder="0" /><div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Bisa diubah nanti lewat tombol Stok In/Out.</div></div>
+            <div><label style={lbl}>Jumlah Stok Awal</label><input type="number" aria-label="Jumlah stok awal" min={0} className="input" value={stokAwal} onChange={e=>setStokAwal(Math.max(0,Number(e.target.value)||0))} placeholder="0" /><div className="au-xs au-muted" style={{ marginTop:6 }}>Bisa diubah nanti lewat tombol Stok masuk / keluar.</div></div>
           ) : (
             // Form USULAN: nama + jumlah + harga + link
             <>
-              <div><label style={lbl}>Deskripsi</label><textarea className="input" rows={2} value={f.deskripsi} onChange={e=>set('deskripsi',e.target.value)} style={{ resize:'vertical' }} /></div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                <div><label style={lbl}>Harga Satuan</label><MoneyInput currency="IDR" className="input" value={f.hargaSatuan} onChange={n=>set('hargaSatuan',Math.max(0,Number(n)||0))} /></div>
-                <div><label style={lbl}>Jumlah Usulan</label><input type="number" min={0} className="input" value={f.jumlahUsulan} onChange={e=>set('jumlahUsulan',Math.max(0,Number(e.target.value)||0))} /></div>
+              <label style={{ display:'block' }}><span style={lbl}>Deskripsi</span><textarea className="input" rows={2} value={f.deskripsi} onChange={e=>set('deskripsi',e.target.value)} style={{ resize:'vertical' }} /></label>
+              <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10 }}>
+                <label style={{ display:'block' }}><span style={lbl}>Harga Satuan</span><MoneyInput currency="IDR" className="input" value={f.hargaSatuan} onChange={n=>set('hargaSatuan',Math.max(0,Number(n)||0))} /></label>
+                <label style={{ display:'block' }}><span style={lbl}>Jumlah Usulan</span><input type="number" min={0} className="input" value={f.jumlahUsulan} onChange={e=>set('jumlahUsulan',Math.max(0,Number(e.target.value)||0))} /></label>
               </div>
-              <div><label style={lbl}>Link E-commerce</label><input className="input" value={f.link} onChange={e=>set('link',e.target.value)} placeholder="https://..." /></div>
-              <div><label style={lbl}>Catatan</label><textarea className="input" rows={2} value={f.catatan} onChange={e=>set('catatan',e.target.value)} style={{ resize:'vertical' }} /></div>
+              <label style={{ display:'block' }}><span style={lbl}>Link E-commerce</span><input className="input" value={f.link} onChange={e=>set('link',e.target.value)} placeholder="https://..." /></label>
+              <label style={{ display:'block' }}><span style={lbl}>Catatan</span><textarea className="input" rows={2} value={f.catatan} onChange={e=>set('catatan',e.target.value)} style={{ resize:'vertical' }} /></label>
             </>
           )}
-        </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
-          <button onClick={onClose} className="btn">Batal</button>
-          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Simpan'}</button>
-        </div>
-      </div>
-    </div>
+    </Sheet>
   )
 }
 
@@ -1018,51 +864,36 @@ function StockMoveModal({ item, user, onClose, onSaved }: { item:any; user:any; 
       toast.success('Stok diperbarui'); onSaved()
     } catch { toast.error('Gagal') } finally { setSaving(false) }
   }
+  const [rmAsk, setRmAsk] = useState<string|null>(null)
   async function removeMove(id:string) {
-    if (!confirm('Hapus catatan stok ini?')) return
+    if (rmAsk !== id) { setRmAsk(id); return }
     const r = await fetch(`/api/souvenir/${item._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ removeMoveId:id }) })
-    if (r.ok) { toast.success('Dihapus'); onSaved() }
+    if (r.ok) { toast.success('Dihapus'); onSaved() } else toast.error('Gagal menghapus')
   }
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:460, maxWidth:'100%' }}>
-        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <div><div style={{ fontSize:14, fontWeight:700 }}>{item.nama}</div><div style={{ fontSize:11, color:'var(--text3)' }}>Stok saat ini: <b style={{ color: stock>0?'var(--green)':'var(--text2)' }}>{stock}</b></div></div>
-          <button onClick={onClose} className="btn btn-icon">×</button>
-        </div>
-        <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:11 }}>
-          <div style={{ display:'flex', gap:6 }}>
-            <button onClick={()=>setType('in')} className="btn btn-sm" style={{ flex:1, background:type==='in'?'#22c55e22':'var(--bg3)', color:type==='in'?'#16a34a':'var(--text2)', borderColor:type==='in'?'#22c55e':'var(--border)' }}>📥 Masuk (In)</button>
-            <button onClick={()=>setType('out')} className="btn btn-sm" style={{ flex:1, background:type==='out'?'#dc262622':'var(--bg3)', color:type==='out'?'#dc2626':'var(--text2)', borderColor:type==='out'?'#dc2626':'var(--border)' }}>📤 Keluar (Out)</button>
+    <Sheet open title={item.nama} onClose={onClose} onSave={save} saveDisabled={saving} saveLabel={saving ? 'Menyimpan…' : 'Simpan'}>
+          <span className="au-small au-ink2">Stok saat ini: <b style={{ color: stock>0?'var(--ok)':'var(--ink2)' }}>{stock}</b></span>
+          <Seg full label="Jenis gerakan" value={type} onChange={setType} options={[['in','Masuk'],['out','Keluar']] as const} />
+          <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:10 }}>
+            <label style={{ display:'block' }}><span style={lbl}>Jumlah</span><input type="number" min={1} className="input" value={qty} onChange={e=>setQty(Math.max(0,Number(e.target.value)||0))} /></label>
+            <label style={{ display:'block' }}><span style={lbl}>Tanggal</span><input type="date" className="input" value={date} onChange={e=>setDate(e.target.value)} /></label>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Jumlah</label><input type="number" min={1} className="input" value={qty} onChange={e=>setQty(Math.max(0,Number(e.target.value)||0))} /></div>
-            <div><label style={lbl}>Tanggal</label><input type="date" className="input" value={date} onChange={e=>setDate(e.target.value)} /></div>
-          </div>
-          <div><label style={lbl}>Keterangan</label><input className="input" value={note} onChange={e=>setNote(e.target.value)} placeholder="mis. beli batch 1 / dipakai event UAT" /></div>
+          <label style={{ display:'block' }}><span style={lbl}>Keterangan</span><input className="input" value={note} onChange={e=>setNote(e.target.value)} placeholder="mis. beli batch 1 / dipakai event UAT" /></label>
           {(item.moves||[]).length>0 && (
-            <div style={{ borderTop:'1px solid var(--border)', paddingTop:8 }}>
-              <div style={{ fontSize:10.5, fontWeight:700, color:'var(--text3)', textTransform:'uppercase', marginBottom:6 }}>Riwayat stok</div>
-              <div style={{ maxHeight:150, overflowY:'auto', display:'flex', flexDirection:'column', gap:3 }}>
+            <div className="au-col" style={{ gap:8 }}>
+              <span className="lbl">Riwayat stok</span>
+              <div className="au-ig" style={{ maxHeight:220, overflowY:'auto' }}>
                 {(item.moves||[]).slice().reverse().map((m:any)=>(
-                  <div key={m._id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:10.5, padding:'3px 6px', background:'var(--bg3)', borderRadius:6 }}>
-                    <span style={{ color:'var(--text3)' }}>{m.date||'—'} · {m.note||'-'}</span>
-                    <span style={{ display:'flex', gap:6, alignItems:'center' }}>
-                      <b style={{ color: m.type==='in'?'var(--green)':'var(--red)' }}>{m.type==='in'?'+':'−'}{m.qty}</b>
-                      <button onClick={()=>removeMove(m._id)} className="btn btn-icon btn-sm" style={{ color:'var(--red)', fontSize:10 }}>×</button>
-                    </span>
+                  <div key={m._id} className="au-igr" style={{ minHeight:44, padding:'6px 10px 6px 14px' }}>
+                    <span className="au-xs au-ink2" style={{ flex:1, minWidth:0 }}>{m.date||'—'} · {m.note||'-'}</span>
+                    <b style={{ color: m.type==='in'?'var(--ok)':'var(--bad)', fontVariantNumeric:'tabular-nums' }}>{m.type==='in'?'+':'−'}{m.qty}</b>
+                    <button type="button" onClick={()=>removeMove(m._id)} className={`btn btn-sm${rmAsk===m._id?' btn-danger':' btn-icon'}`} aria-label="Hapus catatan stok">{rmAsk===m._id ? 'Hapus?' : <Icon name="x" size={13} />}</button>
                   </div>
                 ))}
               </div>
             </div>
           )}
-        </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
-          <button onClick={onClose} className="btn">Tutup</button>
-          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Simpan'}</button>
-        </div>
-      </div>
-    </div>
+    </Sheet>
   )
 }
 
@@ -1129,41 +960,36 @@ function RealisasiFinalModal({ it, user, onClose, onSaved }: { it:any; user:any;
   }
 
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:640, maxWidth:'100%' }}>
-        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <div><div style={{ fontSize:14, fontWeight:700 }}>Realisasi Final</div><div style={{ fontSize:11, color:'var(--text3)' }}>{it.judulKegiatan||'(tanpa judul)'} · biaya aktual pelaksanaan</div></div>
-          <button onClick={onClose} className="btn btn-icon">×</button>
-        </div>
-        <div style={{ padding:'14px 20px', maxHeight:'72vh', overflowY:'auto', display:'flex', flexDirection:'column', gap:11 }}>
+    <Sheet open wide title="Realisasi final" onClose={onClose} onSave={save} saveDisabled={saving} saveLabel={saving ? 'Menyimpan…' : 'Simpan'}>
+          <span className="au-small au-ink2">{it.judulKegiatan||'(tanpa judul)'} · biaya aktual pelaksanaan</span>
           {opts.length>1 && (
             <div>
-              <label style={lbl}>Opsi yang dipakai</label>
+              <span style={lbl}>Opsi yang dipakai</span>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {opts.map((o:any,i:number)=>(
-                  <button key={i} onClick={()=>loadFromOption(i)} className="btn btn-sm" style={{ fontSize:10.5, background:pickedOpt===i?'var(--brand-soft)':'var(--bg3)', color:pickedOpt===i?'var(--brand)':'var(--text2)', borderColor:pickedOpt===i?'var(--brand)':'var(--border)' }}>{o.label||`Opsi ${i+1}`}{i===recIdx?' ⭐':''}</button>
+                  <button type="button" key={i} onClick={()=>loadFromOption(i)} className="au-chip" aria-pressed={pickedOpt===i}>{o.label||`Opsi ${i+1}`}{i===recIdx?' · rek':''}</button>
                 ))}
               </div>
-              <div style={{ fontSize:9.5, color:'var(--text3)', marginTop:4 }}>Pilih opsi untuk isi otomatis dari rencana, lalu sesuaikan angka aktualnya.</div>
+              <div className="au-xs au-muted" style={{ marginTop:6 }}>Pilih opsi untuk isi otomatis dari rencana, lalu sesuaikan angka aktualnya.</div>
             </div>
           )}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Venue</label><input className="input input-sm" value={f.finalVenue} onChange={e=>set('finalVenue',e.target.value)} /></div>
-            <div><label style={lbl}>Kota</label><input className="input input-sm" value={f.finalKota} onChange={e=>set('finalKota',e.target.value)} /></div>
-            <div><label style={lbl}>EO</label><input className="input input-sm" value={f.finalNamaEO} onChange={e=>set('finalNamaEO',e.target.value)} /></div>
+          <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:10 }}>
+            <label style={{ display:'block' }}><span style={lbl}>Venue</span><input className="input input-sm" value={f.finalVenue} onChange={e=>set('finalVenue',e.target.value)} /></label>
+            <label style={{ display:'block' }}><span style={lbl}>Kota</span><input className="input input-sm" value={f.finalKota} onChange={e=>set('finalKota',e.target.value)} /></label>
+            <label style={{ display:'block' }}><span style={lbl}>EO</span><input className="input input-sm" value={f.finalNamaEO} onChange={e=>set('finalNamaEO',e.target.value)} /></label>
           </div>
 
-          <div className="card" style={{ padding:'10px 12px', background:'var(--bg3)' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}><span style={{ fontSize:12, fontWeight:600 }}>Meeting Room</span><span style={{ fontSize:11, color:'var(--text2)' }}>Rp {fmt(mr)}</span></div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1.3fr', gap:8 }}>
+          <div className="au-box" style={{ padding:12, gap:8, background:'var(--sunken)' }}>
+            <div className="au-row au-between"><span className="lbl">Meeting Room</span><b className="au-small">Rp {fmt(mr)}</b></div>
+            <div className="au-grid" style={{ gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr) minmax(0,1.4fr)', gap:8 }}>
               <div><label style={{ ...lbl, fontSize:10 }}>Pax</label><input type="number" min={0} className="input input-sm" value={f.finalMrPax||0} onChange={e=>set('finalMrPax',clampNum(e.target.value))} /></div>
               <div><label style={{ ...lbl, fontSize:10 }}>Days</label><input type="number" min={0} className="input input-sm" value={f.finalMrDays||0} onChange={e=>set('finalMrDays',clampNum(e.target.value))} /></div>
               <div><label style={{ ...lbl, fontSize:10 }}>Price/pax/day</label><MoneyInput currency="IDR" className="input input-sm" value={f.finalMrPrice||0} onChange={n=>set('finalMrPrice',clampNum(n))} /></div>
             </div>
           </div>
-          <div className="card" style={{ padding:'10px 12px', background:'var(--bg3)' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}><span style={{ fontSize:12, fontWeight:600 }}>Bedroom</span><span style={{ fontSize:11, color:'var(--text2)' }}>Rp {fmt(br)}</span></div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1.3fr', gap:8 }}>
+          <div className="au-box" style={{ padding:12, gap:8, background:'var(--sunken)' }}>
+            <div className="au-row au-between"><span className="lbl">Bedroom</span><b className="au-small">Rp {fmt(br)}</b></div>
+            <div className="au-grid" style={{ gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr) minmax(0,1.4fr)', gap:8 }}>
               <div><label style={{ ...lbl, fontSize:10 }}>Rooms</label><input type="number" min={0} className="input input-sm" value={f.finalBrRooms||0} onChange={e=>set('finalBrRooms',clampNum(e.target.value))} /></div>
               <div><label style={{ ...lbl, fontSize:10 }}>Nights</label><input type="number" min={0} className="input input-sm" value={f.finalBrNights||0} onChange={e=>set('finalBrNights',clampNum(e.target.value))} /></div>
               <div><label style={{ ...lbl, fontSize:10 }}>Price/room/night</label><MoneyInput currency="IDR" className="input input-sm" value={f.finalBrPrice||0} onChange={n=>set('finalBrPrice',clampNum(n))} /></div>
@@ -1172,45 +998,33 @@ function RealisasiFinalModal({ it, user, onClose, onSaved }: { it:any; user:any;
 
           <div>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-              <span style={{ fontSize:12, fontWeight:600 }}>Others</span>
-              <button onClick={addItem} className="btn btn-sm">+ Item</button>
+              <span className="lbl">Others</span>
+              <button type="button" onClick={addItem} className="btn btn-sm"><Icon name="plus" size={14} />Item</button>
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {(f.finalItems||[]).length===0 && <div style={{ fontSize:10.5, color:'var(--text3)' }}>Belum ada item.</div>}
+              {(f.finalItems||[]).length===0 && <div className="au-xs au-muted">Belum ada item.</div>}
               {(f.finalItems||[]).map((o:any,i:number)=>(
-                <div key={i} style={{ display:'grid', gridTemplateColumns:'1.3fr 70px 70px 110px 90px 28px', gap:6, alignItems:'center' }}>
+                <div key={i} className="au-othrow">
                   <input className="input input-sm" placeholder="Label" value={o.label||''} onChange={e=>setItem(i,'label',e.target.value)} />
                   <input type="number" min={0} className="input input-sm" placeholder="Pax" value={o.pax||0} onChange={e=>setItem(i,'pax',clampNum(e.target.value))} />
                   <input type="number" min={0} className="input input-sm" placeholder="Times" value={o.times||0} onChange={e=>setItem(i,'times',clampNum(e.target.value))} />
                   <MoneyInput currency="IDR" className="input input-sm" placeholder="Price" value={o.price||0} onChange={n=>setItem(i,'price',clampNum(n))} />
-                  <span style={{ fontSize:10, color:'var(--text2)', textAlign:'right' }}>Rp {fmt(otherTotal(o))}</span>
-                  <button onClick={()=>delItem(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
+                  <span className="au-xs au-ink2 sum">Rp {fmt(otherTotal(o))}</span>
+                  <button type="button" onClick={()=>delItem(i)} className="btn btn-icon btn-sm del" aria-label={`Hapus item ${o.label||i+1}`}><Icon name="x" size={13} /></button>
                 </div>
               ))}
             </div>
           </div>
 
-          <div><label style={lbl}>Catatan Realisasi</label><textarea className="input input-sm" rows={2} value={f.finalCatatan||''} onChange={e=>set('finalCatatan',e.target.value)} style={{ resize:'vertical' }} /></div>
+          <label style={{ display:'block' }}><span style={lbl}>Catatan Realisasi</span><textarea className="input input-sm" rows={2} value={f.finalCatatan||''} onChange={e=>set('finalCatatan',e.target.value)} style={{ resize:'vertical' }} /></label>
 
-          <div style={{ padding:'12px 14px', background:'var(--brand-soft)', borderRadius:10, border:'1px solid var(--brand)' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:2 }}><span>Subtotal</span><b>Rp {fmt(sub)}</b></div>
-            <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, color:'var(--amber)', marginBottom:2 }}><span>EO Handling &amp; Mgmt Fee (10%)</span><b>Rp {fmt(fee)}</b></div>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', borderTop:'1px solid var(--brand)', paddingTop:6, marginTop:4 }}>
-              <span style={{ fontSize:12, fontWeight:800, color:'var(--brand)' }}>TOTAL REALISASI</span>
-              <span style={{ fontSize:18, fontWeight:800, color:'var(--brand)' }}>Rp {fmt(total)}</span>
-            </div>
-            {estimasi>0 && (
-              <div style={{ fontSize:10.5, textAlign:'right', marginTop:4, fontWeight:700, color: diff>0?'var(--red)':'var(--green)' }}>
-                {diff>0?'▲ Lebih':'▼ Hemat'} Rp {fmt(Math.abs(diff))} dari estimasi (Rp {fmt(estimasi)})
-              </div>
-            )}
+          <div className="au-ig">
+            <div className="au-igr"><span className="k">Subtotal</span><span className="v">Rp {fmt(sub)}</span></div>
+            <div className="au-igr"><span className="k">EO handling &amp; mgmt fee (10%)</span><span className="v" style={{ color:'var(--warn)' }}>Rp {fmt(fee)}</span></div>
           </div>
-        </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
-          <button onClick={onClose} className="btn">Batal</button>
-          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Simpan Realisasi'}</button>
-        </div>
-      </div>
-    </div>
+          <div className="au-total" style={{ flexWrap:'wrap' }}><span className="lbl">Total realisasi</span><b>Rp {fmt(total)}</b>
+            {estimasi>0 && <span className="au-xs" style={{ width:'100%', textAlign:'right', fontWeight:700, color: diff>0?'var(--bad)':'var(--ok)' }}>{diff>0?'Lebih':'Hemat'} Rp {fmt(Math.abs(diff))} dari estimasi (Rp {fmt(estimasi)})</span>}
+          </div>
+    </Sheet>
   )
 }

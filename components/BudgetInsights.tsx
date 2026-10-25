@@ -1,57 +1,61 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { cachedFetch } from '@/lib/fetchCache'
-import {
-  ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  PieChart, Pie, Cell,
-} from 'recharts'
+import { useYear } from '@/lib/year'
+import { Ring } from '@/components/ui'
 
-const C = { plan: '#4f8ef7', real: '#22c55e', realLow: '#f59e0b', used: '#ef4444', avail: '#4f8ef7', purple: '#8b7adc', amber: '#f59e0b' }
-const PIE_COLORS = ['#4f8ef7', '#8b7adc', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4']
-
+// Infografis budget tanpa library chart (ringan). Satu sumbu: batang "track" = Plan (RKAP),
+// isi = realisasi/terpakai, garis tegak = prognosa (threshold × RKAP). Angka selalu tertulis.
 const rp = (n: number) => 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.round(n || 0))
 function rpShort(n: number) {
   const a = Math.abs(n)
-  if (a >= 1e12) return (n / 1e12).toFixed(1) + ' T'
-  if (a >= 1e9) return (n / 1e9).toFixed(1) + ' M'
-  if (a >= 1e6) return (n / 1e6).toFixed(0) + ' jt'
-  if (a >= 1e3) return (n / 1e3).toFixed(0) + ' rb'
-  return String(n)
+  const f = (v: number, u: string) => new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(v) + ' ' + u
+  if (a >= 1e12) return f(n / 1e12, 'T')
+  if (a >= 1e9) return f(n / 1e9, 'M')
+  if (a >= 1e6) return f(n / 1e6, 'jt')
+  if (a >= 1e3) return f(n / 1e3, 'rb')
+  return String(Math.round(n))
 }
 const catName = (k: string) => k === 'travel' ? 'Travel Expense' : k === 'accommodation' ? 'External Accommodation' : k
+const toneFor = (pct: number) => pct > 100 ? 'var(--bad)' : 'var(--accent)'
 
-function CardBox({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
+type Bullet = { label: string; plan: number; real: number; prog?: number }
+function BulletRows({ rows, realLabel }: { rows: Bullet[]; realLabel: string }) {
+  const max = Math.max(1, ...rows.map(r => Math.max(r.plan, r.real, r.prog || 0)))
   return (
-    <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', width: '100%' }}>
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>{title}</div>
-        {sub && <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{sub}</div>}
-      </div>
-      {children}
+    <div className="au-col" style={{ gap: 14 }}>
+      {rows.map(r => {
+        const pct = r.plan > 0 ? (r.real / r.plan) * 100 : 0
+        const desc = `${r.label}: Plan ${rp(r.plan)}, ${realLabel} ${rp(r.real)} (${pct.toFixed(1)}%)${r.prog != null ? `, prognosa ${rp(r.prog)}` : ''}`
+        return (
+          <div key={r.label} className="au-bullet" title={desc}>
+            <span className="au-row au-between" style={{ gap: 8 }}>
+              <b className="au-small" style={{ fontFamily: 'var(--mono)' }}>{r.label}</b>
+              <span className="au-xs au-ink2" style={{ fontVariantNumeric: 'tabular-nums' }}><b style={{ color: 'var(--ink)' }}>{rpShort(r.real)}</b> / {rpShort(r.plan)} · <b style={{ color: pct > 100 ? 'var(--bad)' : 'var(--ink)' }}>{pct.toFixed(1)}%</b></span>
+            </span>
+            <span className="bar" role="img" aria-label={desc}>
+              <i className="plan" style={{ width: `${(r.plan / max) * 100}%` }} />
+              <i className="real" style={{ width: `${(Math.min(r.real, max) / max) * 100}%`, background: toneFor(pct) }} />
+              {r.prog != null && r.prog > 0 && <i className="prog" style={{ left: `calc(${(r.prog / max) * 100}% - 1px)` }} />}
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }
-
-function TipBox({ rows }: { rows: { name: string; val: string; color?: string }[] }) {
-  return (
-    <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 11.5, boxShadow: '0 4px 14px rgba(0,0,0,0.18)' }}>
-      {rows.map((r, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '1px 0' }}>
-          {r.color && <span style={{ width: 9, height: 9, borderRadius: 2, background: r.color, display: 'inline-block' }} />}
-          <span style={{ color: 'var(--text3)' }}>{r.name}:</span><b>{r.val}</b>
-        </div>
-      ))}
-    </div>
-  )
+function Legend({ items }: { items: { label: string; kind: 'plan' | 'real' | 'prog' }[] }) {
+  return <div className="au-row au-wrap au-xs au-ink2" style={{ gap: 14 }}>{items.map(i => <span key={i.label} className="au-row" style={{ gap: 6 }}><i className={`au-lg ${i.kind}`} />{i.label}</span>)}</div>
 }
 
 export default function BudgetInsights({ section }: { section?: 'yield' | 'realpct' | 'prognosa' | 'cashcard' }) {
+  const { year } = useYear()
   const [rows, setRows] = useState<any[]>([])
   const [thr, setThr] = useState({ travel: 80, accommodation: 80 })
   const [loading, setLoading] = useState(true)
+  const [ccData, setCcData] = useState<{ topup: number; settlement: number } | null>(null)
 
-  // cachedFetch: komponen ini dirender s/d 4x (yield/realpct/prognosa/cashcard).
-  // Tanpa dedupe, tiap instance nembak API sama -> request duplikat & dashboard lemot.
+  // cachedFetch: komponen ini dirender s/d 4x (yield/realpct/prognosa/cashcard) → 1 request saja.
   useEffect(() => {
     (async () => {
       try {
@@ -68,184 +72,92 @@ export default function BudgetInsights({ section }: { section?: 'yield' | 'realp
       } finally { setLoading(false) }
     })()
   }, [])
-
-  const [viewYear, setViewYear] = useState(new Date().getFullYear())
-  const [ccData, setCcData] = useState<{topup:number;settlement:number}|null>(null)
-  const [ccYear, setCcYear] = useState(new Date().getFullYear())
-
-  // Data cash card cuma dibutuhkan section 'cashcard' -> instance lain ga usah fetch
+  // Data cash card hanya untuk section 'cashcard'
   useEffect(() => {
     if (section && section !== 'cashcard') return
-    cachedFetch(`/api/cashcard/summary?year=${ccYear}`).then(d=>setCcData(d.data||null)).catch(()=>setCcData(null))
-  }, [ccYear, section])
+    cachedFetch(`/api/cashcard/summary?year=${year}`).then(d => setCcData(d.data || null)).catch(() => setCcData(null))
+  }, [year, section])
 
-  const { trend, realPctData, budgetBars, catColors, legendCats, hasData } = useMemo(() => {
+  const { trend, realPctData, budgetBars, hasData } = useMemo(() => {
     const byYear: Record<number, any[]> = {}
     for (const r of rows) { (byYear[r.year] = byYear[r.year] || []).push(r) }
     const years = Object.keys(byYear).map(Number).sort((a, b) => a - b)
-    const trend = years.map(y => {
-      const list = byYear[y]
-      const plan = list.reduce((s, r) => s + (r.annualBudgetIDR || 0), 0)
-      const real = list.reduce((s, r) => s + (r.annualRealIDR || 0), 0)
-      return { year: String(y), plan, real, pct: plan > 0 ? +(real / plan * 100).toFixed(1) : 0 }
-    })
-
+    const sum = (list: any[], k: string) => list.reduce((s, r) => s + (r[k] || 0), 0)
+    const trend: Bullet[] = years.map(y => ({ label: String(y), plan: sum(byYear[y], 'annualBudgetIDR'), real: sum(byYear[y], 'annualRealIDR') }))
     const catKeys = Array.from(new Set(rows.map(r => r.category)))
-    const catColors: Record<string, string> = {}
-    catKeys.forEach((k, i) => { catColors[k] = PIE_COLORS[i % PIE_COLORS.length] })
-    const legendCats = catKeys.map(k => ({ key: k, name: catName(k) }))
-
-    // % Realisasi per cost element for viewYear
-    const yrList = byYear[viewYear] || []
+    const yrList = byYear[year] || []
     const realPctData = catKeys.map(k => {
       const items = yrList.filter(r => r.category === k)
-      const plan = items.reduce((s, r) => s + (r.annualBudgetIDR || 0), 0)
-      const real = items.reduce((s, r) => s + (r.annualRealIDR || 0), 0)
-      return { key: k, name: catName(k), plan, real, pct: plan > 0 ? Math.round(real / plan * 100) : 0, color: catColors[k] }
-    })
-
-    const last3 = years.slice(-3)
+      const plan = sum(items, 'annualBudgetIDR'), real = sum(items, 'annualRealIDR')
+      return { key: k, name: catName(k), plan, real, pct: plan > 0 ? Math.round(real / plan * 100) : 0 }
+    }).filter(d => d.plan > 0 || d.real > 0)
     const thrOf = (cat: string) => (cat === 'travel' ? thr.travel : cat === 'accommodation' ? thr.accommodation : 80) / 100
-    const budgetBars = last3.map(y => {
+    const budgetBars: Bullet[] = years.slice(-3).map(y => {
       const list = byYear[y] || []
-      const plan = list.reduce((s, r) => s + (r.annualBudgetIDR || 0), 0)
-      const real = list.reduce((s, r) => s + (r.annualRealIDR || 0), 0)
-      const prog = list.reduce((s, r) => s + (r.annualBudgetIDR || 0) * thrOf(r.category), 0)
-      return { year: String(y), RKAP: plan, Terpakai: real, Sisa: Math.max(0, plan - real), Prognosa: prog }
+      return { label: String(y), plan: sum(list, 'annualBudgetIDR'), real: sum(list, 'annualRealIDR'), prog: list.reduce((s, r) => s + (r.annualBudgetIDR || 0) * thrOf(r.category), 0) }
     })
+    return { trend, realPctData, budgetBars, hasData: rows.length > 0 }
+  }, [rows, thr, year])
 
-    return { trend, realPctData, budgetBars, catColors, legendCats, hasData: rows.length > 0 }
-  }, [rows, thr, viewYear])
-
-  if (loading) return <div className="card" style={{ padding: 20, fontSize: 12.5, color: 'var(--text3)' }}>Memuat infografis budget…</div>
+  if (loading) return <section className="au-card"><div className="au-skel" style={{ width: '40%' }} /><div className="au-skel" /><div className="au-skel" /></section>
   if (!hasData) return null
-
-
-  const showAll = !section
-  const show = (s: string) => showAll || section === s
+  const show = (s: string) => !section || section === s
 
   return (
     <>
       {show('yield') && (
-        <CardBox title="Yield — Plan vs Realisasi per Tahun" sub="Tren RKAP & realisasi (IDR) + % realisasi">
-          <ResponsiveContainer width="100%" height={240}>
-            <ComposedChart data={trend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="year" tick={{ fontSize: 11, fill: 'var(--text3)' }} />
-              <YAxis yAxisId="l" tickFormatter={rpShort} tick={{ fontSize: 10, fill: 'var(--text3)' }} width={48} />
-              <YAxis yAxisId="r" orientation="right" tickFormatter={(v) => v + '%'} tick={{ fontSize: 10, fill: 'var(--text3)' }} width={36} domain={[0, 'dataMax + 10']} />
-              <Tooltip content={({ active, payload, label }: any) => active && payload?.length ? (
-                <TipBox rows={[
-                  { name: 'Tahun', val: label },
-                  { name: 'Plan', val: rp(payload[0]?.payload.plan), color: C.plan },
-                  { name: 'Realisasi', val: rp(payload[0]?.payload.real), color: C.real },
-                  { name: '% Realisasi', val: payload[0]?.payload.pct + '%', color: C.amber },
-                ]} />) : null} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar yAxisId="l" dataKey="plan" name="Plan (RKAP)" fill={C.plan} radius={[3, 3, 0, 0]} maxBarSize={34} />
-              <Bar yAxisId="l" dataKey="real" name="Realisasi" fill={C.real} radius={[3, 3, 0, 0]} maxBarSize={34} />
-              <Line yAxisId="r" dataKey="pct" name="% Realisasi" stroke={C.amber} strokeWidth={2.5} dot={{ r: 3, fill: C.amber }} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </CardBox>
+        <section className="au-card">
+          <div className="au-col" style={{ gap: 2 }}><h2>Yield · plan vs realisasi</h2><span className="au-xs au-muted">RKAP dan realisasi (IDR) per tahun</span></div>
+          <Legend items={[{ label: 'Plan (RKAP)', kind: 'plan' }, { label: 'Realisasi', kind: 'real' }]} />
+          <BulletRows rows={trend} realLabel="realisasi" />
+        </section>
       )}
 
       {show('realpct') && (
-        <CardBox title={`% Realisasi ${viewYear}`} sub="Realisasi dibanding Plan (RKAP) per cost element">
-          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginBottom: 6 }}>
-            <button onClick={()=>setViewYear(y=>y-1)} className="btn btn-sm" style={{ padding:'2px 8px' }}>◀</button>
-            <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40, textAlign: 'center' }}>{viewYear}</span>
-            <button onClick={()=>setViewYear(y=>y+1)} className="btn btn-sm" style={{ padding:'2px 8px' }}>▶</button>
-          </div>
-          {realPctData.length === 0 ? (
-            <div style={{ fontSize: 11, color: 'var(--text3)', padding: '40px 0', textAlign: 'center' }}>Belum ada data {viewYear}.</div>
-          ) : (
-            <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
-              {realPctData.map(d => {
-                const gaugeData = [{ name: 'Realisasi', value: Math.min(d.pct, 100) }, { name: 'Sisa', value: Math.max(0, 100 - d.pct) }]
-                return (
-                  <div key={d.key} style={{ textAlign: 'center', flex: '1 1 140px', maxWidth: 200 }}>
-                    <div style={{ position: 'relative', width: 130, height: 130, margin: '0 auto' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={gaugeData} dataKey="value" innerRadius={42} outerRadius={60} paddingAngle={2} startAngle={90} endAngle={-270} stroke="none">
-                            <Cell fill={d.color} /><Cell fill="var(--bg3)" />
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                        <div style={{ fontSize: 22, fontWeight: 800, color: d.color }}>{d.pct}%</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 4 }}>{d.name}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{rpShort(d.real)} / {rpShort(d.plan)}</div>
-                  </div>
-                )
-              })}
+        <section className="au-card">
+          <div className="au-col" style={{ gap: 2 }}><h2>% realisasi {year}</h2><span className="au-xs au-muted">Realisasi dibanding plan per cost element</span></div>
+          {realPctData.length === 0 ? <span className="au-small au-muted" style={{ padding: '24px 0', textAlign: 'center' }}>Belum ada data {year}.</span> : (
+            <div className="au-row au-wrap" style={{ gap: 18, justifyContent: 'space-around' }}>
+              {realPctData.map(d => (
+                <div key={d.key} className="au-col" style={{ alignItems: 'center', gap: 6, flex: '1 1 130px', maxWidth: 200, textAlign: 'center' }}>
+                  <Ring value={Math.min(d.pct, 100)} size={118} stroke={12} color={toneFor(d.pct)} label={`${d.name}: ${d.pct}% (${rp(d.real)} dari ${rp(d.plan)})`}><b>{d.pct}%</b></Ring>
+                  <b className="au-small">{d.name}</b>
+                  <span className="au-xs au-muted">{rpShort(d.real)} / {rpShort(d.plan)}</span>
+                </div>
+              ))}
             </div>
           )}
-        </CardBox>
+        </section>
       )}
 
       {show('cashcard') && (
-        <CardBox title={`% Settlement Cash Card ${ccYear}`} sub="Total settlement ÷ total top-up × 100%">
-          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginBottom: 6 }}>
-            <button onClick={()=>setCcYear(y=>y-1)} className="btn btn-sm" style={{ padding:'2px 8px' }}>◀</button>
-            <span style={{ fontSize: 12, fontWeight: 700, minWidth: 40, textAlign: 'center' }}>{ccYear}</span>
-            <button onClick={()=>setCcYear(y=>y+1)} className="btn btn-sm" style={{ padding:'2px 8px' }}>▶</button>
-          </div>
+        <section className="au-card">
+          <div className="au-col" style={{ gap: 2 }}><h2>Settlement Cash Card {year}</h2><span className="au-xs au-muted">Total settlement ÷ total top up</span></div>
           {(() => {
-            if (!ccData) return <div style={{ fontSize: 11, color: 'var(--text3)', padding: '40px 0', textAlign: 'center' }}>Belum ada data cash card {ccYear}.</div>
-            const pct = ccData.topup > 0 ? Math.round(ccData.settlement / ccData.topup * 100) : 0
-            const gaugeData = [{ name: 'Settlement', value: Math.min(pct, 100) }, { name: 'Sisa', value: Math.max(0, 100 - pct) }]
-            const color = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444'
+            if (!ccData || !ccData.topup) return <span className="au-small au-muted" style={{ padding: '24px 0', textAlign: 'center' }}>Belum ada data cash card {year}.</span>
+            const pct = Math.round(ccData.settlement / ccData.topup * 100)
+            const color = pct >= 80 ? 'var(--ok)' : pct >= 50 ? 'var(--warn-bar)' : 'var(--bad)'
+            const state = pct >= 80 ? 'Baik' : pct >= 50 ? 'Perlu dikejar' : 'Rendah'
             return (
-              <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <div style={{ textAlign: 'center', flex: '1 1 140px', maxWidth: 200 }}>
-                  <div style={{ position: 'relative', width: 130, height: 130, margin: '0 auto' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={gaugeData} dataKey="value" innerRadius={42} outerRadius={60} paddingAngle={2} startAngle={90} endAngle={-270} stroke="none">
-                          <Cell fill={color} /><Cell fill="var(--bg3)" />
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                      <div style={{ fontSize: 22, fontWeight: 800, color }}>{pct}%</div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 4 }}>Settlement</div>
-                  <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{rpShort(ccData.settlement)} / {rpShort(ccData.topup)}</div>
+              <div className="au-row au-wrap" style={{ gap: 18, justifyContent: 'center' }}>
+                <Ring value={Math.min(pct, 100)} size={118} stroke={12} color={color} label={`Settlement ${pct}% (${rp(ccData.settlement)} dari ${rp(ccData.topup)})`}><b>{pct}%</b><span>{state}</span></Ring>
+                <div className="au-col" style={{ gap: 8, justifyContent: 'center' }}>
+                  <span className="au-col"><span className="au-xs au-muted">Settlement</span><b>{rp(ccData.settlement)}</b></span>
+                  <span className="au-col"><span className="au-xs au-muted">Top up</span><b>{rp(ccData.topup)}</b></span>
                 </div>
               </div>
             )
           })()}
-        </CardBox>
+        </section>
       )}
 
       {show('prognosa') && (
-        <CardBox title={`Prognosa & Sisa Budget (3 Tahun Terakhir)`} sub="RKAP vs Terpakai vs Sisa per tahun · garis = Prognosa (threshold)">
-          <ResponsiveContainer width="100%" height={240}>
-            <ComposedChart data={budgetBars} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="year" tick={{ fontSize: 11, fill: 'var(--text3)' }} />
-              <YAxis tickFormatter={rpShort} tick={{ fontSize: 10, fill: 'var(--text3)' }} width={48} />
-              <Tooltip cursor={{ fill: 'transparent' }} content={({ active, payload, label }: any) => active && payload?.length ? (
-                <TipBox rows={[
-                  { name: 'Tahun', val: label },
-                  { name: 'RKAP', val: rp(payload[0]?.payload.RKAP), color: C.plan },
-                  { name: 'Terpakai', val: rp(payload[0]?.payload.Terpakai), color: C.used },
-                  { name: 'Sisa', val: rp(payload[0]?.payload.Sisa), color: C.real },
-                  { name: 'Prognosa', val: rp(payload[0]?.payload.Prognosa), color: C.purple },
-                ]} />) : null} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="RKAP" fill={C.plan} radius={[3, 3, 0, 0]} maxBarSize={26} />
-              <Bar dataKey="Terpakai" fill={C.used} radius={[3, 3, 0, 0]} maxBarSize={26} />
-              <Bar dataKey="Sisa" fill={C.real} radius={[3, 3, 0, 0]} maxBarSize={26} />
-              <Line dataKey="Prognosa" stroke={C.purple} strokeWidth={2} strokeDasharray="5 4" dot={{ r: 3, fill: C.purple }} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </CardBox>
+        <section className="au-card">
+          <div className="au-col" style={{ gap: 2 }}><h2>Prognosa & sisa budget</h2><span className="au-xs au-muted">3 tahun terakhir · garis = prognosa (threshold × RKAP)</span></div>
+          <Legend items={[{ label: 'RKAP', kind: 'plan' }, { label: 'Terpakai', kind: 'real' }, { label: 'Prognosa', kind: 'prog' }]} />
+          <BulletRows rows={budgetBars} realLabel="terpakai" />
+          <div className="au-row au-wrap au-xs au-ink2" style={{ gap: 12 }}>{budgetBars.map(b => <span key={b.label}>{b.label}: sisa <b style={{ color: 'var(--ink)' }}>{rpShort(Math.max(0, b.plan - b.real))}</b></span>)}</div>
+        </section>
       )}
     </>
   )
