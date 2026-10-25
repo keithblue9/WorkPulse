@@ -783,3 +783,16 @@ a.au-erow { text-decoration:none; color:inherit }
 .au-cal-grid > .au-cal-day.sel { background:var(--accent-soft); border-color:var(--accent) }
 .au-mcard { display:flex; align-items:flex-start; gap:14px; padding:14px; border-radius:20px; border:1px solid var(--line); background:var(--surface); cursor:pointer; min-height:128px; transition:transform .2s var(--ease), border-color .2s, box-shadow .2s }
 .au-mcard:hover, .au-mcard:focus-visible { transform:translateY(-2px); border-color:var(--accent); box-shadow:var(--shadow-s2) }
+
+/* ═══ Personal notes ═══ */
+.au-qnote { display:flex; flex-direction:column; align-items:flex-start; gap:10px; padding:18px; border-radius:24px; border:1px solid var(--line); background:var(--surface); text-align:left; cursor:pointer; color:inherit; font:inherit; min-height:150px; transition:transform .2s var(--ease), box-shadow .2s, border-color .2s }
+.au-qnote:hover { transform:translateY(-2px); box-shadow:var(--shadow-s2); border-color:var(--accent) }
+.au-qnote .t { font:700 17px/1.3 var(--disp) }
+.au-qnote .pv { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; width:100% }
+.au-qnote .pv li { display:flex; align-items:center; gap:8px; font-size:13.5px; color:var(--ink2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.au-qnote .pv li.done { color:var(--muted); text-decoration:line-through }
+.au-qnote .pv i { width:12px; height:12px; border-radius:50%; border:1.5px solid var(--line2); flex-shrink:0 } .au-qnote .pv i.number { border-radius:4px } .au-qnote .pv i.text { border:0; width:4px; background:var(--line2); border-radius:2px }
+.au-qnote .pv li.done i { background:var(--accent); border-color:var(--accent) }
+.au-qchk { width:24px; height:24px; margin-top:3px; border-radius:50%; border:2px solid var(--line2); background:transparent; color:#fff; display:grid; place-items:center; flex-shrink:0; cursor:pointer; padding:0; font:700 12px var(--sans); color:var(--muted); min-height:0 !important; transition:background .15s, border-color .15s, transform .18s var(--pop) }
+.au-qchk.num { border-radius:8px } .au-qchk:active { transform:scale(.88) }
+.au-qchk.on { background:var(--accent); border-color:var(--accent); color:#fff }

@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useTheme, THEMES } from '@/lib/theme'
 import { useYear } from '@/lib/year'
 import { displayAppName } from '@/lib/appName'
-import { getAllowedMenus, visibleNav, isActive, isInternalUser } from '@/lib/nav'
+import { NAV_GROUPS, getAllowedMenus, visibleNav, isActive, isInternalUser } from '@/lib/nav'
 import { Icon } from '@/components/ui'
 import CommandPalette from '@/components/CommandPalette'
 import AppPopups from '@/components/AppPopups'
@@ -55,7 +55,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const appName = displayAppName(appConfig?.appName)
   const appTagline = appConfig?.appTagline || 'BPD Procurement'
   const initials = user?.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'U'
-  const current = flat.find(i => isActive(pathname, i.href)) || (pathname.startsWith('/dashboard/issues') ? { label: 'Issues', group: 'Activities' } : pathname.startsWith('/dashboard/profile') ? { label: 'Profil', group: 'Akun' } : pathname.startsWith('/dashboard/menu') ? { label: 'Menu', group: appName } : { label: 'Dashboard', group: 'Dashboard & Overview' })
+  // Judul halaman dari seluruh struktur menu (bukan hanya yang terlihat untuk peran ini).
+  const allItems = NAV_GROUPS.flatMap(g => g.items.map(i => ({ ...i, group: g.label })))
+  const current = flat.find(i => isActive(pathname, i.href)) || allItems.filter(i => i.href !== '/dashboard').find(i => isActive(pathname, i.href)) || (pathname.startsWith('/dashboard/issues') ? { label: 'Issues', group: 'Activities' } : pathname.startsWith('/dashboard/profile') ? { label: 'Profil', group: 'Akun' } : pathname.startsWith('/dashboard/menu') ? { label: 'Menu', group: appName } : { label: 'Dashboard', group: 'Dashboard & Overview' })
   const tabs = TAB_PREF.filter(h => flat.some(i => i.href === h)).slice(0, 4)
   const onTab = tabs.some(h => isActive(pathname, h))
   const nextTheme = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'
