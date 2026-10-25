@@ -839,3 +839,57 @@ a.au-erow { text-decoration:none; color:inherit }
   .au-mtbl td:nth-child(4) { grid-area:3 / 1 } .au-mtbl td:nth-child(7) { grid-area:3 / 2 }
   .au-mname { min-width:0 }
 }
+/* Sortable header + evidence */
+.au-sort { display:inline-flex; align-items:center; gap:6px; background:none; border:0; padding:0; font:inherit; color:inherit; letter-spacing:inherit; text-transform:inherit; cursor:pointer }
+.au-sort:hover { color:var(--ink) }
+.au-evic { width:28px; height:28px; border-radius:9px; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; flex-shrink:0 }
+/* Finance forms + card tables */
+.au-fgrid { grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px }
+[data-err] > .input, [data-err] > select.input, .au-seg[data-err] { border-color:var(--bad) !important; box-shadow:0 0 0 3px var(--bad-soft) }
+[data-err] > .lbl { color:var(--bad) }
+.au-drop[data-err] { border-color:var(--bad) } .au-drop[data-has] { border-style:solid; border-color:var(--accent); background:var(--accent-soft); color:var(--accent-ink) }
+.au-dropsm { padding:16px 10px; gap:4px; border-radius:16px }
+.au-docrow { gap:8px; padding:6px 6px 6px 10px; border-radius:12px; background:var(--sunken); color:var(--ink2) }
+.au-total { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:14px 16px; border-radius:18px; background:var(--accent-soft); color:var(--accent-ink) }
+.au-total b { font:700 24px/1.1 var(--disp); letter-spacing:-.02em; font-variant-numeric:tabular-nums }
+.au-total .lbl { color:inherit }
+.au-selbar { position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:180; display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 12px 10px 16px; border-radius:20px; background:color-mix(in srgb, var(--surface) 90%, transparent); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); border:1px solid var(--line); box-shadow:var(--shadow-s2), 0 18px 40px -16px rgba(11,13,23,.35); max-width:calc(100vw - 24px); animation:au-pop .3s var(--pop) }
+.au-selbar b { font:700 18px var(--disp); font-variant-numeric:tabular-nums; color:var(--accent-ink) }
+@keyframes au-pop { from { opacity:0; transform:translate(-50%,12px) scale(.96) } }
+.au-check { width:18px; height:18px; accent-color:var(--accent); cursor:pointer }
+.au-ctbl tr.is-sel td { background:var(--accent-soft) }
+.au-ctbl tr.au-click { cursor:pointer } .au-ctbl tr.au-click:hover td { background:var(--sunken) }
+.au-rowbtn { display:flex; flex-direction:column; align-items:flex-start; gap:2px; background:none; border:0; padding:0; color:inherit; font:inherit; text-align:left; cursor:pointer; max-width:280px }
+.au-rowbtn .au-xs { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100% }
+.au-ctbl td { vertical-align:middle }
+@media (min-width:901px) { .au-rtiles { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)) } }
+@media (max-width:700px) {
+  .au-ctbl { display:block; min-width:0 !important; width:100% } .au-ctbl thead { display:none } .au-ctbl tbody { display:block }
+  .au-ctbl tr { display:flex; flex-direction:column; gap:6px; padding:14px 16px; border-bottom:1px solid var(--line); position:relative }
+  .au-ctbl tr:last-child { border-bottom:0 }
+  .au-ctbl td { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 !important; border:0 !important; text-align:right !important; background:none !important; min-height:0 }
+  .au-ctbl td[data-l]::before { content:attr(data-l); font:500 10.5px var(--mono); letter-spacing:.05em; text-transform:uppercase; color:var(--muted); text-align:left; flex-shrink:0 }
+  .au-ctbl td.c-main { justify-content:flex-start; text-align:left !important; padding-right:40px !important }
+  .au-ctbl td.c-chk { position:absolute; top:14px; right:14px }
+  .au-ctbl td.c-act { justify-content:flex-end; margin-top:4px } .au-ctbl td.c-act:empty { display:none }
+  .au-ctbl tr.is-sel { background:var(--accent-soft) }
+  .au-rowbtn { max-width:100% }
+}
+@media (max-width:900px) { .au-selbar { bottom:calc(84px + env(safe-area-inset-bottom,0px)); left:12px; right:12px; transform:none; justify-content:space-between } @keyframes au-pop { from { opacity:0; transform:translateY(12px) } } }
+/* Settlement flow + petty cash */
+.au-flow { list-style:none; margin:0; padding:0; display:flex; gap:6px; flex-wrap:wrap }
+.au-flow li { display:flex; align-items:center; gap:8px; padding:6px 12px 6px 6px; border-radius:999px; background:var(--surface); border:1px solid var(--line); font-size:13px; font-weight:600; color:var(--muted) }
+.au-flow li > span { width:22px; height:22px; border-radius:50%; display:grid; place-items:center; background:var(--sunken); font:700 11px var(--mono) }
+.au-flow li[data-state="now"] { color:var(--ink); border-color:var(--accent) } .au-flow li[data-state="now"] > span { background:var(--accent); color:#fff }
+.au-flow li[data-state="done"] { color:var(--ink2) } .au-flow li[data-state="done"] > span { background:var(--ok); color:#fff }
+.au-srcbtn { border:0; cursor:pointer; gap:4px } .au-srcbtn:disabled { cursor:default }
+.au-pcgrid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); gap:16px; align-items:start }
+.au-saldo { background:linear-gradient(135deg,var(--accent),#7B6BFF); color:#fff; border:0 } .au-saldo .lbl, .au-saldo .au-muted { color:rgba(255,255,255,.78) }
+.au-saldo > b { font:700 40px/1 var(--disp); letter-spacing:-.03em; font-variant-numeric:tabular-nums }
+.au-saldo .au-small { color:#fff !important } .au-saldo .btn-primary { background:#fff; color:var(--accent-ink); border-color:#fff }
+.au-inrow { display:grid; grid-template-columns:150px minmax(0,1fr) minmax(0,1fr) 150px 36px; gap:8px; padding-bottom:10px; border-bottom:1px solid var(--line) }
+@media (max-width:900px) { .au-pcgrid { grid-template-columns:minmax(0,1fr) } .au-inrow { grid-template-columns:minmax(0,1fr) minmax(0,1fr) } .au-inrow > button { grid-column:2; justify-self:end } .au-saldo > b { font-size:32px } }
+.au-pctbar { display:inline-flex; flex-direction:column; align-items:center; gap:4px; min-width:64px }
+.au-pctbar::after { content:''; display:block; width:100%; height:4px; border-radius:2px; background:linear-gradient(90deg,var(--accent) var(--p),var(--sunken) var(--p)) }
+@media (max-width:700px) { .au-pctbar { align-items:flex-end } }
+.au-tile b.v { overflow-wrap:anywhere }

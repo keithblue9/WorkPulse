@@ -31,8 +31,14 @@ export function SortTh({ label, k, sortKey, sortDir, onSort, style }:
   { label: string; k: string; sortKey: string; sortDir: SortDir; onSort: (k: string) => void; style?: React.CSSProperties }) {
   const active = sortKey === k
   return (
-    <th onClick={() => onSort(k)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', ...style }} title="Klik untuk sort">
-      {label} <span style={{ opacity: active ? 1 : 0.3, fontSize: 9, marginLeft: 2 }}>{active ? (sortDir === 'asc' ? '▲' : '▼') : '⬍'}</span>
+    <th aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'} style={{ whiteSpace: 'nowrap', ...style }}>
+      <button type="button" className="au-sort" onClick={() => onSort(k)} title="Urutkan">
+        {label}
+        <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" style={{ flexShrink: 0 }}>
+          <path d="M5 1 9 5H1z" fill="currentColor" opacity={active && sortDir === 'asc' ? 1 : 0.28} />
+          <path d="M5 11 1 7h8z" fill="currentColor" opacity={active && sortDir === 'desc' ? 1 : 0.28} />
+        </svg>
+      </button>
     </th>
   )
 }

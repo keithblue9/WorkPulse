@@ -5,5 +5,5 @@ import { useRouter } from 'next/navigation'
 export default function SettlementCCRedirect() {
   const router = useRouter()
   useEffect(() => { router.replace('/dashboard/operasional') }, [router])
-  return <div style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>Mengalihkan ke Operasional…</div>
+  return <div className="au-page"><div className="au-view au-muted au-small" style={{ alignItems:'center', paddingTop:40 }}>Mengalihkan ke Operasional…</div></div>
 }

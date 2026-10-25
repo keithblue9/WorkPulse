@@ -9,8 +9,10 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { useYear } from '@/lib/year'
+import { ConfirmSheet, Empty, Icon, PageHeader, Pill, Seg, Sheet, Tile, type Tone } from '@/components/ui'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
+const short = (n:number) => { const a = Math.abs(n||0); const f = (v:number, u:string) => `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(v)} ${u}`; return a >= 1e9 ? f(n/1e9,'M') : a >= 1e6 ? f(n/1e6,'jt') : a >= 1e3 ? f(n/1e3,'rb') : fmt(n) }
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 
 function periodDate(r:any):Date|null {
@@ -44,32 +46,32 @@ function oeExcelCode(code:string):string {
 
 export default function OperasionalPage() {
   const { data:session } = useSession(); const user = session?.user as any
+  const { year } = useYear()
   const [tab, setTab] = useState<'settlement'|'petty'>('settlement')
   const [canPetty, setCanPetty] = useState(false)
-  useEffect(()=>{ let on=true; getConfig().then(c=>{ if(!on)return; const allowed=allowedMenusFor(c?.roleDefs||[], userRolesOf(user)); setCanPetty(allowed.has('pettycash')) }).catch(()=>{}) }, [user])
+  const [month, setMonth] = useState(new Date().getMonth())
+  useEffect(()=>{ let on=true; getConfig().then(c=>{ if(!on)return; const allowed=allowedMenusFor(c?.roleDefs||[], userRolesOf(user)); setCanPetty(allowed.has('pettycash')) }).catch(()=>{}); return () => { on = false } }, [user])
   // kalau lagi di tab petty tapi ga punya akses, balik ke settlement
   useEffect(()=>{ if(tab==='petty' && !canPetty) setTab('settlement') }, [tab, canPetty])
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ padding:'12px 20px 0', borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
-        <div style={{ fontSize:14, fontWeight:600 }}>Operasional</div>
-        <div style={{ display:'flex', gap:4, marginTop:10 }}>
-          <button onClick={()=>setTab('settlement')} style={subtab(tab==='settlement')}>Settlement CC</button>
-          {canPetty && <button onClick={()=>setTab('petty')} style={subtab(tab==='petty')}>Petty Cash</button>}
-        </div>
+    <div className="au-page">
+      <div className="au-view au-anim">
+        <PageHeader eyebrow={`Finance · ${tab === 'petty' ? 's/d ' : ''}${MONTHS[month]} ${year}`} title="Operasional" actions={
+          <select className="input" aria-label="Bulan" style={{ width: 'auto', minHeight: 40 }} value={month} onChange={e=>setMonth(Number(e.target.value))}>
+            {MONTHS.map((m,i)=><option key={i} value={i}>{m}</option>)}
+          </select>} />
+        {canPetty && <div className="rise"><Seg label="Tampilan" value={tab} onChange={setTab} options={[['settlement','Settlement CC'],['petty','Petty Cash']] as const} /></div>}
+        {tab==='petty' && canPetty ? <PettyCashTab month={month} year={year} /> : <SettlementTab user={user} month={month} year={year} />}
       </div>
-      {tab==='petty' && canPetty ? <PettyCashTab /> : <SettlementTab user={user} />}
     </div>
   )
 }
 
 // =====================  SETTLEMENT CC  =====================
-function SettlementTab({ user }: { user:any }) {
+type Ask = { kind:'verify'; ids:string[] } | { kind:'verifyOne'; item:any } | { kind:'source'; item:any } | { kind:'reverse'; item:any } | null
+function SettlementTab({ user, month, year }: { user:any; month:number; year:number }) {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const now = new Date()
-  const [month, setMonth] = useState(now.getMonth())
-  const { year, setYear } = useYear()
   const [allSources, setAllSources] = useState(false)
   const [viewing, setViewing] = useState<any>(null)
   const [zipping, setZipping] = useState(false)
@@ -77,12 +79,12 @@ function SettlementTab({ user }: { user:any }) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [verifying, setVerifying] = useState(false)
   const [loadError, setLoadError] = useState<string>('')
+  const [ask, setAsk] = useState<Ask>(null)
 
   const load = useCallback(async (force = false) => {
     setLoading(true); setLoadError('')
     try {
-      // Berbagi cache dgn halaman Reimbursement (API yang sama) -> tidak fetch ulang
-      // tiap pindah tab. Setelah aksi verify/reverse dipanggil dgn force=true.
+      // Berbagi cache dgn halaman Reimbursement (API yang sama). Setelah aksi dipanggil dgn force=true.
       const r = await cachedFetch('/api/reimbursements', 30_000, force)
       setItems(r?.data || [])
     } catch (e:any) {
@@ -93,13 +95,8 @@ function SettlementTab({ user }: { user:any }) {
   }, [])
   const reloadFresh = useCallback(() => load(true), [load])
   useEffect(() => { load() }, [load])
-
-  const yearOptions = useMemo(() => {
-    const ys = new Set<number>([now.getFullYear(), now.getFullYear()-1, now.getFullYear()+1])
-    items.forEach(r => { const d = periodDate(r); if (d) ys.add(d.getFullYear()) })
-    return Array.from(ys).sort((a,b)=>b-a)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items])
+  // ganti periode -> kosongkan pilihan (sama seperti sebelumnya saat ganti bulan/tahun)
+  useEffect(() => { setSelected(new Set()) }, [month, year])
 
   // semua item periode ini (Cash Card / semua sumber) yg sudah dibayar / verified
   const periodItems = useMemo(() => items.filter(r => {
@@ -111,42 +108,45 @@ function SettlementTab({ user }: { user:any }) {
   const verifiableIds = periodItems.filter(r => r.status==='done'||r.status==='paid').map(r=>r._id)
   const allVerified = periodItems.length>0 && periodItems.every(r => r.status==='verified')
   const anyVerified = periodItems.some(r => r.status==='verified')
-  const exportsEnabled = anyVerified  // aktif begitu minimal 1 item sudah diverify (slide 4)
-  // Isi export HANYA item yang sudah diverify (yang dicentang lalu di-Verify), bukan semua periode.
+  const exportsEnabled = anyVerified  // aktif begitu minimal 1 item sudah diverify
+  // Isi export HANYA item yang sudah diverify, bukan semua periode.
   const exportItems = periodItems.filter(r => r.status === 'verified')
   const exportTotal = exportItems.reduce((s,r)=>s+(r.amount||0),0)
 
-  function toggleSel(id:string) { setSelected(s => { const n = new Set(s); n.has(id)?n.delete(id):n.add(id); return n }) }
+  function toggleSel(id:string) { setSelected(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   function selectAll() { setSelected(new Set(verifiableIds)) }
   function clearSel() { setSelected(new Set()) }
 
-  async function doVerify() {
+  function askVerify() {
     const ids = Array.from(selected).filter(id => verifiableIds.includes(id))
     if (ids.length===0) { toast.error('Pilih minimal 1 item (status Waiting for Verification) untuk diverify'); return }
-    if (!confirm(`Verify ${ids.length} item? Status berubah Waiting for Verification → Verified dan Settlement Cash Card bulan ${MONTHS[month]} ${year} akan dihitung otomatis.`)) return
+    setAsk({ kind:'verify', ids })
+  }
+  async function doVerify(ids:string[]) {
     setVerifying(true)
     try {
       const r = await fetch('/api/settlement/verify', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ ids, month: month+1, year, verifiedBy: user?.name||'-' }) })
-      const j = await r.json()
+      const j = await r.json().catch(() => ({}))
       if (!r.ok) { toast.error(j.error||'Gagal verify'); return }
       toast.success(`${j.data.verified} item verified · Settlement CC = Rp ${fmt(j.data.settlementTotal)}`)
-      clearSel(); await reloadFresh()
-    } finally { setVerifying(false) }
+      setAsk(null); clearSel(); await reloadFresh()
+    } catch { toast.error('Gagal verify') } finally { setVerifying(false) }
   }
-
-  async function verifyOne(item:any) {
+  function askVerifyOne(item:any) {
     if (!verifiableIds.includes(item._id)) { toast.error('Item ini belum bisa diverify (harus status Waiting for Verification)'); return }
-    if (!confirm(`Verify item "${item.title}"? Status Waiting for Verification → Verified & Settlement CC ${MONTHS[month]} ${year} dihitung ulang.`)) return
+    setAsk({ kind:'verifyOne', item })
+  }
+  async function verifyOne(item:any) {
     setVerifying(true)
     try {
       const r = await fetch('/api/settlement/verify', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ ids:[item._id], month: month+1, year, verifiedBy: user?.name||'-' }) })
-      const j = await r.json()
+      const j = await r.json().catch(() => ({}))
       if (!r.ok) { toast.error(j.error||'Gagal verify'); return }
       toast.success(`Verified · Settlement CC = Rp ${fmt(j.data.settlementTotal)}`)
-      setViewing(null); clearSel(); await reloadFresh()
-    } finally { setVerifying(false) }
+      setAsk(null); setViewing(null); clearSel(); await reloadFresh()
+    } catch { toast.error('Gagal verify') } finally { setVerifying(false) }
   }
 
   async function clarifyItem(item:any, note:string) {
@@ -154,35 +154,36 @@ function SettlementTab({ user }: { user:any }) {
     try {
       const r = await fetch('/api/reimbursements/clarify', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ id:item._id, note, clarifiedBy: user?.name||'-' }) })
-      const j = await r.json()
+      const j = await r.json().catch(() => ({}))
       if (!r.ok) { toast.error(j.error||'Gagal clarify'); return }
       toast.success(j.pushed ? 'Dibalikin ke member + notif terkirim' : 'Dibalikin ke member (member belum aktifkan notif)')
       setViewing(null); await reloadFresh()
-    } finally { setVerifying(false) }
+    } catch { toast.error('Gagal clarify') } finally { setVerifying(false) }
   }
 
   // pindah sumber Petty <-> CC (propagasi ke reimburse + cashier + settlement)
-  async function toggleSource(r:any, e?:any) {
-    e?.stopPropagation?.()
+  function askSource(r:any) {
     if (r.status==='verified') { toast.error('Sudah verified — reverse dulu ke Waiting for Verification sebelum ganti sumber'); return }
+    setAsk({ kind:'source', item:r })
+  }
+  async function toggleSource(r:any) {
     const toCC = !r.isCashCard
-    if (!confirm(`Ubah sumber "${r.title}" ke ${toCC?'Cash Card':'Petty Cash'}?`)) return
     const payload:any = { isCashCard: toCC, source: toCC?'cash_card':'petty_cash' }
     // Pindah ke Petty Cash: item ga perlu verifikasi CC -> kalau masih Waiting for Verification, langsung verified
     if (!toCC && (r.status==='done' || r.status==='paid')) {
       payload.status = 'verified'; payload.verifiedAt = new Date().toISOString(); payload.verifiedBy = `${user?.name||'-'} (Petty Cash)`
     }
-    await fetch(`/api/reimbursements/${r._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
-    toast.success(!toCC && payload.status==='verified' ? 'Diubah ke Petty Cash & langsung selesai (verified)' : 'Sumber diperbarui'); await reloadFresh()
+    const res = await fetch(`/api/reimbursements/${r._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }).catch(() => null)
+    if (!res?.ok) { toast.error('Gagal mengubah sumber'); return }
+    toast.success(!toCC && payload.status==='verified' ? 'Diubah ke Petty Cash & langsung selesai (verified)' : 'Sumber diperbarui')
+    setAsk(null); setViewing(null); await reloadFresh()
   }
-
   async function reverseItem(r:any) {
     if (r.status!=='verified') return
-    if (!confirm(`Reverse "${r.title}" dari Verified kembali ke Waiting for Verification? Settlement Cash Card bulan itu akan dihitung ulang.`)) return
-    const res = await fetch('/api/settlement/reverse', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: r._id }) })
-    const j = await res.json()
-    if (!res.ok) { toast.error(j.error||'Gagal reverse'); return }
-    toast.success('Reverse berhasil — status kembali Waiting for Verification'); setViewing(null); await reloadFresh()
+    const res = await fetch('/api/settlement/reverse', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: r._id }) }).catch(() => null)
+    const j = res ? await res.json().catch(() => ({})) : {}
+    if (!res?.ok) { toast.error(j.error||'Gagal reverse'); return }
+    toast.success('Reverse berhasil — status kembali Waiting for Verification'); setAsk(null); setViewing(null); await reloadFresh()
   }
 
   async function exportXLSX() {
@@ -339,160 +340,161 @@ function SettlementTab({ user }: { user:any }) {
   }
 
   const totalNominal = periodItems.reduce((s,r)=>s+(r.amount||0),0)
+  const waiting = verifiableIds.length
+  const step = !periodItems.length ? 0 : selected.size === 0 && !anyVerified ? 1 : !anyVerified ? 2 : allVerified ? 4 : 3
 
   return (
     <>
-      {viewing && <DetailModal item={viewing} onClose={()=>setViewing(null)}
-        onToggleSource={async (r:any)=>{ await toggleSource(r); setViewing(null) }}
-        onVerify={verifyOne}
-        onClarify={clarifyItem}
-        onReverse={reverseItem} />}
+      {viewing && <DetailSheet item={viewing} onClose={()=>setViewing(null)} busy={verifying}
+        onToggleSource={askSource} onVerify={askVerifyOne} onClarify={clarifyItem} onReverse={(r:any)=>setAsk({ kind:'reverse', item:r })} />}
+      {ask?.kind === 'verify' && <ConfirmSheet title="Verify settlement" confirmLabel={`Verify ${ask.ids.length} item`} icon="check"
+        text={<>Status <b>{ask.ids.length} item</b> berubah dari Waiting for Verification menjadi <b>Verified</b>, dan Settlement Cash Card {MONTHS[month]} {year} dihitung otomatis.</>}
+        onConfirm={() => doVerify(ask.ids)} onClose={() => setAsk(null)} />}
+      {ask?.kind === 'verifyOne' && <ConfirmSheet title="Verify item" confirmLabel="Verify" icon="check"
+        text={<>Verify <b>“{ask.item.title}”</b>? Status menjadi Verified dan Settlement CC {MONTHS[month]} {year} dihitung ulang.</>}
+        onConfirm={() => verifyOne(ask.item)} onClose={() => setAsk(null)} />}
+      {ask?.kind === 'source' && <ConfirmSheet title="Ubah sumber dana" confirmLabel={`Ubah ke ${ask.item.isCashCard ? 'Petty Cash' : 'Cash Card'}`}
+        text={<>Ubah sumber <b>“{ask.item.title}”</b> ke <b>{ask.item.isCashCard ? 'Petty Cash' : 'Cash Card'}</b>?{ask.item.isCashCard && (ask.item.status === 'done' || ask.item.status === 'paid') ? ' Item Petty Cash tidak perlu verifikasi CC, jadi langsung berstatus Verified.' : ''}</>}
+        onConfirm={() => toggleSource(ask.item)} onClose={() => setAsk(null)} />}
+      {ask?.kind === 'reverse' && <ConfirmSheet danger title="Reverse verifikasi" confirmLabel="Reverse" icon="back"
+        text={<>Kembalikan <b>“{ask.item.title}”</b> dari Verified ke Waiting for Verification? Settlement Cash Card bulan itu akan dihitung ulang.</>}
+        onConfirm={() => reverseItem(ask.item)} onClose={() => setAsk(null)} />}
 
-      {loadError && (
-        <div style={{ margin:'10px 20px 0', padding:'10px 14px', borderRadius:8, background:'#dc262614', border:'1px solid var(--red)', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-          <span style={{ fontSize:12, color:'var(--red)', fontWeight:600 }}>⚠️ Gagal memuat data — data kamu tidak hilang, hanya belum berhasil dimuat.</span>
-          <span style={{ fontSize:11, color:'var(--text3)' }}>{loadError}</span>
-          <button onClick={reloadFresh} className="btn btn-sm" style={{ marginLeft:"auto" }}>🔄 Coba lagi</button>
+      {loadError && <div className="au-row au-wrap p-bad" role="alert" style={{ borderRadius: 14, padding: 12, gap: 10 }}>
+        <span className="au-small" style={{ flex: 1 }}><b>Gagal memuat data</b> — data kamu tidak hilang, hanya belum berhasil dimuat. <span className="au-muted">{loadError}</span></span>
+        <button type="button" className="btn btn-sm" onClick={reloadFresh}>Coba lagi</button></div>}
+
+      <div className="au-grid au-tiles" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))' }}>
+        <Tile icon="card" color="var(--ink)" iconInk="var(--bg)" value={loading ? '–' : periodItems.length} label="Transaksi periode" hint={totalNominal ? `Rp ${short(totalNominal)}` : undefined} />
+        <Tile icon="clock" color="var(--warn)" value={loading ? '–' : waiting} label="Menunggu verifikasi" />
+        <Tile icon="check" color="var(--accent)" value={loading ? '–' : exportItems.length} label="Verified · siap export" hint={exportTotal ? `Rp ${short(exportTotal)}` : undefined} />
+      </div>
+
+      <ol className="au-flow rise" aria-label="Alur settlement">
+        {['Centang item', 'Cek evidence', 'Verify', 'Export'].map((t, i) => <li key={t} data-state={step > i + 1 ? 'done' : step === i + 1 ? 'now' : undefined}><span>{step > i + 1 ? <Icon name="check" size={12} stroke={3} /> : i + 1}</span>{t}</li>)}
+      </ol>
+
+      <div className="au-row au-wrap rise" style={{ gap: 8 }}>
+        <Seg label="Sumber" value={allSources ? 'all' : 'cc'} onChange={v => setAllSources(v === 'all')} options={[['cc','Cash Card'],['all','Semua sumber']] as const} />
+        <span style={{ flex: 1 }} />
+        <button type="button" onClick={exportXLSX} className="btn" disabled={exporting || !exportsEnabled} title={exportsEnabled ? 'Export item verified ke Excel' : 'Aktif setelah minimal 1 item diverify'}><Icon name="down" size={15} />{exporting ? 'Menyiapkan…' : 'Excel'}</button>
+        <button type="button" onClick={exportPDF} className="btn" disabled={!exportsEnabled} title={exportsEnabled ? 'Export item verified ke PDF' : 'Aktif setelah minimal 1 item diverify'}><Icon name="file" size={15} />PDF</button>
+      </div>
+
+      {loading ? <div className="au-card">{[0,1,2].map(k => <div key={k} className="au-skel" />)}</div>
+       : periodItems.length === 0 ? <div className="au-card"><Empty title={`Tidak ada transaksi ${MONTHS[month]} ${year}`} text={allSources ? 'Belum ada reimburse yang sudah dibayar pada periode ini.' : 'Coba tampilkan semua sumber atau pilih bulan lain.'} action={!allSources ? <button type="button" className="btn" onClick={() => setAllSources(true)}>Semua sumber</button> : undefined} /></div>
+       : <div className="au-tblw rise">
+          <table className="wp-table au-ctbl" style={{ minWidth: 1040 }}>
+            <thead><tr>
+              <th style={{ width: 44, textAlign: 'center' }}><input type="checkbox" className="au-check" aria-label="Pilih semua yang bisa diverify" checked={selected.size>0 && selected.size===verifiableIds.length} onChange={e=>e.target.checked?selectAll():clearSel()} disabled={verifiableIds.length===0} /></th>
+              <th>No</th><th>Keperluan</th><th>Tanggal</th><th>Pengaju</th><th>Kategori</th><th style={{ textAlign: 'right' }}>Nominal</th><th>Sumber</th><th>Status</th><th>Evidence</th><th><span className="sr-only">Aksi</span></th>
+            </tr></thead>
+            <tbody>
+              {periodItems.map((r,i) => {
+                const lengkap = hasEvidence(r); const canVerify = r.status==='done'||r.status==='paid'; const sel = selected.has(r._id)
+                return (
+                  <tr key={r._id} className={`au-click${sel ? ' is-sel' : ''}`} onClick={()=>setViewing(r)}>
+                    <td className="c-chk" style={{ textAlign: 'center' }} onClick={e=>e.stopPropagation()}>{canVerify ? <input type="checkbox" className="au-check" checked={sel} onChange={()=>toggleSel(r._id)} aria-label={`Pilih ${r.title}`} /> : <span title={r.status === 'verified' ? 'Verified' : 'Belum bisa diverify'} style={{ color: 'var(--accent)', display: 'inline-grid' }}><Icon name="lock" size={15} /></span>}</td>
+                    <td className="au-xs au-muted" data-l="No" style={{ fontFamily: 'var(--mono)' }}>{i+1}</td>
+                    <td className="c-main"><button type="button" className="au-rowbtn" onClick={e => { e.stopPropagation(); setViewing(r) }}><b className="au-small">{r.title}</b><span className="au-xs au-muted">{oeLookup(r.category).name}</span></button></td>
+                    <td data-l="Tanggal" className="au-small au-ink2" style={{ whiteSpace: 'nowrap' }}>{(()=>{ const d=periodDate(r); return d?d.toLocaleDateString('id-ID'):'—' })()}</td>
+                    <td data-l="Pengaju" className="au-small">{r.userName||'—'}</td>
+                    <td data-l="Kategori" className="au-xs" style={{ fontFamily: 'var(--mono)' }}>{oeExcelCode(r.category)}</td>
+                    <td data-l="Nominal" style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>Rp {fmt(r.amount)}</td>
+                    <td data-l="Sumber" onClick={e=>e.stopPropagation()}>
+                      <button type="button" onClick={()=>askSource(r)} className="au-tag au-srcbtn" disabled={r.status==='verified'} title={r.status==='verified' ? 'Reverse dulu untuk ganti sumber' : 'Ketuk untuk pindah sumber'} style={r.isCashCard ? { background:'var(--accent-soft)', color:'var(--accent-ink)' } : undefined}>{r.isCashCard?'Cash Card':'Petty Cash'}{r.status!=='verified' && <Icon name="arrow" size={11} />}</button>
+                    </td>
+                    <td data-l="Status">{statusBadge(r.status)}</td>
+                    <td data-l="Evidence"><Pill tone={lengkap ? 'ok' : 'bad'}>{lengkap?`Lengkap · ${evidenceCount(r)}`:'Belum'}</Pill></td>
+                    <td className="c-act" onClick={e=>e.stopPropagation()}><button type="button" onClick={()=>setViewing(r)} className="btn btn-sm">Lihat</button></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>}
+
+      {selected.size > 0 && !loading && (
+        <div className="au-selbar" role="status">
+          <span className="au-col" style={{ gap: 1 }}><span className="au-xs au-muted">{selected.size} dipilih dari {waiting} menunggu</span><b>Rp {fmt(periodItems.filter(r => selected.has(r._id)).reduce((s,r)=>s+(r.amount||0),0))}</b></span>
+          {selected.size < waiting && <button type="button" onClick={selectAll} className="btn btn-sm">Pilih semua</button>}
+          {selected.size > 0 && <>
+            <button type="button" onClick={exportZIP} disabled={zipping} className="btn btn-sm" title="Unduh evidence item yang dicentang"><Icon name="down" size={14} />{zipping ? 'Menyiapkan…' : 'Evidence'}</button>
+            <button type="button" onClick={askVerify} disabled={verifying} className="btn btn-sm btn-primary"><Icon name="check" size={14} stroke={2.4} />Verify {selected.size}</button>
+          </>}
         </div>
       )}
-
-      <div style={{ padding:'10px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12, flexWrap:'wrap', flexShrink:0 }}>
-        <div style={{ fontSize:11, color:'var(--text3)', maxWidth:520 }}>Alur: <b>centang</b> item Waiting for Verification → <b>Evidence</b> (unduh lampiran yg dicentang, cek manual) → <b>Verify</b> (status jadi Verified) → baru <b>Export Excel/PDF</b> aktif.</div>
-        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-          <button onClick={exportXLSX} className="btn btn-sm btn-primary" disabled={exporting} style={{ opacity: exportsEnabled?1:0.55 }}>{exporting?'...':'📗 Export Excel'}</button>
-          <button onClick={exportPDF} className="btn btn-sm" style={{ opacity: exportsEnabled?1:0.55 }}>📄 Export PDF</button>
-        </div>
-      </div>
-
-      <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexWrap:'wrap', alignItems:'center', flexShrink:0 }}>
-        <select className="input input-sm" style={{ width:130 }} value={month} onChange={e=>{setMonth(Number(e.target.value));clearSel()}}>
-          {MONTHS.map((m,i)=><option key={i} value={i}>{m}</option>)}
-        </select>
-        <select className="input input-sm" style={{ width:90 }} value={year} onChange={e=>{setYear(Number(e.target.value));clearSel()}}>
-          {yearOptions.map(y=><option key={y} value={y}>{y}</option>)}
-        </select>
-        <div style={{ display:'flex', gap:5, marginLeft:6 }}>
-          <button onClick={()=>setAllSources(false)} style={chip(!allSources)}>Cash Card</button>
-          <button onClick={()=>setAllSources(true)} style={chip(allSources)}>Semua Sumber</button>
-        </div>
-        <div style={{ marginLeft:'auto', display:'flex', gap:6, alignItems:'center' }}>
-          {allVerified
-            ? <span className="badge" style={{ background:'var(--brand-soft)', color:'var(--brand)', fontSize:10 }}>✓ Semua Verified</span>
-            : <>
-                <button onClick={selectAll} className="btn btn-sm">Select All ({verifiableIds.length})</button>
-                <button onClick={exportZIP} disabled={zipping} className="btn btn-sm" title="Unduh evidence item yang dicentang">{zipping?'...':`🗜 Evidence (${selected.size})`}</button>
-                <button onClick={doVerify} disabled={verifying||selected.size===0} className="btn btn-sm btn-primary">{verifying?'...':`✓ Verify (${selected.size})`}</button>
-              </>}
-        </div>
-      </div>
-
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
-        <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8 }}>{periodItems.length} transaksi · Total Rp {fmt(totalNominal)} · <span style={{ color:'var(--brand)' }}>Export: {exportItems.length} item verified (Rp {fmt(exportTotal)})</span></div>
-        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
-         periodItems.length === 0 ? (
-          <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>🧾</div><div>Tidak ada transaksi pada {MONTHS[month]} {year}</div></div>
-         ) : (
-          <div className="card" style={{ overflow:'auto' }}>
-            <table className="wp-table" style={{ minWidth:1040 }}>
-              <thead><tr>
-                <th style={{ width:34 }}><input type="checkbox" checked={selected.size>0 && selected.size===verifiableIds.length} onChange={e=>e.target.checked?selectAll():clearSel()} disabled={verifiableIds.length===0} /></th>
-                <th>No</th><th>Tanggal</th><th>Pengaju</th><th>Keperluan</th><th>Kategori</th><th>Nominal</th><th>Sumber</th><th>Status</th><th>Evidence</th><th></th>
-              </tr></thead>
-              <tbody>
-                {periodItems.map((r,i) => {
-                  const lengkap = hasEvidence(r); const canVerify = r.status==='done'||r.status==='paid'
-                  return (
-                    <tr key={r._id} style={{ cursor:'pointer' }} onClick={()=>setViewing(r)}>
-                      <td onClick={e=>e.stopPropagation()}>{canVerify ? <input type="checkbox" checked={selected.has(r._id)} onChange={()=>toggleSel(r._id)} /> : <span style={{ color:'var(--brand)', fontSize:11 }}>🔒</span>}</td>
-                      <td style={{ fontSize:11, color:'var(--text3)' }}>{i+1}</td>
-                      <td style={{ fontSize:11, color:'var(--text2)' }}>{(()=>{ const d=periodDate(r); return d?d.toLocaleDateString('id-ID'):'—' })()}</td>
-                      <td style={{ fontSize:11 }}>{r.userName||'—'}</td>
-                      <td style={{ fontSize:11, fontWeight:600 }}>{r.title}</td>
-                      <td style={{ fontSize:10 }}>{oeExcelCode(r.category)}</td>
-                      <td style={{ fontWeight:600 }}>Rp {fmt(r.amount)}</td>
-                      <td onClick={e=>e.stopPropagation()}>
-                        <button onClick={(e)=>toggleSource(r,e)} className="badge" title="Klik untuk pindah sumber" style={{ cursor:r.status==='verified'?'default':'pointer', border:'none', background:r.isCashCard?'var(--brand-soft)':'var(--bg3)', color:r.isCashCard?'var(--brand)':'var(--text2)', fontSize:9 }}>{r.isCashCard?'Cash Card':'Petty Cash'} {r.status!=='verified' && '⇄'}</button>
-                      </td>
-                      <td>{statusBadge(r.status)}</td>
-                      <td><span className="badge" style={{ background:lengkap?'var(--greenbg)':'var(--redbg)', color:lengkap?'var(--green)':'var(--red)', fontSize:9 }}>{lengkap?`Lengkap · ${evidenceCount(r)}`:'Belum'}</span></td>
-                      <td onClick={e=>e.stopPropagation()}><button onClick={()=>setViewing(r)} className="btn btn-sm" style={{ fontSize:10 }}>Lihat</button></td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-         )}
-      </div>
+      {allVerified && <div className="au-row p-accent au-small" style={{ borderRadius: 14, padding: 12, gap: 8 }}><Icon name="check" size={16} stroke={2.4} />Semua transaksi periode ini sudah Verified.</div>}
     </>
   )
 }
 
 // =====================  PETTY CASH  =====================
-function PettyCashTab() {
-  const now = new Date()
-  const [month, setMonth] = useState(now.getMonth())  // 0-11
-  const { year, setYear } = useYear()
+function PettyCashTab({ month, year }: { month:number; year:number }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
   const [editing, setEditing] = useState(false)
   const [rincian, setRincian] = useState<null|'noncc'|'bankfee'|'cc'>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
-    try { const r = await fetch(`/api/pettycash?year=${year}&month=${month+1}`).then(r=>r.json()); setData(r.data) }
-    catch { toast.error('Gagal memuat petty cash') } finally { setLoading(false) }
+    setLoading(true); setFailed(false)
+    try {
+      const r = await fetch(`/api/pettycash?year=${year}&month=${month+1}`)
+      if (!r.ok) throw new Error()
+      setData((await r.json()).data)
+    } catch { setFailed(true); toast.error('Gagal memuat petty cash') } finally { setLoading(false) }
   }, [year, month])
   useEffect(() => { load() }, [load])
 
   const s = data?.summary || { pemasukan:0, nonCCAmount:0, bankFees:0, ccOperasional:0, pengeluaran:0, saldo:0 }
+  const row = (label:string, value:number, kind?:'noncc'|'bankfee'|'cc') => (
+    <button type="button" className="au-igr" onClick={kind ? () => setRincian(kind) : undefined} disabled={!kind}>
+      <span className="au-small au-ink2" style={{ flex: 1, minWidth: 0 }}>{label}</span>
+      <b style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>Rp {fmt(value)}</b>
+      {kind && <Icon name="chev" size={15} style={{ transform: 'rotate(-90deg)', color: 'var(--muted)' }} />}
+    </button>
+  )
 
   return (
     <>
       {editing && <InflowEditor year={year} initial={data?.inflows||[]} onClose={()=>setEditing(false)} onSaved={()=>{setEditing(false);load()}} />}
-      {rincian && <RincianModal kind={rincian} detail={data?.detail} summary={s} month={month} year={year} onClose={()=>setRincian(null)} />}
-      <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexWrap:'wrap', alignItems:'center', flexShrink:0 }}>
-        <span style={{ fontSize:11, color:'var(--text3)' }}>Saldo kumulatif s/d:</span>
-        <select className="input input-sm" style={{ width:130 }} value={month} onChange={e=>setMonth(Number(e.target.value))}>
-          {MONTHS.map((m,i)=><option key={i} value={i}>{m}</option>)}
-        </select>
-        <select className="input input-sm" style={{ width:90 }} value={year} onChange={e=>setYear(Number(e.target.value))}>
-          {[now.getFullYear(), now.getFullYear()-1, now.getFullYear()+1].sort((a,b)=>b-a).map(y=><option key={y} value={y}>{y}</option>)}
-        </select>
-        <button onClick={()=>setEditing(true)} className="btn btn-sm btn-primary" style={{ marginLeft:'auto' }}>+ Saldo Awal / Pemasukan</button>
-      </div>
-
-      <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }} className="safe-bottom page-pad">
-        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> : (
-          <>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px,1fr))', gap:12, marginBottom:16 }}>
-              <BigCard label="Pemasukan (kumulatif)" value={`Rp ${fmt(s.pemasukan)}`} color="var(--green)" />
-              <BigCard label="Pengeluaran (kumulatif)" value={`Rp ${fmt(s.pengeluaran)}`} color="var(--red)" />
-              <BigCard label="Saldo Petty Cash" value={`Rp ${fmt(s.saldo)}`} color="var(--brand)" big />
-            </div>
-            <div className="card" style={{ padding:'14px 16px', marginBottom:16 }}>
-              <div style={{ fontSize:12, fontWeight:600, marginBottom:10 }}>Rincian Pengeluaran s/d {MONTHS[month]} {year} <span style={{ fontWeight:400, color:'var(--text3)', fontSize:10 }}>· klik baris untuk lihat rincian</span></div>
-              <Row label="Reimburse non-Cash Card (nominal, done/verified)" value={s.nonCCAmount} onClick={()=>setRincian('noncc')} />
-              <Row label="Biaya antar bank (semua reimburse: CC + Petty)" value={s.bankFees} onClick={()=>setRincian('bankfee')} />
-              <Row label="Selisih Biaya Settlement Cash Card (total Pengeluaran Operasional)" value={s.ccOperasional} onClick={()=>setRincian('cc')} />
-              <div style={{ borderTop:'1px solid var(--border)', marginTop:8, paddingTop:8 }}><Row label="Total Pengeluaran" value={s.pengeluaran} bold /></div>
-            </div>
-            <div className="card" style={{ padding:'14px 16px' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-                <div style={{ fontSize:12, fontWeight:600 }}>Daftar Pemasukan {year}</div>
-                <button onClick={()=>setEditing(true)} className="btn btn-sm">Edit</button>
+      {rincian && <RincianSheet kind={rincian} detail={data?.detail} summary={s} month={month} year={year} onClose={()=>setRincian(null)} />}
+      {failed && <div className="au-row au-wrap p-bad" role="alert" style={{ borderRadius: 14, padding: 12 }}><span className="au-small" style={{ flex: 1 }}>Petty cash gagal dimuat.</span><button type="button" className="btn btn-sm" onClick={load}>Coba lagi</button></div>}
+      {loading ? <div className="au-card">{[0,1,2].map(k => <div key={k} className="au-skel" />)}</div> : (
+        <>
+          <div className="au-pcgrid">
+            <section className="au-card au-saldo rise">
+              <span className="lbl">Saldo petty cash · s/d {MONTHS[month]} {year}</span>
+              <b>Rp {fmt(s.saldo)}</b>
+              <div className="au-row au-wrap" style={{ gap: 16 }}>
+                <span className="au-col" style={{ gap: 2 }}><span className="au-xs au-muted">Pemasukan kumulatif</span><span className="au-small" style={{ fontWeight: 700, color: 'var(--ok)' }}>+ Rp {fmt(s.pemasukan)}</span></span>
+                <span className="au-col" style={{ gap: 2 }}><span className="au-xs au-muted">Pengeluaran kumulatif</span><span className="au-small" style={{ fontWeight: 700, color: 'var(--bad)' }}>− Rp {fmt(s.pengeluaran)}</span></span>
               </div>
-              {(data?.inflows||[]).length===0 ? <div style={{ fontSize:12, color:'var(--text3)' }}>Belum ada pemasukan dicatat.</div> : (
-                <table className="wp-table"><thead><tr><th>Tanggal</th><th>Sumber</th><th>Catatan</th><th>Jumlah</th></tr></thead>
-                  <tbody>{(data.inflows||[]).map((f:any,i:number)=>(
-                    <tr key={i}><td style={{ fontSize:11 }}>{f.date?new Date(f.date).toLocaleDateString('id-ID'):'—'}</td><td style={{ fontSize:11 }}>{f.source||'—'}</td><td style={{ fontSize:11, color:'var(--text3)' }}>{f.notes||''}</td><td style={{ fontWeight:600 }}>Rp {fmt(f.amount)}</td></tr>
-                  ))}</tbody>
-                </table>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+              <button type="button" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} onClick={()=>setEditing(true)}><Icon name="plus" size={15} stroke={2.2} />Saldo awal / pemasukan</button>
+            </section>
+            <section className="au-col rise" style={{ gap: 8 }}>
+              <span className="lbl">Rincian pengeluaran · ketuk untuk detail</span>
+              <div className="au-ig">
+                {row('Reimburse non-Cash Card (nominal, done/verified)', s.nonCCAmount, 'noncc')}
+                {row('Biaya antar bank (semua reimburse: CC + Petty)', s.bankFees, 'bankfee')}
+                {row('Selisih biaya settlement Cash Card (pengeluaran operasional)', s.ccOperasional, 'cc')}
+                <div className="au-igr" style={{ background: 'var(--sunken)' }}><b className="au-small" style={{ flex: 1 }}>Total pengeluaran</b><b style={{ fontVariantNumeric: 'tabular-nums' }}>Rp {fmt(s.pengeluaran)}</b></div>
+              </div>
+            </section>
+          </div>
+          <section className="au-col rise" style={{ gap: 8 }}>
+            <span className="au-row au-between"><span className="lbl">Daftar pemasukan {year}</span><button type="button" className="btn btn-sm" onClick={()=>setEditing(true)}><Icon name="edit" size={14} />Edit</button></span>
+            {(data?.inflows||[]).length===0 ? <div className="au-card"><Empty title="Belum ada pemasukan" text={`Catat saldo awal atau top up petty cash ${year}.`} /></div> : (
+              <div className="au-tblw"><table className="wp-table au-ctbl"><thead><tr><th>Tanggal</th><th>Sumber</th><th>Catatan</th><th style={{ textAlign: 'right' }}>Jumlah</th></tr></thead>
+                <tbody>{(data.inflows||[]).map((f:any,i:number)=>(
+                  <tr key={i}><td className="c-main au-small">{f.date?new Date(f.date).toLocaleDateString('id-ID'):'—'}</td><td data-l="Sumber" className="au-small">{f.source||'—'}</td><td data-l="Catatan" className="au-small au-muted">{f.notes||''}</td><td data-l="Jumlah" style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>Rp {fmt(f.amount)}</td></tr>
+                ))}</tbody>
+              </table></div>
+            )}
+          </section>
+        </>
+      )}
     </>
   )
 }
@@ -510,191 +512,109 @@ function InflowEditor({ year, initial, onClose, onSaved }: { year:number; initia
       const r = await fetch('/api/pettycash', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ year, inflows: clean }) })
       if (!r.ok) { toast.error('Gagal menyimpan'); return }
       toast.success('Pemasukan disimpan'); onSaved()
-    } finally { setSaving(false) }
+    } catch { toast.error('Gagal menyimpan') } finally { setSaving(false) }
   }
+  const total = rows.reduce((s,r)=>s+(Number(r.amount)||0),0)
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:640 }}>
-        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:600 }}>Pemasukan / Saldo Awal Petty Cash {year}</span>
-          <button onClick={onClose} className="btn btn-icon">×</button>
+    <Sheet open wide title={`Pemasukan petty cash ${year}`} onClose={onClose} onSave={save} saveDisabled={saving} saveLabel={saving ? 'Menyimpan…' : 'Simpan'}>
+      <span className="au-xs au-muted">Baris dengan jumlah 0 tidak disimpan.</span>
+      {rows.map((r,i)=>(
+        <div key={i} className="au-inrow">
+          <label className="au-col" style={{ gap: 4 }}><span className="lbl">Tanggal</span><input type="date" className="input" value={r.date} onChange={e=>upd(i,'date',e.target.value)} /></label>
+          <label className="au-col" style={{ gap: 4 }}><span className="lbl">Sumber</span><input className="input" placeholder="Saldo Awal / Top Up" value={r.source} onChange={e=>upd(i,'source',e.target.value)} /></label>
+          <label className="au-col" style={{ gap: 4 }}><span className="lbl">Catatan</span><input className="input" value={r.notes} onChange={e=>upd(i,'notes',e.target.value)} /></label>
+          <label className="au-col" style={{ gap: 4 }}><span className="lbl">Jumlah</span><MoneyInput currency="IDR" className="input" placeholder="0" value={Number(r.amount)||0} onChange={n=>upd(i,'amount',n)} /></label>
+          <button type="button" onClick={()=>del(i)} className="btn btn-icon btn-sm" aria-label={`Hapus baris ${i + 1}`} style={{ alignSelf: 'end', marginBottom: 6 }}><Icon name="trash" size={14} /></button>
         </div>
-        <div style={{ padding:'14px 20px', maxHeight:'70vh', overflowY:'auto', display:'flex', flexDirection:'column', gap:8 }}>
-          {rows.map((r,i)=>(
-            <div key={i} style={{ display:'grid', gridTemplateColumns:'130px 1fr 1fr 130px 32px', gap:8, alignItems:'center' }}>
-              <input type="date" className="input input-sm" value={r.date} onChange={e=>upd(i,'date',e.target.value)} />
-              <input className="input input-sm" placeholder="Sumber (Saldo Awal/Top Up)" value={r.source} onChange={e=>upd(i,'source',e.target.value)} />
-              <input className="input input-sm" placeholder="Catatan" value={r.notes} onChange={e=>upd(i,'notes',e.target.value)} />
-              <MoneyInput currency="IDR" className="input input-sm" placeholder="Jumlah" value={Number(r.amount)||0} onChange={n=>upd(i,'amount',n)} />
-              <button onClick={()=>del(i)} className="btn btn-icon btn-sm" style={{ color:'var(--red)' }}>×</button>
-            </div>
-          ))}
-          <button onClick={add} className="btn btn-sm" style={{ alignSelf:'flex-start' }}>+ Baris</button>
-        </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
-          <button onClick={onClose} className="btn">Batal</button>
-          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Simpan'}</button>
-        </div>
-      </div>
-    </div>
+      ))}
+      <button type="button" onClick={add} className="btn btn-sm" style={{ alignSelf:'flex-start' }}><Icon name="plus" size={14} />Baris</button>
+      <div className="au-total"><span className="lbl">Total pemasukan</span><b>Rp {fmt(total)}</b></div>
+    </Sheet>
   )
 }
 
 // =====================  shared  =====================
-function DetailModal({ item, onClose, onToggleSource, onVerify, onReverse, onClarify }: { item:any; onClose:()=>void; onToggleSource?:(r:any)=>void; onVerify?:(r:any)=>void; onReverse?:(r:any)=>void; onClarify?:(r:any, note:string)=>void }) {
+function DetailSheet({ item, onClose, onToggleSource, onVerify, onReverse, onClarify, busy }: { item:any; onClose:()=>void; onToggleSource?:(r:any)=>void; onVerify?:(r:any)=>void; onReverse?:(r:any)=>void; onClarify?:(r:any, note:string)=>void; busy?:boolean }) {
   const isVerified = item.status==='verified'
   const isClarification = item.status==='clarification'
   const [clarifyMode, setClarifyMode] = useState(false)
   const [note, setNote] = useState('')
+  const kv = (k:string, v:React.ReactNode) => <div className="au-igr"><span className="k">{k}</span><span className="v">{v}</span></div>
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:520 }}>
-        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:600 }}>Detail & Evidence</span>
-          <button onClick={onClose} className="btn btn-icon">×</button>
-        </div>
-        <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:10, fontSize:12, maxHeight:'72vh', overflowY:'auto' }}>
-          <div><b>{item.title}</b></div>
-          {item.description && <div style={{ color:'var(--text2)' }}>{item.description}</div>}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, fontSize:11 }}>
-            <div><span style={{ color:'var(--text3)' }}>Pengaju:</span> {item.userName||'—'}</div>
-            <div><span style={{ color:'var(--text3)' }}>Nominal:</span> Rp {fmt(item.amount)}</div>
-            <div><span style={{ color:'var(--text3)' }}>Kategori:</span> {oeLookup(item.category).code} · {oeLookup(item.category).name}</div>
-            <div><span style={{ color:'var(--text3)' }}>Tgl Bukti:</span> {(()=>{ const d=periodDate(item); return d?d.toLocaleDateString('id-ID'):'—' })()}</div>
-            <div><span style={{ color:'var(--text3)' }}>Sumber:</span> {item.isCashCard?'Cash Card':'Petty Cash'}</div>
-            <div><span style={{ color:'var(--text3)' }}>Status:</span> {statusBadge(item.status)}</div>
-          </div>
-          {isClarification && item.clarifyNote && (
-            <div style={{ fontSize:11, background:'#fff3e0', border:'1px solid #f0c07a', borderRadius:8, padding:'8px 10px', color:'#8a5300' }}>
-              <b>Sedang menunggu revisi member.</b><br/>Catatan klarifikasi kamu: “{item.clarifyNote}”
-            </div>
-          )}
-          <div>
-            <EvidenceList itemId={item._id} documents={item.documents||[]} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
-          </div>
-          {clarifyMode && (
-            <div>
-              <label style={{ fontSize:11, color:'var(--text3)', display:'block', marginBottom:4 }}>Catatan untuk member (info evidence yang kurang / perlu diperbaiki)</label>
-              <textarea value={note} onChange={e=>setNote(e.target.value)} rows={3} className="input" autoFocus
-                placeholder="Contoh: Invoice belum ada tanda tangan/stempel. Mohon lampirkan ulang."
-                style={{ width:'100%', fontSize:12, resize:'vertical', fontFamily:'inherit' }} />
-            </div>
-          )}
-        </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-          {isVerified ? (
-            onReverse && <button onClick={()=>onReverse(item)} className="btn btn-sm" style={{ color:'var(--amber)' }} title="Mundurkan status ke Waiting for Verification">↩️ Reverse ke Waiting for Verification</button>
-          ) : isClarification ? (
-            <span style={{ fontSize:11, color:'var(--text3)' }}>Menunggu member merevisi & mengirim ulang.</span>
-          ) : clarifyMode ? (
-            <>
-              <button onClick={()=>{ setClarifyMode(false); setNote('') }} className="btn btn-sm">Batal</button>
-              <button onClick={()=>{ if(!note.trim()){ toast.error('Isi catatan klarifikasi dulu'); return } onClarify && onClarify(item, note.trim()) }} className="btn btn-sm btn-primary" title="Balikin ke member dengan catatan">↩️ Submit Klarifikasi</button>
-            </>
-          ) : (
-            <>
-              {onClarify && <button onClick={()=>setClarifyMode(true)} className="btn btn-sm" style={{ color:'#b45309' }} title="Balikin ke member karena evidence kurang">🔄 Clarify</button>}
-              {onToggleSource && <button onClick={()=>onToggleSource(item)} className="btn btn-sm" title="Pindah sumber dana">⇄ Ubah ke {item.isCashCard?'Petty Cash':'Cash Card'}</button>}
-              {onVerify && <button onClick={()=>onVerify(item)} className="btn btn-sm btn-primary" title="Verify item ini">✓ Verify</button>}
-            </>
-          )}
-        </div>
+    <Sheet open title="Detail & evidence" onClose={onClose}>
+      <div className="au-col" style={{ gap: 6 }}>
+        <span className="au-row au-wrap" style={{ gap: 6 }}><span className="au-tag" style={item.isCashCard ? { background:'var(--accent-soft)', color:'var(--accent-ink)' } : undefined}>{item.isCashCard?'Cash Card':'Petty Cash'}</span>{statusBadge(item.status)}</span>
+        <h3 style={{ font: '700 19px/1.3 var(--disp)', overflowWrap: 'anywhere' }}>{item.title}</h3>
+        {item.description && <span className="au-small au-ink2">{item.description}</span>}
+        <b style={{ font: '700 28px/1.1 var(--disp)', letterSpacing: '-.02em', fontVariantNumeric: 'tabular-nums' }}>Rp {fmt(item.amount)}</b>
       </div>
-    </div>
+      <div className="au-ig">
+        {kv('Pengaju', item.userName || '—')}
+        {kv('Kategori', `${oeLookup(item.category).code} · ${oeLookup(item.category).name}`)}
+        {kv('Tgl bukti', (()=>{ const d=periodDate(item); return d?d.toLocaleDateString('id-ID'):'—' })())}
+      </div>
+      {isClarification && item.clarifyNote && <div className="p-warn au-small" style={{ borderRadius: 14, padding: 12, lineHeight: 1.5 }}><b>Sedang menunggu revisi member.</b><br/>Catatan klarifikasi kamu: “{item.clarifyNote}”</div>}
+      <EvidenceList itemId={item._id} documents={item.documents||[]} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />
+      {clarifyMode && <label className="au-col" style={{ gap: 6 }}><span className="lbl">Catatan untuk member</span>
+        <textarea value={note} onChange={e=>setNote(e.target.value)} rows={3} className="input" autoFocus placeholder="Contoh: Invoice belum ada tanda tangan/stempel. Mohon lampirkan ulang." /></label>}
+      <div className="au-row au-wrap" style={{ gap: 8, justifyContent: 'flex-end' }}>
+        {isVerified ? (
+          onReverse && <button type="button" onClick={()=>onReverse(item)} className="btn" title="Mundurkan status ke Waiting for Verification"><Icon name="back" size={15} />Reverse ke Waiting for Verification</button>
+        ) : isClarification ? (
+          <span className="au-xs au-muted">Menunggu member merevisi & mengirim ulang.</span>
+        ) : clarifyMode ? (
+          <>
+            <button type="button" onClick={()=>{ setClarifyMode(false); setNote('') }} className="btn">Batal</button>
+            <button type="button" disabled={busy} onClick={()=>{ if(!note.trim()){ toast.error('Isi catatan klarifikasi dulu'); return } onClarify?.(item, note.trim()) }} className="btn btn-primary">Kirim klarifikasi</button>
+          </>
+        ) : (
+          <>
+            {onClarify && <button type="button" onClick={()=>setClarifyMode(true)} className="btn" title="Kembalikan ke member karena evidence kurang"><Icon name="back" size={15} />Clarify</button>}
+            {onToggleSource && <button type="button" onClick={()=>onToggleSource(item)} className="btn" title="Pindah sumber dana"><Icon name="arrow" size={15} />Ubah ke {item.isCashCard?'Petty Cash':'Cash Card'}</button>}
+            {onVerify && <button type="button" onClick={()=>onVerify(item)} className="btn btn-primary"><Icon name="check" size={15} stroke={2.4} />Verify</button>}
+          </>
+        )}
+      </div>
+    </Sheet>
   )
 }
-function BigCard({ label, value, color, big }: { label:string; value:string; color?:string; big?:boolean }) {
-  return (
-    <div className="card" style={{ padding:'14px 16px', background:big?'var(--brand-soft)':undefined, border:big?'1px solid var(--brand)':undefined }}>
-      <div style={{ fontSize:10, color: big?'var(--brand)':'var(--text3)', textTransform:'uppercase', letterSpacing:0.3, marginBottom:4 }}>{label}</div>
-      <div style={{ fontSize: big?24:18, fontWeight: big?800:700, color: color||'var(--text)' }}>{value}</div>
-    </div>
-  )
-}
-function Row({ label, value, bold, onClick }: { label:string; value:number; bold?:boolean; onClick?:()=>void }) {
-  return (
-    <div onClick={onClick} style={{ display:'flex', justifyContent:'space-between', fontSize:12, padding:'5px 0', fontWeight:bold?700:400, cursor:onClick?'pointer':'default', borderRadius:6 }}
-      onMouseEnter={e=>{ if(onClick) (e.currentTarget as HTMLElement).style.background='var(--bg3)' }}
-      onMouseLeave={e=>{ (e.currentTarget as HTMLElement).style.background='transparent' }}>
-      <span style={{ color:bold?'var(--text)':'var(--text2)' }}>{onClick && <span style={{ color:'var(--brand)', marginRight:4 }}>🔍</span>}{label}</span>
-      <span>Rp {fmt(value)}</span>
-    </div>
-  )
-}
-function RincianModal({ kind, detail, summary, month, year, onClose }:
+function RincianSheet({ kind, detail, summary, month, year, onClose }:
   { kind:'noncc'|'bankfee'|'cc'; detail:any; summary:any; month:number; year:number; onClose:()=>void }) {
   const d = detail || {}
-  const title = kind==='noncc' ? 'Reimburse non-Cash Card' : kind==='bankfee' ? 'Biaya Antar Bank' : 'Selisih Biaya Settlement Cash Card'
+  const title = kind==='noncc' ? 'Reimburse non-Cash Card' : kind==='bankfee' ? 'Biaya antar bank' : 'Selisih biaya settlement Cash Card'
   const total = kind==='noncc' ? summary.nonCCAmount : kind==='bankfee' ? summary.bankFees : summary.ccOperasional
   const fmtDate = (x:any)=> x ? new Date(x).toLocaleDateString('id-ID') : '—'
-
+  const none = <tr><td colSpan={5}><Empty title="Tidak ada data" /></td></tr>
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:640, maxHeight:'82vh', display:'flex', flexDirection:'column' }}>
-        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <div>
-            <div style={{ fontSize:14, fontWeight:600 }}>{title}</div>
-            <div style={{ fontSize:10, color:'var(--text3)' }}>Rincian s/d {MONTHS[month]} {year}</div>
-          </div>
-          <button onClick={onClose} className="btn btn-icon">×</button>
-        </div>
-        <div style={{ flex:1, overflow:'auto', padding:'8px 20px' }}>
-          {kind==='noncc' && (
-            <table className="wp-table" style={{ width:'100%' }}>
-              <thead><tr><th>Tanggal</th><th>Pengaju</th><th>Keperluan</th><th>Kategori</th><th style={{ textAlign:'right' }}>Nominal</th></tr></thead>
-              <tbody>
-                {(d.nonCCItems||[]).length===0 ? <tr><td colSpan={5} style={{ textAlign:'center', color:'var(--text3)', padding:20 }}>Tidak ada data</td></tr> :
-                 (d.nonCCItems||[]).map((it:any,i:number)=>(
-                  <tr key={i}><td style={{ fontSize:11 }}>{fmtDate(it.date)}</td><td style={{ fontSize:11 }}>{it.userName}</td><td style={{ fontSize:11 }}>{it.title}</td><td style={{ fontSize:11 }}>{oeLookup(it.category).name}</td><td style={{ textAlign:'right', fontWeight:600 }}>Rp {fmt(it.amount)}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {kind==='bankfee' && (
-            <table className="wp-table" style={{ width:'100%' }}>
-              <thead><tr><th>Tanggal</th><th>Pengaju</th><th>Keperluan</th><th>Sumber</th><th style={{ textAlign:'right' }}>Biaya</th></tr></thead>
-              <tbody>
-                {(d.bankFeeItems||[]).length===0 ? <tr><td colSpan={5} style={{ textAlign:'center', color:'var(--text3)', padding:20 }}>Tidak ada data</td></tr> :
-                 (d.bankFeeItems||[]).map((it:any,i:number)=>(
-                  <tr key={i}><td style={{ fontSize:11 }}>{fmtDate(it.date)}</td><td style={{ fontSize:11 }}>{it.userName}</td><td style={{ fontSize:11 }}>{it.title}</td><td style={{ fontSize:11 }}>{it.isCashCard?'Cash Card':'Petty Cash'}</td><td style={{ textAlign:'right', fontWeight:600 }}>Rp {fmt(it.fee)}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {kind==='cc' && (
-            <>
-              <div style={{ fontSize:10, color:'var(--text3)', margin:'6px 0 10px' }}>Per bulan: |Pengembalian − (Top Up − Settlement)|. Identik dengan kolom Pengeluaran Operasional di menu Cash Card.</div>
-              <table className="wp-table" style={{ width:'100%' }}>
-                <thead><tr><th>Bulan</th><th style={{ textAlign:'right' }}>Top Up</th><th style={{ textAlign:'right' }}>Settlement</th><th style={{ textAlign:'right' }}>Pengembalian</th><th style={{ textAlign:'right' }}>Operasional</th></tr></thead>
-                <tbody>
-                  {(d.ccItems||[]).length===0 ? <tr><td colSpan={5} style={{ textAlign:'center', color:'var(--text3)', padding:20 }}>Tidak ada data</td></tr> :
-                   (d.ccItems||[]).map((it:any,i:number)=>(
-                    <tr key={i}><td style={{ fontSize:11, fontWeight:600 }}>{MONTHS[it.month-1]}</td><td style={{ textAlign:'right' }}>Rp {fmt(it.topUp)}</td><td style={{ textAlign:'right' }}>Rp {fmt(it.settlement)}</td><td style={{ textAlign:'right' }}>Rp {fmt(it.refund)}</td><td style={{ textAlign:'right', fontWeight:600, color:'var(--red)' }}>Rp {fmt(it.operasional)}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
-        </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <span style={{ fontSize:12, fontWeight:700 }}>Total</span>
-          <span style={{ fontSize:14, fontWeight:800, color:'var(--brand)' }}>Rp {fmt(total)}</span>
-        </div>
+    <Sheet open wide title={title} onClose={onClose}>
+      <span className="au-xs au-muted">Rincian s/d {MONTHS[month]} {year}</span>
+      {kind==='cc' && <span className="au-xs au-muted">Per bulan: |Pengembalian − (Top Up − Settlement)|. Identik dengan kolom Pengeluaran Operasional di menu Cash Card.</span>}
+      <div className="au-tblw">
+        {kind==='noncc' && (
+          <table className="wp-table au-ctbl"><thead><tr><th>Keperluan</th><th>Tanggal</th><th>Pengaju</th><th>Kategori</th><th style={{ textAlign:'right' }}>Nominal</th></tr></thead>
+            <tbody>{(d.nonCCItems||[]).length===0 ? none : (d.nonCCItems||[]).map((it:any,i:number)=>(
+              <tr key={i}><td className="c-main au-small" style={{ fontWeight: 600 }}>{it.title}</td><td data-l="Tanggal" className="au-small">{fmtDate(it.date)}</td><td data-l="Pengaju" className="au-small">{it.userName}</td><td data-l="Kategori" className="au-small">{oeLookup(it.category).name}</td><td data-l="Nominal" style={{ textAlign:'right', fontWeight:700 }}>Rp {fmt(it.amount)}</td></tr>))}</tbody></table>
+        )}
+        {kind==='bankfee' && (
+          <table className="wp-table au-ctbl"><thead><tr><th>Keperluan</th><th>Tanggal</th><th>Pengaju</th><th>Sumber</th><th style={{ textAlign:'right' }}>Biaya</th></tr></thead>
+            <tbody>{(d.bankFeeItems||[]).length===0 ? none : (d.bankFeeItems||[]).map((it:any,i:number)=>(
+              <tr key={i}><td className="c-main au-small" style={{ fontWeight: 600 }}>{it.title}</td><td data-l="Tanggal" className="au-small">{fmtDate(it.date)}</td><td data-l="Pengaju" className="au-small">{it.userName}</td><td data-l="Sumber" className="au-small">{it.isCashCard?'Cash Card':'Petty Cash'}</td><td data-l="Biaya" style={{ textAlign:'right', fontWeight:700 }}>Rp {fmt(it.fee)}</td></tr>))}</tbody></table>
+        )}
+        {kind==='cc' && (
+          <table className="wp-table au-ctbl"><thead><tr><th>Bulan</th><th style={{ textAlign:'right' }}>Top up</th><th style={{ textAlign:'right' }}>Settlement</th><th style={{ textAlign:'right' }}>Pengembalian</th><th style={{ textAlign:'right' }}>Operasional</th></tr></thead>
+            <tbody>{(d.ccItems||[]).length===0 ? none : (d.ccItems||[]).map((it:any,i:number)=>(
+              <tr key={i}><td className="c-main au-small" style={{ fontWeight:700 }}>{MONTHS[it.month-1]}</td><td data-l="Top up" style={{ textAlign:'right' }}>Rp {fmt(it.topUp)}</td><td data-l="Settlement" style={{ textAlign:'right' }}>Rp {fmt(it.settlement)}</td><td data-l="Pengembalian" style={{ textAlign:'right' }}>Rp {fmt(it.refund)}</td><td data-l="Operasional" style={{ textAlign:'right', fontWeight:700, color:'var(--bad)' }}>Rp {fmt(it.operasional)}</td></tr>))}</tbody></table>
+        )}
       </div>
-    </div>
+      <div className="au-total"><span className="lbl">Total</span><b>Rp {fmt(total)}</b></div>
+    </Sheet>
   )
 }
 
 function boxBorder() { const s = { style:'thin' as const, color:{argb:'FFBFBFBF'} }; return { top:s, bottom:s, left:s, right:s } }
-function statusBadge(s:string) {
-  const cfg: Record<string,{label:string;color:string;bg:string}> = {
-    submitted:{ label:'Waiting for Payment', color:'var(--amber)', bg:'var(--amberbg)' }, approved:{ label:'Waiting for Payment', color:'var(--amber)', bg:'var(--amberbg)' },
-    done:{ label:'Waiting for Verification', color:'var(--green)', bg:'var(--greenbg)' }, paid:{ label:'Waiting for Verification', color:'var(--green)', bg:'var(--greenbg)' },
-    verified:{ label:'Verified', color:'var(--brand)', bg:'var(--brand-soft)' }, rejected:{ label:'Ditolak', color:'var(--red)', bg:'var(--redbg)' },
-    clarification:{ label:'Clarification', color:'#b45309', bg:'#fff3e0' },
-  }
-  const c = cfg[s] || { label:s, color:'var(--text3)', bg:'var(--bg3)' }
-  return <span className="badge" style={{ background:c.bg, color:c.color, fontSize:9 }}>{c.label}</span>
+const STATUS: Record<string,{label:string; tone:Tone}> = {
+  submitted:{ label:'Waiting for Payment', tone:'warn' }, approved:{ label:'Waiting for Payment', tone:'warn' },
+  done:{ label:'Waiting for Verification', tone:'ok' }, paid:{ label:'Waiting for Verification', tone:'ok' },
+  verified:{ label:'Verified', tone:'accent' }, rejected:{ label:'Ditolak', tone:'bad' }, clarification:{ label:'Clarification', tone:'warn' },
 }
-function chip(active:boolean, color:string='var(--brand)'):React.CSSProperties { return { padding:'4px 11px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${active?color:'var(--border)'}`, background:active?color+'1a':'var(--bg3)', color:active?color:'var(--text2)' } }
-function subtab(active:boolean):React.CSSProperties { return { padding:'8px 16px', fontSize:12.5, fontWeight:600, cursor:'pointer', border:'none', borderBottom:`2px solid ${active?'var(--brand)':'transparent'}`, background:'transparent', color:active?'var(--brand)':'var(--text3)' } }
+function statusBadge(s:string) { const c = STATUS[s] || { label:s, tone:'none' as Tone }; return <Pill tone={c.tone}>{c.label}</Pill> }
