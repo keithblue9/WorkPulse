@@ -26,7 +26,7 @@ export default function LoginPage() {
   const router = useRouter()
 
   useEffect(() => {
-    fetch('/api/config').then(r => r.json()).then(d => { if (d.data) setConfig(d.data) }).catch(() => {})
+    fetch('/api/config?scope=login').then(r => r.json()).then(d => { if (d.data) setConfig(d.data) }).catch(() => {})
     fetch('/api/users').then(r => r.json()).then(d => {
       const active = (d.data || []).filter((u: any) => u.active !== false && !isGuestOnly(u))
       setUsers(active)

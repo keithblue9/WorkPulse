@@ -83,3 +83,15 @@ export function mergeConfigDefaults(cfg: any, widgetDefaults: any[]): any {
   out.dashboardWidgets = mergeWidgets(out.dashboardWidgets, widgetDefaults)
   return out
 }
+
+const LOGIN_KEYS = ['appName', 'appTagline', 'appIcon', 'loginTagline', 'loginBackgrounds', 'loginSlideInterval']
+/** Public, minimal slice for the login page (no roles, no business settings). */
+export function loginSlice(cfg: any): Record<string, any> {
+  return Object.fromEntries(LOGIN_KEYS.map(k => [k, cfg?.[k]]))
+}
+
+/** Config without the base64 login images (can be several MB); only their count is kept. */
+export function withoutLoginBackgrounds(cfg: any): any {
+  const { loginBackgrounds, ...rest } = cfg || {}
+  return { ...rest, loginBackgroundCount: Array.isArray(loginBackgrounds) ? loginBackgrounds.length : 0 }
+}

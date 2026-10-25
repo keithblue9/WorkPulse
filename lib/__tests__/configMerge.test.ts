@@ -47,3 +47,18 @@ describe('mergeConfigDefaults', () => {
     expect(cfg.appTagline).toBe('BPD & SS Procurement')
   })
 })
+
+import { loginSlice, withoutLoginBackgrounds } from '@/lib/configMerge'
+
+describe('config payload slices', () => {
+  const cfg = { appName: 'WINS', appTagline: 'BPD', loginTagline: 'L', loginBackgrounds: ['data:x'], loginSlideInterval: 5000, appIcon: '', roleDefs: [{ key: 'admin' }], fonnte: { apiUrl: 'x' } }
+  it('login slice exposes only what the login page needs', () => {
+    expect(Object.keys(loginSlice(cfg)).sort()).toEqual(['appIcon', 'appName', 'appTagline', 'loginBackgrounds', 'loginSlideInterval', 'loginTagline'])
+  })
+  it('dashboard payload drops the heavy login backgrounds', () => {
+    const out = withoutLoginBackgrounds(cfg)
+    expect(out).not.toHaveProperty('loginBackgrounds')
+    expect(out.loginBackgroundCount).toBe(1)
+    expect(out.roleDefs).toEqual([{ key: 'admin' }])
+  })
+})

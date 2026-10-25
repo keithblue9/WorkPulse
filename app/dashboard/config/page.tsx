@@ -1,5 +1,5 @@
 'use client'
-import { getConfig, invalidateConfig } from '@/lib/configCache'
+import { invalidateConfig } from '@/lib/configCache'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -349,7 +349,8 @@ export default function ConfigPage() {
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState<Tab>('branding')
 
-  useEffect(()=>{ getConfig().then((data:any)=>({ data })).then(d=>{ setConfig(d.data); setLoading(false) }) }, [])
+  // Halaman ini butuh gambar login juga, jadi ambil config lengkap tanpa cache bersama
+  useEffect(()=>{ fetch('/api/config?include=loginBackgrounds',{ cache:'no-store' }).then(r=>r.json()).then(d=>{ setConfig(d.data); setLoading(false) }).catch(()=>setLoading(false)) }, [])
 
   async function save(patch:any) {
     setSaving(true)
