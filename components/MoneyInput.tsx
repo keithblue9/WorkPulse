@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react'
 import { fmtMoney, parseMoney, Cur } from '@/lib/money'
 
-export function MoneyInput({ value, onChange, currency='IDR', className='input input-sm', style, placeholder }:{
-  value:number; onChange:(n:number)=>void; currency?:Cur; className?:string; style?:React.CSSProperties; placeholder?:string }) {
+export function MoneyInput({ value, onChange, currency='IDR', className='input input-sm', style, placeholder, ariaLabel }:{
+  value:number; onChange:(n:number)=>void; currency?:Cur; className?:string; style?:React.CSSProperties; placeholder?:string; ariaLabel?:string }) {
   const [focused, setFocused] = useState(false)
   const [text, setText] = useState('')
 
@@ -20,6 +20,6 @@ export function MoneyInput({ value, onChange, currency='IDR', className='input i
     onChange(parseMoney(e.target.value, currency))
   }
 
-  return <input type="text" inputMode="decimal" className={className} style={style} placeholder={placeholder}
+  return <input type="text" inputMode="decimal" className={className} style={style} placeholder={placeholder} aria-label={ariaLabel}
     value={text} onChange={onChangeText} onFocus={onFocus} onBlur={onBlur} />
 }

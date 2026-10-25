@@ -152,7 +152,7 @@ export default function CalendarPage() {
         <div className="au-cal-wrap">
           <section className="au-card rise" style={{ padding:14, gap:8 }}>
             <div className="au-cal-head">{['Sen','Sel','Rab','Kam','Jum','Sab','Min'].map(d => <span key={d}>{d}</span>)}</div>
-            <div className="au-cal-grid" role="grid" aria-label="Kalender bulan">
+            <div className="au-cal-grid" role="group" aria-label="Kalender bulan">
               {days.map(day => {
                 const dayActivities = activitiesOn(day)
                 const isCurrentMonth = isSameMonth(day, currentMonth)

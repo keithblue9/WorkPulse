@@ -370,7 +370,7 @@ export default function ConfigPage() {
       <PageHeader eyebrow="Admin · semua pengaturan" title="Configuration" actions={saving ? <span className="au-row au-xs au-muted" role="status" style={{ gap:6 }}><Icon name="clock" size={14} />Menyimpan…</span> : undefined} />
       <div className="au-chips rise" role="tablist" aria-label="Bagian konfigurasi">
         {tabs.map(t => (
-          <button type="button" role="tab" key={t.key} onClick={()=>setTab(t.key)} className="au-chip" aria-selected={tab===t.key} aria-pressed={tab===t.key} style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+          <button type="button" role="tab" key={t.key} onClick={()=>setTab(t.key)} className="au-chip" aria-selected={tab===t.key} style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
             <Icon name={t.icon} size={14} />{t.label}
           </button>
         ))}
@@ -394,15 +394,15 @@ export default function ConfigPage() {
                   <span className="au-xs au-muted">Maks 300KB</span>
                 </div>
                 <div className="au-col" style={{ gap:12, flex:'1 1 260px', minWidth:0 }}>
-                  <div><label style={lbl}>Nama Aplikasi</label>
-                    <input className="input" defaultValue={displayAppName(config.appName)} onBlur={e=>{ const v=e.target.value.trim(); if (v && v!==displayAppName(config.appName)) save({ appName: v }) }} placeholder="WINS" /></div>
-                  <div><label style={lbl}>Tagline / Subtitle</label>
-                    <input className="input" defaultValue={config.appTagline} onBlur={e=>e.target.value!==config.appTagline && save({ appTagline: e.target.value })} placeholder="BPD Procurement" /></div>
+                  <label style={{ display:'block' }}><span style={lbl}>Nama Aplikasi</span>
+                    <input className="input" defaultValue={displayAppName(config.appName)} onBlur={e=>{ const v=e.target.value.trim(); if (v && v!==displayAppName(config.appName)) save({ appName: v }) }} placeholder="WINS" /></label>
+                  <label style={{ display:'block' }}><span style={lbl}>Tagline / Subtitle</span>
+                    <input className="input" defaultValue={config.appTagline} onBlur={e=>e.target.value!==config.appTagline && save({ appTagline: e.target.value })} placeholder="BPD Procurement" /></label>
                   <div style={{ display:'flex', gap:10, alignItems:'flex-end' }}>
                     <div style={{ flex:1 }}><label style={lbl}>Warna Brand Utama</label>
                       <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                        <input type="color" defaultValue={config.appColor} onChange={e=>save({ appColor: e.target.value })} style={{ width:40, height:36, borderRadius:6, border:'1px solid var(--line)', cursor:'pointer' }} />
-                        <input className="input" defaultValue={config.appColor} onBlur={e=>e.target.value!==config.appColor && save({ appColor: e.target.value })} placeholder="#4f8ef7" style={{ width:120 }} />
+                        <input type="color" aria-label="Warna brand utama" defaultValue={config.appColor} onChange={e=>save({ appColor: e.target.value })} style={{ width:40, height:36, borderRadius:6, border:'1px solid var(--line)', cursor:'pointer' }} />
+                        <input className="input" aria-label="Kode warna brand" defaultValue={config.appColor} onBlur={e=>e.target.value!==config.appColor && save({ appColor: e.target.value })} placeholder="#4f8ef7" style={{ width:120 }} />
                       </div>
                     </div>
                   </div>
@@ -412,10 +412,10 @@ export default function ConfigPage() {
 
             <Section title="Periode & target" sub="Tahun aktif dan target kumulatif">
               <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:10 }}>
-                <div><label style={lbl}>Tahun Aktif</label><input type="number" className="input" defaultValue={config.activeYear} onBlur={e=>save({ activeYear: parseInt(e.target.value) })} /></div>
-                <div><label style={lbl}>Bulan Mid Year</label><input type="number" min={1} max={12} className="input" defaultValue={config.midYearMonth} onBlur={e=>save({ midYearMonth: parseInt(e.target.value) })} /></div>
-                <div><label style={lbl}>Target M{config.midYearMonth} (%)</label><input type="number" className="input" defaultValue={config.midYearTarget} onBlur={e=>save({ midYearTarget: parseInt(e.target.value) })} /></div>
-                <div><label style={lbl}>Target Year End (%)</label><input type="number" className="input" defaultValue={config.yearEndTarget} onBlur={e=>save({ yearEndTarget: parseInt(e.target.value) })} /></div>
+                <label style={{ display:'block' }}><span style={lbl}>Tahun Aktif</span><input type="number" className="input" defaultValue={config.activeYear} onBlur={e=>save({ activeYear: parseInt(e.target.value) })} /></label>
+                <label style={{ display:'block' }}><span style={lbl}>Bulan Mid Year</span><input type="number" min={1} max={12} className="input" defaultValue={config.midYearMonth} onBlur={e=>save({ midYearMonth: parseInt(e.target.value) })} /></label>
+                <label style={{ display:'block' }}><span style={lbl}>Target M{config.midYearMonth} (%)</span><input type="number" className="input" defaultValue={config.midYearTarget} onBlur={e=>save({ midYearTarget: parseInt(e.target.value) })} /></label>
+                <label style={{ display:'block' }}><span style={lbl}>Target Year End (%)</span><input type="number" className="input" defaultValue={config.yearEndTarget} onBlur={e=>save({ yearEndTarget: parseInt(e.target.value) })} /></label>
               </div>
             </Section>
           </>
@@ -428,12 +428,12 @@ export default function ConfigPage() {
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                 <div>
                   <label style={lbl}>Tagline Login Page</label>
-                  <input className="input" defaultValue={config.loginTagline||''} onBlur={e=>e.target.value!==config.loginTagline && save({ loginTagline: e.target.value })} placeholder="BPD Procurement — Pertamina" />
+                  <input className="input" aria-label="Tagline login page" defaultValue={config.loginTagline||''} onBlur={e=>e.target.value!==config.loginTagline && save({ loginTagline: e.target.value })} placeholder="BPD Procurement — Pertamina" />
                   <div className="au-xs au-muted" style={{ marginTop:6 }}>Tulisan ini muncul di bawah nama aplikasi di halaman login.</div>
                 </div>
 
                 <div>
-                  <label style={lbl}>Background Slideshow ({((config.loginBackgrounds || [])||[]).length} gambar)</label>
+                  <span style={lbl}>Background Slideshow ({((config.loginBackgrounds || [])||[]).length} gambar)</span>
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:8, marginBottom:8 }}>
                     {((config.loginBackgrounds || [])||[]).map((bg:string, i:number) => (
                       <div key={i} style={{ position:'relative', aspectRatio:'16/10', borderRadius:14, overflow:'hidden', border:'1px solid var(--line)' }}>
@@ -458,7 +458,7 @@ export default function ConfigPage() {
 
                 <div>
                   <label style={lbl}>Durasi Slide (ms)</label>
-                  <input type="number" min={1000} step={1000} className="input" defaultValue={config.loginSlideInterval||5000} onBlur={e=>save({ loginSlideInterval: parseInt(e.target.value)||5000 })} style={{ width:160 }} />
+                  <input type="number" aria-label="Durasi slide (ms)" min={1000} step={1000} className="input" defaultValue={config.loginSlideInterval||5000} onBlur={e=>save({ loginSlideInterval: parseInt(e.target.value)||5000 })} style={{ width:160 }} />
                   <div className="au-xs au-muted" style={{ marginTop:6 }}>Default 5000ms (5 detik). Berapa lama tiap gambar tampil.</div>
                 </div>
               </div>
@@ -473,12 +473,12 @@ export default function ConfigPage() {
                 <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:10 }}>
                   <div>
                     <label style={lbl}>Delay sebelum prompt muncul (ms)</label>
-                    <input type="number" min={0} step={1000} className="input" defaultValue={config.pwaPromptDelay||8000} onBlur={e=>save({ pwaPromptDelay: parseInt(e.target.value)||8000 })} />
+                    <input type="number" aria-label="Delay sebelum prompt muncul (ms)" min={0} step={1000} className="input" defaultValue={config.pwaPromptDelay||8000} onBlur={e=>save({ pwaPromptDelay: parseInt(e.target.value)||8000 })} />
                     <div className="au-xs au-muted" style={{ marginTop:6 }}>Default 8000ms. Setelah user buka app berapa lama prompt muncul.</div>
                   </div>
                   <div>
                     <label style={lbl}>Cooldown setelah dismiss (hari)</label>
-                    <input type="number" min={1} max={90} className="input" defaultValue={config.pwaPromptCooldown||7} onBlur={e=>save({ pwaPromptCooldown: parseInt(e.target.value)||7 })} />
+                    <input type="number" aria-label="Cooldown setelah dismiss (hari)" min={1} max={90} className="input" defaultValue={config.pwaPromptCooldown||7} onBlur={e=>save({ pwaPromptCooldown: parseInt(e.target.value)||7 })} />
                     <div className="au-xs au-muted" style={{ marginTop:6 }}>Default 7 hari. Berapa lama tidak muncul setelah user klik "Nanti".</div>
                   </div>
                 </div>

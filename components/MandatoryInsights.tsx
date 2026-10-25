@@ -95,8 +95,7 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
       {loading ? <div className="au-row" style={{ gap: 14 }}><div className="au-skel" style={{ width: 88, height: 88, borderRadius: '50%' }} /><div className="au-col" style={{ gap: 8, flex: 1 }}><div className="au-skel" style={{ width: '60%' }} /><div className="au-skel" style={{ width: '40%' }} /></div></div> : (
         <div className="au-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
           {cards.map(c => (
-            <div key={c.key} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetail({ title: c.title, rows: c.data.rows, okLabel: c.okLabel, noLabel: c.noLabel }) } }}
-              onClick={() => setDetail({ title: c.title, rows: c.data.rows, okLabel: c.okLabel, noLabel: c.noLabel })} className="au-mcard">
+            <div key={c.key} onClick={e => { if ((e.target as HTMLElement).closest('select')) return; setDetail({ title: c.title, rows: c.data.rows, okLabel: c.okLabel, noLabel: c.noLabel }) }} className="au-mcard">
               <Ring pct={c.data.pct} color={c.color} />
               <div className="au-col" style={{ flex: 1, minWidth: 0, gap: 4 }}>
                 <b style={{ fontSize: 15 }}>{c.title}</b>
@@ -115,7 +114,7 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
                 {c.key === 'kpi' && (status === 'all'
                   ? <span className="au-row au-wrap" style={{ gap: 4 }}><span className="au-tag">Pekerja {(kpi as any).totPekerja}×</span><span className="au-tag">TAD {(kpi as any).totTAD}×</span></span>
                   : <span className="au-xs au-muted">Total pengisian {(kpi as any).totPekerja + (kpi as any).totTAD}×</span>)}
-                <span className="au-xs" style={{ color: 'var(--accent-ink)', fontWeight: 600 }}>Lihat detail</span>
+                <button type="button" className="au-link au-xs" style={{ alignSelf: 'flex-start', fontWeight: 600 }} onClick={e => { e.stopPropagation(); setDetail({ title: c.title, rows: c.data.rows, okLabel: c.okLabel, noLabel: c.noLabel }) }}>Lihat detail {c.title}</button>
               </div>
             </div>
           ))}

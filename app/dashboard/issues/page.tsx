@@ -76,7 +76,7 @@ export default function IssuesPage() {
         {failed && <div className="au-row au-wrap p-bad" role="alert" style={{ borderRadius:14, padding:12 }}><span className="au-small" style={{ flex:1 }}>Issues gagal dimuat.</span><button type="button" className="btn btn-sm" onClick={load}>Coba lagi</button></div>}
         {loading ? <div className="au-card"><div className="au-skel" /><div className="au-skel" style={{ width:'70%' }} /><div className="au-skel" style={{ width:'50%' }} /></div>
           : filtered.length === 0 ? <div className="au-card"><Empty title="Belum ada issue di filter ini" text="Issues diambil dari Activities. Ubah periode atau sub tipe." /></div>
-          : <div className="au-tblw" style={{ maxHeight:'calc(100dvh - 280px)', overflow:'auto' }}>
+          : <div className="au-tblw" tabIndex={0} role="region" aria-label="Tabel issues" style={{ maxHeight:'calc(100dvh - 280px)', overflow:'auto' }}>
               <table className="wp-table" style={{ minWidth:1100 }}>
                 <thead style={{ position:'sticky', top:0, zIndex:2 }}><tr><th style={{ minWidth:220 }}>Issue</th><th style={{ minWidth:240 }}>Progress</th><th>Tanggal</th><th style={{ minWidth:200 }}>Next plan</th><th>Target week</th><th>Status</th><th>Prioritas</th><th>PIC</th></tr></thead>
                 <tbody>{filtered.map(a => {

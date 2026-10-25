@@ -387,7 +387,7 @@ function Issues({ acts, config, internal, onToggleHidden }: { acts: Any[]; confi
           <div className="au-key">{dist.map(s => <span key={s.key}><i style={{ background: s.color }} />{s.label} <b style={{ color: 'var(--ink)' }}>{s.n}</b></span>)}</div>
         </section>
         <section className="au-card rise" style={{ ['--d' as any]: 1 }}><div className="au-row au-between"><h2>Prioritas tinggi aktif</h2><Pill tone={high.length ? 'bad' : 'ok'}>{high.length ? `${high.length} aktif` : 'Aman'}</Pill></div>
-          {high.length ? <div className="au-ig" style={{ border: 0, maxHeight: 220, overflowY: 'auto' }}>{high.map(a => <div key={a._id} className="au-igr"><span className="au-col" style={{ gap: 2, minWidth: 0 }}><b style={{ fontSize: 14 }}>{a.title}</b><span className="au-xs au-muted">{a.category} · PIC {picArray(a.pic).join(', ') || a.picName || '–'}</span></span></div>)}</div> : <span className="au-small au-muted">Tidak ada issue prioritas tinggi yang aktif.</span>}
+          {high.length ? <div className="au-ig" tabIndex={0} role="region" aria-label="Issue prioritas tinggi" style={{ border: 0, maxHeight: 220, overflowY: 'auto' }}>{high.map(a => <div key={a._id} className="au-igr"><span className="au-col" style={{ gap: 2, minWidth: 0 }}><b style={{ fontSize: 14 }}>{a.title}</b><span className="au-xs au-muted">{a.category} · PIC {picArray(a.pic).join(', ') || a.picName || '–'}</span></span></div>)}</div> : <span className="au-small au-muted">Tidak ada issue prioritas tinggi yang aktif.</span>}
         </section>
       </div>
       <section className="au-card rise" style={{ ['--d' as any]: 2, padding: 0, gap: 0 }} data-export-card="">

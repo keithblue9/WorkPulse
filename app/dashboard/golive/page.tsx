@@ -233,7 +233,7 @@ export default function GoLivePage() {
                 {apps.map((a:any,ai:number)=>{
                   const subs=(a.subFeatures||[]); const cols=subs.length+1; // subs + date
                   const color=APP_COLORS[ai%6]
-                  return <th key={a._id||a.key} style={{...th,borderLeft:'1px solid var(--line2)',color,cursor:'pointer'}} colSpan={cols} onClick={()=>setEditApp({...a})} title="Klik untuk edit aplikasi & sub-fitur">{a.label} <Icon name="pnote" size={11} /></th>
+                  return <th key={a._id||a.key} style={{...th,borderLeft:'1px solid var(--line2)',color:`color-mix(in srgb, ${color} 62%, var(--ink))`,cursor:'pointer'}} colSpan={cols} onClick={()=>setEditApp({...a})} title="Klik untuk edit aplikasi & sub-fitur">{a.label} <Icon name="pnote" size={11} /></th>
                 })}
                 <th style={{...th,width:30}} rowSpan={2}></th>
               </tr>

@@ -239,10 +239,10 @@ function YieldTab() {
                     return (
                       <tr key={ce.key}>
                         <td style={{ fontSize:11 }}><div style={{ fontWeight:600 }}>{ce.short}</div><div style={{ color:'var(--muted)', fontSize:10 }}>{ce.code} · {ce.name}</div></td>
-                        <td style={{ borderLeft:'1px solid var(--line)', textAlign:'right' }}><MoneyInput currency="USD" className="input input-sm" style={{ width:120, textAlign:'right' }} value={v.planUSD||0} onChange={n=>setVal(y,ce.key,'planUSD',n)} /></td>
-                        <td style={{ textAlign:'right' }}><MoneyInput currency="USD" className="input input-sm" style={{ width:120, textAlign:'right' }} value={v.realUSD||0} onChange={n=>setVal(y,ce.key,'realUSD',n)} /></td>
-                        <td style={{ borderLeft:'1px solid var(--line)', textAlign:'right' }}><MoneyInput currency="IDR" className="input input-sm" style={{ width:150, textAlign:'right' }} value={v.planIDR||0} onChange={n=>setVal(y,ce.key,'planIDR',n)} /></td>
-                        <td style={{ textAlign:'right' }}><MoneyInput currency="IDR" className="input input-sm" style={{ width:150, textAlign:'right' }} value={v.realIDR||0} onChange={n=>setVal(y,ce.key,'realIDR',n)} /></td>
+                        <td style={{ borderLeft:'1px solid var(--line)', textAlign:'right' }}><MoneyInput ariaLabel={`Plan USD ${ce.short} ${y}`} currency="USD" className="input input-sm" style={{ width:120, textAlign:'right' }} value={v.planUSD||0} onChange={n=>setVal(y,ce.key,'planUSD',n)} /></td>
+                        <td style={{ textAlign:'right' }}><MoneyInput ariaLabel={`Realisasi USD ${ce.short} ${y}`} currency="USD" className="input input-sm" style={{ width:120, textAlign:'right' }} value={v.realUSD||0} onChange={n=>setVal(y,ce.key,'realUSD',n)} /></td>
+                        <td style={{ borderLeft:'1px solid var(--line)', textAlign:'right' }}><MoneyInput ariaLabel={`Plan IDR ${ce.short} ${y}`} currency="IDR" className="input input-sm" style={{ width:150, textAlign:'right' }} value={v.planIDR||0} onChange={n=>setVal(y,ce.key,'planIDR',n)} /></td>
+                        <td style={{ textAlign:'right' }}><MoneyInput ariaLabel={`Realisasi IDR ${ce.short} ${y}`} currency="IDR" className="input input-sm" style={{ width:150, textAlign:'right' }} value={v.realIDR||0} onChange={n=>setVal(y,ce.key,'realIDR',n)} /></td>
                         <td style={{ borderLeft:'1px solid var(--line)', textAlign:'center', fontWeight:600, color: realPctUSD>=100?'var(--ok)':'var(--ink)' }}>{pct(realPctUSD)}</td>
                         <td style={{ textAlign:'center', fontWeight:600, color: realPctIDR>=100?'var(--ok)':'var(--ink)' }}>{pct(realPctIDR)}</td>
                         <td style={{ borderLeft:'1px solid var(--line)', textAlign:'center' }}>{yoyCell(yPlanIDR, yPlanUSD)}</td>

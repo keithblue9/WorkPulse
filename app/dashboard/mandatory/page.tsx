@@ -65,7 +65,7 @@ export default function MandatoryPage() {
 
   function StatusCell({ u }:{ u:any }) {
     return (
-      <select value={u.status||'pekerja'} onChange={e=>saveStatus(u, e.target.value)} style={{ ...cellInput, width:100 }}>
+      <select aria-label={`Status kepegawaian ${u.name}`} value={u.status||'pekerja'} onChange={e=>saveStatus(u, e.target.value)} style={{ ...cellInput, width:100 }}>
         <option value="pekerja">Pekerja</option>
         <option value="TAD">TAD</option>
       </select>
@@ -112,7 +112,7 @@ export default function MandatoryPage() {
                       <td style={td}><input type="date" aria-label={`Tanggal MCU ${u.name}`} value={mcu.date||''} onChange={e=>saveRec(idOf(u),{ mcu:{ ...mcu, date:e.target.value } })} style={cellInput} /></td>
                       <td style={td}>
                         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                          <select value={mcu.result||''} onChange={e=>saveRec(idOf(u),{ mcu:{ ...mcu, result:e.target.value } })} style={{ ...cellInput, width:80 }}>
+                          <select aria-label={`Hasil MCU ${u.name}`} value={mcu.result||''} onChange={e=>saveRec(idOf(u),{ mcu:{ ...mcu, result:e.target.value } })} style={{ ...cellInput, width:80 }}>
                             <option value="">—</option>{MCU_RESULTS.map(r=><option key={r} value={r}>{r}</option>)}
                           </select>
                           {mcu.result && <span title={mcu.result} style={{ width:14, height:14, borderRadius:'50%', background:resultColor(mcu.result), flexShrink:0, boxShadow:'0 0 0 2px var(--surface)' }} />}
@@ -141,7 +141,7 @@ export default function MandatoryPage() {
                         <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
                           {list.map((t:any)=>(
                             <div key={t.id} style={{ display:'grid', gridTemplateColumns:'120px 1fr 130px 1fr 26px', gap:6, alignItems:'center' }}>
-                              <select value={t.training||''} onChange={e=>saveRec(idOf(u),{ trainings:list.map((x:any)=>x.id===t.id?{...x,training:e.target.value}:x) })} style={cellInput}>
+                              <select aria-label={`Jenis training ${u.name}`} value={t.training||''} onChange={e=>saveRec(idOf(u),{ trainings:list.map((x:any)=>x.id===t.id?{...x,training:e.target.value}:x) })} style={cellInput}>
                                 <option value="">Pilih</option>{TRAINING_OPTS.map(o=><option key={o} value={o}>{o==='lainnya'?'Lainnya…':o}</option>)}
                               </select>
                               {t.training==='lainnya'
@@ -180,7 +180,7 @@ export default function MandatoryPage() {
                         <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
                           {list.map((k:any)=>(
                             <div key={k.id} style={{ display:'grid', gridTemplateColumns:'110px 1fr 70px 130px 1fr 26px', gap:6, alignItems:'center' }}>
-                              <select value={k.jenis||''} onChange={e=>saveRec(idOf(u),{ supportKpi:list.map((x:any)=>x.id===k.id?{...x,jenis:e.target.value}:x) })} style={cellInput}>
+                              <select aria-label={`Jenis support KPI ${u.name}`} value={k.jenis||''} onChange={e=>saveRec(idOf(u),{ supportKpi:list.map((x:any)=>x.id===k.id?{...x,jenis:e.target.value}:x) })} style={cellInput}>
                                 <option value="">Jenis</option>{KPI_OPTS.map(o=><option key={o} value={o}>{o==='lainnya'?'Lainnya…':o}</option>)}
                               </select>
                               {k.jenis==='lainnya'

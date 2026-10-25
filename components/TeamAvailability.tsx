@@ -259,7 +259,7 @@ export default function TeamAvailability() {
             <div className="au-col" style={{ gap: 8, minWidth: 0 }}>
               <span className="lbl">WFO · {scope === 'week' && curWeek ? `Minggu ${curWeek.no} ${BULAN[mm0 - 1].slice(0, 3)}` : `${BULAN[mm0 - 1].slice(0, 3)} ${my}`}</span>
               {wfoList.length === 0 ? <span className="au-small au-muted">Belum ada member WFO di periode ini.</span> : (
-                <div className="au-ig" style={{ maxHeight: 230, overflowY: 'auto' }}>
+                <div className="au-ig" tabIndex={0} role="region" aria-label="Daftar anggota" style={{ maxHeight: 230, overflowY: 'auto' }}>
                   {wfoList.map((m: any) => (
                     <div key={m.id} className="au-igr" style={{ alignItems: 'flex-start', padding: '10px 14px' }}>
                       <span className="au-col" style={{ flex: 1, minWidth: 0, gap: 2 }}>

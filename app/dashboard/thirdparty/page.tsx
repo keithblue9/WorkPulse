@@ -549,15 +549,15 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
   return (
     <Sheet open wide title={editing ? 'Edit rencana' : 'Rencana event'} onClose={onClose} onSave={save} saveDisabled={saving} saveLabel={saving ? 'Menyimpan…' : 'Simpan'}>
           {/* ── Info agenda (berlaku utk semua opsi) ── */}
-          <div><label style={lbl}>Judul Kegiatan</label><input className="input" value={f.judulKegiatan||''} onChange={e=>set('judulKegiatan',e.target.value)} /></div>
+          <label style={{ display:'block' }}><span style={lbl}>Judul Kegiatan</span><input className="input" value={f.judulKegiatan||''} onChange={e=>set('judulKegiatan',e.target.value)} /></label>
           <div className="au-grid" style={{ gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr) auto', gap:10, alignItems:'end' }}>
-            <div><label style={lbl}>Tanggal Mulai</label><input type="date" className="input" value={f.tanggalMulai||''} onChange={e=>{ set('tanggalMulai',e.target.value); if(!f.tanggalSelesai||new Date(f.tanggalSelesai)<new Date(e.target.value)) set('tanggalSelesai',e.target.value) }} /></div>
-            <div><label style={lbl}>Tanggal Selesai</label><input type="date" className="input" min={f.tanggalMulai||undefined} value={f.tanggalSelesai||''} onChange={e=>set('tanggalSelesai',e.target.value)} /></div>
+            <label style={{ display:'block' }}><span style={lbl}>Tanggal Mulai</span><input type="date" className="input" value={f.tanggalMulai||''} onChange={e=>{ set('tanggalMulai',e.target.value); if(!f.tanggalSelesai||new Date(f.tanggalSelesai)<new Date(e.target.value)) set('tanggalSelesai',e.target.value) }} /></label>
+            <label style={{ display:'block' }}><span style={lbl}>Tanggal Selesai</span><input type="date" className="input" min={f.tanggalMulai||undefined} value={f.tanggalSelesai||''} onChange={e=>set('tanggalSelesai',e.target.value)} /></label>
             <div className="au-small au-ink2" style={{ paddingBottom:12, whiteSpace:'nowrap' }}>{durasiHari>0 ? <><b style={{ color:'var(--accent-ink)' }}>{durasiHari}</b> hari</> : '—'}</div>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Jumlah Peserta</label><input type="number" min={0} className="input" value={f.jumlahPeserta||0} onChange={e=>set('jumlahPeserta',clampNum(e.target.value))} /></div>
-            <div><label style={lbl}>PIC Internal (opsional)</label><input className="input" value={f.picInternal||''} onChange={e=>set('picInternal',e.target.value)} placeholder="Penanggung jawab dari tim" /></div>
+            <label style={{ display:'block' }}><span style={lbl}>Jumlah Peserta</span><input type="number" min={0} className="input" value={f.jumlahPeserta||0} onChange={e=>set('jumlahPeserta',clampNum(e.target.value))} /></label>
+            <label style={{ display:'block' }}><span style={lbl}>PIC Internal (opsional)</span><input className="input" value={f.picInternal||''} onChange={e=>set('picInternal',e.target.value)} placeholder="Penanggung jawab dari tim" /></label>
           </div>
 
           {/* ── Tab opsi ── */}
@@ -571,7 +571,7 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
             </div>
             <div className="au-chips wrap" role="tablist" aria-label="Opsi">
               {f.options.map((o:any,i:number)=>(
-                <button type="button" role="tab" key={i} onClick={()=>{ setActive(i); setDelOptAsk(false) }} className="au-chip" aria-selected={active===i} aria-pressed={active===i}>
+                <button type="button" role="tab" key={i} onClick={()=>{ setActive(i); setDelOptAsk(false) }} className="au-chip" aria-selected={active===i}>
                   {o.label||`Opsi ${i+1}`}{i===f.recommendedIndex && ' · rek'}
                   <span style={{ opacity:0.7, marginLeft:6, fontWeight:500 }}>Rp {fmt(estimasiOf(o)*(1+FEE_RATE))}</span>
                 </button>
@@ -581,7 +581,7 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
             {opt && (
               <div className="au-box" style={{ padding:14, gap:12 }}>
                 <div className="au-row au-wrap" style={{ gap:10, alignItems:'flex-end' }}>
-                  <div style={{ flex:'1 1 180px' }}><label style={lbl}>Nama opsi</label><input className="input" value={opt.label||''} onChange={e=>setOpt('label',e.target.value)} placeholder={`Opsi ${active+1}`} /></div>
+                  <div style={{ flex:'1 1 180px' }}><label style={lbl}>Nama opsi</label><input className="input" aria-label="Nama opsi" value={opt.label||''} onChange={e=>setOpt('label',e.target.value)} placeholder={`Opsi ${active+1}`} /></div>
                   <label className="au-row au-small" style={{ gap:8, cursor:'pointer', paddingBottom:10, whiteSpace:'nowrap' }}>
                     <input type="checkbox" className="au-sw" checked={f.recommendedIndex===active} onChange={()=>set('recommendedIndex',active)} />
                     Rekomendasi tim
@@ -592,14 +592,14 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
                 </div>
 
                 <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:10 }}>
-                  <div><label style={lbl}>Nama EO</label>
+                  <label style={{ display:'block' }}><span style={lbl}>Nama EO</span>
                     <input className="input input-sm" list="eo-list" value={opt.namaEO||''} onChange={e=>setOpt('namaEO',e.target.value)} placeholder="PTC / Kinanti / MTT / Others" />
-                    <datalist id="eo-list"><option value="PTC"/><option value="Kinanti"/><option value="MTT"/><option value="Others"/></datalist></div>
-                  <div><label style={lbl}>Kontak EO (opsional)</label><input className="input input-sm" value={opt.kontakEO||''} onChange={e=>setOpt('kontakEO',e.target.value)} placeholder="Nama PIC / No. HP EO" /></div>
+                    <datalist id="eo-list"><option value="PTC"/><option value="Kinanti"/><option value="MTT"/><option value="Others"/></datalist></label>
+                  <label style={{ display:'block' }}><span style={lbl}>Kontak EO (opsional)</span><input className="input input-sm" value={opt.kontakEO||''} onChange={e=>setOpt('kontakEO',e.target.value)} placeholder="Nama PIC / No. HP EO" /></label>
                 </div>
                 <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:10 }}>
-                  <div><label style={lbl}>Kota</label><input className="input input-sm" value={opt.kota||''} onChange={e=>setOpt('kota',e.target.value)} /></div>
-                  <div><label style={lbl}>Venue</label><input className="input input-sm" value={opt.venue||''} onChange={e=>setOpt('venue',e.target.value)} /></div>
+                  <label style={{ display:'block' }}><span style={lbl}>Kota</span><input className="input input-sm" value={opt.kota||''} onChange={e=>setOpt('kota',e.target.value)} /></label>
+                  <label style={{ display:'block' }}><span style={lbl}>Venue</span><input className="input input-sm" value={opt.venue||''} onChange={e=>setOpt('venue',e.target.value)} /></label>
                 </div>
 
                 <Section title="Meeting Room" total={mr}>
@@ -657,7 +657,7 @@ function RencanaForm({ editing, user, onClose, onSaved }: { editing?:any; user:a
                   </div>
                 </div>
 
-                <div><label style={lbl}>Catatan Opsi (opsional)</label><textarea className="input input-sm" rows={2} value={opt.catatan||''} onChange={e=>setOpt('catatan',e.target.value)} placeholder="Kelebihan/kekurangan opsi ini, rundown, dsb." style={{ resize:'vertical' }} /></div>
+                <label style={{ display:'block' }}><span style={lbl}>Catatan Opsi (opsional)</span><textarea className="input input-sm" rows={2} value={opt.catatan||''} onChange={e=>setOpt('catatan',e.target.value)} placeholder="Kelebihan/kekurangan opsi ini, rundown, dsb." style={{ resize:'vertical' }} /></label>
 
                 <div className="au-total" style={{ flexWrap:'wrap' }}>
                   <span className="au-col" style={{ gap:2 }}><span className="lbl">Estimasi {opt.label||`Opsi ${active+1}`}</span><span className="au-xs">Belum termasuk EO handling &amp; management fee (10%)</span></span>
@@ -827,20 +827,20 @@ function SuvenirForm({ editing, mode, user, onClose, onSaved }: { editing?:any; 
   }
   return (
     <Sheet open title={editing?'Edit suvenir':isStok?'Barang stok baru':'Usulan suvenir'} onClose={onClose} onSave={save} saveDisabled={saving} saveLabel={saving ? 'Menyimpan…' : 'Simpan'}>
-          <div><label style={lbl}>Nama Barang *</label><input className="input" value={f.nama} onChange={e=>set('nama',e.target.value)} placeholder="mis. Omron Wrist" /></div>
+          <label style={{ display:'block' }}><span style={lbl}>Nama Barang *</span><input className="input" value={f.nama} onChange={e=>set('nama',e.target.value)} placeholder="mis. Omron Wrist" /></label>
           {isStok ? (
             // Form STOK: cukup nama + jumlah stok awal
-            <div><label style={lbl}>Jumlah Stok Awal</label><input type="number" min={0} className="input" value={stokAwal} onChange={e=>setStokAwal(Math.max(0,Number(e.target.value)||0))} placeholder="0" /><div className="au-xs au-muted" style={{ marginTop:6 }}>Bisa diubah nanti lewat tombol Stok masuk / keluar.</div></div>
+            <div><label style={lbl}>Jumlah Stok Awal</label><input type="number" aria-label="Jumlah stok awal" min={0} className="input" value={stokAwal} onChange={e=>setStokAwal(Math.max(0,Number(e.target.value)||0))} placeholder="0" /><div className="au-xs au-muted" style={{ marginTop:6 }}>Bisa diubah nanti lewat tombol Stok masuk / keluar.</div></div>
           ) : (
             // Form USULAN: nama + jumlah + harga + link
             <>
-              <div><label style={lbl}>Deskripsi</label><textarea className="input" rows={2} value={f.deskripsi} onChange={e=>set('deskripsi',e.target.value)} style={{ resize:'vertical' }} /></div>
+              <label style={{ display:'block' }}><span style={lbl}>Deskripsi</span><textarea className="input" rows={2} value={f.deskripsi} onChange={e=>set('deskripsi',e.target.value)} style={{ resize:'vertical' }} /></label>
               <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10 }}>
-                <div><label style={lbl}>Harga Satuan</label><MoneyInput currency="IDR" className="input" value={f.hargaSatuan} onChange={n=>set('hargaSatuan',Math.max(0,Number(n)||0))} /></div>
-                <div><label style={lbl}>Jumlah Usulan</label><input type="number" min={0} className="input" value={f.jumlahUsulan} onChange={e=>set('jumlahUsulan',Math.max(0,Number(e.target.value)||0))} /></div>
+                <label style={{ display:'block' }}><span style={lbl}>Harga Satuan</span><MoneyInput currency="IDR" className="input" value={f.hargaSatuan} onChange={n=>set('hargaSatuan',Math.max(0,Number(n)||0))} /></label>
+                <label style={{ display:'block' }}><span style={lbl}>Jumlah Usulan</span><input type="number" min={0} className="input" value={f.jumlahUsulan} onChange={e=>set('jumlahUsulan',Math.max(0,Number(e.target.value)||0))} /></label>
               </div>
-              <div><label style={lbl}>Link E-commerce</label><input className="input" value={f.link} onChange={e=>set('link',e.target.value)} placeholder="https://..." /></div>
-              <div><label style={lbl}>Catatan</label><textarea className="input" rows={2} value={f.catatan} onChange={e=>set('catatan',e.target.value)} style={{ resize:'vertical' }} /></div>
+              <label style={{ display:'block' }}><span style={lbl}>Link E-commerce</span><input className="input" value={f.link} onChange={e=>set('link',e.target.value)} placeholder="https://..." /></label>
+              <label style={{ display:'block' }}><span style={lbl}>Catatan</span><textarea className="input" rows={2} value={f.catatan} onChange={e=>set('catatan',e.target.value)} style={{ resize:'vertical' }} /></label>
             </>
           )}
     </Sheet>
@@ -875,10 +875,10 @@ function StockMoveModal({ item, user, onClose, onSaved }: { item:any; user:any; 
           <span className="au-small au-ink2">Stok saat ini: <b style={{ color: stock>0?'var(--ok)':'var(--ink2)' }}>{stock}</b></span>
           <Seg full label="Jenis gerakan" value={type} onChange={setType} options={[['in','Masuk'],['out','Keluar']] as const} />
           <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:10 }}>
-            <div><label style={lbl}>Jumlah</label><input type="number" min={1} className="input" value={qty} onChange={e=>setQty(Math.max(0,Number(e.target.value)||0))} /></div>
-            <div><label style={lbl}>Tanggal</label><input type="date" className="input" value={date} onChange={e=>setDate(e.target.value)} /></div>
+            <label style={{ display:'block' }}><span style={lbl}>Jumlah</span><input type="number" min={1} className="input" value={qty} onChange={e=>setQty(Math.max(0,Number(e.target.value)||0))} /></label>
+            <label style={{ display:'block' }}><span style={lbl}>Tanggal</span><input type="date" className="input" value={date} onChange={e=>setDate(e.target.value)} /></label>
           </div>
-          <div><label style={lbl}>Keterangan</label><input className="input" value={note} onChange={e=>setNote(e.target.value)} placeholder="mis. beli batch 1 / dipakai event UAT" /></div>
+          <label style={{ display:'block' }}><span style={lbl}>Keterangan</span><input className="input" value={note} onChange={e=>setNote(e.target.value)} placeholder="mis. beli batch 1 / dipakai event UAT" /></label>
           {(item.moves||[]).length>0 && (
             <div className="au-col" style={{ gap:8 }}>
               <span className="lbl">Riwayat stok</span>
@@ -964,7 +964,7 @@ function RealisasiFinalModal({ it, user, onClose, onSaved }: { it:any; user:any;
           <span className="au-small au-ink2">{it.judulKegiatan||'(tanpa judul)'} · biaya aktual pelaksanaan</span>
           {opts.length>1 && (
             <div>
-              <label style={lbl}>Opsi yang dipakai</label>
+              <span style={lbl}>Opsi yang dipakai</span>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {opts.map((o:any,i:number)=>(
                   <button type="button" key={i} onClick={()=>loadFromOption(i)} className="au-chip" aria-pressed={pickedOpt===i}>{o.label||`Opsi ${i+1}`}{i===recIdx?' · rek':''}</button>
@@ -974,9 +974,9 @@ function RealisasiFinalModal({ it, user, onClose, onSaved }: { it:any; user:any;
             </div>
           )}
           <div className="au-grid" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:10 }}>
-            <div><label style={lbl}>Venue</label><input className="input input-sm" value={f.finalVenue} onChange={e=>set('finalVenue',e.target.value)} /></div>
-            <div><label style={lbl}>Kota</label><input className="input input-sm" value={f.finalKota} onChange={e=>set('finalKota',e.target.value)} /></div>
-            <div><label style={lbl}>EO</label><input className="input input-sm" value={f.finalNamaEO} onChange={e=>set('finalNamaEO',e.target.value)} /></div>
+            <label style={{ display:'block' }}><span style={lbl}>Venue</span><input className="input input-sm" value={f.finalVenue} onChange={e=>set('finalVenue',e.target.value)} /></label>
+            <label style={{ display:'block' }}><span style={lbl}>Kota</span><input className="input input-sm" value={f.finalKota} onChange={e=>set('finalKota',e.target.value)} /></label>
+            <label style={{ display:'block' }}><span style={lbl}>EO</span><input className="input input-sm" value={f.finalNamaEO} onChange={e=>set('finalNamaEO',e.target.value)} /></label>
           </div>
 
           <div className="au-box" style={{ padding:12, gap:8, background:'var(--sunken)' }}>
@@ -1016,7 +1016,7 @@ function RealisasiFinalModal({ it, user, onClose, onSaved }: { it:any; user:any;
             </div>
           </div>
 
-          <div><label style={lbl}>Catatan Realisasi</label><textarea className="input input-sm" rows={2} value={f.finalCatatan||''} onChange={e=>set('finalCatatan',e.target.value)} style={{ resize:'vertical' }} /></div>
+          <label style={{ display:'block' }}><span style={lbl}>Catatan Realisasi</span><textarea className="input input-sm" rows={2} value={f.finalCatatan||''} onChange={e=>set('finalCatatan',e.target.value)} style={{ resize:'vertical' }} /></label>
 
           <div className="au-ig">
             <div className="au-igr"><span className="k">Subtotal</span><span className="v">Rp {fmt(sub)}</span></div>

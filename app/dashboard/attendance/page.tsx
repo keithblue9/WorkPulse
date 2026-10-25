@@ -302,11 +302,12 @@ export default function AttendancePage() {
                   const isToday = dateStr === today
                   const pt = slots[0] ? attTypes.find(t=>t.key===slots[0].type) : null
                   return (
-                    <div key={day} role={isWeekend ? undefined : 'button'} tabIndex={isWeekend ? -1 : 0}
-                      onClick={()=>!isWeekend&&setShowSlotForm(dateStr)} onKeyDown={e=>{ if (!isWeekend && (e.key==='Enter'||e.key===' ')) { e.preventDefault(); setShowSlotForm(dateStr) } }}
-                      aria-label={`${day} ${monthLabel}${slots.length ? ': ' + slots.map((sl:any)=>`${sl.label||sl.type} ${slotTimeLabel(sl)}`).join(', ') : isWeekend ? ', akhir pekan' : ', tambah kehadiran'}`}
+                    <div key={day}
                       className={`au-cal-day au-att-day${isToday ? ' today' : ''}${isWeekend && !pt ? ' out' : ''}`}
                       style={pt ? { background:tint(pt.textColor, 18), borderColor:tint(pt.textColor, 45) } : isWeekend ? { cursor:'default' } : undefined}>
+                      {/* Tombol tambah menutupi sel; tombol edit/hapus slot berada di atasnya (tidak bersarang). */}
+                      {!isWeekend && <button type="button" className="add" onClick={()=>setShowSlotForm(dateStr)}
+                        aria-label={`${day} ${monthLabel}${slots.length ? ': ' + slots.map((sl:any)=>`${sl.label||sl.type} ${slotTimeLabel(sl)}`).join(', ') + ', tambah kehadiran' : ', tambah kehadiran'}`} />}
                       <span className="n">{day}</span>
                       {slots.slice(0,3).map((slot:any, si:number) => {
                         const t = attTypes.find(x=>x.key===slot.type)
