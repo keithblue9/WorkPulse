@@ -56,9 +56,7 @@ function PWAInstallPrompt({ config }: { config:any }) {
 }
 
 // NOTE: the daily attendance reminder used to be a modal popup here (PresensiPopup).
-// It now lives inside the Wibi chat assistant (components/Wibi.tsx) — Wibi greets the
-// member on first visit of the day and asks Sudah/Belum absen right inside the chat
-// bubble, instead of a separate blocking modal.
+// It now lives in components/DailyCheckin.tsx (a small non-blocking card).
 
 // ─── Agenda H-1 Reminder ────────────────────────────────────
 function AgendaReminder() {

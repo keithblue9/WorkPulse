@@ -1,6 +1,5 @@
 'use client'
 import { cachedFetch } from '@/lib/fetchCache'
-import { getConfig } from '@/lib/configCache'
 import { OE_CATEGORIES, oeLookup } from '@/lib/defaults'
 import { useSort, sortRows, SortTh } from '@/lib/useSort'
 import { EvidenceList } from '@/components/EvidenceList'
@@ -201,22 +200,6 @@ function ReimburseForm({ editing, onClose, onSave }: { editing?:any; onClose:()=
         if (r.status === 413) msg = 'File bukti terlalu besar. Kompres/perkecil PDF (maks ±3MB) lalu coba lagi.'
         else { try { const j = await r.json(); if (j?.error) msg = `Gagal: ${j.error}` } catch {} }
         toast.error(msg); return
-      }
-      if (!editing) {
-        try {
-          const cfg = await getConfig()
-          if (cfg?.fonnte?.cashierUserId) {
-            const usersR = await fetch('/api/users').then(r=>r.json())
-            const cashier = (usersR.data||[]).find((u:any)=>u._id===cfg.fonnte.cashierUserId || u.roles?.includes('cashier'))
-            if (cashier?.phone) {
-              const tpl = cfg.fonnte.messageToCashier || ''
-              const msg = tpl.replace(/{memberName}/g, user?.name||'-').replace(/{purpose}/g, form.title)
-                            .replace(/{amount}/g, 'Rp ' + fmt(form.amount)).replace(/{category}/g, oeLookup(form.category).name)
-                            .replace(/{bank}/g, form.bank).replace(/{noRekening}/g, form.noRekening)
-              await fetch('/api/fonnte', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ target: cashier.phone, message: msg }) })
-            }
-          }
-        } catch { /* non-blocking */ }
       }
       toast.success(isResubmit ? 'Revisi terkirim — menunggu verifikasi CC Holder' : (editing?'Diperbarui':'Pengajuan terkirim ke Cashier')); onSave(); onClose()
     } finally { setSaving(false) }
@@ -424,22 +407,10 @@ function TransferModal({ item, onClose, onSave }: { item:any; onClose:()=>void; 
         : { status:'verified', verifiedAt: now, verifiedBy: `${user?.name||'Cashier'} (Petty Cash)` }
       const updateRes = await fetch(`/api/reimbursements/${item._id}`, {
         method:'PATCH', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ ...statusPayload, isCashCard:isCC, source, hasBiayaAntarBank: hasBiaya, biayaAntarBank: hasBiaya ? biaya : 0, totalTransfer: total, transferredAt: now, transferredBy: user?.name, whatsappSent: true })
+        body: JSON.stringify({ ...statusPayload, isCashCard:isCC, source, hasBiayaAntarBank: hasBiaya, biayaAntarBank: hasBiaya ? biaya : 0, totalTransfer: total, transferredAt: now, transferredBy: user?.name })
       })
       if (!updateRes.ok) { toast.error('Gagal update'); return }
-      try {
-        const cfg = await getConfig()
-        const usersR = await fetch('/api/users').then(r=>r.json())
-        const member = (usersR.data||[]).find((u:any)=>u.name===item.userName || u.email===item.userId)
-        if (member?.phone) {
-          const tpl = cfg?.fonnte?.messageToMember || ''
-          const msg = tpl.replace(/{memberName}/g, item.userName||'-').replace(/{purpose}/g, item.title)
-                        .replace(/{amount}/g, 'Rp ' + fmt(total)).replace(/{category}/g, oeLookup(item.category).name)
-                        .replace(/{bank}/g, item.bank).replace(/{noRekening}/g, item.noRekening)
-          await fetch('/api/fonnte', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ target: member.phone, message: msg }) })
-        }
-      } catch { /* non-blocking */ }
-      toast.success('Transferred & notified via WhatsApp'); onSave(); onClose()
+      toast.success('Ditandai sudah ditransfer'); onSave(); onClose()
     } finally { setProcessing(false) }
   }
 

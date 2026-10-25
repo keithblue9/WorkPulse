@@ -15,7 +15,6 @@ function MemberModal({ editing, onClose, onSave, allRoles }: { editing?:any; onC
     division: editing?.division || '',
     status: editing?.status || 'pekerja',
     phone: editing?.phone || '',
-    fonnteToken: editing?.fonnteToken || '',
   })
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -38,7 +37,6 @@ function MemberModal({ editing, onClose, onSave, allRoles }: { editing?:any; onC
         division: form.division,
         status: form.status,
         phone: form.phone,
-        fonnteToken: form.fonnteToken,
       }
       if (!editing) {
         // generate email from name slug
@@ -63,7 +61,6 @@ function MemberModal({ editing, onClose, onSave, allRoles }: { editing?:any; onC
     } catch(e:any) { toast.error(e.message||'Gagal') } finally { setDeleting(false) }
   }
 
-  const hasCashierRole = form.roles.includes('cashier')
 
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -83,7 +80,7 @@ function MemberModal({ editing, onClose, onSave, allRoles }: { editing?:any; onC
               <option value="TAD">TAD</option>
             </select>
           </div>
-          <div><label style={lbl}>No. HP (untuk WhatsApp / Fonnte)</label><input className="input" value={form.phone} onChange={e=>set('phone',e.target.value)} placeholder="08xxxxxxxxxx" /></div>
+          <div><label style={lbl}>No. HP</label><input className="input" value={form.phone} onChange={e=>set('phone',e.target.value)} placeholder="08xxxxxxxxxx" /></div>
           <div>
             <label style={lbl}>Role (boleh pilih lebih dari 1)</label>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -99,14 +96,6 @@ function MemberModal({ editing, onClose, onSave, allRoles }: { editing?:any; onC
             </div>
             <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Klik untuk toggle. Hak akses menu sesuai konfigurasi role di Configuration.</div>
           </div>
-          {hasCashierRole && (
-            <div className="card" style={{ padding:'10px 12px', background:'var(--brand-soft)', border:'1px dashed var(--brand)' }}>
-              <div style={{ fontSize:11, fontWeight:600, color:'var(--brand)', marginBottom:6 }}>💰 Cashier Settings</div>
-              <label style={lbl}>Token Fonnte (untuk auto WhatsApp)</label>
-              <input className="input" value={form.fonnteToken} onChange={e=>set('fonnteToken',e.target.value)} placeholder="Paste token dari fonnte.com" />
-              <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>Get token: <a href="https://fonnte.com" target="_blank" style={{ color:'var(--brand)' }}>fonnte.com</a> → Device → Token. Test kirim bisa dari menu Configuration.</div>
-            </div>
-          )}
           <div><label style={lbl}>{editing ? 'PIN Baru (6 digit, kosongkan jika tidak diubah)' : 'PIN 6 Digit *'}</label>
             <input type="password" maxLength={6} className="input" value={form.password} onChange={e=>set('password',e.target.value.replace(/\D/g,''))} placeholder={editing ? '...' : 'Default: 123456'} /></div>
         </div>

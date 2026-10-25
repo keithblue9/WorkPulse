@@ -58,29 +58,6 @@ function DonutChart({ data, size=180 }: { data: {label:string; value:number; col
   )
 }
 
-function Linkify({ text }: { text:string }) {
-  if (!text) return null
-  const parts = text.split(/(https?:\/\/[^\s]+)/g)
-  return (
-    <>
-      {parts.map((part, i) =>
-        /^https?:\/\//.test(part)
-          ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" style={{ color:'var(--brand)', textDecoration:'underline', wordBreak:'break-all' }}>🔗 Buka link</a>
-          : <span key={i}>{part}</span>
-      )}
-    </>
-  )
-}
-
-function stripMd(t:string):string {
-  if (!t) return ''
-  return t
-    .replace(/^#{1,6}\s+/gm, '')        // headings
-    .replace(/\*\*(.+?)\*\*/g, '$1')   // bold
-    .replace(/\*(.+?)\*/g, '$1')         // italic
-    .replace(/`(.+?)`/g, '$1')             // inline code
-    .trim()
-}
 
 function spiColor(spi:number|null) { if (spi===null||spi===undefined) return 'var(--text3)'; if (spi>=0.95) return 'var(--green)'; if (spi>=0.80) return 'var(--amber)'; return 'var(--red)' }
 function ProgressRing({ plan, actual, size=120 }: { plan:number; actual:number; size?:number }) {
@@ -163,13 +140,9 @@ export default function DashboardPage() {
   const [attendance, setAttendance] = useState<any[]>([])
   const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [aiQuotes, setAiQuotes] = useState(''); const [loadingQuotes, setLoadingQuotes] = useState(false)
-  const [aiTeam, setAiTeam] = useState(''); const [loadingTeam, setLoadingTeam] = useState(false)
-  const [aiPersonal, setAiPersonal] = useState(''); const [loadingPersonal, setLoadingPersonal] = useState(false)
   const [statDetail, setStatDetail] = useState<{title:string; items:any[]}|null>(null)
   const [showHidden, setShowHidden] = useState(false)
   const [issueStatusFilter, setIssueStatusFilter] = useState('all')
-  const autoRan = useRef(false)
   const issuesRef = useRef<HTMLDivElement>(null)
 
   // Guest/external users (only 'guest' role, no internal role) get a reduced dashboard
@@ -192,28 +165,6 @@ export default function DashboardPage() {
     setActivities(a.data||[]); setInitiatives(init.data||[]); setIssues(iss.data||[]); setMembers(m.data||[]); setConfig(c.data); setAttendance(att.data||[]); setLoading(false)
   }
   useEffect(() => { load() }, [])
-
-  async function genQuotes() {
-    setLoadingQuotes(true); setAiQuotes('')
-    try {
-      const r = await fetch('/api/ai-insight', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ type:'quotes' }) })
-      const d = await r.json(); setAiQuotes(d.data?.insight || ('⚠️ '+(d.error||'failed')))
-    } finally { setLoadingQuotes(false) }
-  }
-  async function genTeam() {
-    setLoadingTeam(true); setAiTeam('')
-    try {
-      const r = await fetch('/api/ai-insight', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ type:'team' }) })
-      const d = await r.json(); setAiTeam(d.data?.insight || ('⚠️ '+(d.error||'failed')))
-    } finally { setLoadingTeam(false) }
-  }
-  async function genPersonal() {
-    setLoadingPersonal(true); setAiPersonal('')
-    try {
-      const r = await fetch('/api/ai-insight', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ type:'personal', userName: user?.name, userEmail: user?.email }) })
-      const d = await r.json(); setAiPersonal(d.data?.insight || ('⚠️ '+(d.error||'failed')))
-    } finally { setLoadingPersonal(false) }
-  }
 
   // Stats
   const wfoToday = useMemo(() => {
@@ -268,15 +219,6 @@ export default function DashboardPage() {
     saveWidgets([...others, ...reordered])
   }
 
-  // Auto-load AI insights on mount — no manual trigger needed. Personal/Tim only for internal users.
-  useEffect(() => {
-    if (loading || !user || autoRan.current) return
-    autoRan.current = true
-    if (isWidgetActive('ai-quotes')) genQuotes()
-    if (isInternal && isWidgetActive('ai-insight-personal')) genPersonal()
-    if (isInternal && isWidgetActive('ai-insight-team')) genTeam()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, user])
 
   // Issues visibility — hidden activities are excluded from ALL dashboard Issues sections
   // (Status Distribution, High Priority Active, Detail) so everything stays aligned.
@@ -370,44 +312,6 @@ export default function DashboardPage() {
                     'mandatory-training': <MandatoryInsights section="training" />,
                     'mandatory-kpi': <MandatoryInsights section="kpi" />,
                     'golive-insights': <GoLiveInsights />,
-                    'ai-row': (
-                      <div className="responsive-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))', gap:10, width:'100%' }}>
-                        {isWidgetActive('ai-quotes') && (
-                          <div className="card glass" style={{ padding:14 }}>
-                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                              <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>📅 Inspirasi & Info Hari Ini</div>
-                              <button onClick={genQuotes} disabled={loadingQuotes} className="btn btn-icon btn-sm">↻</button>
-                            </div>
-                            {!aiQuotes && !loadingQuotes ? <button onClick={genQuotes} className="btn btn-sm" style={{ width:'100%' }}>✨ Tampilkan</button> :
-                             loadingQuotes ? <div style={{ fontSize:11, color:'var(--text3)' }}>Generating...</div> :
-                             <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}><Linkify text={stripMd(aiQuotes)} /></div>}
-                          </div>
-                        )}
-                        {isInternal && isWidgetActive('ai-insight-personal') && (
-                          <div className="card glass" style={{ padding:14 }}>
-                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                              <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>🤖 AI Insight — Personal</div>
-                              <button onClick={genPersonal} disabled={loadingPersonal} className="btn btn-icon btn-sm">↻</button>
-                            </div>
-                            <div style={{ fontSize:9, color:'var(--text3)', marginBottom:6 }}>Rekomendasi tindakan untuk {user?.name?.split(' ')[0]}</div>
-                            {!aiPersonal && !loadingPersonal ? <button onClick={genPersonal} className="btn btn-sm" style={{ width:'100%' }}>✨ Generate Next Actions</button> :
-                             loadingPersonal ? <div style={{ fontSize:11, color:'var(--text3)' }}>Generating...</div> :
-                             <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}>{stripMd(aiPersonal)}</div>}
-                          </div>
-                        )}
-                        {isInternal && isWidgetActive('ai-insight-team') && (
-                          <div className="card glass" style={{ padding:14 }}>
-                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                              <div style={{ fontSize:11, fontWeight:600, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'0.06em' }}>🤝 AI Insight — Tim</div>
-                              <button onClick={genTeam} disabled={loadingTeam} className="btn btn-icon btn-sm">↻</button>
-                            </div>
-                            {!aiTeam && !loadingTeam ? <button onClick={genTeam} className="btn btn-sm" style={{ width:'100%' }}>✨ Generate Actions</button> :
-                             loadingTeam ? <div style={{ fontSize:11, color:'var(--text3)' }}>Generating...</div> :
-                             <div style={{ fontSize:12, lineHeight:1.6, whiteSpace:'pre-wrap', color:'var(--text2)' }}>{stripMd(aiTeam)}</div>}
-                          </div>
-                        )}
-                      </div>
-                    ),
                     'progress-chart': (
                       <div className="card glass-hover" style={{ padding:14, cursor:'pointer', width:'100%' }} onClick={()=>{ window.location.href='/dashboard/progress' }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>

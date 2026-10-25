@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { ConfigModel } from '@/models/Config'
-import { DEFAULT_WIDGETS, DEFAULT_FONNTE } from '@/lib/defaults'
+import { DEFAULT_WIDGETS } from '@/lib/defaults'
 import { mergeConfigDefaults, loginSlice, withoutLoginBackgrounds } from '@/lib/configMerge'
 import { currentRoles } from '@/lib/session'
 
@@ -17,7 +17,6 @@ export async function GET(req: NextRequest) {
     const doc = await ConfigModel.findOne({}).lean() as any
     const base = doc || (new ConfigModel({}) as any).toObject()
     const cfg = mergeConfigDefaults(base, DEFAULT_WIDGETS)
-    if (!cfg.fonnte || !cfg.fonnte.apiUrl) cfg.fonnte = DEFAULT_FONNTE
     const headers = { 'Cache-Control': 'no-store' }
     if (searchParams.get('scope') === 'login') return NextResponse.json({ data: loginSlice(cfg) }, { headers })
     if (searchParams.get('include') === 'loginBackgrounds') return NextResponse.json({ data: cfg }, { headers })

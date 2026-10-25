@@ -52,18 +52,17 @@ const clampNum = (v:any) => Math.max(0, Number(v)||0)
 const fmtTgl = (d:string)=> d ? new Date(d).toLocaleDateString('id-ID',{ day:'numeric', month:'short', year:'numeric' }) : '—'
 
 export default function ThirdPartyPage() {
-  const [tab, setTab] = useState<'rencana'|'realisasi'|'suvenir'>('rencana')
+  const [tab, setTab] = useState<'rencana'|'suvenir'>('rencana')
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
       <div style={{ padding:'12px 20px 0', borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
         <div style={{ fontSize:14, fontWeight:600 }}>[3rd Party] Event</div>
         <div style={{ display:'flex', gap:4, marginTop:10 }}>
           <button onClick={()=>setTab('rencana')} style={subtab(tab==='rencana')}>Rencana</button>
-          <button onClick={()=>setTab('realisasi')} style={subtab(tab==='realisasi')}>Realisasi</button>
           <button onClick={()=>setTab('suvenir')} style={subtab(tab==='suvenir')}>🎁 Suvenir</button>
         </div>
       </div>
-      {tab==='rencana' ? <RencanaTab/> : tab==='realisasi' ? <RealisasiTab/> : <SuvenirTab/>}
+      {tab==='rencana' ? <RencanaTab/> : <SuvenirTab/>}
     </div>
   )
 }
@@ -726,112 +725,6 @@ function optTab(active:boolean):React.CSSProperties {
 }
 
 // =====================  REALISASI  =====================
-function RealisasiTab() {
-  const { data:session } = useSession(); const user = session?.user as any
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState<number>(-1)
-  const [items, setItems] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState<any>(null)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    const qs = new URLSearchParams({ kind:'realisasi', year:String(year) }); if (month>=0) qs.set('month', String(month+1))
-    const r = await fetch(`/api/thirdparty?${qs}`).then(r=>r.json()); setItems(r.data||[]); setLoading(false)
-  }, [year, month])
-  useEffect(()=>{ load() }, [load])
-
-  return (
-    <>
-      {(showForm||editing) && <RealisasiForm editing={editing} user={user} onClose={()=>{setShowForm(false);setEditing(null)}} onSaved={()=>{setShowForm(false);setEditing(null);load()}} />}
-      <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexWrap:'wrap', alignItems:'center', flexShrink:0 }}>
-        <select className="input input-sm" style={{ width:130 }} value={month} onChange={e=>setMonth(Number(e.target.value))}>
-          <option value={-1}>Semua Bulan</option>{MONTHS.map((m,i)=><option key={i} value={i}>{m}</option>)}
-        </select>
-        <select className="input input-sm" style={{ width:90 }} value={year} onChange={e=>setYear(Number(e.target.value))}>
-          {[now.getFullYear()+1, now.getFullYear(), now.getFullYear()-1].map(y=><option key={y} value={y}>{y}</option>)}
-        </select>
-        <button onClick={()=>setShowForm(true)} className="btn btn-sm btn-primary" style={{ marginLeft:'auto' }}>+ Realisasi</button>
-      </div>
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
-        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
-         items.length===0 ? <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}><div style={{ fontSize:30, marginBottom:8 }}>📑</div><div>Belum ada realisasi</div></div> : (
-          <div className="card" style={{ overflow:'auto' }}>
-            <table className="wp-table" style={{ minWidth:1000 }}>
-              <thead><tr><th>Nama EO</th><th>Nominal Tagihan</th><th>Nomor PO</th><th>Tgl Vendor BAST</th><th>Tgl Approve BAST</th><th>Nomor Invoice</th><th>Tgl Invoice</th><th></th></tr></thead>
-              <tbody>{items.map(it=>(
-                <tr key={it._id}>
-                  <td style={{ fontSize:11, fontWeight:600 }}>{it.namaEO||'—'}</td>
-                  <td style={{ fontWeight:600 }}>Rp {fmt(it.nominalTagihan)}</td>
-                  <td style={{ fontSize:11 }}>{it.nomorPO||'—'}</td>
-                  <td style={{ fontSize:11 }}>{it.tglVendorBAST?new Date(it.tglVendorBAST).toLocaleDateString('id-ID'):'—'}</td>
-                  <td style={{ fontSize:11 }}>{it.tglApproveBAST?new Date(it.tglApproveBAST).toLocaleDateString('id-ID'):'—'}</td>
-                  <td style={{ fontSize:11 }}>{it.nomorInvoice||'—'}</td>
-                  <td style={{ fontSize:11 }}>{it.tglInvoice?new Date(it.tglInvoice).toLocaleDateString('id-ID'):'—'}</td>
-                  <td style={{ display:'flex', gap:5 }}>
-                    <button onClick={()=>setEditing(it)} className="btn btn-sm" style={{ fontSize:10 }}>Edit</button>
-                    <button onClick={async()=>{ if(!confirm(`Hapus realisasi "${it.namaEO||''}"?`))return; await fetch(`/api/thirdparty/${it._id}`,{method:'DELETE'}); toast.success('Realisasi dihapus'); load() }} className="btn btn-sm btn-danger" style={{ fontSize:10 }}>🗑</button>
-                  </td>
-                </tr>
-              ))}</tbody>
-            </table>
-          </div>
-         )}
-      </div>
-    </>
-  )
-}
-
-function RealisasiForm({ editing, user, onClose, onSaved }: { editing?:any; user:any; onClose:()=>void; onSaved:()=>void }) {
-  const now = new Date()
-  const [f, setF] = useState<any>(editing ? {...editing} : { namaEO:'', nominalTagihan:0, nomorPO:'', tglVendorBAST:'', tglApproveBAST:'', nomorInvoice:'', tglInvoice:'', year:now.getFullYear(), month:now.getMonth()+1 })
-  const [saving, setSaving] = useState(false)
-  const set = (k:string,v:any)=>setF((p:any)=>({...p,[k]:v}))
-  async function save() {
-    if (!f.namaEO?.trim()) { toast.error('Isi Nama EO'); return }
-    setSaving(true)
-    try {
-      const d = f.tglInvoice||f.tglVendorBAST ? new Date(f.tglInvoice||f.tglVendorBAST) : null
-      const body = { ...f, kind:'realisasi', nominalTagihan:Number(f.nominalTagihan)||0, createdBy:user?.name, year: d?d.getFullYear():f.year, month: d?d.getMonth()+1:f.month }
-      const url = editing ? `/api/thirdparty/${editing._id}` : '/api/thirdparty'
-      const r = await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
-      if (!r.ok) { toast.error('Gagal menyimpan'); return }
-      toast.success(editing?'Diperbarui':'Realisasi tersimpan'); onSaved()
-    } finally { setSaving(false) }
-  }
-  return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:560 }}>
-        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit Realisasi':'+ Realisasi Event'}</span>
-          <button onClick={onClose} className="btn btn-icon">×</button>
-        </div>
-        <div style={{ padding:'14px 20px', display:'flex', flexDirection:'column', gap:11 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Nama EO</label><input className="input" value={f.namaEO} onChange={e=>set('namaEO',e.target.value)} /></div>
-            <div><label style={lbl}>Nominal Tagihan (Rp)</label><MoneyInput currency="IDR" className="input" value={f.nominalTagihan||0} onChange={n=>set('nominalTagihan',n)} /></div>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Nomor PO</label><input className="input" value={f.nomorPO} onChange={e=>set('nomorPO',e.target.value)} /></div>
-            <div><label style={lbl}>Nomor Invoice</label><input className="input" value={f.nomorInvoice} onChange={e=>set('nomorInvoice',e.target.value)} /></div>
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
-            <div><label style={lbl}>Tgl Vendor BAST</label><input type="date" className="input" value={f.tglVendorBAST} onChange={e=>set('tglVendorBAST',e.target.value)} /></div>
-            <div><label style={lbl}>Tgl Approve BAST</label><input type="date" className="input" value={f.tglApproveBAST} onChange={e=>set('tglApproveBAST',e.target.value)} /></div>
-            <div><label style={lbl}>Tgl Invoice</label><input type="date" className="input" value={f.tglInvoice} onChange={e=>set('tglInvoice',e.target.value)} /></div>
-          </div>
-        </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
-          <button onClick={onClose} className="btn">Batal</button>
-          <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':'Simpan'}</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }
 function subtab(active:boolean):React.CSSProperties { return { padding:'8px 16px', fontSize:12.5, fontWeight:600, cursor:'pointer', border:'none', borderBottom:`2px solid ${active?'var(--brand)':'transparent'}`, background:'transparent', color:active?'var(--brand)':'var(--text3)' } }
 

@@ -3,9 +3,9 @@ import { invalidateConfig } from '@/lib/configCache'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
-import { DEFAULT_ROLES, DEFAULT_WIDGETS, DEFAULT_LINK_CATEGORIES, DEFAULT_FONNTE } from '@/lib/defaults'
+import { DEFAULT_ROLES, DEFAULT_WIDGETS, DEFAULT_LINK_CATEGORIES } from '@/lib/defaults'
 
-type Tab = 'branding'|'login'|'taxonomies'|'attendance'|'budget'|'roles'|'widgets'|'fonnte'|'reset'|'system'
+type Tab = 'branding'|'login'|'taxonomies'|'attendance'|'budget'|'roles'|'widgets'|'reset'|'system'
 
 function Section({ title, sub, children, action }: { title:string; sub?:string; children:React.ReactNode; action?:React.ReactNode }) {
   return (
@@ -144,10 +144,10 @@ function ResetSection() {
 }
 
 
-const MENU_KEYS = ['dashboard','progress','activities','mandatory','golive','calendar','issues','attendance','biodata','links','meetings','notes','quicknotes','playground','reimbursement','operasional','pettycash','cashcard','thirdparty','budgetreport','cashier','settlementcc','members','config','biodata-export']
+const MENU_KEYS = ['dashboard','progress','activities','mandatory','golive','calendar','issues','attendance','biodata','links','notes','quicknotes','reimbursement','operasional','pettycash','cashcard','thirdparty','budgetreport','cashier','settlementcc','members','config','biodata-export']
 const MENU_LABELS: Record<string,string> = {
   dashboard:'Dashboard', progress:'Progress Project', activities:'Activities', mandatory:'Mandatory', golive:'Go-Live', calendar:'Calendar', issues:'Issues',
-  attendance:'Presensi', biodata:'Biodata', links:'Link Hub', meetings:'Meeting Reports', notes:'[Team] Notes', quicknotes:'[Personal] Notes', playground:'Playground',
+  attendance:'Presensi', biodata:'Biodata', links:'Link Hub', notes:'[Team] Notes', quicknotes:'[Personal] Notes',
   reimbursement:'Reimbursement', operasional:'Operasional', pettycash:'Petty Cash (tab)', cashcard:'Cash Card', thirdparty:'[3rd Party] Event', budgetreport:'Budget Report',
   cashier:'Akses Cashier (tab)', settlementcc:'Akses Settlement CC (CC Holder)',
   members:'Member', config:'Configuration', 'biodata-export':'Export Biodata (Excel) — admin'
@@ -234,63 +234,6 @@ function RolesEditor({ roles, onChange }: { roles:any[]; onChange:(roles:any[])=
     </div>
   )
 }
-
-function FonnteSettings({ config, onSave }: { config:any; onSave:(patch:any)=>void }) {
-  const [users, setUsers] = useState<any[]>([])
-  const [cashierUserId, setCashierUserId] = useState(config?.fonnte?.cashierUserId || '')
-  const [tplCashier, setTplCashier] = useState(config?.fonnte?.messageToCashier || '')
-  const [tplMember, setTplMember] = useState(config?.fonnte?.messageToMember || '')
-  const [testNum, setTestNum] = useState('')
-  const [sending, setSending] = useState(false)
-
-  useEffect(() => { fetch('/api/users').then(r=>r.json()).then(d=>setUsers(d.data||[])) }, [])
-
-  async function test() {
-    if (!testNum) { alert('Masukkan nomor HP test'); return }
-    setSending(true)
-    try {
-      const r = await fetch('/api/fonnte', { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ target: testNum, message: '🧪 Test message dari WorkPulse. Konfigurasi Fonnte berhasil.' }) })
-      const d = await r.json()
-      if (r.ok && d.success) alert('✅ Test kirim sukses (via ' + (d.resolvedFrom||'?') + '). Cek WA target.')
-      else alert('❌ Gagal: ' + (d.error||'unknown'))
-    } finally { setSending(false) }
-  }
-
-  return (
-    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-      <div>
-        <label style={lbl}>Cashier User (yang punya token Fonnte)</label>
-        <select className="input" value={cashierUserId} onChange={e=>{ setCashierUserId(e.target.value); onSave({ cashierUserId: e.target.value }) }}>
-          <option value="">— Pilih cashier —</option>
-          {users.filter((u:any)=>u.active!==false).map((u:any) => (
-            <option key={u._id} value={u._id}>{u.name}{u.division?` · ${u.division}`:''} {u.fonnteToken?'✓ has token':''}</option>
-          ))}
-        </select>
-        <div style={{ fontSize:10, color:'var(--text3)', marginTop:5 }}>User yang dipilih harus punya role <code>cashier</code> dan token Fonnte di profil-nya.</div>
-      </div>
-      <div>
-        <label style={lbl}>Template Pesan ke Cashier (saat member submit reimburse)</label>
-        <textarea className="input" rows={5} value={tplCashier} onChange={e=>setTplCashier(e.target.value)} onBlur={()=>onSave({ messageToCashier: tplCashier })} />
-        <div style={{ fontSize:10, color:'var(--text3)', marginTop:5 }}>Variabel: <code>{`{memberName} {purpose} {amount} {category} {bank} {noRekening}`}</code></div>
-      </div>
-      <div>
-        <label style={lbl}>Template Pesan ke Member (saat cashier transfer)</label>
-        <textarea className="input" rows={5} value={tplMember} onChange={e=>setTplMember(e.target.value)} onBlur={()=>onSave({ messageToMember: tplMember })} />
-        <div style={{ fontSize:10, color:'var(--text3)', marginTop:5 }}>Variabel: <code>{`{memberName} {purpose} {amount} {category} {bank} {noRekening}`}</code></div>
-      </div>
-      <div className="card" style={{ padding:12, background:'var(--bg3)' }}>
-        <div style={{ fontSize:11, fontWeight:600, marginBottom:6 }}>🧪 Test Kirim WhatsApp</div>
-        <div style={{ display:'flex', gap:8 }}>
-          <input className="input input-sm" value={testNum} onChange={e=>setTestNum(e.target.value)} placeholder="08xxxxxxxxxx" />
-          <button onClick={test} disabled={sending} className="btn btn-primary btn-sm">{sending?'...':'Test Kirim'}</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-
 
 function WidgetGroupsEditor({ widgets, onChange }: { widgets:any[]; onChange:(w:any[])=>void }) {
   // Group widgets by segment with dashboard-tab semantic mapping
@@ -393,7 +336,6 @@ export default function ConfigPage() {
     { key:'budget',     label:'Kategori Anggaran', icon:'💰' },
     { key:'roles',      label:'Roles & Permissions', icon:'🔐' },
     { key:'widgets',    label:'Dashboard Widgets', icon:'📊' },
-    { key:'fonnte',     label:'WhatsApp / Fonnte', icon:'💬' },
     { key:'reset',      label:'Reset Data',    icon:'🗑️' },
     { key:'system',     label:'Sistem Info',   icon:'ℹ️' },
   ]
@@ -596,9 +538,6 @@ export default function ConfigPage() {
               <TaxonomyEditor items={(config.issueStatuses || [])} onChange={items=>setConfig((c:any)=>({...c, issueStatuses:items}))} label="status" />
             </Section>
 
-            <Section title="📝 Kategori Meeting Reports" sub="Weekly / Project / 1-on-1 / Workshop / etc" action={<button className="btn btn-sm btn-primary" onClick={()=>save({ meetingCategories: (config.meetingCategories || []) })}>💾 Simpan</button>}>
-              <TaxonomyEditor items={(config.meetingCategories || [])} onChange={items=>setConfig((c:any)=>({...c, meetingCategories:items}))} label="kategori meeting" />
-            </Section>
           </>
         )}
 
@@ -643,16 +582,6 @@ export default function ConfigPage() {
               <div style={{ fontSize:13, fontWeight:600, marginBottom:6 }}>🔗 Kategori Link Hub</div>
               <div style={{ fontSize:11, color:'var(--text3)', marginBottom:10 }}>Kategori link yang dipakai di menu Link Hub</div>
               <TaxonomyEditor items={(config.linkCategories && config.linkCategories.length) ? config.linkCategories : DEFAULT_LINK_CATEGORIES} onChange={(v:any)=>setConfig((c:any)=>({...c, linkCategories:v}))} label="Link Categories" />
-            </div>
-          </Section>
-        )}
-        {tab === 'fonnte' && (
-          <Section title="💬 WhatsApp / Fonnte Integration" sub="Konfigurasi notifikasi WhatsApp otomatis via fonnte.com">
-            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-              <div className="card" style={{ padding:12, background:'var(--bg3)', fontSize:11, color:'var(--text3)', lineHeight:1.6 }}>
-                <b style={{ color:'var(--text)' }}>How it works:</b> Set role <code>cashier</code> ke salah satu user di menu Member. Edit member tsb, masukkan Token Fonnte (dari fonnte.com → Device → Token) dan no HP. Lalu pilih user-nya di dropdown di bawah.
-              </div>
-              <FonnteSettings config={{...config, fonnte: { ...DEFAULT_FONNTE, ...(config.fonnte||{}) }}} onSave={(patch:any)=>save({ fonnte: { ...DEFAULT_FONNTE, ...(config.fonnte||{}), ...patch } })} />
             </div>
           </Section>
         )}
