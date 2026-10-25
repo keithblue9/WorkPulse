@@ -21,12 +21,13 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json()
     const { userId, ...update } = body
     // Never allow role/email/password update via profile
-    delete update.role; delete update.password; delete update.email
+    delete update.role; delete update.roles; delete update.password; delete update.email
+    delete update.active; delete update.sortOrder; delete update.fonnteToken
 
     // Resolve target: prefer session email; fallback to userId for backward compat
     let user
     if (session?.user?.email) {
-      user = await UserModel.findOneAndUpdate({ email: session.user.email }, update, { new: true }).select('-password').lean()
+      user = await UserModel.findOneAndUpdate({ email: session.user.email }, update, { new: true }).select('-password -fonnteToken').lean()
     } else if (userId) {
       user = await UserModel.findByIdAndUpdate(userId, update, { new: true }).select('-password').lean()
     } else return NextResponse.json({ error:'Unauthorized' }, { status:401 })
