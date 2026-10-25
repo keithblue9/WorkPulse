@@ -988,3 +988,124 @@ button.au-wl { cursor:pointer } button.au-wl:hover { background:var(--sunken) }
 /* Badge "perlu update" di menu */
 .wn-due { margin-left:auto; min-width:20px; height:20px; padding:0 6px; border-radius:999px; background:#C42B1C; color:#fff; font:700 11px/20px var(--mono, monospace); text-align:center }
 .wn-tabbar .wn-due { position:absolute; top:2px; left:calc(50% + 6px); margin:0; min-width:18px; height:18px; line-height:18px; font-size:10px; box-shadow:0 0 0 2px var(--surface) }
+/* Isi sheet tidak boleh menyusut: konten panjang harus bisa di-scroll, bukan saling tumpuk */
+.au-sheet-b > * { flex-shrink:0 }
+
+/* ═══════════ Widget "Instrument Light" ═══════════ */
+.wg-board { display:flex; flex-direction:column; gap:12px }
+.wg-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-height:40px }
+.wg-title { font:700 19px var(--disp) }
+.wg-grid { --cols:2; --row:164px; display:grid; grid-template-columns:repeat(var(--cols),minmax(0,1fr)); grid-auto-rows:var(--row); grid-auto-flow:row dense; gap:14px }
+@media (min-width:720px) { .wg-grid { --cols:4; --row:170px } }
+@media (min-width:1360px) { .wg-grid { --cols:6 } }
+.wg-slot { position:relative; min-width:0; min-height:0 }
+.wg-slot.wg-S { grid-column:span 1; grid-row:span 1 }
+.wg-slot.wg-M { grid-column:span 2; grid-row:span 1 }
+.wg-slot.wg-L { grid-column:span 2; grid-row:span 2 }
+.wg-slot > .au-lazy, .wg-slot > div:not(.wg-ctl) { height:100% }
+.wg-skel { border-radius:26px; background:var(--sunken); animation:pulse 1.4s ease-in-out infinite }
+.wg-skel.wg-M { grid-column:span 2 }
+
+.wg { --wf:var(--accent); position:relative; isolation:isolate; height:100%; display:flex; flex-direction:column; gap:8px; padding:14px 16px; border-radius:26px; overflow:hidden;
+  background:var(--surface); border:1px solid var(--line); box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 16px 34px -26px rgba(43,30,140,.5); color:var(--ink) }
+.wg::before { content:''; position:absolute; inset:-25%; z-index:-2; background:var(--art) center/cover no-repeat; opacity:.9; transform:rotate(-8deg) }
+.wg::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(165deg,color-mix(in srgb,var(--surface) 94%,transparent) 0%,color-mix(in srgb,var(--surface) 84%,transparent) 60%,color-mix(in srgb,var(--surface) 70%,transparent) 100%) }
+.wg[data-fam=progress]{--wf:#4B3BFF} .wg[data-fam=enhancement]{--wf:#8C3FD6} .wg[data-fam=agenda]{--wf:#1F66D1} .wg[data-fam=issues]{--wf:#C8371F}
+.wg[data-fam=team]{--wf:#0B8578} .wg[data-fam=mandatory]{--wf:#0A7A5C} .wg[data-fam=golive]{--wf:#C9481F} .wg[data-fam=budget]{--wf:#9A6200} .wg[data-fam=notes]{--wf:#A83A7E}
+@media (prefers-color-scheme:dark) { :root:not([data-theme=light]) .wg[data-fam=progress]{--wf:#9C8FFF} :root:not([data-theme=light]) .wg[data-fam=enhancement]{--wf:#C9A2FF} :root:not([data-theme=light]) .wg[data-fam=agenda]{--wf:#7FB2FF} :root:not([data-theme=light]) .wg[data-fam=issues]{--wf:#FF8A70} :root:not([data-theme=light]) .wg[data-fam=team]{--wf:#3DD9C5} :root:not([data-theme=light]) .wg[data-fam=mandatory]{--wf:#4FE0BE} :root:not([data-theme=light]) .wg[data-fam=golive]{--wf:#FF9A80} :root:not([data-theme=light]) .wg[data-fam=budget]{--wf:#F6BC62} :root:not([data-theme=light]) .wg[data-fam=notes]{--wf:#F28CC6} }
+:root[data-theme=dark] .wg[data-fam=progress]{--wf:#9C8FFF} :root[data-theme=dark] .wg[data-fam=enhancement]{--wf:#C9A2FF} :root[data-theme=dark] .wg[data-fam=agenda]{--wf:#7FB2FF} :root[data-theme=dark] .wg[data-fam=issues]{--wf:#FF8A70} :root[data-theme=dark] .wg[data-fam=team]{--wf:#3DD9C5} :root[data-theme=dark] .wg[data-fam=mandatory]{--wf:#4FE0BE} :root[data-theme=dark] .wg[data-fam=golive]{--wf:#FF9A80} :root[data-theme=dark] .wg[data-fam=budget]{--wf:#F6BC62} :root[data-theme=dark] .wg[data-fam=notes]{--wf:#F28CC6}
+.wg-link { position:absolute; inset:0; z-index:0; border:0; background:none; border-radius:inherit; cursor:pointer }
+.wg-link:focus-visible { outline:2px solid var(--wf); outline-offset:-3px }
+.wg-h, .wg-b { position:relative; z-index:1; pointer-events:none }
+.wg-b button, .wg-b a { pointer-events:auto }
+.wg-h { display:flex; align-items:center; gap:7px; font:600 11px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--wf); min-width:0 }
+.wg-h > span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.wg-ic { display:grid; place-items:center; width:22px; height:22px; border-radius:7px; background:color-mix(in srgb,var(--wf) 14%,transparent); color:var(--wf); flex-shrink:0 }
+.wg-b { flex:1; min-height:0; display:flex; flex-direction:column; gap:8px; overflow:hidden }
+.wg-S .wg-b { justify-content:flex-end }
+.wg-big b { display:block; font:800 42px/1 var(--disp); letter-spacing:-.03em; font-variant-numeric:tabular-nums }
+.wg-big b small { font-size:.45em; opacity:.55; letter-spacing:0; margin-left:2px }
+.wg-big > span { display:block; margin-top:4px; font-size:12.5px; color:var(--ink2) }
+.wg-center { flex:1; display:grid; place-items:center }
+.wg-center .au-ring .mid span, .wg-split .au-ring .mid span { font-size:10.5px }
+.wg-split { display:grid; grid-template-columns:auto minmax(0,1fr); gap:14px; align-items:center; min-height:0 }
+.wg-legend { display:flex; flex-direction:column; gap:6px; font-size:12.5px; color:var(--ink2) }
+.wg-legend span { display:flex; align-items:center; gap:7px } .wg-legend i { width:8px; height:8px; border-radius:3px } .wg-legend b { margin-left:auto; color:var(--ink); font-variant-numeric:tabular-nums }
+.wg-list { display:flex; flex-direction:column; gap:7px; min-height:0 }
+.wg-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(56px,40%) auto; align-items:center; gap:10px; font-size:13px }
+.wg-row .t { display:flex; flex-direction:column; min-width:0; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.wg-row .t small { font-weight:400; font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis }
+.wg-row .n { font:600 12px var(--mono); color:var(--ink2); min-width:2ch; text-align:right }
+.wg-row:not(:has(.wg-bar)) { grid-template-columns:minmax(0,1fr) auto }
+.wg-btn { border:0; background:none; color:inherit; text-align:left; font:inherit; padding:4px 6px; margin:-4px -6px; border-radius:10px; cursor:pointer; min-height:36px }
+.wg-btn:hover { background:color-mix(in srgb,var(--wf) 9%,transparent) }
+.wg-bar { position:relative; display:block; height:7px; border-radius:99px; background:color-mix(in srgb,var(--ink) 9%,transparent) }
+.wg-bar i { position:absolute; inset:0 auto 0 0; border-radius:inherit } .wg-bar s { position:absolute; top:-3px; bottom:-3px; width:2px; border-radius:1px; background:var(--ink); opacity:.55 }
+.wg-story { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px; font-size:13px; line-height:1.35; color:var(--ink2) }
+.wg-story li { display:grid; grid-template-columns:20px 1fr; gap:8px } .wg-story .n { display:grid; place-items:center; width:20px; height:20px; border-radius:7px; background:color-mix(in srgb,var(--wf) 14%,transparent); color:var(--wf); font:700 11px var(--mono) }
+.wg-story b { color:var(--ink) } .wg-warn { color:var(--warn) !important }
+.wg-next .when { display:block; font:600 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--wf) }
+.wg-next b { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; font:700 16px/1.25 var(--disp); margin-top:4px }
+.wg-ag { display:grid; grid-template-columns:40px minmax(0,1fr); gap:10px; align-items:center }
+.wg-ag .dt { display:flex; flex-direction:column; align-items:center; padding:4px 0; border-radius:10px; background:color-mix(in srgb,var(--wf) 11%,transparent); color:var(--wf); font:600 9.5px var(--mono); text-transform:uppercase }
+.wg-ag .dt b { font:800 16px/1 var(--disp); color:var(--ink) }
+.wg-ag .t { display:flex; flex-direction:column; min-width:0; font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis } .wg-ag .t small { font-weight:400; font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis }
+.wg-cells { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px }
+.wg-cell { display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:7px 9px; border-radius:12px; border:0; background:color-mix(in srgb,var(--surface) 70%,transparent); color:var(--ink); cursor:pointer; text-align:left; font:inherit; min-height:44px }
+.wg-cell:hover { background:color-mix(in srgb,var(--wf) 12%,var(--surface)) } .wg-cell b { font:800 18px/1 var(--disp) } .wg-cell span { font-size:10.5px; color:var(--ink2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100% }
+.wg-pill { font:600 10.5px var(--mono); padding:2px 8px; border-radius:99px; background:var(--bad-soft); color:var(--bad) }
+.wg-chips { display:flex; flex-wrap:wrap; gap:5px }
+.wg-chips span { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:99px; background:color-mix(in srgb,var(--surface) 75%,transparent); font-size:11.5px; color:var(--ink2) }
+.wg-chips i { width:7px; height:7px; border-radius:50%; background:var(--c) } .wg-chips b { color:var(--ink) }
+.wg-avs { display:flex; flex-wrap:wrap; gap:4px } .wg-avs .av { display:grid; place-items:center; width:28px; height:28px; border-radius:50%; font:700 10px var(--mono); background:var(--surface); color:var(--ink); box-shadow:0 0 0 2px var(--c) }
+.wg-week { display:flex; flex-direction:column; gap:4px; font-size:11px }
+.wg-week .r { display:grid; grid-template-columns:64px repeat(5,minmax(0,1fr)); gap:4px; align-items:center }
+.wg-week .hd span { font:600 10px var(--mono); color:var(--muted); text-align:center } .wg-week .hd .today { color:var(--wf) }
+.wg-week .nm { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.wg-week .c { height:22px; display:grid; place-items:center; border-radius:7px; font:600 9.5px var(--mono); color:#fff; background:var(--c); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ink) 8%,transparent) }
+.wg-rings { display:flex; justify-content:space-around; gap:6px } .wg-ringc { display:flex; flex-direction:column; align-items:center; gap:4px; font-size:11px; color:var(--ink2) }
+.wg-cap { font:600 10.5px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted) }
+.wg-stages { display:flex; align-items:flex-end; gap:6px; height:76px }
+.wg-stages > span { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; min-width:0 }
+.wg-stages i { width:100%; max-width:26px; border-radius:7px 7px 3px 3px; background:var(--wf) } .wg-stages small { font-size:9.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; max-width:100%; white-space:nowrap }
+.wg-years { display:flex; justify-content:space-around; align-items:flex-end; height:84px }
+.wg-years > span { display:flex; flex-direction:column; align-items:center; gap:4px } .wg-years .col { display:flex; align-items:flex-end; gap:3px; height:62px }
+.wg-years i { width:14px; border-radius:5px 5px 2px 2px } .wg-years .p { background:color-mix(in srgb,var(--ink) 14%,transparent) } .wg-years .r { background:var(--wf) } .wg-years small { font:600 10px var(--mono); color:var(--muted) }
+.wg-kv { display:flex; flex-direction:column } .wg-kv span { font-size:11.5px; color:var(--muted) } .wg-kv b { font:700 16px var(--disp) }
+.wg-note { display:flex; flex-direction:column; gap:2px; padding:8px 10px; border-radius:12px; background:color-mix(in srgb,var(--surface) 70%,transparent) }
+.wg-note b { font-size:13.5px } .wg-note span { font-size:12px; color:var(--ink2); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+.wg-empty { margin:auto; font-size:12.5px; color:var(--muted); text-align:center }
+
+/* Mode edit: bergoyang halus, tombol hapus, kontrol ukuran/geser */
+.wg-grid.editing .wg-slot { cursor:grab }
+.wg-slot.jiggle > .wg { animation:wg-jig .32s ease-in-out infinite alternate }
+.wg-slot.jiggle:nth-child(2n) > .wg { animation-delay:-.16s }
+@keyframes wg-jig { from { transform:rotate(-.55deg) } to { transform:rotate(.55deg) } }
+@media (prefers-reduced-motion:reduce) { .wg-slot.jiggle > .wg { animation:none } }
+.wg-slot.over > .wg { outline:2px dashed var(--accent); outline-offset:3px }
+.wg-del { position:absolute; top:-8px; left:-8px; z-index:3; width:30px; height:30px; border-radius:50%; border:0; display:grid; place-items:center; background:#6E6C80; color:#fff; font:700 20px/1 var(--disp); box-shadow:0 4px 10px -4px rgba(0,0,0,.4); cursor:pointer }
+.wg-del:hover { background:#C42B1C }
+.wg-ctl { position:absolute; left:50%; bottom:8px; transform:translateX(-50%); z-index:3; display:flex; align-items:center; gap:4px; padding:4px; border-radius:99px; background:color-mix(in srgb,var(--surface) 88%,transparent); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid var(--line); box-shadow:var(--shadow-s2) }
+.wg-mv { width:30px; height:30px; border-radius:50%; border:0; display:grid; place-items:center; background:none; color:var(--ink); cursor:pointer } .wg-mv:disabled { opacity:.3 }
+.wg-sz { min-width:44px; height:30px; padding:0 10px; border-radius:99px; border:0; background:var(--accent); color:var(--on-accent); font:700 12px var(--mono); cursor:pointer; display:inline-flex; align-items:center; gap:4px }
+.wg-sz:disabled { background:var(--sunken); color:var(--muted); cursor:default }
+.wg-add { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; border-radius:26px; border:2px dashed var(--line2); background:color-mix(in srgb,var(--surface) 50%,transparent); color:var(--ink2); font:600 13px var(--disp); cursor:pointer }
+.wg-add:hover { border-color:var(--accent); color:var(--accent) }
+
+/* Galeri */
+.wg-search { display:flex; align-items:center; gap:8px; padding:0 14px; min-height:44px; border-radius:14px; background:var(--sunken); color:var(--muted) }
+.wg-search input { flex:1; border:0; background:none; font:inherit; color:var(--ink); outline:none; min-height:44px }
+.wg-fams { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px }
+.wg-fam { position:relative; isolation:isolate; overflow:hidden; display:flex; flex-direction:column; align-items:flex-start; gap:4px; padding:14px; min-height:104px; border-radius:20px; border:1px solid var(--line); background:var(--surface); color:var(--ink); text-align:left; cursor:pointer; font:inherit }
+.wg-fam::before { content:''; position:absolute; inset:0; z-index:-2; background:var(--art) center/cover; opacity:.85 }
+.wg-fam::after { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(160deg,color-mix(in srgb,var(--surface) 92%,transparent),color-mix(in srgb,var(--surface) 66%,transparent)) }
+.wg-fam:hover { transform:translateY(-2px); box-shadow:var(--shadow-s2) } .wg-fam { transition:transform .2s var(--ease), box-shadow .2s }
+.wg-fam .wg-ic { width:30px; height:30px; border-radius:10px; margin-bottom:auto }
+.wg-fam[data-fam=progress]{--wf:#4B3BFF} .wg-fam[data-fam=enhancement]{--wf:#8C3FD6} .wg-fam[data-fam=agenda]{--wf:#1F66D1} .wg-fam[data-fam=issues]{--wf:#C8371F} .wg-fam[data-fam=team]{--wf:#0B8578} .wg-fam[data-fam=mandatory]{--wf:#0A7A5C} .wg-fam[data-fam=golive]{--wf:#C9481F} .wg-fam[data-fam=budget]{--wf:#9A6200} .wg-fam[data-fam=notes]{--wf:#A83A7E}
+.wg-gitem { display:flex; flex-direction:column; gap:10px; padding:12px 0; border-top:1px solid var(--line) }
+.wg-carousel { display:flex; gap:16px; overflow-x:auto; scroll-snap-type:x mandatory; padding:4px 2px 10px; -webkit-overflow-scrolling:touch; scrollbar-width:thin }
+.wg-gslide { scroll-snap-align:center; flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:8px }
+.wg-prev { display:grid; height:164px } .wg-prev.wg-S { width:164px } .wg-prev.wg-M { width:342px } .wg-prev.wg-L { width:342px; height:342px }
+@media (max-width:520px) { .wg-prev.wg-M, .wg-prev.wg-L { width:min(342px, calc(100vw - 72px)) } .wg-prev.wg-L { height:min(342px, calc(100vw - 72px)) } }
+.wg-on { display:inline-flex; align-items:center; gap:5px; min-height:32px; font-size:12.5px; font-weight:600; color:var(--ok) }
+@media (max-width:719px) { .wg-story { font-size:12.5px; gap:5px } .wg-toolbar .au-seg { width:100% } }
