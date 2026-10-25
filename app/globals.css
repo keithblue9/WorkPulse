@@ -629,3 +629,46 @@ button.au-igr, label.au-igr { cursor:pointer } button.au-igr:hover, label.au-igr
   .wn-tabbar a[aria-current="page"] { background:var(--ink); color:var(--bg) }
   .wn-pal { align-self:flex-end; border-radius:28px 28px 0 0; width:100% }
 }
+
+/* ═══ Gantt & kurva S (Progress, Enhancement) ═══ */
+.au-gwrap { overflow-x:auto; margin:0 -6px; padding:4px 6px }
+.au-gantt { --gl:180px; min-width:680px; display:flex; flex-direction:column; gap:8px }
+.au-ghead, .au-grow { display:grid; grid-template-columns:var(--gl) minmax(0,1fr); align-items:center }
+.au-gmon { display:flex; font:500 11px var(--mono); color:var(--muted); padding-bottom:6px; border-bottom:1px solid var(--line) }
+.au-gmon span { flex:1; min-width:0; white-space:nowrap; overflow:hidden } .au-gmon .yr { color:var(--ink); font-weight:600 }
+.au-gbody { position:relative; display:flex; flex-direction:column; gap:8px; padding-top:16px }
+.au-gtr { position:relative; height:34px }
+.au-gtr .gl { position:absolute; top:0; bottom:0; width:1px; background:var(--line); opacity:.7 } .au-gtr .yl { background:var(--muted); opacity:.5 }
+.au-bar { position:absolute; top:4px; height:26px; border-radius:10px; background:var(--plan); overflow:hidden; border:0; padding:0; min-width:10px; cursor:pointer; min-height:0 !important }
+.au-bar:disabled { cursor:default }
+.au-bar i { position:absolute; inset:0 auto 0 0; background:linear-gradient(90deg,var(--accent),#7B6BFF); border-radius:10px 0 0 10px }
+.au-bar em { position:relative; font:700 11.5px/26px var(--sans); font-style:normal; padding:0 8px; color:var(--ink); white-space:nowrap }
+.au-bar.done em { color:#fff } .au-bar.late { box-shadow:inset 0 0 0 2px var(--today) }
+.au-tline { position:absolute; top:-10px; bottom:0; width:2px; background:var(--today); border-radius:1px; pointer-events:none; z-index:2 }
+.au-tline::before { content:'Hari ini'; position:absolute; top:-18px; left:50%; transform:translateX(-50%); font:700 10px/1 var(--mono); color:#fff; background:var(--today); padding:3px 6px; border-radius:6px; white-space:nowrap }
+.au-glab { display:flex; flex-direction:column; align-items:flex-start; border:0; background:none; text-align:left; min-width:0; border-radius:10px; padding:4px 12px 4px 4px; cursor:pointer; color:inherit; min-height:0 !important }
+.au-glab:hover:not(:disabled) { background:var(--sunken) }
+.au-glab, .au-ghead > span:first-child { position:sticky; left:0; z-index:3; background:var(--surface); align-self:stretch; justify-content:center } .au-glab:disabled { cursor:default }
+.au-glab b { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100% }
+.au-scurve { width:100%; height:auto; display:block }
+.au-scurve text { fill:var(--muted); font:500 11px var(--mono) }
+.au-scurve .ax { stroke:var(--line); fill:none } .au-scurve .pl { fill:none; stroke:var(--accent); stroke-width:3; stroke-linecap:round }
+.au-scurve .pa { fill:var(--accent-soft); opacity:.7 } .au-scurve .tl { stroke:var(--today); stroke-width:2 }
+.au-scurve .pt { fill:var(--hot); stroke:var(--surface); stroke-width:3 } .au-scurve .pp { fill:var(--plan); stroke:var(--surface); stroke-width:3 }
+.au-scurve .lab-a { fill:var(--hot-ink); font:700 12.5px var(--sans) } .au-scurve .lab-p { fill:var(--ink2); font:600 12px var(--sans) }
+.au-hchips { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px }
+@media (min-width:901px) { .au-hero.ini { grid-template-columns:minmax(0,1fr) 190px } }
+@media (max-width:900px) { .au-hchips .au-hchip { padding:10px } .au-hchips .au-hchip b { font-size:21px } .au-hchips .au-hchip > span { font-size:9.5px; letter-spacing:.03em } .au-hero.ini .au-ring svg { width:150px; height:150px } }
+.au-icard { position:relative; background:var(--surface); border:1px solid var(--line); border-radius:24px; padding:18px; display:grid; grid-template-columns:96px minmax(0,1fr); gap:16px; align-items:center; text-align:left; width:100%; cursor:pointer; color:inherit; font:inherit; transition:transform .2s var(--ease), box-shadow .2s, border-color .2s }
+.au-icard:hover { transform:translateY(-2px); box-shadow:var(--shadow-s2); border-color:var(--accent) }
+.au-icard[aria-current="true"] { border-color:var(--accent); box-shadow:0 0 0 4px var(--accent-soft) }
+.au-icard h3 { font:700 16px/1.25 var(--disp) }
+.au-split { display:grid; grid-template-columns:minmax(300px,380px) minmax(0,1fr); gap:16px; align-items:start }
+.au-lpane { position:sticky; top:0; display:flex; flex-direction:column; gap:12px }
+.au-box { background:var(--surface); border:1px solid var(--line); border-radius:20px; display:flex; flex-direction:column; position:relative }
+.au-bigpct { font:700 52px/1 var(--disp); letter-spacing:-.04em; font-variant-numeric:tabular-nums }
+.au-quick { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px }
+.au-quick button { border:1px solid var(--line); background:var(--surface); border-radius:14px; min-height:44px; font-weight:700; cursor:pointer; color:var(--ink); transition:transform .18s var(--pop) }
+.au-quick button:active { transform:scale(.9) } .au-quick button[aria-pressed="true"] { background:var(--ink); border-color:var(--ink); color:var(--bg) }
+@media (max-width:1180px) { .au-split { grid-template-columns:minmax(0,1fr) } .au-lpane { position:static } .au-split.has .au-lp { display:none } .au-split:not(.has) .au-dp { display:none } }
+@media (max-width:900px) { .au-icard { grid-template-columns:76px minmax(0,1fr) } .au-gantt { --gl:124px; min-width:560px } .au-glab b { font-size:13px } }
