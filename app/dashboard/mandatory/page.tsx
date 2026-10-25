@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import toast from 'react-hot-toast'
+import { useYear } from '@/lib/year'
 
 type Rec = { userId:string; year:number; mcu?:any; trainings?:any[]; supportKpi?:any[] }
 function uid(){ return Math.random().toString(36).slice(2,9) }
@@ -14,7 +15,7 @@ export default function MandatoryPage() {
   const [users, setUsers] = useState<any[]>([])
   const [recs, setRecs] = useState<Record<string, Rec>>({})
   const [loading, setLoading] = useState(true)
-  const [year, setYear] = useState(new Date().getFullYear())
+  const { year, setYear } = useYear()
   const [subtab, setSubtab] = useState<'mcu'|'training'|'kpi'>('mcu')
   const [statusFilter, setStatusFilter] = useState<'all'|'pekerja'|'TAD'>('all')
 
@@ -72,9 +73,9 @@ export default function MandatoryPage() {
           <div style={{ fontSize:11, color:'var(--text3)' }}>MCU · Training · Support KPI — bisa diisi oleh siapa saja · view tahunan</div>
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <button onClick={()=>setYear(y=>y-1)} className="btn btn-sm">◀</button>
+          <button onClick={()=>setYear(year-1)} className="btn btn-sm">◀</button>
           <span style={{ padding:'5px 14px', background:'var(--bg3)', borderRadius:6, fontSize:13, fontWeight:700 }}>{year}</span>
-          <button onClick={()=>setYear(y=>y+1)} className="btn btn-sm">▶</button>
+          <button onClick={()=>setYear(year+1)} className="btn btn-sm">▶</button>
         </div>
       </div>
 

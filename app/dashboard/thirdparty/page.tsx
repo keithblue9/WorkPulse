@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { MoneyInput } from '@/components/MoneyInput'
+import { useYear } from '@/lib/year'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
@@ -71,7 +72,7 @@ export default function ThirdPartyPage() {
 function RencanaTab() {
   const { data:session } = useSession(); const user = session?.user as any
   const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
+  const { year, setYear } = useYear()
   const [month, setMonth] = useState<number>(-1)
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)

@@ -4,6 +4,7 @@ import { MoneyInput } from '@/components/MoneyInput'
 import { fmtMoney } from '@/lib/money'
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import toast from 'react-hot-toast'
+import { useYear } from '@/lib/year'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(Math.round(n||0))
 const pct = (n:number) => (isFinite(n)?n:0).toFixed(1) + '%'
@@ -17,7 +18,7 @@ const COST_ELEMENTS = [
 export default function BudgetReportPage() {
   const [tab, setTab] = useState<'yield'|'realisasi'>('yield')
   const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
+  const { year, setYear } = useYear()
   const [cur, setCur] = useState<any[]>([])
   const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)

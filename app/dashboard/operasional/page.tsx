@@ -8,6 +8,7 @@ import { MoneyInput } from '@/components/MoneyInput'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
+import { useYear } from '@/lib/year'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
@@ -68,7 +69,7 @@ function SettlementTab({ user }: { user:any }) {
   const [loading, setLoading] = useState(true)
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth())
-  const [year, setYear] = useState(now.getFullYear())
+  const { year, setYear } = useYear()
   const [allSources, setAllSources] = useState(false)
   const [viewing, setViewing] = useState<any>(null)
   const [zipping, setZipping] = useState(false)
@@ -431,7 +432,7 @@ function SettlementTab({ user }: { user:any }) {
 function PettyCashTab() {
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth())  // 0-11
-  const [year, setYear] = useState(now.getFullYear())
+  const { year, setYear } = useYear()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)

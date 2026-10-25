@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { cachedFetch } from '@/lib/fetchCache'
+import { useYear } from '@/lib/year'
 
 type Detail = { title: string; rows: { name: string; sub?: string; ok: boolean; extra?: string }[]; okLabel: string; noLabel: string }
 
@@ -19,7 +20,7 @@ function Ring({ pct, color, size = 96 }: { pct: number; color: string; size?: nu
 }
 
 export default function MandatoryInsights({ section }: { section?: 'mcu' | 'training' | 'kpi' }) {
-  const [year, setYear] = useState(new Date().getFullYear())
+  const { year, setYear } = useYear()
   const [status, setStatus] = useState<'all' | 'pekerja' | 'TAD'>('all')
   const [kpiJenis, setKpiJenis] = useState<string>('all')
   const [users, setUsers] = useState<any[]>([])
@@ -100,9 +101,9 @@ export default function MandatoryInsights({ section }: { section?: 'mcu' | 'trai
         <div style={{ fontSize: 13, fontWeight: 700 }}>{section ? cards[0]?.title || 'Mandatory' : `📋 Mandatory ${year}`}</div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: 3, alignItems: 'center', marginRight: 4 }}>
-            <button onClick={() => setYear(y => y - 1)} className="btn btn-sm" style={{ padding: '2px 7px', fontSize: 10 }}>◀</button>
+            <button onClick={() => setYear(year - 1)} className="btn btn-sm" style={{ padding: '2px 7px', fontSize: 10 }}>◀</button>
             <span style={{ fontSize: 11, fontWeight: 700, minWidth: 34, textAlign: 'center' }}>{year}</span>
-            <button onClick={() => setYear(y => y + 1)} disabled={year >= new Date().getFullYear()} className="btn btn-sm" style={{ padding: '2px 7px', fontSize: 10, opacity: year >= new Date().getFullYear() ? 0.3 : 1 }}>▶</button>
+            <button onClick={() => setYear(year + 1)} disabled={year >= new Date().getFullYear()} className="btn btn-sm" style={{ padding: '2px 7px', fontSize: 10, opacity: year >= new Date().getFullYear() ? 0.3 : 1 }}>▶</button>
           </div>
           <span style={{ fontSize: 11, color: 'var(--text3)' }}>Status:</span>
           {(['all', 'pekerja', 'TAD'] as const).map(s => (

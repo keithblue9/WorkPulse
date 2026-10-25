@@ -7,6 +7,7 @@ import { MoneyInput } from '@/components/MoneyInput'
 import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
+import { useYear } from '@/lib/year'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
 
@@ -545,7 +546,7 @@ function PengajuanTab({ items, loading, reload, user, isAdminish }: { items:any[
   const [viewing, setViewing] = useState<any>(null)
   const [statusTab, setStatusTab] = useState<'all'|'submitted'|'done'|'verified'|'clarification'>('all')
   const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
+  const { year, setYear } = useYear()
   const [month, setMonth] = useState<number>(-1)
 
   const visible = isAdminish ? items : items.filter(i => i.userName === user?.name || i.userId === user?.id || i.userId === user?.email)
@@ -689,7 +690,7 @@ function PengajuanTab({ items, loading, reload, user, isAdminish }: { items:any[
 function CashierTab({ items, loading, reload }: { items:any[]; loading:boolean; reload:()=>void }) {
   const [transferring, setTransferring] = useState<any>(null)
   const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
+  const { year, setYear } = useYear()
   const [month, setMonth] = useState<number>(-1)
 
   const inPeriod = (r:any) => { const d = periodDate(r); if (!d) return false; if (d.getFullYear()!==year) return false; if (month>=0 && d.getMonth()!==month) return false; return true }

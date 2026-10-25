@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useSession } from 'next-auth/react'
 import { MoneyInput } from '@/components/MoneyInput'
+import { useYear } from '@/lib/year'
 
 const MONTHS = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
@@ -89,7 +90,7 @@ export default function CashCardPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any>(null)
-  const [year, setYear] = useState(new Date().getFullYear())
+  const { year, setYear } = useYear()
 
   async function load() {
     setLoading(true)
