@@ -965,3 +965,12 @@ a.au-erow { text-decoration:none; color:inherit }
 .au-att-day > .au-att-slot { position:relative; z-index:1 }
 .au-chip[role="tab"][aria-selected="true"] { background:var(--ink); border-color:var(--ink); color:var(--bg) }
 .c2{background:#0B7F73}.c3{background:#C9401F}.c5{background:#6A6785}
+
+/* Overlay di-portal ke <body>: di HP bar seleksi duduk di atas tab bar, sheet beri ruang home indicator. */
+@media (max-width:768px) {
+  .au-selbar { bottom:calc(88px + env(safe-area-inset-bottom,0px)) }
+  .modal .au-sheet-b { padding-bottom:calc(22px + env(safe-area-inset-bottom,0px)) }
+}
+/* Tinggi dok tab bar HP: kartu/toast melayang di bawah layar diangkat setinggi ini supaya tidak tertutup. */
+:root { --dock:0px }
+@media (max-width:768px) { :root { --dock:78px } }

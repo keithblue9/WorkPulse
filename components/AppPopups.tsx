@@ -1,4 +1,5 @@
 'use client'
+import { Portal } from '@/components/ui/Portal'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -44,7 +45,7 @@ function PWAInstallPrompt({ config }: { config:any }) {
 
   if (!show) return null
   return (
-    <div className="fade-in" style={{ position:'fixed', bottom:'max(20px, env(safe-area-inset-bottom))', left:'50%', transform:'translateX(-50%)', zIndex:9999, background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:14, padding:'14px 16px', boxShadow:'0 12px 40px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:12, maxWidth:'calc(100% - 32px)', width:380 }}>
+    <div className="fade-in" style={{ position:'fixed', bottom:'calc(max(20px, env(safe-area-inset-bottom)) + var(--dock, 0px))', left:'50%', transform:'translateX(-50%)', zIndex:9999, background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:14, padding:'14px 16px', boxShadow:'0 12px 40px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:12, maxWidth:'calc(100% - 32px)', width:380 }}>
       <div style={{ width:42, height:42, borderRadius:10, background:config.appColor||'var(--blue)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, color:'#fff', flexShrink:0 }}>📱</div>
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>Install {displayAppName(config.appName)}</div>
@@ -95,6 +96,7 @@ function AgendaReminder() {
   const ITEM_ICONS: Record<string,string> = { meeting:'👥', task:'✅', dinas:'✈️', wfo:'🏢', wfh:'🏠', event:'🎉', other:'📌' }
 
   return (
+    <Portal>
     <div className="modal-overlay" style={{ zIndex:9998 }} onClick={e=>e.target===e.currentTarget&&dismiss()}>
       <div className="modal" style={{ width:420 }}>
         <div style={{ padding:'18px 22px 12px', borderBottom:'1px solid var(--border)' }}>
@@ -125,6 +127,7 @@ function AgendaReminder() {
         </div>
       </div>
     </div>
+    </Portal>
   )
 }
 

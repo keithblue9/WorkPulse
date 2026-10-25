@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Icon } from '@/components/ui'
+import { Icon, Portal } from '@/components/ui'
 
 type Item = { href: string; label: string; icon: string; group: string }
 type Row = { t: string; s: string; i: string; run: () => void }
@@ -27,6 +27,7 @@ export default function CommandPalette({ open, onClose, items, onTheme, years, o
   if (!open) return null
   const go = (r?: Row) => { if (!r) return; onClose(); r.run() }
   return (
+    <Portal>
     <div className="modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '12vh' }} onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="wn-pal" role="dialog" aria-modal="true" aria-label="Cari cepat">
         <input ref={input} value={q} placeholder="Cari menu atau aksi…" aria-label="Cari cepat" autoComplete="off"
@@ -44,5 +45,6 @@ export default function CommandPalette({ open, onClose, items, onTheme, years, o
         </ul>
       </div>
     </div>
+    </Portal>
   )
 }

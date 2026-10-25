@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { MoneyInput } from '@/components/MoneyInput'
 import { useYear } from '@/lib/year'
 import { ConfirmSheet, Empty, Icon, PageHeader, Pill, Seg, Sheet, Tile } from '@/components/ui'
+import { useTabParam } from '@/lib/useTabParam'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
@@ -54,7 +55,7 @@ const clampNum = (v:any) => Math.max(0, Number(v)||0)
 const fmtTgl = (d:string)=> d ? new Date(d).toLocaleDateString('id-ID',{ day:'numeric', month:'short', year:'numeric' }) : '—'
 
 export default function ThirdPartyPage() {
-  const [tab, setTab] = useState<'rencana'|'suvenir'>('rencana')
+  const [tab, setTab] = useTabParam(['rencana','suvenir'] as const, 'rencana')
   const { year } = useYear()
   const [month, setMonth] = useState<number>(-1)
   const [adding, setAdding] = useState(0)

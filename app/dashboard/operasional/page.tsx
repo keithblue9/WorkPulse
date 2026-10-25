@@ -9,7 +9,8 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { useYear } from '@/lib/year'
-import { ConfirmSheet, Empty, Icon, PageHeader, Pill, Seg, Sheet, Tile, type Tone } from '@/components/ui'
+import { ConfirmSheet, Empty, Icon, PageHeader, Pill, Seg, Sheet, Tile, type Tone, Portal } from '@/components/ui'
+import { useTabParam } from '@/lib/useTabParam'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
 const short = (n:number) => { const a = Math.abs(n||0); const f = (v:number, u:string) => `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(v)} ${u}`; return a >= 1e9 ? f(n/1e9,'M') : a >= 1e6 ? f(n/1e6,'jt') : a >= 1e3 ? f(n/1e3,'rb') : fmt(n) }
@@ -47,7 +48,7 @@ function oeExcelCode(code:string):string {
 export default function OperasionalPage() {
   const { data:session } = useSession(); const user = session?.user as any
   const { year } = useYear()
-  const [tab, setTab] = useState<'settlement'|'petty'>('settlement')
+  const [tab, setTab] = useTabParam(['settlement','petty'] as const, 'settlement')
   const [canPetty, setCanPetty] = useState(false)
   const [month, setMonth] = useState(new Date().getMonth())
   useEffect(()=>{ let on=true; getConfig().then(c=>{ if(!on)return; const allowed=allowedMenusFor(c?.roleDefs||[], userRolesOf(user)); setCanPetty(allowed.has('pettycash')) }).catch(()=>{}); return () => { on = false } }, [user])
@@ -415,14 +416,14 @@ function SettlementTab({ user, month, year }: { user:any; month:number; year:num
         </div>}
 
       {selected.size > 0 && !loading && (
-        <div className="au-selbar" role="status">
+        <Portal><div className="au-selbar" role="status">
           <span className="au-col" style={{ gap: 1 }}><span className="au-xs au-muted">{selected.size} dipilih dari {waiting} menunggu</span><b>Rp {fmt(periodItems.filter(r => selected.has(r._id)).reduce((s,r)=>s+(r.amount||0),0))}</b></span>
           {selected.size < waiting && <button type="button" onClick={selectAll} className="btn btn-sm">Pilih semua</button>}
           {selected.size > 0 && <>
             <button type="button" onClick={exportZIP} disabled={zipping} className="btn btn-sm" title="Unduh evidence item yang dicentang"><Icon name="down" size={14} />{zipping ? 'Menyiapkan…' : 'Evidence'}</button>
             <button type="button" onClick={askVerify} disabled={verifying} className="btn btn-sm btn-primary"><Icon name="check" size={14} stroke={2.4} />Verify {selected.size}</button>
           </>}
-        </div>
+        </div></Portal>
       )}
       {allVerified && <div className="au-row p-accent au-small" style={{ borderRadius: 14, padding: 12, gap: 8 }}><Icon name="check" size={16} stroke={2.4} />Semua transaksi periode ini sudah Verified.</div>}
     </>

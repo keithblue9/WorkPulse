@@ -64,7 +64,7 @@ export default function DailyCheckin() {
   if (!show) return null
   const first = user?.name?.split(' ')[0] || ''
   return (
-    <div className="card scale-in" style={{ position: 'fixed', right: 18, bottom: 18, zIndex: 300, width: 320, maxWidth: 'calc(100vw - 32px)', padding: 16, boxShadow: '0 16px 40px rgba(0,0,0,0.22)', borderRadius: 16 }}>
+    <div className="card scale-in" style={{ position: 'fixed', right: 18, bottom: 'calc(18px + var(--dock, 0px))', zIndex: 300, width: 320, maxWidth: 'calc(100vw - 32px)', padding: 16, boxShadow: '0 16px 40px rgba(0,0,0,0.22)', borderRadius: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ fontSize: 13.5, fontWeight: 700 }}>Halo {first}! 👋</div>
         <button onClick={dismiss} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 18, lineHeight: 1 }}>×</button>
