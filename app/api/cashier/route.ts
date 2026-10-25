@@ -9,11 +9,8 @@ export async function GET(req:NextRequest) {
     await connectDB()
     const { searchParams } = new URL(req.url)
     const year = Number(searchParams.get('year')) || new Date().getFullYear()
-    let cashier = await CashierModel.findOne({ year }).lean() as any
-    if (!cashier) {
-      const created = await CashierModel.create({ year, saldoAwal:0, manualTopUps:[] })
-      cashier = created.toObject()
-    }
+    // Read-only: a year without a cashier document gets an in-memory default (PATCH upserts by year).
+    const cashier = (await CashierModel.findOne({ year }).lean() as any) || { year, saldoAwal:0, manualTopUps:[] }
     const cashCardRows = await CashCardModel.find({ year }).lean()
     const cashCardKasMasuk = cashCardRows.reduce((s,r:any)=>s+(r.topUpAmount||0),0)       // top up = uang masuk ke kas tim
     const cashCardKeluar = cashCardRows.reduce((s,r:any)=>s+(r.settlementAmount||0),0)     // settlement = dipertanggungjawabkan (keluar)
