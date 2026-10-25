@@ -14,6 +14,8 @@ const MAX_ITEMS = 100
 
 function score(v: unknown): number | null | 'bad' {
   if (v === '' || v == null) return null
+  // Hanya angka atau teks angka; [] / true / {} tidak boleh lolos sebagai skor (Number([]) === 0).
+  if (typeof v !== 'number' && !(typeof v === 'string' && /^\s*\d+\s*$/.test(v))) return 'bad'
   const n = typeof v === 'number' ? v : Number(v)
   return Number.isInteger(n) && n >= 0 && n <= 5 ? n : 'bad'
 }
