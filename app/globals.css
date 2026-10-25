@@ -893,3 +893,37 @@ a.au-erow { text-decoration:none; color:inherit }
 .au-pctbar::after { content:''; display:block; width:100%; height:4px; border-radius:2px; background:linear-gradient(90deg,var(--accent) var(--p),var(--sunken) var(--p)) }
 @media (max-width:700px) { .au-pctbar { align-items:flex-end } }
 .au-tile b.v { overflow-wrap:anywhere }
+/* Budget */
+.au-bgauges { grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px }
+.au-gauge { gap:10px; padding:16px } .au-gauge .pct { font:700 24px/1 var(--disp); letter-spacing:-.02em; font-variant-numeric:tabular-nums }
+.au-gauge.tot { background:var(--ink); color:var(--bg); border-color:var(--ink) } .au-gauge.tot .au-muted { color:color-mix(in srgb, var(--bg) 65%, transparent) } .au-gauge.tot .au-track { background:color-mix(in srgb, var(--bg) 18%, transparent) } .au-gauge.tot .au-track .tick { background:var(--bg) }
+.au-btbl td { vertical-align:middle } .au-btbl th { text-align:inherit }
+.au-totrow td { background:var(--sunken); font-weight:800; border-top:2px solid var(--line) }
+/* Budget bullet charts (no chart library) */
+.au-bullet { display:flex; flex-direction:column; gap:6px }
+.au-bullet .bar { position:relative; height:18px; border-radius:6px }
+.au-bullet .bar i { position:absolute; top:0; bottom:0; left:0; display:block; border-radius:4px }
+.au-bullet .bar .plan { background:var(--plan) }
+.au-bullet .bar .real { top:4px; bottom:4px; transition:width .8s var(--ease) }
+.au-bullet .bar .prog { width:3px; top:-3px; bottom:-3px; border-radius:2px; background:var(--hot); box-shadow:0 0 0 2px var(--surface) }
+.au-lg { width:12px; height:10px; border-radius:3px; display:inline-block } .au-lg.plan { background:var(--plan) } .au-lg.real { background:var(--accent) } .au-lg.prog { width:3px; height:12px; background:var(--hot) }
+/* 3rd Party Event */
+.au-rab { gap:12px }
+.au-rabhd { display:flex; flex-direction:column; gap:6px; flex:1; min-width:0; background:none; border:0; padding:0; text-align:left; color:inherit; font:inherit; cursor:pointer }
+.au-rabhd .t { font:700 17px/1.3 var(--disp); overflow-wrap:anywhere }
+.au-rabexec { gap:12px; padding-top:12px; border-top:1px dashed var(--line); justify-content:space-between }
+.au-optgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:8px }
+.au-optc { display:flex; flex-direction:column; align-items:flex-start; gap:4px; padding:12px 14px; border-radius:16px; border:1px solid var(--line); background:var(--sunken); text-align:left; color:inherit; font:inherit; cursor:pointer; transition:transform .18s var(--pop), border-color .2s }
+.au-optc:hover { border-color:var(--accent) } .au-optc:active { transform:scale(.97) }
+.au-optc[data-rec] { background:var(--accent-soft); border-color:var(--accent) }
+.au-optc .v { font:700 18px/1.15 var(--disp); letter-spacing:-.01em; font-variant-numeric:tabular-nums }
+.au-othrow { display:grid; grid-template-columns:minmax(0,1.4fr) 76px 76px minmax(0,1fr) 110px 36px; gap:6px; align-items:center }
+.au-othrow .sum { text-align:right; font-variant-numeric:tabular-nums }
+.au-psrow { display:grid; grid-template-columns:minmax(0,1.4fr) 90px minmax(0,1.4fr) 36px; gap:6px; align-items:center }
+.au-sgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px }
+.au-stock { gap:10px; padding:16px } .au-stock .n { font:700 36px/1 var(--disp); letter-spacing:-.03em; font-variant-numeric:tabular-nums }
+@media (max-width:700px) {
+  .au-othrow { grid-template-columns:minmax(0,1fr) minmax(0,1fr) } .au-othrow > :first-child { grid-column:1 / -1 } .au-othrow .sum { text-align:left }
+  .au-othrow .del { justify-self:end }
+  .au-psrow { grid-template-columns:minmax(0,1fr) 80px 36px } .au-psrow > :nth-child(3) { grid-column:1 / 3; grid-row:2 }
+}
