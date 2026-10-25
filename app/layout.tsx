@@ -73,9 +73,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 setInterval(function(){ try { reg.update(); } catch(e){} }, 60000);
                 document.addEventListener('visibilitychange', function(){ if (!document.hidden) { try { reg.update(); } catch(e){} } });
               }).catch(function(){});
-              // Begitu SW baru ambil alih, reload sekali biar dapet versi terbaru
+              // Begitu SW baru ambil alih, reload sekali biar dapet versi terbaru.
+              // Kunjungan pertama (belum ada SW lama) tidak perlu reload — sebelumnya halaman dimuat dua kali.
+              var hadController = !!navigator.serviceWorker.controller;
               var refreshing = false;
               navigator.serviceWorker.addEventListener('controllerchange', function(){
+                if (!hadController) { hadController = true; return; }
                 if (refreshing) return; refreshing = true; window.location.reload();
               });
             });

@@ -1,11 +1,12 @@
 'use client'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { getConfig, invalidateConfig } from '@/lib/configCache'
+import { LazyMount } from '@/components/LazyMount'
 import { cachedFetch, invalidateFetch } from '@/lib/fetchCache'
 import { picArray } from '@/lib/defaults'
 import BudgetInsights from '@/components/BudgetInsights'
@@ -85,10 +86,12 @@ export default function DashboardPage() {
       get('/api/users', 'member'), internal ? get('/api/notes', 'catatan') : Promise.resolve([]),
       ...months.map(m => get(`/api/attendance?month=${m}`, 'presensi')),
     ])
-    setData({ acts, inits, enh, members, notes, att: (att as Any[][]).flat() }); setFailed(Array.from(new Set(bad)))
-    getConfig(true).then(c => setConfig(c)).catch(() => {})
+    // Transition: render widget yang berat dipecah React menjadi potongan kecil (tidak memblokir input).
+    startTransition(() => { setData({ acts, inits, enh, members, notes, att: (att as Any[][]).flat() }); setFailed(Array.from(new Set(bad))) })
+    getConfig(true).then(c => startTransition(() => setConfig(c))).catch(() => {})
   }, [internal, todayIso])
-  useEffect(() => { if (session !== undefined) load() }, [load, session])
+  const ready = session !== undefined
+  useEffect(() => { if (ready) load() }, [load, ready])
 
   const widgets: Any[] = config?.dashboardWidgets || []
   const visible = (key: string) => { const w = widgets.find(x => x.key === key); if (!w) return true; return internal ? w.active !== false : w.active !== false && w.activeGuest !== false }
@@ -204,7 +207,7 @@ export default function DashboardPage() {
                 const half = (internal ? w.size : w.sizeGuest || w.size) === 'half'
                 const node = renderWidget(w.key, { d, data: data!, internal, today, todayIso, year, nowYear, notes: data!.notes })
                 if (!node) return null
-                return <div key={w.key} className={`${half ? 's6' : 's12'} au-wslot rise`} style={{ ['--d' as any]: Math.min(k, 8) }}>{node}</div>
+                return <div key={w.key} className={`${half ? 's6' : 's12'} au-wslot rise`} style={{ ['--d' as any]: Math.min(k, 8) }}><LazyMount eager={k < 2}>{node}</LazyMount></div>
               })}
             </div>
           </>}

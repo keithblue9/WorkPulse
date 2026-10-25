@@ -937,7 +937,7 @@ a.au-erow { text-decoration:none; color:inherit }
 /* Login */
 .au-login { min-height:100vh; min-height:100dvh; display:flex; align-items:center; justify-content:flex-start; position:relative; overflow:hidden; padding:24px 6vw; background:var(--bg) }
 .au-login-aurora { position:absolute; inset:0; pointer-events:none }
-.au-login-aurora i { position:absolute; border-radius:50%; filter:blur(70px); opacity:.55; animation:au-float 18s var(--ease) infinite alternate }
+.au-login-aurora i { position:absolute; border-radius:50%; opacity:.55; will-change:transform; animation:au-float 18s var(--ease) infinite alternate }
 .au-login-aurora i:nth-child(1) { width:52vmax; height:52vmax; left:-14vmax; top:-18vmax; background:radial-gradient(circle,#7B6BFF,transparent 65%) }
 .au-login-aurora i:nth-child(2) { width:44vmax; height:44vmax; right:-12vmax; bottom:-16vmax; background:radial-gradient(circle,#3DD9C5,transparent 65%); animation-delay:-6s }
 .au-login-aurora i:nth-child(3) { width:30vmax; height:30vmax; right:22vmax; top:8vmax; background:radial-gradient(circle,#FF7A5C,transparent 65%); opacity:.35; animation-delay:-12s }

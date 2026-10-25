@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import ExportMenu from '@/components/ExportMenu'
@@ -309,7 +309,7 @@ export default function EnhancementPage() {
 
   const load = useCallback(async () => {
     setFailed(false)
-    try { const d = await send('/api/enhancements?year=all', 'GET'); setAll(Array.isArray(d.data) ? d.data : []) } catch { setFailed(true); setAll(a => a ?? []) }
+    try { const d = await send('/api/enhancements?year=all', 'GET'); startTransition(() => setAll(Array.isArray(d.data) ? d.data : [])) } catch { setFailed(true); setAll(a => a ?? []) }
   }, [])
   useEffect(() => { load(); getConfig().then(c => setTpl(normWeights(c?.enhancementTemplate))).catch(() => {}) }, [load])
   useEffect(() => { try { const id = new URLSearchParams(location.search).get('e'); if (id) setSelId(id) } catch {} }, [])

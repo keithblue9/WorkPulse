@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import RichTextarea from '@/components/RichTextarea'
@@ -254,7 +254,7 @@ export default function ProgressPage() {
     try {
       const r = await fetch('/api/initiatives?year=all')
       if (!r.ok) throw new Error()
-      const d = await r.json(); setAll(Array.isArray(d.data) ? d.data : [])
+      const d = await r.json(); startTransition(() => setAll(Array.isArray(d.data) ? d.data : []))
     } catch { setFailed(true); setAll(a => a ?? []) }
   }, [])
   useEffect(() => { load() }, [load])

@@ -5,7 +5,7 @@ function normKey(s:any):string { return String(s||'').toLowerCase().replace(/[\s
 
 import { picArray } from '@/lib/defaults'
 import RichTextarea from '@/components/RichTextarea'
-import { useEffect, useState } from 'react'
+import { startTransition, useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { Empty, Icon, PageHeader, Pill, Sheet, Tile } from '@/components/ui'
@@ -307,7 +307,7 @@ export default function ActivitiesPage() {
         getConfig().then((data:any)=>({ data })),
         fetch('/api/users').then(r=>r.ok ? r.json() : { data: [] }),
       ])
-      setActivities(a.data||[]); setConfig(c.data); setMembers((m.data||[]).filter((u:any)=>u.active!==false))
+      startTransition(() => { setActivities(a.data||[]); setConfig(c.data); setMembers((m.data||[]).filter((u:any)=>u.active!==false)) })
     } catch { setFailed(true) } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
