@@ -796,3 +796,13 @@ a.au-erow { text-decoration:none; color:inherit }
 .au-qchk { width:24px; height:24px; margin-top:3px; border-radius:50%; border:2px solid var(--line2); background:transparent; color:#fff; display:grid; place-items:center; flex-shrink:0; cursor:pointer; padding:0; font:700 12px var(--sans); color:var(--muted); min-height:0 !important; transition:background .15s, border-color .15s, transform .18s var(--pop) }
 .au-qchk.num { border-radius:8px } .au-qchk:active { transform:scale(.88) }
 .au-qchk.on { background:var(--accent); border-color:var(--accent); color:#fff }
+
+/* ═══ Presensi ═══ */
+.au-att-day { min-height:84px; outline:none } .au-att-day:focus-visible { box-shadow:0 0 0 3px var(--accent-soft); border-color:var(--accent) }
+.au-att-slot { display:flex; align-items:center; gap:2px; border-radius:7px; background:color-mix(in srgb, var(--tc) 22%, var(--surface)); min-width:0 }
+.au-att-slot button { border:0; background:none; color:var(--ink); font:600 10.5px var(--sans); padding:2px 5px; cursor:pointer; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; flex:1; min-height:0 !important }
+.au-att-slot button.x { flex:0 0 auto; padding:2px 4px; color:var(--muted); display:grid; place-items:center }
+.au-att-slot button.x:hover { color:var(--bad) }
+.au-cuti > summary { list-style:none; cursor:pointer } .au-cuti > summary::-webkit-details-marker { display:none }
+.au-cuti + .au-cuti > summary { border-top:1px solid var(--line) }
+@media (max-width:700px) { .au-att-day { min-height:56px } .au-att-slot button { font-size:9px; padding:1px 3px } .au-att-slot button.x { display:none } }
