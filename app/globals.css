@@ -781,3 +781,5 @@ a.au-erow { text-decoration:none; color:inherit }
 }
 .au-cal-grid > .au-cal-day.hol { background:var(--bad-soft) }
 .au-cal-grid > .au-cal-day.sel { background:var(--accent-soft); border-color:var(--accent) }
+.au-mcard { display:flex; align-items:flex-start; gap:14px; padding:14px; border-radius:20px; border:1px solid var(--line); background:var(--surface); cursor:pointer; min-height:128px; transition:transform .2s var(--ease), border-color .2s, box-shadow .2s }
+.au-mcard:hover, .au-mcard:focus-visible { transform:translateY(-2px); border-color:var(--accent); box-shadow:var(--shadow-s2) }
