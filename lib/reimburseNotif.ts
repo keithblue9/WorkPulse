@@ -32,7 +32,7 @@ async function resolveEmail(uid: string): Promise<string | null> {
 }
 
 // Semua email cashier aktif
-async function cashierEmails(): Promise<string[]> {
+export async function cashierEmails(): Promise<string[]> {
   try {
     await connectDB()
     const users: any[] = await UserModel.find({ active: { $ne: false } }, 'email roles role').lean()

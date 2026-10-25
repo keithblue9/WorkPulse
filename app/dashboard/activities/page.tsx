@@ -11,6 +11,7 @@ import toast from 'react-hot-toast'
 import { Empty, Icon, PageHeader, Pill, Sheet, Tile } from '@/components/ui'
 import { useYear } from '@/lib/year'
 import { activityInYear } from '@/lib/dashboard'
+import HistoryList from '@/components/HistoryList'
 
 function PicTagInput({ value, onChange, members }: { value:string[]; onChange:(v:string[])=>void; members:any[] }) {
   const [input, setInput] = useState('')
@@ -270,6 +271,7 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
             <button type="button" onClick={()=>setConfirmDel('one')} className="btn btn-danger"><Icon name="trash" size={15} />Hapus{editing.recurrenceGroupId ? ' yang ini' : ''}</button>
             {editing.recurrenceGroupId && <button type="button" onClick={()=>setConfirmDel('all')} className="btn"><Icon name="trash" size={15} />Hapus semua pengulangan</button>}
           </div>)}
+      {editing?._id && <HistoryList entity="activity" id={String(editing._id)} />}
     </Sheet>
   )
 }

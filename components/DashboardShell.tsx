@@ -1,5 +1,9 @@
 'use client'
 import { getConfig } from '@/lib/configCache'
+import { cachedFetch } from '@/lib/fetchCache'
+import { needsUpdate } from '@/lib/workload'
+import { normWeights } from '@/lib/enhancement'
+import { todayUTC } from '@/lib/progress'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Suspense, startTransition, useEffect, useMemo, useState } from 'react'
@@ -56,6 +60,21 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const flat = groups.flatMap(g => g.items.map(i => ({ ...i, group: g.label })))
   const internal = isInternalUser(userRoles)
 
+  // Badge "perlu update": tugas initiative/enhancement dengan PIC saya yang tertinggal dari rencana.
+  // Dihitung saat browser senggang; data diambil dari cache yang sama dengan dashboard.
+  const [due, setDue] = useState<{ progress: number; enhancement: number } | null>(null)
+  const myName = String(user?.name || '')
+  useEffect(() => {
+    if (!idle || !internal || !myName || !appConfig) return
+    let alive = true
+    Promise.all([cachedFetch('/api/initiatives?year=all'), cachedFetch('/api/enhancements?year=all')])
+      .then(([i, e]) => { if (alive) startTransition(() => setDue(needsUpdate(myName, { inits: i?.data || [], enh: e?.data || [] }, todayUTC(), normWeights(appConfig?.enhancementTemplate)))) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [idle, internal, myName, appConfig, pathname])
+  const dueOf = (href: string) => href === '/dashboard/progress' ? due?.progress || 0 : href === '/dashboard/enhancement' ? due?.enhancement || 0 : 0
+  const dueBadge = (href: string) => { const n = dueOf(href); return n ? <span className="wn-due" aria-label={`${n} perlu update`}>{n > 99 ? '99+' : n}</span> : null }
+
   if (status === 'loading') return (
     <div style={{ display: 'flex', height: '100dvh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
       <div style={{ width: 36, height: 36, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%' }} className="spin" />
@@ -92,7 +111,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 </button>
                 {!closed && g.items.map(i => (
                   <Link key={i.href} href={i.href} className="wn-nav" aria-current={isActive(pathname, i.href) ? 'page' : undefined}>
-                    <Icon name={i.icon} />{i.label}{i.isNew && <span className="wn-new">BARU</span>}
+                    <Icon name={i.icon} />{i.label}{dueBadge(i.href) || (i.isNew && <span className="wn-new">BARU</span>)}
                   </Link>
                 ))}
               </div>
@@ -135,7 +154,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         <nav className="wn-tabbar" aria-label="Navigasi HP">
           {tabs.map(h => {
             const it = flat.find(i => i.href === h)!
-            return <Link key={h} href={h} aria-current={isActive(pathname, h) ? 'page' : undefined}><Icon name={it.icon} size={22} stroke={1.8} />{TAB_LABEL[h]}</Link>
+            return <Link key={h} href={h} aria-current={isActive(pathname, h) ? 'page' : undefined} style={{ position: 'relative' }}><Icon name={it.icon} size={22} stroke={1.8} />{TAB_LABEL[h]}{dueBadge(h)}</Link>
           })}
           <Link href="/dashboard/menu" aria-current={!onTab ? 'page' : undefined}><Icon name="more" size={22} stroke={1.8} />Menu</Link>
         </nav>

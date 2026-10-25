@@ -22,6 +22,7 @@ import { useYear } from '@/lib/year'
 import { DAY, actsFromPhases, calc, dUTC, inYear, ptd, statusOf, todayUTC } from '@/lib/progress'
 import { showInYear } from '@/lib/initiativeView'
 import { CATS, STAGES_SHORT, enhActs, normWeights, score } from '@/lib/enhancement'
+import { workload } from '@/lib/workload'
 import { activityInYear, activityStats, greeting, portfolio, samePerson, upcoming, wfoUserIds } from '@/lib/dashboard'
 
 type View = 'general' | 'staff' | 'issues'
@@ -209,7 +210,7 @@ export default function DashboardPage() {
             <div className="au-bento" style={{ gridAutoFlow: 'row dense' }}>
               {[...widgets].filter(w => w.segment === 'main' && visible(w.key)).sort((a, b) => (a.order ?? 99) - (b.order ?? 99)).map((w, k) => {
                 const half = (internal ? w.size : w.sizeGuest || w.size) === 'half'
-                const node = renderWidget(w.key, { d, data: data!, internal, today, todayIso, year, nowYear, notes: data!.notes })
+                const node = renderWidget(w.key, { d, data: data!, internal, today, todayIso, year, nowYear, notes: data!.notes, tpl, onFocus: internal ? (name: string) => { setFocus(name); pickView('staff') } : undefined })
                 if (!node) return null
                 return <div key={w.key} className={`${half ? 's6' : 's12'} au-wslot rise`} style={{ ['--d' as any]: Math.min(k, 8) }}><LazyMount eager={k < 2}>{node}</LazyMount></div>
               })}
@@ -225,7 +226,7 @@ function Skeleton() {
     <div className="au-grid g4">{[0, 1, 2, 3].map(k => <div key={k} className="au-tile"><div className="au-skel" style={{ width: 40, height: 30 }} /><div className="au-skel" style={{ width: '60%' }} /></div>)}</div></div>
 }
 
-type Ctx = { d: NonNullable<Any>; data: Any; internal: boolean; today: number; todayIso: string; year: number; nowYear: number; notes: Any[] }
+type Ctx = { d: NonNullable<Any>; data: Any; internal: boolean; today: number; todayIso: string; year: number; nowYear: number; notes: Any[]; tpl: number[]; onFocus?: (name: string) => void }
 function renderWidget(key: string, x: Ctx): React.ReactNode {
   const { d, internal, today, todayIso, year, nowYear } = x
   switch (key) {
@@ -300,6 +301,26 @@ function renderWidget(key: string, x: Ctx): React.ReactNode {
           <div className="au-row au-between"><h2>Catatan disematkan</h2><Link href="/dashboard/notes" className="au-link">Semua</Link></div>
           {pins.length ? pins.map((n: Any) => <div key={n._id} className="au-row" style={{ alignItems: 'flex-start', gap: 12 }}><span className="au-pin" style={{ marginTop: 3 }}>PIN</span><span className="au-col" style={{ minWidth: 0 }}><b style={{ fontSize: 14.5 }}>{n.title}</b>{n.content && <span className="au-xs au-ink2" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{n.content}</span>}</span></div>)
             : <span className="au-small au-muted">Belum ada catatan yang disematkan. Sematkan dari menu [Team] Notes.</span>}
+        </section>
+      )
+    }
+    case 'team-workload': {
+      if (!internal) return null
+      const rows = workload(d.staff, { acts: d.acts, inits: d.inits.map((v: Any) => v.i), enh: d.enh.map((v: Any) => v.e) }, today, x.tpl)
+      const max = Math.max(1, ...rows.map(r => r.total))
+      const seg = [['acts', 'Activity', 'var(--accent)'], ['inits', 'Initiative', 'var(--aqua)'], ['enh', 'Enhancement', '#7B6BFF']] as const
+      return (
+        <section className="au-card">
+          <div className="au-row au-between au-wrap"><h2>Beban kerja per member</h2><span className="lbl">berdasarkan PIC · {year}</span></div>
+          <div className="au-key">{seg.map(([k, l, c]) => <span key={k}><i style={{ background: c }} />{l}</span>)}<span><i style={{ background: 'var(--warn-bar)' }} />Perlu update</span></div>
+          {rows.length ? <div className="au-col" style={{ gap: 4 }}>{rows.map(r => {
+            const label = `${r.name}: ${r.acts} activity, ${r.inits} initiative, ${r.enh} enhancement${r.late ? `, ${r.late} perlu update` : ''}`
+            const body = <>
+              <span className="au-wl-n"><b>{r.name}</b><span className="au-xs au-muted">{r.total} item{r.late ? <> · <b style={{ color: 'var(--warn)' }}>{r.late} perlu update</b></> : ''}</span></span>
+              <span className="au-wl-bar" role="img" aria-label={label}><span className="au-stack" style={{ height: 10, width: `${(r.total / max) * 100}%`, minWidth: r.total ? 6 : 0 }}>{seg.map(([k, , c]) => r[k] ? <i key={k} style={{ flex: r[k], background: c }} /> : null)}</span></span>
+            </>
+            return x.onFocus ? <button key={r.name} type="button" className="au-wl" onClick={() => x.onFocus!(r.name)} title={`Lihat fokus ${r.name}`}>{body}</button> : <div key={r.name} className="au-wl">{body}</div>
+          })}</div> : <Empty title="Belum ada member" />}
         </section>
       )
     }

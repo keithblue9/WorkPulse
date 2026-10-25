@@ -9,6 +9,50 @@ import { AttendanceModel } from '@/models/Attendance'
 import { ProjectModel } from '@/models/Project'
 import { ConfigModel } from '@/models/Config'
 import { computeReminderDue } from '@/lib/reminderDue'
+import { InitiativeModel } from '@/models/Initiative'
+import { EnhancementModel } from '@/models/Enhancement'
+import { ReimbursementModel } from '@/models/Reimbursement'
+import { cashierEmails } from '@/lib/reimburseNotif'
+import { staleReimburses, weeklyDigest } from '@/lib/digest'
+
+const rupiah = (n: number) => new Intl.NumberFormat('id-ID').format(Math.round(n || 0))
+
+// Senin pagi: ringkasan pekan ini per member yang sudah mengaktifkan notifikasi (berdasarkan PIC).
+async function weeklyBroadcast(jakartaToday: string) {
+  const [subs, users, acts, inits, enh] = await Promise.all([
+    PushSubscriptionModel.find({}, 'userEmail').lean(),
+    UserModel.find({ active: { $ne: false } }, 'name email').lean(),
+    ProjectModel.find({}, 'title pic picName status actionDate actionDateEnd showInList').lean(),
+    InitiativeModel.find({}, 'title pic phases year').lean(),
+    EnhancementModel.find({}, 'title pic stage').lean(),
+  ]) as any[]
+  const emails = new Set((subs as any[]).map(s => String(s.userEmail || '').toLowerCase()).filter(Boolean))
+  let recipients = 0, sent = 0
+  for (const u of users as any[]) {
+    if (!u.email || !emails.has(String(u.email).toLowerCase())) continue
+    const d = weeklyDigest(String(u.name || ''), { acts, inits, enh }, jakartaToday)
+    if (!d) continue
+    recipients++
+    const r: any = await sendPushToUser(u.email, { title: 'Ringkasan pekan ini', body: d.body, url: '/dashboard', tag: `weekly-${jakartaToday}` }).catch(() => null)
+    if (r?.sent) sent++
+  }
+  return { recipients, sent }
+}
+
+// Harian: reimburse yang belum ditransfer lebih dari N hari → ingatkan semua cashier.
+async function staleReimburseBroadcast(jakartaToday: string, days: number) {
+  const pending: any[] = await ReimbursementModel.find({ status: { $in: ['submitted', 'approved'] } }, 'title amount userName status submittedAt createdAt').lean()
+  const stale = staleReimburses(pending, Date.now(), days)
+  if (!stale.length) return { stale: 0, sent: 0 }
+  const total = stale.reduce((s, r) => s + (Number(r.amount) || 0), 0)
+  const names = Array.from(new Set(stale.map(r => r.userName).filter(Boolean))).slice(0, 3).join(', ')
+  let sent = 0
+  for (const e of await cashierEmails()) {
+    const r: any = await sendPushToUser(e, { title: `${stale.length} reimburse menunggu lebih dari ${days} hari`, body: `Total Rp ${rupiah(total)}${names ? ` · ${names}${stale.length > 3 ? ', dll' : ''}` : ''}. Segera proses transfer.`, url: '/dashboard/reimbursements?tab=cashier', tag: `stale-${jakartaToday}` }).catch(() => null)
+    if (r?.sent) sent++
+  }
+  return { stale: stale.length, sent }
+}
 
 // Kirim pengingat harian (absen + agenda hari ini) ke SEMUA member yg subscribe push.
 // Dipanggil 1x/hari (guard via Config.lastDailyBroadcast) saat endpoint diakses setelah ~08:00 WIB.
@@ -118,7 +162,23 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true, checked: notes.length, fired, broadcast })
+    // ===== Senin: ringkasan mingguan · Harian: reimburse menggantung =====
+    let weekly: any = null, stale: any = null
+    if (jamWIB >= 8) {
+      const cfg2: any = await ConfigModel.findOne({}, 'lastWeeklyDigest lastStaleReimburse weeklyDigest staleReimburseDays').lean()
+      const isMonday = jakarta.getUTCDay() === 1
+      if (isMonday && cfg2?.weeklyDigest !== false && cfg2?.lastWeeklyDigest !== jakartaToday) {
+        weekly = await weeklyBroadcast(jakartaToday)
+        await ConfigModel.updateOne({}, { $set: { lastWeeklyDigest: jakartaToday } }, { upsert: true })
+      }
+      const days = Number(cfg2?.staleReimburseDays ?? 3)
+      if (days > 0 && cfg2?.lastStaleReimburse !== jakartaToday) {
+        stale = await staleReimburseBroadcast(jakartaToday, days)
+        await ConfigModel.updateOne({}, { $set: { lastStaleReimburse: jakartaToday } }, { upsert: true })
+      }
+    }
+
+    return NextResponse.json({ ok: true, checked: notes.length, fired, broadcast, weekly, stale })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

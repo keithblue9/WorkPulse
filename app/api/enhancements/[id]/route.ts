@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { addedPics } from '@/lib/changeLog'
+import { currentActor, notifyNewPics } from '@/lib/notifyServer'
 import { isValidObjectId } from 'mongoose'
 import { connectDB } from '@/lib/db'
 import { EnhancementModel } from '@/models/Enhancement'
@@ -24,7 +26,10 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 })
     if (!Object.keys(r.data).length) return NextResponse.json({ error: 'Tidak ada perubahan' }, { status: 400 })
     await connectDB()
-    const doc = await EnhancementModel.findByIdAndUpdate(id, { $set: { ...r.data, updatedBy: await sessionEmail() } }, { new: true }).lean()
+    const prev: any = 'pic' in r.data ? await EnhancementModel.findById(id, 'pic').lean() : null
+    const doc: any = await EnhancementModel.findByIdAndUpdate(id, { $set: { ...r.data, updatedBy: await sessionEmail() } }, { new: true }).lean()
+    const added = prev && doc ? addedPics(prev.pic, doc.pic) : []
+    if (added.length) { const actor = await currentActor(); after(() => notifyNewPics({ kind: 'enhancement', title: doc.title, names: added, actor, url: `/dashboard/enhancement?e=${id}`, tagId: id })) }
     return doc ? NextResponse.json({ data: doc }) : notFound()
   } catch {
     return NextResponse.json({ error: 'Gagal menyimpan enhancement' }, { status: 500 })
