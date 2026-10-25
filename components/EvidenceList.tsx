@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState } from 'react'
-import { Icon } from '@/components/ui'
+import { Icon, Portal } from '@/components/ui'
 
 function parseMime(url:string){ const m=/^data:([^;]+)/.exec(url||''); return m?m[1]:'' }
 function isImg(d:any){ const t=(d.type||parseMime(d.url)||'').toLowerCase(); return t.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(d.name||'') }
@@ -88,6 +88,7 @@ function PreviewModal({ doc, onClose }:{ doc:any; onClose:()=>void }) {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [onClose])
   return (
+    <Portal>
     <div className="modal-overlay" style={{ zIndex:2000 }} onMouseDown={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={doc.name || 'Evidence'} style={{ width:'min(920px,94vw)', height:'88vh', display:'flex', flexDirection:'column' }}>
         <div className="au-sheet-h">
@@ -102,5 +103,6 @@ function PreviewModal({ doc, onClose }:{ doc:any; onClose:()=>void }) {
         </div>
       </div>
     </div>
+    </Portal>
   )
 }

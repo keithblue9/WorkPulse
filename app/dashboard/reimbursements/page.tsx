@@ -8,7 +8,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { useYear } from '@/lib/year'
-import { ConfirmSheet, Empty, Icon, PageHeader, Pill, Seg, Sheet, Tile, type Tone } from '@/components/ui'
+import { ConfirmSheet, Empty, Icon, PageHeader, Pill, Seg, Sheet, Tile, type Tone, Portal } from '@/components/ui'
+import { useTabParam } from '@/lib/useTabParam'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
 const short = (n:number) => { const a = Math.abs(n||0); const f = (v:number, u:string) => `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(v)} ${u}`; return a >= 1e9 ? f(n/1e9,'M') : a >= 1e6 ? f(n/1e6,'jt') : a >= 1e3 ? f(n/1e3,'rb') : fmt(n) }
@@ -410,7 +411,7 @@ export default function ReimbursementPage() {
   const userRoles = user?.roles || (user?.role ? [user.role] : [])
   const isCashierish = userRoles.includes('admin') || userRoles.includes('manager') || userRoles.includes('finance') || userRoles.includes('cashier')
   const { year } = useYear()
-  const [tab, setTab] = useState<'pengajuan'|'cashier'>('pengajuan')
+  const [tab, setTab] = useTabParam(['pengajuan','cashier'] as const, 'pengajuan')
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string>('')
@@ -665,11 +666,11 @@ function CashierTab({ items, loading, reload, year, month }: { items:any[]; load
       )}
 
       {selected.size > 0 && (
-        <div className="au-selbar" role="status">
+        <Portal><div className="au-selbar" role="status">
           <span className="au-col" style={{ gap: 1 }}><span className="au-xs au-muted">{selected.size} item · {rekap.groups.length} rekening</span><b>Rp {fmt(rekap.total)}</b></span>
           <button type="button" onClick={()=>setShowRincian(true)} className="btn btn-sm btn-primary"><Icon name="list" size={14} />Rincian</button>
           <button type="button" onClick={()=>setSelected(new Set())} className="btn btn-sm">Batal pilih</button>
-        </div>
+        </div></Portal>
       )}
 
       <div className="au-grid au-tiles" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' }}>

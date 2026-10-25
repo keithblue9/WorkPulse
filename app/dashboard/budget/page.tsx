@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import toast from 'react-hot-toast'
 import { useYear } from '@/lib/year'
 import { Empty, Icon, PageHeader, Seg } from '@/components/ui'
+import { useTabParam } from '@/lib/useTabParam'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(Math.round(n||0))
 const pct = (n:number) => (isFinite(n)?n:0).toFixed(1) + '%'
@@ -17,7 +18,7 @@ const COST_ELEMENTS = [
 ]
 
 export default function BudgetReportPage() {
-  const [tab, setTab] = useState<'yield'|'realisasi'>('yield')
+  const [tab, setTab] = useTabParam(['yield','realisasi'] as const, 'yield')
   const { year } = useYear()
   const [cur, setCur] = useState<any[]>([])
   const [config, setConfig] = useState<any>(null)

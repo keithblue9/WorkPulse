@@ -42,7 +42,7 @@ export default function NotifyEnabler() {
 
   if (!show) return null
   return (
-    <div className="card scale-in" style={{ position: 'fixed', left: 18, bottom: 18, zIndex: 290, width: 320, maxWidth: 'calc(100vw - 36px)', padding: 14, boxShadow: '0 16px 40px rgba(0,0,0,0.22)', borderRadius: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="card scale-in" style={{ position: 'fixed', left: 18, bottom: 'calc(18px + var(--dock, 0px))', zIndex: 290, width: 320, maxWidth: 'calc(100vw - 36px)', padding: 14, boxShadow: '0 16px 40px rgba(0,0,0,0.22)', borderRadius: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 700 }}>🔔 Aktifkan Notifikasi</div>
         <button onClick={dismiss} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 18, lineHeight: 1 }}>×</button>

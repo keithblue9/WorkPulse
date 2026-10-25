@@ -180,13 +180,18 @@ export default function GoLivePage() {
     return ()=>{ ro?.disconnect(); window.removeEventListener('resize', measure) }
   },[apps, view.length, loading])
 
-  const isLastFrozen = (i:number) => i===ID_COUNT-1
+  // HP: 5 kolom beku (±510px) lebih lebar dari layar sehingga kolom aplikasi tertimpa dan tidak
+  // bisa dilihat/diubah. Di layar sempit hanya No + Company yang beku, Company dipersempit.
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => { const mq = window.matchMedia('(max-width: 768px)'); const on = () => setNarrow(mq.matches); on(); mq.addEventListener('change', on); return () => mq.removeEventListener('change', on) }, [])
+  const frozen = narrow ? 2 : ID_COUNT
+  const isLastFrozen = (i:number) => i===frozen-1
   const edge = (i:number):React.CSSProperties => isLastFrozen(i)
     ? { borderRight:'1px solid var(--line2)', boxShadow:'6px 0 10px -8px rgba(11,13,23,.25)' } : {}
   // Header beku: menempel atas DAN kiri -> z-index paling tinggi
-  const thFreeze = (i:number):React.CSSProperties => ({ ...th, position:'sticky', top:0, left:idLeft[i], zIndex:6, ...edge(i) })
+  const thFreeze = (i:number):React.CSSProperties => i>=frozen ? { ...th, position:'sticky', top:0, zIndex:4 } : ({ ...th, position:'sticky', top:0, left:idLeft[i], zIndex:6, ...edge(i) })
   // Body beku: latar solid supaya kolom lain tidak menembus saat digeser
-  const tdFreeze = (i:number, even:boolean, hl=false):React.CSSProperties => ({ ...td, position:'sticky', left:idLeft[i], zIndex:3, background: hl ? 'var(--accent-soft)' : (even?'var(--surface)':'var(--sunken)'), ...edge(i) })
+  const tdFreeze = (i:number, even:boolean, hl=false):React.CSSProperties => i>=frozen ? { ...td } : ({ ...td, position:'sticky', left:idLeft[i], zIndex:3, background: hl ? 'var(--accent-soft)' : (even?'var(--surface)':'var(--sunken)'), ...edge(i) })
   const totalSubs = apps.reduce((s:number,a:any)=>(a.subFeatures||[]).length + 1 + s, 0) // +1 for date col
 
   return (
@@ -220,13 +225,13 @@ export default function GoLivePage() {
         {yearFilter!=='all' && <span className="au-xs au-muted" style={{ marginTop:-8 }}>Kolom aplikasi yang go-live di tahun lain ditampilkan samar.</span>}
 
         {loading?<div className="au-card"><div className="au-skel" /><div className="au-skel" style={{ width:'70%' }} /></div>:(
-        <div className="au-tblw" style={{overflow:'auto',maxHeight:'calc(100dvh - 330px)', minHeight:260}}>
+        <div className="au-tblw" style={{overflow:'auto',maxHeight:'calc(100dvh - 330px)', minHeight:260, scrollPaddingLeft: idLeft[frozen] ?? undefined}}>
           <table style={{borderCollapse:'collapse',width:'100%',minWidth:600+totalSubs*70}}>
             <thead>
               {/* Row 1: app group headers */}
               <tr ref={headRow1}>
                 <th ref={el=>{idRefs.current[0]=el}} style={{...thFreeze(0),width:30}} rowSpan={2}>No</th>
-                <th ref={el=>{idRefs.current[1]=el}} style={{...thFreeze(1),minWidth:260,textAlign:'left'}} rowSpan={2}>Company</th>
+                <th ref={el=>{idRefs.current[1]=el}} style={{...thFreeze(1),minWidth:narrow?150:260,textAlign:'left'}} rowSpan={2}>Company</th>
                 <th ref={el=>{idRefs.current[2]=el}} style={{...thFreeze(2),width:52}} rowSpan={2}>CoCd</th>
                 <th ref={el=>{idRefs.current[3]=el}} style={{...thFreeze(3),width:100,textAlign:'left'}} rowSpan={2}>HSH</th>
                 <th ref={el=>{idRefs.current[4]=el}} style={{...thFreeze(4),width:70,textAlign:'left'}} rowSpan={2}>Client</th>

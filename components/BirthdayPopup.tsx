@@ -1,4 +1,5 @@
 'use client'
+import { Portal } from '@/components/ui/Portal'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { format } from 'date-fns'
@@ -50,6 +51,7 @@ export default function BirthdayPopup() {
   const p = birthdays[currentIdx]
 
   return (
+    <Portal>
     <div className="modal-overlay" style={{ zIndex:1000 }} onClick={e=>e.target===e.currentTarget&&close()}>
       <div className="glass-strong scale-in" style={{ width:460, maxWidth:'92vw', borderRadius:20, padding:0, overflow:'hidden', position:'relative' }}>
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg, var(--brand) 0%, var(--purple) 100%)', opacity:0.18, pointerEvents:'none' }} />
@@ -85,5 +87,6 @@ export default function BirthdayPopup() {
         </div>
       </div>
     </div>
+    </Portal>
   )
 }

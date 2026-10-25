@@ -8,7 +8,7 @@ import { useTheme, THEMES } from '@/lib/theme'
 import { useYear } from '@/lib/year'
 import { displayAppName } from '@/lib/appName'
 import { NAV_GROUPS, getAllowedMenus, visibleNav, isActive, isInternalUser } from '@/lib/nav'
-import { Icon } from '@/components/ui'
+import { Icon, Portal } from '@/components/ui'
 import dynamic from 'next/dynamic'
 // Overlay & popup dimuat terpisah setelah halaman tampil (tidak ikut bundle awal / hidrasi pertama).
 const OnlinePresence = dynamic(() => import('@/components/OnlinePresence'), { ssr: false })
@@ -139,12 +139,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           })}
           <Link href="/dashboard/menu" aria-current={!onTab ? 'page' : undefined}><Icon name="more" size={22} stroke={1.8} />Menu</Link>
         </nav>
+        <Portal>
         {idle && <>
           <AppPopups />
           {internal && <><BirthdayPopup /><DailyCheckin /></>}
           {internal ? <NotifyEnabler /> : <InstallPWA />}
         </>}
         {palOpen && <CommandPalette open={palOpen} onClose={() => setPalOpen(false)} items={flat} onTheme={() => setTheme(nextTheme)} years={years} onYear={setYear} />}
+        </Portal>
       </div>
     </div>
   )

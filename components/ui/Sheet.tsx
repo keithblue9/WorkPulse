@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef } from 'react'
+import { Portal } from './Portal'
 type Props = { open: boolean; title: string; onClose: () => void; onSave?: () => void; saveLabel?: string; saveDisabled?: boolean; wide?: boolean; children: React.ReactNode }
 /** Modal on desktop, bottom sheet on phones (see .modal rules in globals.css). */
 export function Sheet({ open, title, onClose, onSave, saveLabel = 'Simpan', saveDisabled, wide, children }: Props) {
@@ -25,6 +26,7 @@ export function Sheet({ open, title, onClose, onSave, saveLabel = 'Simpan', save
   }, [open])
   if (!open) return null
   return (
+    <Portal>
     <div className="modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <div ref={ref} className="modal" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} style={{ width: wide ? 820 : 520, maxWidth: '100%', outline: 'none' }}>
         <div className="au-sheet-h">
@@ -35,5 +37,6 @@ export function Sheet({ open, title, onClose, onSave, saveLabel = 'Simpan', save
         <div data-modal-scroll className="au-sheet-b">{children}</div>
       </div>
     </div>
+    </Portal>
   )
 }

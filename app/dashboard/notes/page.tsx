@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import { getConfig } from '@/lib/configCache'
-import { Empty, Icon, PageHeader, Sheet } from '@/components/ui'
+import { Empty, Icon, PageHeader, Sheet, Portal } from '@/components/ui'
 import { useYear } from '@/lib/year'
 import { groupNotes, matches, notesForYear } from '@/lib/notesView'
 
@@ -32,10 +32,12 @@ function Lightbox({ src, onClose }: { src: string | null; onClose: () => void })
   }, [src, onClose])
   if (!src) return null
   return (
+    <Portal>
     <div role="dialog" aria-label="Pratinjau gambar" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out' }}>
       <button type="button" aria-label="Tutup" onClick={onClose} style={{ position: 'absolute', top: 16, right: 20, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,.15)', color: '#fff', border: 0, cursor: 'pointer' }}><Icon name="x" size={20} /></button>
       <img src={src} alt="Gambar catatan" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 12, cursor: 'default' }} />
     </div>
+    </Portal>
   )
 }
 
