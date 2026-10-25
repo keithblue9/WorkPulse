@@ -188,6 +188,8 @@ const ConfigSchema = new Schema({
   // Guard: tanggal terakhir broadcast pengingat harian (absen + agenda) dikirim — biar 1x/hari
   lastDailyBroadcast: { type:String, default:'' },
   // Guard ringkasan mingguan (Senin) & pengingat reimburse menggantung — 1x per tanggal
+  // Susunan widget dashboard untuk tamu/eksternal (diatur admin)
+  guestLayout: { type: [{ _id:false, id:String, size:String }], default: undefined },
   lastWeeklyDigest: { type:String, default:'' },
   lastStaleReimburse: { type:String, default:'' },
   // Pengingat reimburse belum ditransfer setelah N hari (0 = mati)

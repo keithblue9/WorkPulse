@@ -2,34 +2,28 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
-import { getConfig, invalidateConfig } from '@/lib/configCache'
-import { LazyMount } from '@/components/LazyMount'
+import { getConfig } from '@/lib/configCache'
 import { cachedFetch, invalidateFetch } from '@/lib/fetchCache'
 import { picArray } from '@/lib/defaults'
-import BudgetInsights from '@/components/BudgetInsights'
-import TeamAvailability from '@/components/TeamAvailability'
-import MandatoryInsights from '@/components/MandatoryInsights'
-import GoLiveInsights from '@/components/GoLiveInsights'
 import ExportMenu from '@/components/ExportMenu'
-import { EnhMatrix, catK } from '@/components/EnhMatrix'
-import { CountUp, Empty, Icon, PageHeader, Pill, Ring, Seg, Sheet, Tile } from '@/components/ui'
+import { catK } from '@/components/EnhMatrix'
+import { WidgetBoard } from '@/components/widgets/WidgetBoard'
+import { getAllowedMenus } from '@/lib/nav'
+import { CountUp, Empty, Icon, PageHeader, Pill, Ring, Seg, Sheet } from '@/components/ui'
 import { userRolesOf } from '@/lib/perms'
 import { isInternalUser } from '@/lib/nav'
 import { useYear } from '@/lib/year'
-import { DAY, actsFromPhases, calc, dUTC, inYear, ptd, statusOf, todayUTC } from '@/lib/progress'
+import { DAY, actsFromPhases, calc, dUTC, inYear, ptd, todayUTC } from '@/lib/progress'
 import { showInYear } from '@/lib/initiativeView'
-import { CATS, STAGES_SHORT, enhActs, normWeights, score } from '@/lib/enhancement'
-import { workload } from '@/lib/workload'
+import { STAGES_SHORT, enhActs, normWeights, score } from '@/lib/enhancement'
 import { activityInYear, activityStats, greeting, portfolio, samePerson, upcoming, wfoUserIds } from '@/lib/dashboard'
 
 type View = 'general' | 'staff' | 'issues'
 type Any = Record<string, any>
 const VIEW_KEY = 'wins-dash-view'
 const P = (v: number) => `${Math.round(v)}%`
-const n1 = (v: number) => (Math.round(v * 100) / 100).toLocaleString('id-ID')
 const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 const HARI = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 const fmtD = (s?: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? `${Number(m[3])} ${BLN[Number(m[2]) - 1]}` : '–' }
@@ -40,14 +34,6 @@ const whenLabel = (iso: string, today: string) => {
   return diff === 0 ? `HARI INI · ${tail}` : diff === 1 ? `BESOK · ${tail}` : tail
 }
 const PRIO: Record<string, { l: string; t: 'bad' | 'warn' | 'ok' }> = { high: { l: 'High', t: 'bad' }, medium: { l: 'Medium', t: 'warn' }, low: { l: 'Low', t: 'ok' } }
-const STAT_DEFS = [
-  { key: 'stat-kpi', label: 'KPI', icon: 'act', color: 'var(--accent)', pick: (a: Any) => a.subType === 'KPI' },
-  { key: 'stat-nonkpi', label: 'Non KPI', icon: 'list', color: '#7B6BFF', pick: (a: Any) => a.subType === 'Non-KPI' },
-  { key: 'stat-golive', label: 'Go Live', icon: 'rocket', color: 'var(--aqua)', pick: (a: Any) => a.subType === 'Go-Live' },
-  { key: 'stat-anggaran', label: 'Anggaran', icon: 'budget', color: 'var(--warn-bar)', pick: (a: Any) => a.subType === 'Anggaran' },
-  { key: 'stat-others', label: 'Others', icon: 'more', color: 'var(--muted)', pick: (a: Any) => a.subType === 'Others' },
-  { key: 'stat-highpriority', label: 'Prioritas tinggi', icon: 'bolt', color: 'var(--hot)', pick: (a: Any) => a.priority === 'high' },
-]
 
 export default function DashboardPage() {
   const { data: session } = useSession(); const user = session?.user as Any | undefined
@@ -66,7 +52,6 @@ export default function DashboardPage() {
   const [failed, setFailed] = useState<string[]>([])
   const [config, setConfig] = useState<Any | null>(null)
   const [detail, setDetail] = useState<{ title: string; items: Any[] } | null>(null)
-  const [layout, setLayout] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -96,8 +81,6 @@ export default function DashboardPage() {
   const ready = session !== undefined
   useEffect(() => { if (ready) load() }, [load, ready])
 
-  const widgets: Any[] = config?.dashboardWidgets || []
-  const visible = (key: string) => { const w = widgets.find(x => x.key === key); if (!w) return true; return internal ? w.active !== false : w.active !== false && w.activeGuest !== false }
   const tpl = normWeights(config?.enhancementTemplate)
 
   // ── Derived data ──
@@ -150,16 +133,10 @@ export default function DashboardPage() {
             <span className="au-xs au-muted">{[it.category, it.subType, it.actionDate && fmtD(it.actionDate), picArray(it.pic).join(', ')].filter(Boolean).join(' · ')}</span></span></div>
         ))}</div> : <Empty title="Tidak ada data" />}
       </Sheet>}
-      {layout && config && <LayoutSheet widgets={widgets} onClose={() => setLayout(false)} onChange={async next => {
-        setConfig(c => ({ ...(c || {}), dashboardWidgets: next }))
-        const r = await fetch('/api/config', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dashboardWidgets: next }) }).catch(() => null)
-        if (!r?.ok) throw new Error('Layout gagal disimpan'); invalidateConfig()
-      }} />}
 
       <div className="au-view au-anim">
         <PageHeader eyebrow={`${dateLabel} · ${year}`} title="Dashboard" actions={<>
           <Seg label="Tampilan dashboard" value={view} onChange={pickView} options={views} />
-          {internal && view === 'general' && <button type="button" className="btn btn-ghost" onClick={() => setLayout(true)} disabled={!config}><Icon name="grid" size={15} />Atur layout</button>}
         </>} />
         {failed.length > 0 && <div className="au-row au-wrap p-warn" role="status" style={{ borderRadius: 14, padding: 12 }}><span className="au-small" style={{ flex: 1 }}>Sebagian data gagal dimuat ({failed.join(', ')}).</span><button type="button" className="btn btn-sm" onClick={() => { ['/api/projects', '/api/initiatives?year=all', '/api/enhancements?year=all', '/api/users', '/api/notes'].forEach(u => invalidateFetch(u)); load() }}>Coba lagi</button></div>}
 
@@ -193,28 +170,12 @@ export default function DashboardPage() {
               </Ring>
             </section>
 
-            {/* Stat tiles */}
-            {(() => {
-              const tiles = STAT_DEFS.filter(s => visible(s.key))
-              const showWfo = visible('member-count')
-              if (!tiles.length && !showWfo) return null
-              return (
-                <div className="au-grid au-tiles" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(128px,1fr))' }}>
-                  {tiles.map(s => { const items = d.st.open.filter(s.pick); return <Tile key={s.key} icon={s.icon} color={s.color} value={<CountUp to={items.length} />} label={s.label} hint={d.st.total ? P((items.length / d.st.total) * 100) : undefined} onClick={() => setDetail({ title: `Aktivitas ${s.label}`, items })} /> })}
-                  {showWfo && <Tile icon="user" color="var(--ok)" value={<>{d.wfoToday.length}<small style={{ fontSize: 15, opacity: .6 }}>/{d.staff.length}</small></>} label="WFO hari ini" onClick={() => setDetail({ title: 'WFO hari ini', items: d.wfoToday.map(m => ({ title: m.name, category: m.division || '' })) })} />}
-                </div>
-              )
-            })()}
-
-            {/* Widgets in configured order */}
-            <div className="au-bento" style={{ gridAutoFlow: 'row dense' }}>
-              {[...widgets].filter(w => w.segment === 'main' && visible(w.key)).sort((a, b) => (a.order ?? 99) - (b.order ?? 99)).map((w, k) => {
-                const half = (internal ? w.size : w.sizeGuest || w.size) === 'half'
-                const node = renderWidget(w.key, { d, data: data!, internal, today, todayIso, year, nowYear, notes: data!.notes, tpl, onFocus: internal ? (name: string) => { setFocus(name); pickView('staff') } : undefined })
-                if (!node) return null
-                return <div key={w.key} className={`${half ? 's6' : 's12'} au-wslot rise`} style={{ ['--d' as any]: Math.min(k, 8) }}><LazyMount eager={k < 2}>{node}</LazyMount></div>
-              })}
-            </div>
+            {/* Widget ala Apple: dipilih & disusun per user (galeri per menu) */}
+            <WidgetBoard isAdmin={roles.includes('admin')} allowed={config ? getAllowedMenus(config.roleDefs || [], roles, true) : null}
+              ctx={{ d, data: data!, me, today, todayIso, year, nowYear, tpl, internal, config,
+                onDetail: (title, items) => setDetail({ title, items }),
+                onFocus: internal ? (name: string) => { setFocus(name); pickView('staff') } : undefined,
+                onMyFocus: internal ? () => { setFocus(''); pickView('staff') } : undefined }} />
           </>}
       </div>
     </div>
@@ -224,117 +185,6 @@ export default function DashboardPage() {
 function Skeleton() {
   return <div className="au-col" style={{ gap: 16 }}><div className="au-hero" style={{ minHeight: 260 }}><div className="au-col" style={{ gap: 12 }}><div className="au-skel" style={{ width: '70%', height: 34 }} /><div className="au-skel" style={{ width: '45%', height: 34 }} /></div></div>
     <div className="au-grid g4">{[0, 1, 2, 3].map(k => <div key={k} className="au-tile"><div className="au-skel" style={{ width: 40, height: 30 }} /><div className="au-skel" style={{ width: '60%' }} /></div>)}</div></div>
-}
-
-type Ctx = { d: NonNullable<Any>; data: Any; internal: boolean; today: number; todayIso: string; year: number; nowYear: number; notes: Any[]; tpl: number[]; onFocus?: (name: string) => void }
-function renderWidget(key: string, x: Ctx): React.ReactNode {
-  const { d, internal, today, todayIso, year, nowYear } = x
-  switch (key) {
-    case 'today-summary': {
-      const qw = d.enh.filter((v: Any) => v.s.cat === 'Quick Win').length
-      const nextAg = upcoming<Any>(d.acts, year === nowYear ? todayIso : `${year}-01-01`, 1)[0]
-      return (
-        <section className="au-card">
-          <div className="au-row au-between"><h2>Ringkasan {year === nowYear ? 'hari ini' : year}</h2><span className="lbl">dari data</span></div>
-          <ol className="au-story">
-            <li><span className="n">1</span><span>{d.inits.length
-              ? <>Realisasi portofolio <b>{P(d.port.actual)}</b> vs plan <b>{P(d.port.plan)}</b>. {d.behind.length ? <><b style={{ color: 'var(--warn)' }}>{d.behind.slice(0, 3).map((b: Any) => b.i.title).join(', ')}</b>{d.behind.length > 3 ? ` dan ${d.behind.length - 3} lainnya` : ''} di belakang jadwal.</> : 'Semua sesuai jadwal.'}</>
-              : `Tidak ada initiative berjalan di ${year}.`}</span></li>
-            <li><span className="n">2</span><span><b>{d.enh.length} enhancement</b>{d.enh.length ? `: ${CATS.map(c => [c, d.enh.filter((v: Any) => v.s.cat === c).length] as const).filter(c => c[1]).map(c => `${c[1]} ${c[0]}`).join(', ')}` : ' belum tercatat'}.{qw ? ` ${qw} Quick Win bisa dikerjakan lebih dulu.` : ''}</span></li>
-            <li><span className="n">3</span><span><b>{d.wfoToday.length} dari {d.staff.length}</b> orang WFO hari ini.{nextAg ? <> Berikutnya: <b>{nextAg.title}</b> ({fmtD(nextAg.actionDate)}).</> : ''}</span></li>
-          </ol>
-          <div style={{ height: 1, background: 'var(--line)' }} />
-          <div className="au-row au-between"><h2>Laju vs waktu</h2><span className="lbl">garis = plan hari ini</span></div>
-          {d.inits.length ? d.inits.slice(0, 8).map((v: Any) => {
-            const st = statusOf(v.c.spi)
-            const inner = <><span className="t">{v.i.title}</span><span className="au-track"><i className="a" style={{ width: `${Math.min(100, v.c.actual)}%` }} /><span className="tick" style={{ left: `calc(${Math.min(100, v.c.plan)}% - 1px)` }} /></span><Pill tone={st.key}>{st.label}</Pill></>
-            return internal ? <Link key={v.i._id} href={`/dashboard/progress?i=${v.i._id}`} className="au-pace" aria-label={`${v.i.title}: realisasi ${P(v.c.actual)}, plan ${P(v.c.plan)}, ${st.label}`}>{inner}</Link> : <div key={v.i._id} className="au-pace">{inner}</div>
-          }) : <span className="au-small au-muted">Belum ada initiative di {year}.</span>}
-        </section>
-      )
-    }
-    case 'upcoming-agenda': {
-      const list = upcoming<Any>(d.acts, year === nowYear ? todayIso : `${year}-01-01`, 6)
-      const [n0, ...rest] = list
-      return (
-        <section className="au-card">
-          <div className="au-row au-between"><h2>Berikutnya</h2>{internal && <Link href="/dashboard/calendar" className="au-link">Kalender</Link>}</div>
-          {n0 ? <>
-            <div className="au-next"><div className="when">{whenLabel(n0.actionDate, todayIso)}</div><h3>{n0.title}</h3><div className="au-small" style={{ opacity: .75 }}>{[n0.category, n0.subType, picArray(n0.pic).join(', ')].filter(Boolean).join(' · ')}</div></div>
-            <div>{rest.map((a: Any) => <div key={a._id} className="au-agrow"><span className="w">{fmtD(a.actionDate)}</span><span><b style={{ fontWeight: 600 }}>{a.title}</b><br /><span className="au-xs au-muted">{[a.category, a.subType].filter(Boolean).join(' · ')}</span></span></div>)}</div>
-          </> : <Empty title="Tidak ada agenda" text="Belum ada aktivitas terjadwal berikutnya." />}
-        </section>
-      )
-    }
-    case 'progress-chart': {
-      const keys = [['ok', 'On track', 'var(--ok)'], ['warn', 'Perlu perhatian', 'var(--warn-bar)'], ['bad', 'Terlambat', 'var(--hot)'], ['none', 'Belum mulai', 'var(--line2)']] as const
-      const cnt = keys.map(([k]) => d.inits.filter((v: Any) => statusOf(v.c.spi).key === k).length)
-      return (
-        <section className="au-card">
-          <div className="au-row au-between"><h2>Status progress project</h2>{internal && <Link href="/dashboard/progress" className="au-link">Detail</Link>}</div>
-          {d.inits.length ? <>
-            <div className="au-row" style={{ alignItems: 'baseline', gap: 8 }}><b style={{ font: '700 40px/1 var(--disp)' }}><CountUp to={d.inits.length} /></b><span className="au-small au-ink2">initiative di {year}</span></div>
-            <div className="au-stack" style={{ height: 14 }}>{keys.map(([k, , c], i) => cnt[i] ? <i key={k} style={{ flex: cnt[i], background: c }} /> : null)}</div>
-            <div className="au-key">{keys.map(([k, l, c], i) => <span key={k}><i style={{ background: c }} />{l} <b style={{ color: 'var(--ink)' }}>{cnt[i]}</b></span>)}</div>
-          </> : <Empty title={`Belum ada initiative di ${year}`} />}
-        </section>
-      )
-    }
-    case 'enhancement-map': {
-      const stageN = STAGES_SHORT.map((_, i) => d.enh.filter((v: Any) => (v.e.stage || 1) === i + 1).length), maxS = Math.max(1, ...stageN)
-      return (
-        <section className="au-card">
-          <div className="au-row au-between"><h2>Peta enhancement</h2>{internal && <Link href="/dashboard/enhancement" className="au-link">Buka</Link>}</div>
-          {d.enh.length ? <>
-            <EnhMatrix list={d.enh} small />
-            <div className="au-key">{CATS.map(c => <span key={c} className={catK(c)}><i style={{ background: 'var(--k)' }} />{c} <b style={{ color: 'var(--ink)' }}>{d.enh.filter((v: Any) => v.s.cat === c).length}</b></span>)}</div>
-            <div className="au-col" style={{ gap: 6 }}>{STAGES_SHORT.map((s, i) => stageN[i] ? <div key={s} className="au-stagebar"><span className="au-ink2">{s}</span><span className="au-track" style={{ height: 9 }}><i className="a" style={{ width: `${(stageN[i] / maxS) * 100}%` }} /></span><b>{stageN[i]}</b></div> : null)}</div>
-          </> : <Empty title={`Belum ada enhancement di ${year}`} />}
-        </section>
-      )
-    }
-    case 'pinned-notes': {
-      if (!internal) return null
-      const pins = x.notes.filter((n: Any) => n.pinned).slice(0, 5)
-      return (
-        <section className="au-card">
-          <div className="au-row au-between"><h2>Catatan disematkan</h2><Link href="/dashboard/notes" className="au-link">Semua</Link></div>
-          {pins.length ? pins.map((n: Any) => <div key={n._id} className="au-row" style={{ alignItems: 'flex-start', gap: 12 }}><span className="au-pin" style={{ marginTop: 3 }}>PIN</span><span className="au-col" style={{ minWidth: 0 }}><b style={{ fontSize: 14.5 }}>{n.title}</b>{n.content && <span className="au-xs au-ink2" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{n.content}</span>}</span></div>)
-            : <span className="au-small au-muted">Belum ada catatan yang disematkan. Sematkan dari menu [Team] Notes.</span>}
-        </section>
-      )
-    }
-    case 'team-workload': {
-      if (!internal) return null
-      const rows = workload(d.staff, { acts: d.acts, inits: d.inits.map((v: Any) => v.i), enh: d.enh.map((v: Any) => v.e) }, today, x.tpl)
-      const max = Math.max(1, ...rows.map(r => r.total))
-      const seg = [['acts', 'Activity', 'var(--accent)'], ['inits', 'Initiative', 'var(--aqua)'], ['enh', 'Enhancement', '#7B6BFF']] as const
-      return (
-        <section className="au-card">
-          <div className="au-row au-between au-wrap"><h2>Beban kerja per member</h2><span className="lbl">berdasarkan PIC · {year}</span></div>
-          <div className="au-key">{seg.map(([k, l, c]) => <span key={k}><i style={{ background: c }} />{l}</span>)}<span><i style={{ background: 'var(--warn-bar)' }} />Perlu update</span></div>
-          {rows.length ? <div className="au-col" style={{ gap: 4 }}>{rows.map(r => {
-            const label = `${r.name}: ${r.acts} activity, ${r.inits} initiative, ${r.enh} enhancement${r.late ? `, ${r.late} perlu update` : ''}`
-            const body = <>
-              <span className="au-wl-n"><b>{r.name}</b><span className="au-xs au-muted">{r.total} item{r.late ? <> · <b style={{ color: 'var(--warn)' }}>{r.late} perlu update</b></> : ''}</span></span>
-              <span className="au-wl-bar" role="img" aria-label={label}><span className="au-stack" style={{ height: 10, width: `${(r.total / max) * 100}%`, minWidth: r.total ? 6 : 0 }}>{seg.map(([k, , c]) => r[k] ? <i key={k} style={{ flex: r[k], background: c }} /> : null)}</span></span>
-            </>
-            return x.onFocus ? <button key={r.name} type="button" className="au-wl" onClick={() => x.onFocus!(r.name)} title={`Lihat fokus ${r.name}`}>{body}</button> : <div key={r.name} className="au-wl">{body}</div>
-          })}</div> : <Empty title="Belum ada member" />}
-        </section>
-      )
-    }
-    case 'budget-yield': return <BudgetInsights section="yield" />
-    case 'budget-realpct': return <BudgetInsights section="realpct" />
-    case 'budget-prognosa': return <BudgetInsights section="prognosa" />
-    case 'budget-cashcard': return <BudgetInsights section="cashcard" />
-    case 'team-availability': return <TeamAvailability />
-    case 'mandatory-mcu': return <MandatoryInsights section="mcu" />
-    case 'mandatory-training': return <MandatoryInsights section="training" />
-    case 'mandatory-kpi': return <MandatoryInsights section="kpi" />
-    case 'golive-insights': return <GoLiveInsights />
-    default: return null
-  }
 }
 
 /* ───────────── Fokus saya ───────────── */
@@ -457,39 +307,5 @@ function Issues({ acts, config, internal, onToggleHidden }: { acts: Any[]; confi
         </div>
       </section>
     </div>
-  )
-}
-
-/* ───────────── Atur layout ───────────── */
-function LayoutSheet({ widgets, onClose, onChange }: { widgets: Any[]; onClose: () => void; onChange: (w: Any[]) => Promise<void> }) {
-  const [mode, setMode] = useState<'internal' | 'guest'>('internal')
-  const [busy, setBusy] = useState(false)
-  const main = [...widgets].filter(w => w.segment === 'main').sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
-  const stats = [...widgets].filter(w => w.segment === 'stats').sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
-  const on = (w: Any) => (mode === 'guest' ? w.activeGuest !== false : w.active !== false)
-  const size = (w: Any) => (mode === 'guest' ? w.sizeGuest || w.size : w.size) || 'full'
-  async function save(next: Any[]) { setBusy(true); try { await onChange(next) } catch (e: any) { toast.error(e.message) } finally { setBusy(false) } }
-  const toggle = (w: Any) => { const f = mode === 'guest' ? 'activeGuest' : 'active'; save(widgets.map(x => (x.key === w.key ? { ...x, [f]: !on(w) } : x))) }
-  const resize = (w: Any) => { const f = mode === 'guest' ? 'sizeGuest' : 'size'; save(widgets.map(x => (x.key === w.key ? { ...x, [f]: size(w) === 'half' ? 'full' : 'half' } : x))) }
-  const move = (i: number, dir: -1 | 1) => { const j = i + dir; if (j < 0 || j >= main.length) return; const arr = [...main]; [arr[i], arr[j]] = [arr[j], arr[i]]; const re = arr.map((x, k) => ({ ...x, order: k + 1 })); save([...widgets.filter(x => x.segment !== 'main'), ...re]) }
-  return (
-    <Sheet open title="Atur layout dashboard" onClose={onClose}>
-      <Seg full label="Tampilan untuk" value={mode} onChange={setMode} options={[['internal', 'Internal'], ['guest', 'Tamu / eksternal']] as const} />
-      <p className="au-xs au-muted">{mode === 'guest' ? 'Yang disembunyikan di sini tidak terlihat oleh tamu.' : 'Urutan berlaku untuk semua; visibilitas dan ukuran khusus tampilan internal.'} {busy ? 'Menyimpan…' : 'Tersimpan otomatis.'}</p>
-      <span className="au-igh">Blok utama</span>
-      <div className="au-ig">{main.map((w, i) => (
-        <div key={w.key} className="au-igr" style={{ opacity: on(w) ? 1 : .55, gap: 6 }}>
-          <span className="k" style={{ flex: 1, minWidth: 0, fontWeight: 600, color: 'var(--ink)' }}>{w.label}</span>
-          <button type="button" className="btn btn-icon btn-sm" aria-label={`Naikkan ${w.label}`} disabled={i === 0 || busy} onClick={() => move(i, -1)}><Icon name="up" size={14} /></button>
-          <button type="button" className="btn btn-icon btn-sm" aria-label={`Turunkan ${w.label}`} disabled={i === main.length - 1 || busy} onClick={() => move(i, 1)} style={{ transform: 'rotate(180deg)' }}><Icon name="up" size={14} /></button>
-          <button type="button" className="btn btn-sm" disabled={busy} onClick={() => resize(w)} aria-label={`Ukuran ${w.label}: ${size(w) === 'half' ? 'setengah' : 'penuh'}`}>{size(w) === 'half' ? '½' : 'Penuh'}</button>
-          <input type="checkbox" className="au-sw" checked={on(w)} disabled={busy} onChange={() => toggle(w)} aria-label={`Tampilkan ${w.label}`} />
-        </div>
-      ))}</div>
-      <span className="au-igh">Kartu statistik</span>
-      <div className="au-ig">{stats.map(w => (
-        <label key={w.key} className="au-igr"><span className="k" style={{ flex: 1 }}>{String(w.label).replace('Stat: ', '')}</span><input type="checkbox" className="au-sw" checked={on(w)} disabled={busy} onChange={() => toggle(w)} /></label>
-      ))}</div>
-    </Sheet>
   )
 }

@@ -7,6 +7,8 @@ const UserSchema = new Schema({
   role: { type: String, default: 'member' },
   roles: { type: [String], default: ['member'] },
   sortOrder: { type: Number, default: 999 },
+  // Susunan widget dashboard pribadi [{id,size}] — kosong/undefined = pakai susunan bawaan
+  dashboardLayout: { type: [{ _id: false, id: String, size: String }], default: undefined },
   division: { type: String, default: '' },
   // Status kepegawaian: 'pekerja' (organik) atau 'TAD' (tenaga alih daya)
   status: { type: String, enum: ['pekerja','TAD'], default: 'pekerja' },

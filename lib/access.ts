@@ -14,7 +14,7 @@ const PUBLIC_API = ['/api/auth', '/api/warmup', '/api/cron']
 const GUEST_GET_API = [
   '/api/config', '/api/dashboard', '/api/attendance', '/api/users', '/api/presence', '/api/projects', '/api/issues',
   '/api/initiatives', '/api/enhancements', '/api/golive', '/api/cashcard/summary', '/api/budget', '/api/mandatory',
-  '/api/links', '/api/agenda', '/api/birthdays', '/api/profile', '/api/announcements',
+  '/api/links', '/api/agenda', '/api/birthdays', '/api/profile', '/api/announcements', '/api/me/widgets',
 ]
 const GUEST_PAGES = ['/dashboard', '/dashboard/links', '/dashboard/menu']
 
