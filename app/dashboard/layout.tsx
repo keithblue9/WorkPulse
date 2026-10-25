@@ -2,255 +2,134 @@
 import { getConfig } from '@/lib/configCache'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter, usePathname } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useTheme, THEMES } from '@/lib/theme'
+import { useYear } from '@/lib/year'
+import { displayAppName } from '@/lib/appName'
+import { getAllowedMenus, visibleNav, isActive, isInternalUser } from '@/lib/nav'
+import { Icon } from '@/components/ui'
+import CommandPalette from '@/components/CommandPalette'
 import AppPopups from '@/components/AppPopups'
 import BirthdayPopup from '@/components/BirthdayPopup'
 import OnlinePresence from '@/components/OnlinePresence'
 import DailyCheckin from '@/components/DailyCheckin'
 import NotifyEnabler from '@/components/NotifyEnabler'
 import InstallPWA from '@/components/InstallPWA'
-import { displayAppName } from '@/lib/appName'
 
-// Menu definitions with permission keys (matches config.roleDefs[].allowedMenus)
-const NAV_GROUPS = [
-  { key:'dashboard', label:'Dashboard & Overview', items:[
-    { href:'/dashboard',          label:'Dashboard',    permKey:'dashboard' },
-    { href:'/dashboard/progress', label:'Progress Project', permKey:'progress' },
-  ]},
-  { key:'activities', label:'Activities', items:[
-    { href:'/dashboard/activities', label:'Activities',  permKey:'activities' },
-    { href:'/dashboard/mandatory',  label:'Mandatory', permKey:'mandatory' },
-    { href:'/dashboard/golive',     label:'Go-Live', permKey:'golive' },
-    { href:'/dashboard/notes',      label:'[Team] Notes', permKey:'notes' },
-    { href:'/dashboard/quicknotes', label:'[Personal] Notes', permKey:'quicknotes' },
-  ]},
-  { key:'team', label:'Team', items:[
-    { href:'/dashboard/attendance', label:'Presensi', permKey:'attendance' },
-    { href:'/dashboard/calendar',   label:'Calendar', permKey:'calendar' },
-    { href:'/dashboard/links',      label:'Link Hub', permKey:'links' },
-    { href:'/dashboard/biodata',    label:'Member Biodata', permKey:'biodata' },
-  ]},
-  { key:'finance', label:'Finance', items:[
-    { href:'/dashboard/reimbursements', label:'Reimbursement', permKey:'reimbursement', perms:['reimbursement','cashier'] },
-    { href:'/dashboard/operasional',    label:'Operasional', permKey:'operasional', perms:['operasional','settlementcc','cashier'] },
-    { href:'/dashboard/cashcard',       label:'Cash Card', permKey:'cashcard', perms:['cashcard'] },
-    { href:'/dashboard/thirdparty',     label:'[3rd Party] Event', permKey:'thirdparty', perms:['thirdparty','budget','cashier'], abbr:'3P' },
-    { href:'/dashboard/budget',         label:'Budget Report', permKey:'budget', perms:['budgetreport','budget'] },
-  ]},
-  { key:'admin', label:'Admin', items:[
-    { href:'/dashboard/members', label:'Member', permKey:'members' },
-    { href:'/dashboard/config',  label:'Configuration', permKey:'config' },
-  ]},
-]
-
-const FALLBACK_MENUS: Record<string,string[]> = {
-  admin:    ['dashboard','activities','mandatory','golive','calendar','issues','progress','attendance','biodata','links','notes','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','settlementcc','thirdparty','members','config'],
-  manager:  ['dashboard','activities','mandatory','golive','calendar','issues','progress','attendance','biodata','links','notes','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','thirdparty','members'],
-  member:   ['dashboard','activities','mandatory','golive','calendar','issues','progress','attendance','biodata','links','notes','quicknotes','reimbursement'],
-  finance:  ['dashboard','attendance','biodata','links','quicknotes','budget','budgetreport','reimbursement','operasional','cashcard','cashier','thirdparty'],
-  cashier:  ['dashboard','reimbursement','operasional','cashier','cashcard','biodata','quicknotes'],
-  ccholder: ['dashboard','reimbursement','operasional','cashcard','settlementcc','quicknotes'],
-  guest:    ['dashboard','links'],
-}
-function getAllowedMenus(roleDefs:any[], userRoles:string[], configLoaded:boolean):Set<string> {
-  const allowed = new Set<string>()
-  // Try from roleDefs first
-  for (const role of userRoles) {
-    // Admin is a superuser: always sees every menu the app defines, even if the
-    // saved config in DB predates a newly added menu (e.g. settlementcc). This
-    // future-proofs new menus so they appear for admins without re-saving roles.
-    if (role === 'admin') { FALLBACK_MENUS.admin.forEach(m => allowed.add(m)); continue }
-    const def = roleDefs?.find((r:any)=>r.key===role)
-    if (def?.allowedMenus) def.allowedMenus.forEach((m:string)=>allowed.add(m))
-  }
-  // Fallback to defaults if empty (config still loading OR no roleDefs in DB yet)
-  if (allowed.size === 0) {
-    for (const role of userRoles) {
-      (FALLBACK_MENUS[role] || []).forEach(m => allowed.add(m))
-    }
-    // Ultra last-resort: if STILL empty and config hasn't loaded yet, show admin defaults
-    if (allowed.size === 0 && !configLoaded) {
-      FALLBACK_MENUS.admin.forEach(m => allowed.add(m))
-    }
-  }
-  return allowed
-}
+// Tab bar HP: 4 menu utama + Menu. Item tanpa izin diganti menu berikutnya yang diizinkan.
+const TAB_PREF = ['/dashboard', '/dashboard/progress', '/dashboard/enhancement', '/dashboard/notes', '/dashboard/activities', '/dashboard/links']
+const TAB_LABEL: Record<string, string> = { '/dashboard': 'Beranda', '/dashboard/progress': 'Progress', '/dashboard/enhancement': 'Enhance', '/dashboard/notes': 'Notes', '/dashboard/activities': 'Activities', '/dashboard/links': 'Link Hub' }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { data:session, status } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
-  const [collapsed, setCollapsed] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
-  const [showThemePicker, setShowThemePicker] = useState(false)
-  const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const { year, years, setYear, hydrate } = useYear()
   const [appConfig, setAppConfig] = useState<any>(null)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(['dashboard','activities','team']))
-  const themeRef = useRef<HTMLDivElement>(null)
-  const profileRef = useRef<HTMLDivElement>(null)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [palOpen, setPalOpen] = useState(false)
 
-  useEffect(()=>{ if(status==='unauthenticated') router.push('/login') },[status,router])
-  useEffect(()=>{
-    function h(e:MouseEvent){
-      if(themeRef.current && !themeRef.current.contains(e.target as Node)) setShowThemePicker(false)
-      if(profileRef.current && !profileRef.current.contains(e.target as Node)) setShowProfileMenu(false)
-    }
-    document.addEventListener('mousedown',h); return ()=>document.removeEventListener('mousedown',h)
-  },[])
-  useEffect(()=>{ fetch('/api/warmup').catch(()=>{}); getConfig().then(d=>setAppConfig(d)).catch(()=>{}) },[])
-  useEffect(()=>{ setMobileOpen(false) },[pathname])
-  useEffect(()=>{
-    const check = () => setIsMobile(window.innerWidth <= 768)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  },[])
-  useEffect(()=>{
-    NAV_GROUPS.forEach(g => {
-      if (g.items.some(i => pathname===i.href || (i.href!=='/dashboard' && pathname.startsWith(i.href)))) {
-        setExpanded(prev => new Set([...prev, g.key]))
-      }
-    })
-  },[pathname])
-
-  function toggleGroup(key:string) { setExpanded(prev => { const s = new Set(prev); s.has(key)?s.delete(key):s.add(key); return s }) }
-
-  if(status==='loading') return (
-    <div style={{ display:'flex', height:'100vh', alignItems:'center', justifyContent:'center', background:'var(--bg)' }}>
-      <div style={{ width:36, height:36, border:'3px solid var(--border2)', borderTopColor:'var(--brand)', borderRadius:'50%' }} className="spin" />
-    </div>
-  )
+  useEffect(() => { if (status === 'unauthenticated') router.push('/login') }, [status, router])
+  useEffect(() => { hydrate(); fetch('/api/warmup').catch(() => {}); getConfig().then(d => setAppConfig(d)).catch(() => {}) }, [hydrate])
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalOpen(o => !o) } }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
 
   const user = session?.user as any
   const userRoles: string[] = user?.roles && user.roles.length ? user.roles : (user?.role ? [user.role] : ['guest'])
-  const roleDefs = appConfig?.roleDefs || []
-  const allowedMenus = getAllowedMenus(roleDefs, userRoles, !!appConfig)
-  const initials = user?.name?.split(' ').map((n:string)=>n[0]).join('').slice(0,2)||'U'
-  const allItems = NAV_GROUPS.flatMap(g=>g.items)
-  const currentPage = allItems.find(n=>pathname===n.href||(n.href!=='/dashboard'&&pathname.startsWith(n.href)))?.label || (pathname==='/dashboard/profile'?'My Profile':'Dashboard')
+  const allowed = useMemo(() => getAllowedMenus(appConfig?.roleDefs || [], userRoles, !!appConfig), [appConfig, userRoles.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+  const groups = useMemo(() => visibleNav(allowed, userRoles), [allowed, userRoles.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
+  const flat = groups.flatMap(g => g.items.map(i => ({ ...i, group: g.label })))
+  const internal = isInternalUser(userRoles)
+
+  if (status === 'loading') return (
+    <div style={{ display: 'flex', height: '100dvh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div style={{ width: 36, height: 36, border: '3px solid var(--line)', borderTopColor: 'var(--accent)', borderRadius: '50%' }} className="spin" />
+    </div>
+  )
+
   const appName = displayAppName(appConfig?.appName)
   const appTagline = appConfig?.appTagline || 'BPD Procurement'
+  const initials = user?.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'U'
+  const current = flat.find(i => isActive(pathname, i.href)) || (pathname.startsWith('/dashboard/issues') ? { label: 'Issues', group: 'Activities' } : pathname.startsWith('/dashboard/profile') ? { label: 'Profil', group: 'Akun' } : pathname.startsWith('/dashboard/menu') ? { label: 'Menu', group: appName } : { label: 'Dashboard', group: 'Dashboard & Overview' })
+  const tabs = TAB_PREF.filter(h => flat.some(i => i.href === h)).slice(0, 4)
+  const onTab = tabs.some(h => isActive(pathname, h))
+  const nextTheme = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'
+  const themeMeta = THEMES.find(t => t.key === theme)!
+  const logo = appConfig?.appIcon
+    ? <img src={appConfig.appIcon} alt="" className="wn-logo" style={{ objectFit: 'cover' }} />
+    : <div className="wn-logo" aria-hidden="true">{appName[0]}</div>
 
   return (
-    <div className="app-shell" style={{ display:'flex', overflow:'hidden', background:'var(--bg)' }}>
-      {/* Mobile backdrop */}
-      <div className={`mobile-backdrop${mobileOpen?' show':''}`} onClick={()=>setMobileOpen(false)} />
-      <aside className={`app-sidebar${mobileOpen?' mobile-open':''}`} style={{ width:(collapsed && !isMobile)?56:230, background:'var(--bg2)', borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', flexShrink:0, transition:'width 0.2s ease, transform 0.25s ease', overflow:'hidden' }}>
-        <div style={{ padding:collapsed?'14px 12px':'14px 16px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:10, justifyContent:collapsed?'center':'flex-start', minHeight:52 }}>
-          {appConfig?.appIcon ? (
-            <img src={appConfig.appIcon} style={{ width:28, height:28, borderRadius:7, objectFit:'cover', flexShrink:0 }} alt="logo" />
-          ) : (
-            <div style={{ width:28, height:28, background:'var(--brand)', borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, color:'#fff', flexShrink:0 }}>{appName[0]}</div>
-          )}
-          {!collapsed && <div style={{ minWidth:0 }}>
-            <div style={{ fontSize:14, fontWeight:700, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{appName}</div>
-            <div style={{ fontSize:10, color:'var(--text3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{appTagline}</div>
-          </div>}
-        </div>
-        <nav style={{ padding:'10px 8px', flex:1, overflowY:'auto' }}>
-          {NAV_GROUPS.map(group=>{
-            const visibleItems = group.items.filter((item:any) => item.always ? true : (item.perms ? item.perms.some((p:string)=>allowedMenus.has(p)) : allowedMenus.has(item.permKey)))
-            if (visibleItems.length === 0) return null
-            const isExpanded = expanded.has(group.key)
-            const hasActive = visibleItems.some(i => pathname===i.href||(i.href!=='/dashboard'&&pathname.startsWith(i.href)))
-            if (collapsed && !isMobile) {
-              return (
-                <div key={group.key} style={{ marginBottom:6 }}>
-                  {visibleItems.map(item=>{
-                    const active = pathname===item.href||(item.href!=='/dashboard'&&pathname.startsWith(item.href))
-                    return (
-                      <Link key={item.href} href={item.href} style={{ textDecoration:'none' }}>
-                        <div className={`sidebar-link${active?' active':''}`} style={{ justifyContent:'center', padding:'10px' }} title={item.label}>
-                          <span style={{ fontSize:11, fontWeight:600 }}>{(item as any).abbr || item.label[0]}</span>
-                        </div>
-                      </Link>
-                    )
-                  })}
-                </div>
-              )
-            }
+    <div className="app-shell wn-shell">
+      <aside className="wn-side" aria-label="Menu utama">
+        <div className="wn-brand">{logo}<div style={{ minWidth: 0 }}><b>{appName}</b><small>{appTagline}</small></div></div>
+        <nav className="wn-navs">
+          {groups.map(g => {
+            const closed = collapsed.has(g.key) && !g.items.some(i => isActive(pathname, i.href))
             return (
-              <div key={group.key} style={{ marginBottom:4 }}>
-                <div className={`sidebar-group-header${isExpanded?' expanded':''}`} onClick={()=>toggleGroup(group.key)} style={{ color: hasActive?'var(--brand)':'var(--text)' }}>
-                  <span>{group.label}</span>
-                  <span className="chevron">▶</span>
-                </div>
-                {isExpanded && (
-                  <div className="sidebar-sub fade-in">
-                    {visibleItems.map(item=>{
-                      const active = pathname===item.href||(item.href!=='/dashboard'&&pathname.startsWith(item.href))
-                      return (
-                        <Link key={item.href} href={item.href} style={{ textDecoration:'none' }}>
-                          <div className={`sidebar-link${active?' active':''}`}><span>{item.label}</span></div>
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
+              <div key={g.key}>
+                <button type="button" className="wn-ghd" aria-expanded={!closed} onClick={() => setCollapsed(p => { const s = new Set(p); s.has(g.key) ? s.delete(g.key) : s.add(g.key); return s })}>
+                  <span>{g.label}</span><Icon name="chev" size={14} stroke={2} style={{ transform: `rotate(${closed ? -90 : 0}deg)`, transition: 'transform .2s' }} />
+                </button>
+                {!closed && g.items.map(i => (
+                  <Link key={i.href} href={i.href} className="wn-nav" aria-current={isActive(pathname, i.href) ? 'page' : undefined}>
+                    <Icon name={i.icon} />{i.label}{i.isNew && <span className="wn-new">BARU</span>}
+                  </Link>
+                ))}
               </div>
             )
           })}
         </nav>
+        <div className="wn-foot">
+          <button type="button" className="wn-nav" onClick={() => setTheme(nextTheme)} title="Ganti tema"><Icon name={theme === 'dark' ? 'moon' : theme === 'light' ? 'sun' : 'spark'} />Tema: {themeMeta.label}</button>
+          {internal
+            ? <Link href="/dashboard/profile" className="wn-me"><span className="au-av">{initials}</span><span className="au-col" style={{ minWidth: 0 }}><b>{user?.name}</b><span className="au-xs au-muted">{userRoles.join(', ')} · Profil</span></span></Link>
+            : <button type="button" className="wn-nav" onClick={() => signOut({ callbackUrl: '/login' })}><Icon name="out" />Keluar</button>}
+        </div>
       </aside>
 
-      <div className="app-main" style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-        <header className="app-header" style={{ display:'flex', alignItems:'center', gap:8, padding:'0 16px', height:52, borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
-          <button onClick={()=>{ if (window.innerWidth <= 768) setMobileOpen(o=>!o); else setCollapsed(c=>!c) }} className="btn btn-icon hamburger-btn" style={{ fontSize:16 }}>☰</button>
-          <div style={{ flex:1, display:'flex', alignItems:'center', gap:6, fontSize:13 }}>
-            <span style={{ color:'var(--text3)' }}>{appName}</span>
-            <span style={{ color:'var(--border2)' }}>›</span>
-            <span style={{ color:'var(--text)', fontWeight:500 }}>{currentPage}</span>
-          </div>
-          <OnlinePresence />
-          <div ref={themeRef} style={{ position:'relative' }}>
-            <button className="btn btn-sm" onClick={()=>setShowThemePicker(!showThemePicker)}>
-              {THEMES.find((t:any)=>t.key===theme)?.emoji} {THEMES.find((t:any)=>t.key===theme)?.label}
-            </button>
-            {showThemePicker && (
-              <div className="glass-strong scale-in" style={{ position:'absolute', top:'calc(100% + 6px)', right:0, borderRadius:10, padding:6, zIndex:200, minWidth:160 }}>
-                {THEMES.map((t:any)=>(
-                  <div key={t.key} onClick={()=>{setTheme(t.key);setShowThemePicker(false)}} style={{ padding:'7px 10px', borderRadius:6, cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', gap:8, background:theme===t.key?'var(--brand-soft)':'transparent', color:theme===t.key?'var(--brand)':'var(--text2)' }}>
-                    <span>{t.emoji}</span><span>{t.label}</span>{theme===t.key && <span style={{ marginLeft:'auto' }}>✓</span>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div ref={profileRef} style={{ position:'relative' }}>
-            <button onClick={()=>setShowProfileMenu(!showProfileMenu)} style={{ width:32, height:32, borderRadius:'50%', background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:'#fff', cursor:'pointer', border:'none' }}>{initials}</button>
-            {showProfileMenu && (
-              <div className="glass-strong scale-in" style={{ position:'absolute', top:'calc(100% + 6px)', right:0, borderRadius:10, padding:6, zIndex:200, minWidth:200 }}>
-                <div style={{ padding:'8px 10px', borderBottom:'1px solid var(--glass-border)', marginBottom:4 }}>
-                  <div style={{ fontSize:12, fontWeight:600, color:'var(--text)' }}>{user?.name}</div>
-                  <div style={{ fontSize:10, color:'var(--text3)' }}>{userRoles.join(', ')} {user?.division ? ' · ' + user.division : ''}</div>
-                </div>
-                <Link href="/dashboard/profile" style={{ textDecoration:'none' }}>
-                  <div onClick={()=>setShowProfileMenu(false)} style={{ padding:'7px 10px', borderRadius:6, cursor:'pointer', fontSize:12, color:'var(--text2)' }}
-                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='var(--bg3)'}
-                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
-                    👤 My Profile
-                  </div>
-                </Link>
-                <div onClick={()=>{setShowProfileMenu(false); signOut({callbackUrl:'/login'})}} style={{ padding:'7px 10px', borderRadius:6, cursor:'pointer', fontSize:12, color:'var(--red)' }}
-                  onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='var(--redbg)'}
-                  onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
-                  ⏻ Keluar
-                </div>
-              </div>
-            )}
+      <div className="app-main wn-main">
+        <header className="wn-top">
+          <span className="wn-crumb">{appName}&nbsp;&nbsp;/&nbsp;&nbsp;{current.group}&nbsp;&nbsp;/&nbsp;&nbsp;<b>{current.label}</b></span>
+          <div className="au-row">
+            <OnlinePresence />
+            <button type="button" className="wn-kbtn" onClick={() => setPalOpen(true)}><Icon name="search" size={16} stroke={2} /><span>Cari menu atau aksi</span><kbd>⌘K</kbd></button>
+            <div className="au-seg" role="group" aria-label="Tahun">
+              {years.map(y => <button type="button" key={y} aria-pressed={y === year} onClick={() => setYear(y)}>{y}</button>)}
+            </div>
           </div>
         </header>
-        <main style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }} className="fade-in">
-          {children}
-        </main>
+        <header className="wn-mtop">
+          <Link href="/dashboard" className="au-row" style={{ textDecoration: 'none', color: 'inherit', minWidth: 0 }}>{logo}<b className="disp" style={{ fontSize: 18 }}>{appName}</b></Link>
+          <div className="au-row" style={{ gap: 8 }}>
+            <label htmlFor="ymob" className="sr-only">Tahun</label>
+            <select id="ymob" className="input" style={{ minHeight: 38, padding: '6px 8px', width: 'auto', fontSize: 15 }} value={year} onChange={e => setYear(Number(e.target.value))}>
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <button type="button" className="wn-icb" aria-label="Cari" onClick={() => setPalOpen(true)}><Icon name="search" /></button>
+            <button type="button" className="wn-icb" aria-label={'Tema: ' + themeMeta.label} onClick={() => setTheme(nextTheme)}><Icon name={theme === 'dark' ? 'moon' : theme === 'light' ? 'sun' : 'spark'} /></button>
+            {internal && <Link href="/dashboard/profile" className="au-av" aria-label="Profil" style={{ textDecoration: 'none' }}>{initials}</Link>}
+          </div>
+        </header>
+        <main className="wn-content fade-in">{children}</main>
+        <nav className="wn-tabbar" aria-label="Navigasi HP">
+          {tabs.map(h => {
+            const it = flat.find(i => i.href === h)!
+            return <Link key={h} href={h} aria-current={isActive(pathname, h) ? 'page' : undefined}><Icon name={it.icon} size={22} stroke={1.8} />{TAB_LABEL[h]}</Link>
+          })}
+          <Link href="/dashboard/menu" aria-current={!onTab ? 'page' : undefined}><Icon name="more" size={22} stroke={1.8} />Menu</Link>
+        </nav>
         <AppPopups />
-        {userRoles.some((r:string)=>r!=='guest') && <><BirthdayPopup /><DailyCheckin /></>}
-        {userRoles.some((r:string)=>r!=='guest') ? <NotifyEnabler /> : <InstallPWA />}
+        {internal && <><BirthdayPopup /><DailyCheckin /></>}
+        {internal ? <NotifyEnabler /> : <InstallPWA />}
+        <CommandPalette open={palOpen} onClose={() => setPalOpen(false)} items={flat} onTheme={() => setTheme(nextTheme)} years={years} onYear={setYear} />
       </div>
     </div>
   )
 }
+
