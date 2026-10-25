@@ -14,7 +14,6 @@ export default function GoLivePage() {
   const [yearFilter, setYearFilter] = useState('all')
   const [q, setQ] = useState('')
 
-  const [seeding, setSeeding] = useState(false)
   const [editApp, setEditApp] = useState<any|null>(null)
   const [exporting, setExporting] = useState<'excel'|'pdf'|null>(null)
   const [newEntityId, setNewEntityId] = useState<string|null>(null)   // sorot baris yg baru ditambah
@@ -48,18 +47,6 @@ export default function GoLivePage() {
     if(!confirm(`Hapus aplikasi "${app.label}" beserta semua data centangnya?`)) return
     await fetch(`/api/golive?kind=app&id=${app._id}`,{method:'DELETE'})
     setApps(p=>p.filter(a=>a._id!==app._id)); setEditApp(null); toast.success('App dihapus')
-  }
-
-  async function doSeed() {
-    setSeeding(true)
-    try {
-      const sr = await fetch('/api/golive/seed', { method:'POST' })
-      const sd = await sr.json()
-      if (!sr.ok) { toast.error(sd.error || 'Seed gagal'); setSeeding(false); return }
-      toast.success(`Berhasil import ${sd.entities} entitas`)
-      await load()
-    } catch { toast.error('Seed gagal') }
-    setSeeding(false)
   }
 
   async function load() {
@@ -191,7 +178,6 @@ export default function GoLivePage() {
       <div style={{padding:'12px 20px',borderBottom:'1px solid var(--border)',background:'var(--bg2)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',flexShrink:0}}>
         <div><div style={{fontSize:14,fontWeight:600}}>🚀 Go-Live</div><div style={{fontSize:11,color:'var(--text3)'}}>Status go-live entitas per aplikasi · sub-fitur + tanggal</div></div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-          {entities.length===0 && !loading && <button onClick={doSeed} disabled={seeding} className="btn btn-sm" style={{background:'#f59e0b',color:'#fff',border:'none'}}>{seeding?'Importing…':'📥 Import dari Excel'}</button>}
           <button onClick={()=>doExport('excel')} disabled={!!exporting||view.length===0} className="btn btn-sm" title="Export tabel ke Excel (data asli, bisa difilter)">
             {exporting==='excel'?'⏳ Excel…':'📊 Excel'}
           </button>
