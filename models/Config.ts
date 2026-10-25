@@ -33,6 +33,8 @@ const ConfigSchema = new Schema({
 
   loginTagline: { type:String, default:'BPD Procurement — Pertamina' },
   loginBackgrounds: { type:[String], default:[] },
+  // Bobot default template timeline Enhancement (BRD, Development, UAT, Go Live, Stabilisasi)
+  enhancementTemplate: { type:[{ name:String, w:Number, _id:false }], default:[] },
   loginSlideInterval: { type:Number, default:5000 },
   loginBgMaxSize: { type:Number, default:5 },
 

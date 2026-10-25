@@ -2,6 +2,7 @@
 // They never touch the database: legacy or incomplete config documents are
 // completed in memory only, so opening the app never changes stored data.
 import { DEFAULT_ROLES, DEFAULT_LINK_CATEGORIES } from '@/lib/defaults'
+import { TPL, DEFAULT_TEMPLATE } from '@/lib/enhancement'
 
 export const CONFIG_FALLBACKS: Record<string, any[]> = {
   attendanceTypes: [
@@ -45,6 +46,7 @@ export const CONFIG_FALLBACKS: Record<string, any[]> = {
     { key: 'completed', label: 'Completed', color: '#4f8ef7', active: true },
   ],
   roleDefs: DEFAULT_ROLES,
+  enhancementTemplate: TPL.map((name, i) => ({ name, w: DEFAULT_TEMPLATE[i] })),
   linkCategories: DEFAULT_LINK_CATEGORIES,
 }
 

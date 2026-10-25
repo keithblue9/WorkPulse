@@ -5,8 +5,41 @@ import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { DEFAULT_ROLES, DEFAULT_WIDGETS, DEFAULT_LINK_CATEGORIES } from '@/lib/defaults'
 import { displayAppName } from '@/lib/appName'
+import { TPL, STAGES, normWeights } from '@/lib/enhancement'
 
-type Tab = 'branding'|'login'|'taxonomies'|'attendance'|'budget'|'roles'|'widgets'|'reset'|'system'
+type Tab = 'branding'|'login'|'taxonomies'|'attendance'|'budget'|'roles'|'widgets'|'enhancement'|'reset'|'system'
+
+const TPL_COLORS = ['var(--accent)', '#7B6BFF', 'var(--aqua)', 'var(--warn-bar)', 'var(--muted)']
+// Bobot default timeline Enhancement. Tiap enhancement memakai bobot ini kecuali diatur sendiri.
+function EnhTemplateEditor({ value, saving, onSave }: { value: any; saving: boolean; onSave: (v: { name: string; w: number }[]) => void }) {
+  const [w, setW] = useState<number[]>(() => normWeights(value))
+  const total = Math.round(w.reduce((a, b) => a + (Number(b) || 0), 0) * 100) / 100
+  const even = () => { const b = Math.floor(100 / TPL.length); setW(TPL.map((_, i) => b + (i < 100 - b * TPL.length ? 1 : 0))) }
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ display:'flex', gap:3, height:14, borderRadius:7, overflow:'hidden' }} aria-hidden="true">
+        {TPL.map((k, i) => <i key={k} style={{ flex: Math.max(0.0001, w[i] || 0), background: TPL_COLORS[i], borderRadius:3 }} />)}
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:10 }}>
+        {TPL.map((k, i) => (
+          <label key={k} style={{ display:'flex', flexDirection:'column', gap:6, fontSize:13, fontWeight:600 }}>{k}
+            <span style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <input className="input" type="number" inputMode="numeric" min={0} max={100} value={w[i]} onChange={e => setW(ws => ws.map((x, j) => j === i ? Math.max(0, Math.min(100, Number(e.target.value) || 0)) : x))} style={{ textAlign:'right' }} />%
+            </span>
+          </label>
+        ))}
+      </div>
+      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+        <b style={{ color: total === 100 ? 'var(--ok)' : 'var(--bad)' }}>Total {total}%{total === 100 ? '' : ' · harus 100%'}</b>
+        <button type="button" className="btn btn-sm" onClick={even}>Ratakan</button>
+        <button type="button" className="btn btn-primary btn-sm" disabled={saving || total !== 100} onClick={() => onSave(TPL.map((name, i) => ({ name, w: w[i] })))}>Simpan bobot</button>
+      </div>
+      <div style={{ fontSize:12, color:'var(--muted)', lineHeight:1.6 }}>
+        Progress BRD otomatis dari tahap: {STAGES.map((s, i) => `${i + 1}. ${s}`).join(' · ')} — BRD % = tahap ÷ 7.
+      </div>
+    </div>
+  )
+}
 
 function Section({ title, sub, children, action }: { title:string; sub?:string; children:React.ReactNode; action?:React.ReactNode }) {
   return (
@@ -337,6 +370,7 @@ export default function ConfigPage() {
     { key:'budget',     label:'Kategori Anggaran', icon:'💰' },
     { key:'roles',      label:'Roles & Permissions', icon:'🔐' },
     { key:'widgets',    label:'Dashboard Widgets', icon:'📊' },
+    { key:'enhancement', label:'Template Enhancement', icon:'⭐' },
     { key:'reset',      label:'Reset Data',    icon:'🗑️' },
     { key:'system',     label:'Sistem Info',   icon:'ℹ️' },
   ]
@@ -584,6 +618,11 @@ export default function ConfigPage() {
               <div style={{ fontSize:11, color:'var(--text3)', marginBottom:10 }}>Kategori link yang dipakai di menu Link Hub</div>
               <TaxonomyEditor items={(config.linkCategories && config.linkCategories.length) ? config.linkCategories : DEFAULT_LINK_CATEGORIES} onChange={(v:any)=>setConfig((c:any)=>({...c, linkCategories:v}))} label="Link Categories" />
             </div>
+          </Section>
+        )}
+        {tab === 'enhancement' && (
+          <Section title="Template timeline Enhancement" sub="Bobot default 5 aktivitas (BRD, Development, UAT, Go Live, Stabilisasi). Bisa diubah per enhancement di menu Enhancement.">
+            <EnhTemplateEditor value={config.enhancementTemplate} saving={saving} onSave={v => save({ enhancementTemplate: v })} />
           </Section>
         )}
         {tab === 'reset' && <ResetSection />}
