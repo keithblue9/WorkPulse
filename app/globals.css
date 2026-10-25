@@ -927,3 +927,33 @@ a.au-erow { text-decoration:none; color:inherit }
   .au-othrow .del { justify-self:end }
   .au-psrow { grid-template-columns:minmax(0,1fr) 80px 36px } .au-psrow > :nth-child(3) { grid-column:1 / 3; grid-row:2 }
 }
+/* Configuration */
+.au-taxrow { display:flex; align-items:center; gap:10px; padding:8px 10px 8px 8px; border-radius:14px; border:1px solid var(--line); background:var(--surface) }
+.au-mv { display:grid; place-items:center; width:24px; height:18px; border:0; border-radius:6px; background:var(--sunken); color:var(--ink2); cursor:pointer } .au-mv:disabled { opacity:.3; cursor:default }
+.au-color { width:30px; height:30px; padding:0; border:1px solid var(--line); border-radius:9px; background:none; cursor:pointer; flex-shrink:0 }
+.au-taxlbl { flex:1; min-width:0; background:transparent; border:0; outline:0; color:var(--ink); font:600 14px var(--sans); padding:6px 4px; border-radius:8px } .au-taxlbl:focus { background:var(--sunken) }
+.au-bcrow { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) 110px minmax(0,1.3fr) auto; gap:8px; align-items:center }
+@media (max-width:700px) { .au-bcrow { grid-template-columns:minmax(0,1fr) minmax(0,1fr) } .au-bcrow > :first-child { grid-column:1 / -1 } .au-taxrow code { display:none } }
+/* Login */
+.au-login { min-height:100vh; min-height:100dvh; display:flex; align-items:center; justify-content:flex-start; position:relative; overflow:hidden; padding:24px 6vw; background:var(--bg) }
+.au-login-aurora { position:absolute; inset:0; pointer-events:none }
+.au-login-aurora i { position:absolute; border-radius:50%; filter:blur(70px); opacity:.55; animation:au-float 18s var(--ease) infinite alternate }
+.au-login-aurora i:nth-child(1) { width:52vmax; height:52vmax; left:-14vmax; top:-18vmax; background:radial-gradient(circle,#7B6BFF,transparent 65%) }
+.au-login-aurora i:nth-child(2) { width:44vmax; height:44vmax; right:-12vmax; bottom:-16vmax; background:radial-gradient(circle,#3DD9C5,transparent 65%); animation-delay:-6s }
+.au-login-aurora i:nth-child(3) { width:30vmax; height:30vmax; right:22vmax; top:8vmax; background:radial-gradient(circle,#FF7A5C,transparent 65%); opacity:.35; animation-delay:-12s }
+@keyframes au-float { to { transform:translate3d(4vmax,3vmax,0) scale(1.08) } }
+@media (prefers-reduced-motion:reduce) { .au-login-aurora i { animation:none } }
+.au-login-card { position:relative; z-index:2; width:100%; max-width:390px; display:flex; flex-direction:column; gap:22px; padding:32px 28px; border-radius:30px; background:var(--glass-bg-strong, var(--glass)); backdrop-filter:blur(36px) saturate(1.8); -webkit-backdrop-filter:blur(36px) saturate(1.8); border:1px solid var(--line); box-shadow:var(--shadow-l, 0 30px 70px -32px rgba(43,30,140,.45)); color:var(--ink) }
+.au-login-card h1 { font:700 28px/1.1 var(--disp); letter-spacing:-.03em; margin-top:6px }
+.au-login-mark { width:60px; height:60px; border-radius:18px; display:grid; place-items:center; font:800 28px var(--disp); color:#fff; background:linear-gradient(135deg,var(--accent),#7B6BFF 60%,var(--aqua)); box-shadow:0 12px 28px -10px var(--accent) }
+.au-login-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:52px; border-radius:16px; font:700 15px var(--sans); cursor:pointer; border:1px solid var(--line); background:var(--surface); color:var(--ink); transition:transform .18s var(--pop), box-shadow .2s }
+.au-login-btn:active { transform:scale(.97) } .au-login-btn:disabled { opacity:.5; cursor:default; transform:none }
+.au-login-btn.primary { background:var(--accent); border-color:var(--accent); color:var(--on-accent); box-shadow:0 10px 24px -12px var(--accent) }
+.au-login-acct { display:flex; align-items:center; gap:10px; width:100%; min-height:56px; padding:8px 12px; border-radius:16px; border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; font:inherit }
+.au-login-pick { position:absolute; top:calc(100% + 6px); left:0; right:0; max-height:280px; overflow-y:auto; display:flex; flex-direction:column; padding:6px; border-radius:18px; z-index:10; background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow-s2) }
+.au-login-opt { display:flex; align-items:center; gap:10px; min-height:48px; padding:6px 10px; border-radius:12px; border:0; background:none; color:var(--ink); cursor:pointer; font:inherit }
+.au-login-opt:hover, .au-login-opt[aria-selected="true"] { background:var(--sunken) }
+.au-pinrow { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px }
+.au-pinbox { width:100%; height:54px; text-align:center; font:700 22px var(--mono); border:1px solid var(--line); border-radius:14px; background:var(--surface); color:var(--ink); outline:none; transition:border-color .15s, box-shadow .15s }
+.au-pinbox:focus { border-color:var(--accent); box-shadow:0 0 0 4px var(--accent-soft) } .au-pinbox:disabled { opacity:.5 }
+@media (max-width:700px) { .au-login { justify-content:center; padding:20px 16px } .au-login-card { padding:26px 20px } }

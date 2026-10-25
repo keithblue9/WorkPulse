@@ -4,6 +4,7 @@ import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { displayAppName } from '@/lib/appName'
+import { Icon } from '@/components/ui'
 
 // A user is "guest/external-only" if every role they hold is 'guest'. These accounts
 // are NOT shown in the Internal picker — external access is via the front-door button.
@@ -28,7 +29,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     fetch('/api/config?scope=login').then(r => r.json()).then(d => { if (d.data) setConfig(d.data) }).catch(() => {})
-    fetch('/api/users').then(r => r.json()).then(d => {
+    fetch('/api/users?scope=login').then(r => r.json()).then(d => {
       const active = (d.data || []).filter((u: any) => u.active !== false && !isGuestOnly(u))
       setUsers(active)
       const lastEmail = localStorage.getItem('wp-last-user')
@@ -93,121 +94,81 @@ export default function LoginPage() {
 
   const bgs = config.loginBackgrounds || []
   const hasBg = bgs.length > 0
-  const appColor = config.appColor || '#4f8ef7'
+  const initials = (n: string) => String(n || '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || '?'
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', position: 'relative', overflow: 'hidden', background: '#f5f5f7', padding: '24px 5vw' }} className="safe-all login-shell">
+    <main className="safe-all au-login">
       {hasBg && bgs.map((bg: string, i: number) => (
-        <div key={i} className={`login-bg-slide login-bg-img${i === currentSlide ? ' active' : ''}`} style={{ backgroundImage: `url("${bg}")` }} />
+        <div key={i} className={`login-bg-slide login-bg-img${i === currentSlide ? ' active' : ''}`} style={{ backgroundImage: `url("${bg}")` }} aria-hidden="true" />
       ))}
-      {!hasBg && (
-        <div className="ambient-bg">
-          <div className="orb" style={{ width: 500, height: 500, top: '-10%', left: '-10%', opacity: 0.25 }} />
-          <div className="orb" style={{ width: 400, height: 400, bottom: '-15%', right: '15%', animationDelay: '-8s', opacity: 0.25 }} />
-        </div>
-      )}
+      {!hasBg && <div className="au-login-aurora" aria-hidden="true"><i /><i /><i /></div>}
 
-      {/* Apple-style light glass card, positioned LEFT */}
-      <div className="login-card" style={{
-        position: 'relative', zIndex: 2, width: '100%', maxWidth: 380,
-        padding: '32px 28px', borderRadius: 22,
-        background: 'rgba(255,255,255,0.72)',
-        backdropFilter: 'blur(40px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-        border: '1px solid rgba(255,255,255,0.5)',
-        boxShadow: '0 24px 60px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.7)',
-        color: '#1a1a1a',
-        marginLeft: 0,
-      }}>
-        <div style={{ marginBottom: 22, textAlign: 'center' }}>
-          {config.appIcon ? (
-            <img src={config.appIcon} alt="logo" style={{ width: 56, height: 56, borderRadius: 14, objectFit: 'cover', marginBottom: 12 }} />
-          ) : (
-            <div style={{ width: 56, height: 56, borderRadius: 14, background: appColor, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 700, color: '#fff', marginBottom: 12, boxShadow: `0 8px 20px ${appColor}40` }}>{(config.appName || 'W')[0]}</div>
-          )}
-          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 3, color: '#1a1a1a' }}>{displayAppName(config.appName)}</div>
-          <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.55)' }}>{config.loginTagline}</div>
+      <section className="au-login-card" aria-labelledby="login-title">
+        <div className="au-col" style={{ alignItems: 'center', gap: 6, textAlign: 'center' }}>
+          {config.appIcon
+            ? <img src={config.appIcon} alt="" width={60} height={60} style={{ width: 60, height: 60, borderRadius: 18, objectFit: 'cover' }} />
+            : <span className="au-login-mark" aria-hidden="true">{(displayAppName(config.appName) || 'W')[0]}</span>}
+          <h1 id="login-title">{displayAppName(config.appName)}</h1>
+          <span className="au-small au-muted">{config.loginTagline}</span>
         </div>
 
         {mode === 'choose' ? (
-          /* ── Step 1: pilih jenis akses ── */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(0,0,0,0.6)', textAlign: 'center', marginBottom: 2 }}>Masuk sebagai</div>
-            <button onClick={() => setMode('internal')}
-              style={{ width: '100%', padding: '14px', fontSize: 14, fontWeight: 700, background: appColor, color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', boxShadow: `0 6px 16px ${appColor}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              👤 Internal
-            </button>
-            <button onClick={handleGuest} disabled={guestLoading}
-              style={{ width: '100%', padding: '14px', fontSize: 14, fontWeight: 700, background: 'rgba(255,255,255,0.7)', color: '#1a1a1a', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 12, cursor: 'pointer', opacity: guestLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              {guestLoading ? 'Masuk...' : '🌐 External (Guest)'}
-            </button>
-            <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.45)', textAlign: 'center', marginTop: 4 }}>External masuk langsung tanpa PIN (akses terbatas)</div>
+          <div className="au-col" style={{ gap: 10 }}>
+            <span className="lbl" style={{ textAlign: 'center' }}>Masuk sebagai</span>
+            <button type="button" className="au-login-btn primary" onClick={() => setMode('internal')}><Icon name="user" size={18} stroke={2.1} />Internal</button>
+            <button type="button" className="au-login-btn" onClick={handleGuest} disabled={guestLoading}><Icon name="link" size={18} stroke={2.1} />{guestLoading ? 'Masuk…' : 'External (guest)'}</button>
+            <span className="au-xs au-muted" style={{ textAlign: 'center' }}>External masuk langsung tanpa PIN, dengan akses terbatas.</span>
           </div>
         ) : (
-          /* ── Step 2: login Internal (picker + PIN) ── */
-          <>
-            <button onClick={backToChoose} type="button"
-              style={{ background: 'transparent', border: 'none', color: 'rgba(0,0,0,0.55)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0, marginBottom: 12 }}>← Kembali</button>
+          <div className="au-col" style={{ gap: 16 }}>
+            <button onClick={backToChoose} type="button" className="au-link au-row" style={{ alignSelf: 'flex-start', gap: 4 }}><Icon name="back" size={14} />Kembali</button>
 
-            <div ref={pickerRef} style={{ position: 'relative', marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'rgba(0,0,0,0.6)', marginBottom: 6 }}>Akun</label>
-              <button onClick={() => setShowUserPicker(s => !s)} type="button" style={{
-                width: '100%', padding: '10px 12px', background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10,
-                display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: '#1a1a1a',
-              }}>
+            <div ref={pickerRef} className="au-col" style={{ position: 'relative', gap: 6 }}>
+              <span className="lbl" id="acct-lbl">Akun</span>
+              <button onClick={() => setShowUserPicker(s => !s)} type="button" className="au-login-acct" aria-haspopup="listbox" aria-expanded={showUserPicker} aria-labelledby="acct-lbl">
                 {selectedUser ? (
                   <>
-                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: appColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{selectedUser.name?.[0]}</div>
-                    <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedUser.name}</div>
-                      <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.5)' }}>{selectedUser.division || selectedUser.role}</div>
-                    </div>
+                    <span className="au-av">{initials(selectedUser.name)}</span>
+                    <span className="au-col" style={{ flex: 1, minWidth: 0, gap: 1, textAlign: 'left' }}>
+                      <b className="au-small" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedUser.name}</b>
+                      <span className="au-xs au-muted">{selectedUser.division || selectedUser.role}</span>
+                    </span>
                   </>
-                ) : (
-                  <span style={{ flex: 1, textAlign: 'left', color: 'rgba(0,0,0,0.4)', fontSize: 13 }}>Pilih nama akun...</span>
-                )}
-                <span style={{ color: 'rgba(0,0,0,0.4)', fontSize: 10 }}>▼</span>
+                ) : <span className="au-small au-muted" style={{ flex: 1, textAlign: 'left' }}>Pilih nama akun</span>}
+                <Icon name="chev" size={16} style={{ color: 'var(--muted)', transform: showUserPicker ? 'rotate(180deg)' : undefined, transition: 'transform .2s' }} />
               </button>
               {showUserPicker && (
-                <div className="scale-in" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, maxHeight: 260, overflowY: 'auto', borderRadius: 12, padding: 6, zIndex: 10, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(40px) saturate(180%)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 12px 30px rgba(0,0,0,0.12)' }}>
+                <div className="au-login-pick scale-in" role="listbox" aria-labelledby="acct-lbl">
                   {users.map(u => (
-                    <div key={u.email} onClick={() => selectUser(u)} style={{ padding: '8px 10px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, background: selectedUser?.email === u.email ? 'rgba(0,0,0,0.05)' : 'transparent', color: '#1a1a1a' }}
-                      onMouseEnter={e => { if (selectedUser?.email !== u.email) (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.03)' }}
-                      onMouseLeave={e => { if (selectedUser?.email !== u.email) (e.currentTarget as HTMLElement).style.background = 'transparent' }}>
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: appColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff' }}>{u.name[0]}</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, fontWeight: 500 }}>{u.name}</div>
-                        <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.5)' }}>{u.division || u.role}</div>
-                      </div>
-                      {selectedUser?.email === u.email && <span style={{ color: appColor }}>✓</span>}
-                    </div>
+                    <button type="button" role="option" aria-selected={selectedUser?.email === u.email} key={u.email} onClick={() => selectUser(u)} className="au-login-opt">
+                      <span className="au-av s">{initials(u.name)}</span>
+                      <span className="au-col" style={{ flex: 1, minWidth: 0, gap: 1, textAlign: 'left' }}><span className="au-small" style={{ fontWeight: 600 }}>{u.name}</span><span className="au-xs au-muted">{u.division || u.role}</span></span>
+                      {selectedUser?.email === u.email && <Icon name="check" size={16} stroke={2.4} style={{ color: 'var(--accent)' }} />}
+                    </button>
                   ))}
-                  {users.length === 0 && <div style={{ padding: 14, textAlign: 'center', color: 'rgba(0,0,0,0.4)', fontSize: 11 }}>Belum ada user</div>}
+                  {users.length === 0 && <span className="au-xs au-muted" style={{ padding: 14, textAlign: 'center' }}>Belum ada user</span>}
                 </div>
               )}
             </div>
 
-            <div style={{ marginBottom: 18 }}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'rgba(0,0,0,0.6)', marginBottom: 6 }}>PIN 6 Digit</label>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+            <div className="au-col" style={{ gap: 6 }}>
+              <span className="lbl" id="pin-lbl">PIN 6 digit</span>
+              <div className="au-pinrow" role="group" aria-labelledby="pin-lbl">
                 {pin.map((d, i) => (
-                  <input key={i} ref={el => { inputRefs.current[i] = el }} type="tel" inputMode="numeric" pattern="[0-9]" maxLength={1} value={d}
+                  <input key={i} ref={el => { inputRefs.current[i] = el }} type="password" inputMode="numeric" autoComplete={i === 0 ? 'one-time-code' : 'off'} pattern="[0-9]" maxLength={1} value={d}
+                    aria-label={`Digit PIN ${i + 1}`} className="au-pinbox"
                     onChange={e => handlePinChange(i, e.target.value)} onKeyDown={e => handleKeyDown(i, e)} onPaste={i === 0 ? handlePaste : undefined}
-                    disabled={!selectedUser || loading}
-                    style={{ width: '100%', height: 46, textAlign: 'center', fontSize: 20, fontWeight: 600, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, background: 'rgba(255,255,255,0.6)', color: '#1a1a1a', outline: 'none' }}
-                    onFocus={e => (e.currentTarget.style.borderColor = appColor)}
-                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.1)')} />
+                    disabled={!selectedUser || loading} />
                 ))}
               </div>
             </div>
 
-            <button onClick={() => submitWithPin(pin.join(''))} disabled={loading || !selectedUser || pin.some(d => !d)}
-              style={{ width: '100%', padding: '12px', fontSize: 13, fontWeight: 600, background: appColor, color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', opacity: (loading || !selectedUser || pin.some(d => !d)) ? 0.5 : 1, boxShadow: `0 4px 12px ${appColor}40` }}>
-              {loading ? 'Masuk...' : 'Masuk'}
+            <button type="button" className="au-login-btn primary" onClick={() => submitWithPin(pin.join(''))} disabled={loading || !selectedUser || pin.some(d => !d)}>
+              {loading ? 'Masuk…' : 'Masuk'}
             </button>
-          </>
+          </div>
         )}
-      </div>
-    </div>
+      </section>
+    </main>
   )
 }
