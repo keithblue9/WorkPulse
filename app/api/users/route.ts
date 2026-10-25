@@ -3,11 +3,16 @@ import { connectDB } from '@/lib/db'
 import { UserModel } from '@/models/User'
 import bcrypt from 'bcryptjs'
 import { currentRoles } from '@/lib/session'
-import { sanitizeUser } from '@/lib/access'
+import { loginDirectory, sanitizeUser } from '@/lib/access'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     await connectDB()
+    // Halaman login (belum ada sesi): hanya direktori minimal untuk memilih akun.
+    if (req.nextUrl.searchParams.get('scope') === 'login') {
+      const list = await UserModel.find({}, { name: 1, email: 1, division: 1, role: 1, roles: 1, active: 1 }).sort({ sortOrder: 1, createdAt: 1 }).lean()
+      return NextResponse.json({ data: loginDirectory(list as any[]) }, { headers: { 'Cache-Control': 'no-store' } })
+    }
     const roles = (await currentRoles()) || []
     const users = await UserModel.find({}, { password: 0, fonnteToken: 0 }).sort({ sortOrder: 1, createdAt: 1 }).lean()
     return NextResponse.json({ data: (users as any[]).map(u => sanitizeUser(u, roles)) })

@@ -28,6 +28,8 @@ export function decideAccess(input: { pathname: string; method: string; roles: s
   if (under(pathname, '/api')) {
     if (PUBLIC_API.some(p => under(pathname, p))) return { kind: 'next' }
     if (pathname === '/api/config' && method === 'GET' && /(^|[?&])scope=login(&|$)/.test(input.search || '')) return { kind: 'next' }
+    // Login account picker: a minimal directory (see loginDirectory) is readable before sign-in.
+    if (pathname === '/api/users' && method === 'GET' && /(^|[?&])scope=login(&|$)/.test(input.search || '')) return { kind: 'next' }
     if (!signedIn) return { kind: 'deny', status: 401, message: 'Silakan login dulu' }
     if (isGuest) {
       const ok = (method === 'GET' && GUEST_GET_API.some(p => under(pathname, p)))
@@ -65,4 +67,13 @@ export function sanitizeUser(u: Record<string, any>, roles: string[]): Record<st
     return Object.fromEntries(Object.entries(rest).filter(([k]) => GUEST_USER_FIELDS.includes(k)))
   }
   return rest
+}
+
+// Account picker on the login page (no session yet): active internal users only, no personal data.
+export function loginDirectory(users: Record<string, any>[]): { name: string; email: string; division: string; role: string }[] {
+  return (users || [])
+    .filter(u => u && u.active !== false)
+    .map(u => ({ u, roles: (Array.isArray(u.roles) && u.roles.length ? u.roles : u.role ? [u.role] : []) as string[] }))
+    .filter(({ roles }) => !(roles.length > 0 && roles.every(r => r === 'guest')))
+    .map(({ u, roles }) => ({ name: String(u.name || ''), email: String(u.email || ''), division: String(u.division || ''), role: String(roles[0] || '') }))
 }

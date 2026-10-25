@@ -88,3 +88,25 @@ describe('sanitizeUser', () => {
     expect(sanitizeUser(u, ['guest'])).toEqual({ _id: '1', name: 'A', email: 'a@x', status: 'TAD' })
   })
 })
+
+import { loginDirectory } from '@/lib/access'
+describe('login directory (account picker before sign-in)', () => {
+  it('allows only GET /api/users?scope=login anonymously', () => {
+    expect(d('/api/users', 'GET', null, '?scope=login').kind).toBe('next')
+    expect(d('/api/users', 'GET', null, '').kind).toBe('deny')
+    expect(d('/api/users', 'POST', null, '?scope=login').kind).toBe('deny')
+    expect(d('/api/users/abc', 'GET', null, '?scope=login').kind).toBe('deny')
+  })
+  it('exposes only name, email, division and primary role of active internal users', () => {
+    const list = loginDirectory([
+      { _id: '1', name: 'A', email: 'a@x', division: 'BPD', roles: ['member', 'finance'], password: 'h', noKtp: '123', noRekening: '9', phone: '08', active: true },
+      { _id: '2', name: 'G', email: 'g@x', roles: ['guest'], active: true },
+      { _id: '3', name: 'Off', email: 'o@x', role: 'member', active: false },
+      { _id: '4', name: 'Legacy', email: 'l@x', role: 'admin' },
+    ])
+    expect(list).toEqual([
+      { name: 'A', email: 'a@x', division: 'BPD', role: 'member' },
+      { name: 'Legacy', email: 'l@x', division: '', role: 'admin' },
+    ])
+  })
+})
