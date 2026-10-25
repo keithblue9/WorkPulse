@@ -9,6 +9,7 @@ import { CATS, STAGES_SHORT } from '@/lib/enhancement'
 import { statusOf, ptd, DAY, dUTC } from '@/lib/progress'
 import { upcoming } from '@/lib/dashboard'
 import { workload } from '@/lib/workload'
+import { otherYearHint } from '@/lib/hero'
 import { EnhMatrix, catK } from '@/components/EnhMatrix'
 
 type Any = Record<string, any>
@@ -16,7 +17,7 @@ export type WCtx = {
   d: Any; data: Any; me: Any | null; today: number; todayIso: string; year: number; nowYear: number; tpl: number[]
   extra: { mandatory?: Any[] | null; golive?: Any | null; budget?: Any[] | null; cashcard?: Any | null }
   internal: boolean; config: Any | null
-  onDetail: (title: string, items: Any[]) => void; onFocus?: (name: string) => void; onMyFocus?: () => void
+  onDetail: (title: string, items: Any[]) => void; onFocus?: (name: string) => void; onMyFocus?: () => void; onYear?: (y: number) => void
 }
 
 const P = (v: number) => `${Math.round(v || 0)}%`
@@ -49,6 +50,7 @@ export function WidgetFrame({ id, size, children, href, onOpen, preview }: { id:
 const Big = ({ v, unit, sub }: { v: React.ReactNode; unit?: string; sub?: React.ReactNode }) => <div className="wg-big"><b>{v}{unit && <small>{unit}</small>}</b>{sub && <span>{sub}</span>}</div>
 const Bar = ({ v, c = 'var(--wf)', tick }: { v: number; c?: string; tick?: number }) => <span className="wg-bar"><i style={{ width: `${Math.max(0, Math.min(100, v))}%`, background: c }} />{tick != null && <s style={{ left: `calc(${Math.min(100, tick)}% - 1px)` }} />}</span>
 const Empty = ({ t }: { t: string }) => <span className="wg-empty">{t}</span>
+const EnhEmpty = ({ x }: { x: WCtx }) => { const h = otherYearHint(x.data.enh || [], x.year); return h && x.onYear ? <span className="wg-empty">Belum ada di {x.year}.<br /><button type="button" className="au-link" onClick={() => x.onYear!(h.year)}>Ada {h.n} di {h.year} — lihat</button></span> : <Empty t={`Belum ada enhancement di ${x.year}`} /> }
 
 export function renderWidget(id: string, size: Size, x: WCtx): React.ReactNode {
   const { d, data, today, todayIso, year, nowYear } = x
@@ -84,7 +86,7 @@ export function renderWidget(id: string, size: Size, x: WCtx): React.ReactNode {
     }
     case 'enhancement': {
       const total = d.enh.length; const by = CATS.map(c => [c, d.enh.filter((v: Any) => v.s.cat === c).length] as const)
-      if (!total) return <Empty t={`Belum ada enhancement di ${year}`} />
+      if (!total) return <EnhEmpty x={x} />
       if (size === 'S') return <Big v={<CountUp to={total} />} sub={`${by[0][1]} Quick Win`} />
       const max = Math.max(1, ...by.map(b => b[1]))
       const cats = <div className="wg-list">{by.map(([c, n]) => <div key={c} className="wg-row"><span className="t">{c}</span><Bar v={(n / max) * 100} /><b className="n">{n}</b></div>)}</div>
@@ -202,7 +204,7 @@ export function renderWidget(id: string, size: Size, x: WCtx): React.ReactNode {
       </div>
     }
     case 'enh-map': {
-      if (!d.enh.length) return <Empty t={`Belum ada enhancement di ${year}`} />
+      if (!d.enh.length) return <EnhEmpty x={x} />
       const stageN = STAGES_SHORT.map((_, i) => d.enh.filter((v: Any) => (v.e.stage || 1) === i + 1).length), mx = Math.max(1, ...stageN)
       return <><div className="wg-matrix"><EnhMatrix list={d.enh} small /></div>
         <div className="wg-legend row">{CATS.map(c => <span key={c} className={catK(c)}><i style={{ background: 'var(--k)' }} />{c}<b>{d.enh.filter((v: Any) => v.s.cat === c).length}</b></span>)}</div>

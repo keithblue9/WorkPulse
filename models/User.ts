@@ -9,6 +9,7 @@ const UserSchema = new Schema({
   sortOrder: { type: Number, default: 999 },
   // Susunan widget dashboard pribadi [{id,size}] — kosong/undefined = pakai susunan bawaan
   dashboardLayout: { type: [{ _id: false, id: String, size: String }], default: undefined },
+  dashboardHero: String,   // Sorotan dashboard pilihan user (lib/hero)
   division: { type: String, default: '' },
   // Status kepegawaian: 'pekerja' (organik) atau 'TAD' (tenaga alih daya)
   status: { type: String, enum: ['pekerja','TAD'], default: 'pekerja' },

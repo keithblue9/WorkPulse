@@ -6,6 +6,7 @@ import { UserModel } from '@/models/User'
 import { ConfigModel } from '@/models/Config'
 import { userRolesOf } from '@/lib/perms'
 import { sanitizeLayoutInput } from '@/lib/widgets'
+import { isHeroKind } from '@/lib/hero'
 
 // GET  → { mine, guest } susunan widget tersimpan (null = belum pernah diatur → klien pakai bawaan)
 // PUT  { layout, scope?: 'guest' } → simpan susunan pribadi; scope=guest khusus admin.
@@ -20,27 +21,30 @@ export async function GET() {
   try {
     await connectDB()
     const isGuest = me.roles.every(r => r === 'guest')
-    const [u, c]: any[] = await Promise.all([isGuest ? null : UserModel.findOne({ email: me.email }, 'dashboardLayout').lean(), ConfigModel.findOne({}, 'guestLayout').lean()])
+    const [u, c]: any[] = await Promise.all([isGuest ? null : UserModel.findOne({ email: me.email }, 'dashboardLayout dashboardHero').lean(), ConfigModel.findOne({}, 'guestLayout guestHero').lean()])
     const arr = (x: any) => (Array.isArray(x) && x.length ? x.map((p: any) => ({ id: p.id, size: p.size })) : null)
-    return NextResponse.json({ data: { mine: arr(u?.dashboardLayout), guest: arr(c?.guestLayout) } }, { headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json({ data: { mine: arr(u?.dashboardLayout), guest: arr(c?.guestLayout), hero: u?.dashboardHero || null, guestHero: c?.guestHero || null } }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (e: any) { return NextResponse.json({ error: e?.message || 'Gagal memuat' }, { status: 500 }) }
 }
 
 export async function PUT(req: NextRequest) {
   const me = await who(); if (!me) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => ({}))
-  const layout = sanitizeLayoutInput(body?.layout)
-  if (!layout) return NextResponse.json({ error: 'Susunan widget tidak valid' }, { status: 400 })
+  const hasLayout = body && 'layout' in body, hasHero = body && 'hero' in body
+  const layout = hasLayout ? sanitizeLayoutInput(body.layout) : null
+  if ((!hasLayout && !hasHero) || (hasLayout && !layout)) return NextResponse.json({ error: 'Susunan widget tidak valid' }, { status: 400 })
+  if (hasHero && !isHeroKind(body.hero)) return NextResponse.json({ error: 'Pilihan sorotan tidak valid' }, { status: 400 })
+  const set = (layoutKey: string, heroKey: string) => ({ ...(hasLayout ? { [layoutKey]: layout } : {}), ...(hasHero ? { [heroKey]: body.hero } : {}) })
   try {
     await connectDB()
     if (body?.scope === 'guest') {
       if (!me.roles.includes('admin')) return NextResponse.json({ error: 'Khusus admin' }, { status: 403 })
-      await ConfigModel.updateOne({}, { $set: { guestLayout: layout } }, { upsert: true })
+      await ConfigModel.updateOne({}, { $set: set('guestLayout', 'guestHero') }, { upsert: true })
     } else {
       if (me.roles.every(r => r === 'guest')) return NextResponse.json({ error: 'Akses tamu tidak diizinkan' }, { status: 403 })
-      await UserModel.updateOne({ email: me.email }, { $set: { dashboardLayout: layout } })
+      await UserModel.updateOne({ email: me.email }, { $set: set('dashboardLayout', 'dashboardHero') })
     }
-    return NextResponse.json({ data: layout })
+    return NextResponse.json({ data: { layout, hero: hasHero ? body.hero : undefined } })
   } catch (e: any) { return NextResponse.json({ error: e?.message || 'Gagal menyimpan' }, { status: 500 }) }
 }
 
