@@ -1,269 +1,220 @@
 'use client'
-import { getConfig } from '@/lib/configCache'
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
+import { getConfig } from '@/lib/configCache'
+import { Empty, Icon, PageHeader, Sheet } from '@/components/ui'
+import { useYear } from '@/lib/year'
+import { groupNotes, matches, notesForYear } from '@/lib/notesView'
 
-// Fullscreen image preview (lightbox). Click backdrop or × to close.
-function Lightbox({ src, onClose }: { src:string|null; onClose:()=>void }) {
+type Note = Record<string, any>
+type Cat = { key: string; label: string; color?: string }
+const COLLAPSE_KEY = 'wins-notes-collapsed'
+const initials = (s: string) => s.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('')
+const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+const fmtD = (s?: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? `${Number(m[3])} ${BLN[Number(m[2]) - 1]} ${m[1]}` : '' }
+
+async function send(url: string, method: string, body?: unknown) {
+  const res = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data?.error || 'Gagal menyimpan, coba lagi')
+  return data
+}
+
+// Fullscreen image preview. Click backdrop or × to close.
+function Lightbox({ src, onClose }: { src: string | null; onClose: () => void }) {
   useEffect(() => {
     if (!src) return
-    const onKey = (e:KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [src, onClose])
   if (!src) return null
   return (
-    <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:3000, background:'rgba(0,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center', padding:24, cursor:'zoom-out' }}>
-      <button onClick={onClose} style={{ position:'absolute', top:16, right:20, width:40, height:40, borderRadius:'50%', background:'rgba(255,255,255,0.15)', color:'#fff', border:'none', fontSize:22, cursor:'pointer', lineHeight:1 }}>×</button>
-      <img src={src} alt="preview" onClick={e=>e.stopPropagation()} style={{ maxWidth:'95vw', maxHeight:'90vh', objectFit:'contain', borderRadius:8, boxShadow:'0 8px 40px rgba(0,0,0,0.5)', cursor:'default' }} />
+    <div role="dialog" aria-label="Pratinjau gambar" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out' }}>
+      <button type="button" aria-label="Tutup" onClick={onClose} style={{ position: 'absolute', top: 16, right: 20, width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,.15)', color: '#fff', border: 0, cursor: 'pointer' }}><Icon name="x" size={20} /></button>
+      <img src={src} alt="Gambar catatan" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 12, cursor: 'default' }} />
     </div>
   )
 }
 
-function NoteForm({ editing, onClose, onSave, config, members }: { editing?:any; onClose:()=>void; onSave:()=>void; config:any; members:any[] }) {
-  const { data:session } = useSession(); const user = session?.user as any
-  const [lightbox, setLightbox] = useState<string|null>(null)
+function NoteSheet({ editing, defaultCat, cats, members, onClose, onSaved }: { editing: Note | null; defaultCat: string; cats: Cat[]; members: any[]; onClose: () => void; onSaved: () => void }) {
+  const { data: session } = useSession(); const user = session?.user as any
   const [form, setForm] = useState({
-    title: editing?.title || '',
-    category: editing?.category || (config?.activityCategories?.[0]?.key || 'Others'),
-    date: editing?.date || format(new Date(),'yyyy-MM-dd'),
-    content: editing?.content || '',
-    picTags: editing?.picTags || [],
-    categoryTags: editing?.categoryTags || [],
-    images: editing?.images || [],
-    tags: editing?.tags?.join(',') || '',
+    title: editing?.title || '', category: editing?.category || defaultCat, date: editing?.date || format(new Date(), 'yyyy-MM-dd'),
+    content: editing?.content || '', picTags: (editing?.picTags || []) as string[], images: (editing?.images || []) as string[], pinned: !!editing?.pinned,
   })
-  const [saving, setSaving] = useState(false)
-  const set = (k:string,v:any) => setForm(f=>({...f,[k]:v}))
-  const contentRef = useRef<HTMLTextAreaElement>(null)
+  const [saving, setSaving] = useState(false), [tried, setTried] = useState(false), [confirmDel, setConfirmDel] = useState(false)
+  const [lightbox, setLightbox] = useState<string | null>(null)
+  const ref = useRef<HTMLTextAreaElement>(null)
+  const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
+  const catOpts = cats.some(c => c.key === form.category) ? cats : [...cats, { key: form.category, label: form.category }]
 
-  async function handlePaste(e:React.ClipboardEvent<HTMLTextAreaElement>) {
-    const items = e.clipboardData?.items
-    if (!items) return
-    for (const item of Array.from(items)) {
-      if (item.type.startsWith('image/')) {
-        e.preventDefault()
-        const blob = item.getAsFile()
-        if (!blob) continue
-        if (blob.size > 3 * 1024 * 1024) { toast.error('Gambar max 3MB'); continue }
-        const reader = new FileReader()
-        reader.onload = (ev) => {
-          const dataUrl = ev.target?.result as string
-          setForm(f => ({ ...f, images: [...f.images, dataUrl] }))
-          toast.success('Gambar ditempel')
-        }
-        reader.readAsDataURL(blob)
-      }
+  function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    for (const item of Array.from(e.clipboardData?.items || [])) {
+      if (!item.type.startsWith('image/')) continue
+      e.preventDefault()
+      const blob = item.getAsFile()
+      if (!blob) continue
+      if (blob.size > 3 * 1024 * 1024) { toast.error('Gambar maksimal 3 MB'); continue }
+      const reader = new FileReader()
+      reader.onload = ev => { setForm(f => ({ ...f, images: [...f.images, ev.target?.result as string] })); toast.success('Gambar ditempel') }
+      reader.readAsDataURL(blob)
     }
   }
-
-  function insertBullet(prefix:string) {
-    const ta = contentRef.current
-    if (!ta) return
-    const start = ta.selectionStart
-    const text = form.content || ''
-    const lineStart = text.lastIndexOf('\n', start - 1) + 1
-    const newText = text.slice(0, lineStart) + prefix + ' ' + text.slice(lineStart)
-    set('content', newText)
-    setTimeout(()=>{ ta.focus(); ta.setSelectionRange(lineStart + prefix.length + 1, lineStart + prefix.length + 1) }, 0)
+  function bullet(prefix: string) {
+    const ta = ref.current; if (!ta) return
+    const text = form.content || '', start = ta.selectionStart, ls = text.lastIndexOf('\n', start - 1) + 1
+    set('content', text.slice(0, ls) + prefix + ' ' + text.slice(ls))
+    setTimeout(() => { ta.focus(); ta.setSelectionRange(ls + prefix.length + 1, ls + prefix.length + 1) }, 0)
   }
-
-  function togglePic(name:string) { setForm(f=>({...f, picTags: f.picTags.includes(name) ? f.picTags.filter((p:string)=>p!==name) : [...f.picTags, name] })) }
+  const togglePic = (n: string) => set('picTags', form.picTags.includes(n) ? form.picTags.filter(p => p !== n) : [...form.picTags, n])
 
   async function save() {
-    if (!form.title) { toast.error('Title wajib'); return }
+    setTried(true)
+    if (!form.title.trim()) { toast.error('Judul wajib diisi'); return }
     setSaving(true)
     try {
-      const url = editing ? `/api/notes/${editing._id}` : '/api/notes'
-      await fetch(url, { method: editing?'PATCH':'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          ...form, tags: form.tags.split(',').map((s:string)=>s.trim()).filter(Boolean),
-          authorId: user?.id||user?.email, authorName: user?.name,
-        })
-      })
-      toast.success(editing?'Diperbarui':'Note dibuat'); onSave(); onClose()
-    } catch { toast.error('Gagal') } finally { setSaving(false) }
+      const body: Record<string, unknown> = { ...form, title: form.title.trim() }
+      if (!editing) Object.assign(body, { authorId: user?.id || user?.email, authorName: user?.name })
+      await send(editing ? `/api/notes/${editing._id}` : '/api/notes', editing ? 'PATCH' : 'POST', body)
+      toast.success(editing ? 'Catatan diperbarui' : 'Catatan dibuat'); onSaved(); onClose()
+    } catch (e: any) { toast.error(e.message) } finally { setSaving(false) }
   }
   async function del() {
-    if (!confirm('Hapus note?')) return
-    await fetch(`/api/notes/${editing._id}`, { method:'DELETE' })
-    toast.success('Dihapus'); onSave(); onClose()
+    if (!editing) return
+    setSaving(true)
+    try { await send(`/api/notes/${editing._id}`, 'DELETE'); toast.success('Catatan dihapus'); onSaved(); onClose() } catch (e: any) { toast.error(e.message) } finally { setSaving(false) }
   }
 
-  const cats = config?.activityCategories?.filter((c:any)=>c.active) || []
-
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:580 }}>
-        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit Note':'+ Note Baru'}</span>
-          <button onClick={onClose} className="btn btn-icon">×</button>
-        </div>
-        <div style={{ padding:'14px 20px', overflowY:'auto', maxHeight:'72vh', display:'flex', flexDirection:'column', gap:11 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 140px', gap:10 }}>
-            <div><label style={lbl}>Title *</label><input className="input" value={form.title} onChange={e=>set('title',e.target.value)} /></div>
-            <div><label style={lbl}>Tanggal</label><input type="date" className="input" value={form.date} onChange={e=>set('date',e.target.value)} /></div>
-          </div>
-          <div><label style={lbl}>Kategori (Kolom Kanban)</label>
-            <select className="input" value={form.category} onChange={e=>set('category',e.target.value)}>
-              {cats.map((c:any)=><option key={c.key} value={c.key}>{c.label}</option>)}
-            </select></div>
-          <div>
-            <label style={lbl}>Konten / Catatan <span style={{ color:'var(--text3)', fontWeight:400 }}>(bisa paste gambar: Ctrl/Cmd+V)</span></label>
-            <div style={{ display:'flex', gap:4, marginBottom:4 }}>
-              <button type="button" onClick={()=>insertBullet('•')} className="btn btn-sm btn-icon" title="Bullet">•</button>
-              <button type="button" onClick={()=>insertBullet('1.')} className="btn btn-sm btn-icon" title="Number" style={{ fontSize:11 }}>1.</button>
-            </div>
-            <textarea ref={contentRef} className="input" rows={6} value={form.content} onChange={e=>set('content',e.target.value)} onPaste={handlePaste} placeholder="Isi catatan. Paste gambar langsung dari clipboard (Ctrl+V / Cmd+V)..." />
-            {form.images.length > 0 && (
-              <>
-                <div style={{ fontSize:10, color:'var(--text3)', marginTop:8 }}>Klik gambar untuk lihat ukuran penuh</div>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:4 }}>
-                  {form.images.map((img:string, i:number) => (
-                    <div key={i} style={{ position:'relative' }}>
-                      <img src={img} alt={`paste-${i}`} onClick={()=>setLightbox(img)} style={{ maxWidth:120, maxHeight:120, borderRadius:6, border:'1px solid var(--border)', objectFit:'cover', cursor:'zoom-in' }} />
-                      <button type="button" onClick={()=>set('images', form.images.filter((_:any,idx:number)=>idx!==i))} style={{ position:'absolute', top:-6, right:-6, width:20, height:20, borderRadius:'50%', background:'var(--red)', color:'#fff', border:'none', cursor:'pointer', fontSize:12, lineHeight:1 }}>×</button>
-                    </div>
-                  ))}
-                </div>
-                <Lightbox src={lightbox} onClose={()=>setLightbox(null)} />
-              </>
-            )}
-          </div>
-          <div>
-            <label style={lbl}>PIC (klik untuk tag)</label>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-              {members.map(m => (
-                <button key={m._id} onClick={()=>togglePic(m.name)} className="btn btn-sm" style={{ background:form.picTags.includes(m.name)?'var(--brand)':'var(--bg3)', color:form.picTags.includes(m.name)?'#fff':'var(--text2)', borderColor:form.picTags.includes(m.name)?'var(--brand)':'var(--border2)', fontSize:11 }}>{m.name}</button>
-              ))}
-            </div>
-          </div>
-
-        </div>
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          {editing ? <button onClick={del} className="btn btn-danger btn-sm">🗑 Hapus</button> : <div/>}
-          <div style={{ display:'flex', gap:8 }}>
-            <button onClick={onClose} className="btn">Batal</button>
-            <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'...':editing?'Simpan':'Buat'}</button>
-          </div>
-        </div>
+    <Sheet open title={editing ? 'Edit catatan' : 'Catatan baru'} onClose={onClose} onSave={save} saveDisabled={saving} saveLabel={saving ? 'Menyimpan…' : 'Simpan'}>
+      <label className="au-col" style={{ gap: 6 }}><span className="lbl">Judul *</span>
+        <input className="input" value={form.title} maxLength={200} onChange={e => set('title', e.target.value)} aria-invalid={tried && !form.title.trim()} />
+        {tried && !form.title.trim() && <span role="alert" className="au-xs" style={{ color: 'var(--bad)', fontWeight: 600 }}>Judul wajib diisi</span>}</label>
+      <div className="au-grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
+        <label className="au-col" style={{ gap: 6 }}><span className="lbl">Kategori</span><select className="input" value={form.category} onChange={e => set('category', e.target.value)}>{catOpts.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select></label>
+        <label className="au-col" style={{ gap: 6 }}><span className="lbl">Tanggal</span><input type="date" className="input" value={form.date} onChange={e => set('date', e.target.value)} /></label>
       </div>
-    </div>
+      <div className="au-col" style={{ gap: 6 }}>
+        <div className="au-row au-between"><span className="lbl">Isi catatan</span>
+          <span className="au-row" style={{ gap: 4 }}><button type="button" className="btn btn-sm btn-icon" aria-label="Bullet" onClick={() => bullet('•')}>•</button><button type="button" className="btn btn-sm btn-icon" aria-label="Penomoran" onClick={() => bullet('1.')}>1.</button></span></div>
+        <textarea ref={ref} className="input" rows={7} value={form.content} onChange={e => set('content', e.target.value)} onPaste={onPaste} placeholder="Tulis catatan. Gambar bisa ditempel langsung (Ctrl/Cmd + V)." />
+        {form.images.length > 0 && <div className="au-row au-wrap" style={{ gap: 8 }}>
+          {form.images.map((img, i) => (
+            <span key={i} style={{ position: 'relative' }}>
+              <button type="button" onClick={() => setLightbox(img)} aria-label={`Lihat gambar ${i + 1}`} style={{ border: 0, padding: 0, background: 'none', cursor: 'zoom-in' }}><img src={img} alt="" style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 12, border: '1px solid var(--line)' }} /></button>
+              <button type="button" aria-label={`Hapus gambar ${i + 1}`} onClick={() => set('images', form.images.filter((_, k) => k !== i))} style={{ position: 'absolute', top: -8, right: -8, width: 26, height: 26, borderRadius: '50%', background: 'var(--bad)', color: '#fff', border: '2px solid var(--surface)', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><Icon name="x" size={12} stroke={2.6} /></button>
+            </span>
+          ))}
+        </div>}
+      </div>
+      {members.length > 0 && <div className="au-col" style={{ gap: 6 }}><span className="lbl">PIC</span>
+        <div className="au-row au-wrap" style={{ gap: 6 }}>{members.map(m => <button key={m._id || m.name} type="button" className="au-chip" aria-pressed={form.picTags.includes(m.name)} onClick={() => togglePic(m.name)}>{m.name}</button>)}</div></div>}
+      <label className="au-igr" style={{ border: '1px solid var(--line)', borderRadius: 16 }}><span className="k">Sematkan di atas grup</span><input type="checkbox" className="au-sw" style={{ marginLeft: 'auto' }} checked={form.pinned} onChange={e => set('pinned', e.target.checked)} /></label>
+      {editing && (confirmDel
+        ? <div className="au-row au-wrap p-bad" style={{ borderRadius: 14, padding: 12, gap: 10 }}><span className="au-small" style={{ flex: 1 }}>Hapus “{editing.title}”?</span><button type="button" className="btn btn-sm" onClick={() => setConfirmDel(false)}>Batal</button><button type="button" className="btn btn-danger btn-sm" disabled={saving} onClick={del}>Ya, hapus</button></div>
+        : <button type="button" className="btn btn-danger" style={{ alignSelf: 'flex-start' }} onClick={() => setConfirmDel(true)}><Icon name="trash" size={15} />Hapus catatan</button>)}
+      <Lightbox src={lightbox} onClose={() => setLightbox(null)} />
+    </Sheet>
   )
 }
 
 export default function NotesPage() {
-  const [notes, setNotes] = useState<any[]>([])
-  const [config, setConfig] = useState<any>(null)
+  const { year } = useYear()
+  const [notes, setNotes] = useState<Note[] | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [cats, setCats] = useState<Cat[]>([])
   const [members, setMembers] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState<any>(null)
-  const [search, setSearch] = useState('')
-  const [cardLightbox, setCardLightbox] = useState<string|null>(null)
+  const [q, setQ] = useState('')
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const [sheet, setSheet] = useState<{ note: Note | null; cat: string } | null>(null)
+  const [lightbox, setLightbox] = useState<string | null>(null)
 
-  async function load() {
-    setLoading(true)
-    const [n,c,m] = await Promise.all([fetch('/api/notes').then(r=>r.json()), getConfig().then((data:any)=>({ data })), fetch('/api/users').then(r=>r.json())])
-    setNotes(n.data||[]); setConfig(c.data); setMembers((m.data||[]).filter((u:any)=>u.active!==false)); setLoading(false)
+  const load = useCallback(async () => {
+    setFailed(false)
+    try { const d = await send('/api/notes', 'GET'); setNotes(Array.isArray(d.data) ? d.data : []) } catch { setFailed(true); setNotes(n => n ?? []) }
+  }, [])
+  useEffect(() => {
+    load()
+    getConfig().then((c: any) => setCats((c?.activityCategories || []).filter((x: any) => x.active))).catch(() => {})
+    fetch('/api/users').then(r => (r.ok ? r.json() : { data: [] })).then(d => setMembers((d.data || []).filter((u: any) => u.active !== false))).catch(() => {})
+    try { setCollapsed(JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '{}') || {}) } catch {}
+  }, [load])
+  const toggle = (k: string) => setCollapsed(c => { const n = { ...c, [k]: !c[k] }; try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(n)) } catch {} return n })
+
+  async function update(n: Note, patch: Record<string, unknown>, msg: string) {
+    const prev = notes
+    setNotes(list => (list || []).map(x => (x._id === n._id ? { ...x, ...patch } : x)))
+    try { await send(`/api/notes/${n._id}`, 'PATCH', patch); toast.success(msg) } catch (e: any) { setNotes(prev); toast.error(e.message) }
   }
-  useEffect(() => { load() }, [])
-  const cats = config?.activityCategories?.filter((c:any)=>c.active) || []
-  function catColor(key:string) { return cats.find((c:any)=>c.key===key)?.color || 'var(--brand)' }
-  function catLabel(key:string) { return cats.find((c:any)=>c.key===key)?.label || key }
 
-  // Group notes by category (Kanban columns) + filter by search
-  const visible = search ? notes.filter(n => (n.title||'').toLowerCase().includes(search.toLowerCase()) || (n.content||'').toLowerCase().includes(search.toLowerCase())) : notes
-
-  const columns = cats.map((c:any) => ({
-    key: c.key, label: c.label, color: c.color,
-    items: visible.filter(n => n.category === c.key),
-  }))
-  // Add "Uncategorized" column for notes whose category isn't in current cats
-  const knownKeys = new Set(cats.map((c:any)=>c.key))
-  const orphans = visible.filter(n => !knownKeys.has(n.category))
-  if (orphans.length > 0) columns.push({ key:'__orphan', label:'Lainnya', color:'#9aa6b3', items: orphans })
+  const inYear = notesForYear(notes || [], year)
+  const shown = inYear.filter(n => matches(n, q))
+  const groups = groupNotes(shown, cats)
+  const catName = (k: string) => cats.find(c => c.key === k)?.label || k
+  const defaultCat = cats[0]?.key || 'Others'
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      {(showForm||editing) && <NoteForm editing={editing} onClose={()=>{setShowForm(false);setEditing(null)}} onSave={load} config={config} members={members} />}
+    <div className="au-page">
+      {sheet && <NoteSheet editing={sheet.note} defaultCat={sheet.cat} cats={cats} members={members} onClose={() => setSheet(null)} onSaved={load} />}
+      <Lightbox src={lightbox} onClose={() => setLightbox(null)} />
+      <div className="au-view au-anim">
+        <PageHeader eyebrow={`Activities · ${inYear.length} catatan di ${year}`} title="[Team] Notes" actions={
+          <button type="button" className="btn btn-primary" onClick={() => setSheet({ note: null, cat: defaultCat })}><Icon name="plus" size={16} stroke={2.2} />Catatan baru</button>
+        } />
+        <label className="input au-row rise" style={{ gap: 8, padding: '0 12px', maxWidth: 520 }}><Icon name="search" size={16} />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari judul, isi atau PIC" aria-label="Cari catatan" style={{ border: 0, background: 'transparent', flex: 1, minHeight: 42, outline: 0, color: 'var(--ink)' }} /></label>
+        {failed && <div className="au-row au-wrap p-bad" role="alert" style={{ borderRadius: 14, padding: 12 }}><span className="au-small" style={{ flex: 1 }}>Catatan gagal dimuat.</span><button type="button" className="btn btn-sm" onClick={load}>Coba lagi</button></div>}
 
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
-        <div>
-          <div style={{ fontSize:14, fontWeight:600 }}>[Team] Notes — Kanban</div>
-          <div style={{ fontSize:11, color:'var(--text3)' }}>{notes.length} note · Kolom = kategori dari Activities</div>
-        </div>
-        <div style={{ display:'flex', gap:8 }}>
-          <input className="input" value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Cari..." style={{ width:180 }} />
-          <button onClick={()=>setShowForm(true)} className="btn btn-primary btn-sm">+ Note Baru</button>
-        </div>
+        {notes === null ? <div className="au-col" style={{ gap: 10 }}>{[0, 1].map(k => <div key={k} className="au-card"><div className="au-skel" style={{ width: '40%' }} /><div className="au-skel" /></div>)}</div>
+          : !groups.length ? <div className="au-card"><Empty title="Belum ada kategori" text="Tambahkan kategori activities di Configuration." /></div>
+          : <>
+            {q && !shown.length && <div className="au-card"><Empty title="Tidak ada yang cocok" text={`Tidak ada catatan di ${year} yang memuat “${q}”.`} action={<button type="button" className="btn" onClick={() => setQ('')}>Hapus pencarian</button>} /></div>}
+            <div className="au-ngrid">
+              {groups.filter(g => !q || g.items.length).map((g, gi) => {
+                const col = !!collapsed[g.key]
+                return (
+                  <section key={g.key} className="au-ngrp rise" style={{ ['--d' as any]: Math.min(gi, 8) }}>
+                    <button type="button" className="au-nhd" aria-expanded={!col} onClick={() => toggle(g.key)}>
+                      <span className="au-row" style={{ gap: 10 }}><i className="tag" style={{ background: g.color }} /><b>{g.label}</b><span className="au-xs au-muted" style={{ fontFamily: 'var(--mono)' }}>{g.items.length}</span></span>
+                      <span style={{ transform: `rotate(${col ? -90 : 0}deg)`, transition: 'transform .2s', display: 'grid' }}><Icon name="chev" size={18} /></span>
+                    </button>
+                    {!col && <>
+                      {g.items.map(n => (
+                        <article key={n._id} className="au-note">
+                          <button type="button" className="au-note-main" onClick={() => setSheet({ note: n, cat: n.category })}>
+                            <span className="au-row au-wrap" style={{ gap: 8 }}>{n.pinned && <span className="au-pin">PIN</span>}<b>{n.title}</b></span>
+                            {n.content && <span className="au-note-body">{n.content}</span>}
+                          </button>
+                          <div className="au-note-side">
+                            <button type="button" className="btn btn-icon btn-sm" aria-pressed={!!n.pinned} aria-label={n.pinned ? `Lepas sematan ${n.title}` : `Sematkan ${n.title}`} title={n.pinned ? 'Lepas sematan' : 'Sematkan'} onClick={() => update(n, { pinned: !n.pinned }, n.pinned ? 'Sematan dilepas' : 'Disematkan')} style={n.pinned ? { background: 'var(--volt)', color: 'var(--on-volt)', borderColor: 'var(--volt)' } : undefined}><Icon name="pin" size={15} /></button>
+                            <label className="au-row au-xs au-muted" style={{ gap: 6 }}>Pindah
+                              <select className="input input-sm" style={{ width: 'auto', minHeight: 32 }} value={n.category} aria-label={`Pindahkan ${n.title}`} onChange={e => update(n, { category: e.target.value }, `Dipindah ke ${catName(e.target.value)}`)}>
+                                {(cats.some(c => c.key === n.category) ? cats : [...cats, { key: n.category, label: n.category }]).map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                              </select></label>
+                          </div>
+                          {n.images?.length > 0 && <div className="au-row au-wrap" style={{ gap: 6, gridColumn: '1 / -1' }}>
+                            {n.images.slice(0, 4).map((img: string, i: number) => <button key={i} type="button" onClick={() => setLightbox(img)} aria-label={`Lihat gambar ${i + 1} dari ${n.title}`} style={{ border: 0, padding: 0, background: 'none', cursor: 'zoom-in' }}><img src={img} alt="" loading="lazy" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--line)' }} /></button>)}
+                            {n.images.length > 4 && <span className="au-tag">+{n.images.length - 4}</span>}
+                          </div>}
+                          <div className="au-row au-wrap au-xs au-muted" style={{ gap: 8, gridColumn: '1 / -1' }}>
+                            {n.picTags?.length > 0 && <span className="au-avs">{n.picTags.slice(0, 4).map((p: string, i: number) => <span key={p} className={`au-av s c${(i % 7) + 1}`} title={p}>{initials(p)}</span>)}</span>}
+                            {n.categoryTags?.filter((k: string) => k !== n.category).slice(0, 3).map((k: string) => <span key={k} className="au-tag">{catName(k)}</span>)}
+                            <span>{fmtD(n.date)}{n.authorName ? ` · ${String(n.authorName).split(' ')[0]}` : ''}</span>
+                          </div>
+                        </article>
+                      ))}
+                      {!g.items.length && <div className="au-note au-muted au-small" style={{ display: 'flex' }}>Belum ada catatan di {g.label}{year ? ` (${year})` : ''}.</div>}
+                      {g.key !== '__orphan' && <button type="button" className="au-nadd" onClick={() => setSheet({ note: null, cat: g.key })}><Icon name="plus" size={14} />Tambah ke {g.label}</button>}
+                    </>}
+                  </section>
+                )
+              })}
+            </div>
+          </>}
       </div>
-
-      <div style={{ flex:1, overflow:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
-        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> : (
-          <div style={{ display:'flex', gap:12, alignItems:'flex-start', minHeight:'100%' }}>
-            {columns.map((col:any) => (
-              <div key={col.key} style={{ flex:'0 0 280px', display:'flex', flexDirection:'column', gap:8 }}>
-                {/* Column header */}
-                <div className="card" style={{ padding:'10px 12px', borderTop:`3px solid ${col.color}`, display:'flex', justifyContent:'space-between', alignItems:'center', position:'sticky', top:0, zIndex:2 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                    <div style={{ width:8, height:8, borderRadius:'50%', background:col.color }} />
-                    <div style={{ fontSize:12, fontWeight:700 }}>{col.label}</div>
-                  </div>
-                  <div style={{ fontSize:11, color:'var(--text3)', fontWeight:600, background:'var(--bg3)', padding:'2px 8px', borderRadius:10 }}>{col.items.length}</div>
-                </div>
-                {/* Cards */}
-                <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 220px)', display:'flex', flexDirection:'column', gap:6, paddingBottom: 4 }}>
-                  {col.items.length === 0 ? (
-                    <div style={{ padding:'18px 10px', textAlign:'center', color:'var(--text3)', fontSize:10, border:'1px dashed var(--border)', borderRadius:7, background:'var(--bg)' }}>Belum ada note</div>
-                  ) : col.items.map((n:any) => (
-                    <div key={n._id} className="card glass-hover" onClick={()=>setEditing(n)} style={{ padding:11, cursor:'pointer' }}>
-                      <div style={{ fontSize:12, fontWeight:600, marginBottom:5, lineHeight:1.3 }}>{n.title}</div>
-                      {n.content && <div style={{ fontSize:10, color:'var(--text2)', lineHeight:1.5, marginBottom:7, whiteSpace:'pre-wrap', maxHeight:60, overflow:'hidden', textOverflow:'ellipsis' }}>{n.content.substring(0,120)}{n.content.length>120?'...':''}</div>}
-                      {/* PIC tags */}
-                      {n.picTags?.length > 0 && (
-                        <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:5 }}>
-                          {n.picTags.slice(0,3).map((p:string) => (
-                            <div key={p} style={{ width:20, height:20, borderRadius:'50%', background:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color:'#fff' }} title={p}>{p[0]}</div>
-                          ))}
-                          {n.picTags.length > 3 && <div style={{ width:20, height:20, borderRadius:'50%', background:'var(--bg3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, color:'var(--text3)' }}>+{n.picTags.length-3}</div>}
-                        </div>
-                      )}
-                      {/* Cross-category tags */}
-                      {n.categoryTags?.length > 0 && (
-                        <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:5 }}>
-                          {n.categoryTags.filter((k:string)=>k!==n.category).slice(0,3).map((k:string) => (
-                            <span key={k} className="badge" style={{ fontSize:8, background:catColor(k)+'22', color:catColor(k) }}>{catLabel(k)}</span>
-                          ))}
-                        </div>
-                      )}
-                      {n.images?.length > 0 && (
-                        <div style={{ display:'flex', gap:4, flexWrap:'wrap', margin:'6px 0' }}>
-                          {n.images.slice(0,4).map((img:string, ii:number) => (
-                            <img key={ii} src={img} alt={`img-${ii}`} onClick={(e)=>{e.stopPropagation();setCardLightbox(img)}} style={{ width:54, height:54, objectFit:'cover', borderRadius:5, border:'1px solid var(--border)', cursor:'zoom-in' }} />
-                          ))}
-                          {n.images.length > 4 && <div style={{ width:54, height:54, borderRadius:5, background:'var(--bg3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, color:'var(--text3)', fontWeight:600 }}>+{n.images.length-4}</div>}
-                        </div>
-                      )}
-                      <div style={{ fontSize:9, color:'var(--text3)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <span>📅 {n.date}{n.images?.length > 0 ? ` · 🖼 ${n.images.length}` : ''}</span>
-                        {n.authorName && <span>· {n.authorName.split(' ')[0]}</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {/* Quick add at bottom of column */}
-                <button onClick={()=>setShowForm(true)} className="btn btn-sm" style={{ width:'100%', justifyContent:'center', borderStyle:'dashed', fontSize:11, color:'var(--text3)' }}>+ Tambah ke {col.label}</button>
-              </div>
-            ))}
-            {columns.length === 0 && <div className="card" style={{ padding:40, textAlign:'center', color:'var(--text3)' }}>Belum ada kategori. Tambah di Config → Kategori.</div>}
-          </div>
-        )}
-      </div>
-      <Lightbox src={cardLightbox} onClose={()=>setCardLightbox(null)} />
     </div>
   )
 }
-const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }

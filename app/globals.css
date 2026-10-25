@@ -705,3 +705,19 @@ button.au-igr, label.au-igr { cursor:pointer } button.au-igr:hover, label.au-igr
 .au-mgrid { grid-template-columns:minmax(0,1fr) minmax(260px,340px) }
 @media (max-width:1180px) { .au-mgrid { grid-template-columns:minmax(0,1fr) } }
 @media (max-width:900px) { .au-matrix { height:340px } .au-matrix .dot { min-width:38px; height:24px; font-size:10px; padding:0 5px } }
+
+/* ═══ Team Notes (daftar per kategori) ═══ */
+.au-ngrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr)); gap:16px; align-items:start }
+.au-ngrp { background:var(--surface); border:1px solid var(--line); border-radius:24px; overflow:hidden }
+.au-nhd { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; padding:14px 20px; border:0; background:none; min-height:56px; cursor:pointer; color:inherit; font:inherit }
+.au-nhd b { font:700 17px var(--disp) } .au-nhd .tag { width:12px; height:12px; border-radius:4px; display:inline-block }
+.au-note { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 14px; padding:14px 20px; border-top:1px solid var(--line); transition:background .15s }
+.au-note:hover { background:var(--sunken) }
+.au-note-main { display:flex; flex-direction:column; gap:6px; border:0; background:none; text-align:left; padding:0; color:inherit; font:inherit; cursor:pointer; min-width:0; min-height:0 !important }
+.au-note-main b { font-size:15px; line-height:1.35 }
+.au-note-body { color:var(--ink2); font-size:13.5px; line-height:1.5; white-space:pre-wrap; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden }
+.au-note-side { display:flex; flex-direction:column; align-items:flex-end; gap:8px }
+.au-pin { font:600 10px var(--mono); letter-spacing:.06em; color:var(--on-volt); background:var(--volt); border-radius:6px; padding:2px 6px }
+.au-nadd { display:flex; align-items:center; gap:6px; width:100%; border:0; border-top:1px dashed var(--line); background:none; padding:12px 20px; color:var(--accent-ink); font-weight:600; font-size:13.5px; cursor:pointer; min-height:46px }
+.au-nadd:hover { background:var(--accent-soft) }
+@media (max-width:600px) { .au-note { grid-template-columns:minmax(0,1fr) } .au-note-side { flex-direction:row; justify-content:space-between; align-items:center } }
