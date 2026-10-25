@@ -974,3 +974,17 @@ a.au-erow { text-decoration:none; color:inherit }
 /* Tinggi dok tab bar HP: kartu/toast melayang di bawah layar diangkat setinggi ini supaya tidak tertutup. */
 :root { --dock:0px }
 @media (max-width:768px) { :root { --dock:78px } }
+/* Riwayat perubahan di sheet detail */
+.au-hist { border:1px solid var(--line); border-radius:16px; padding:12px 14px; background:var(--surface) }
+.au-hist > summary { list-style:none; display:flex; align-items:center; justify-content:space-between; min-height:28px }
+.au-hist > summary::after { content:'›'; transform:rotate(90deg); transition:transform .2s var(--ease); color:var(--muted); font-size:18px }
+.au-hist[open] > summary::after { transform:rotate(-90deg) }
+/* Widget beban kerja per member */
+.au-wl { display:grid; grid-template-columns:minmax(120px,190px) 1fr; align-items:center; gap:12px; padding:8px 10px; margin:0 -10px; border:0; border-radius:12px; background:none; color:inherit; text-align:left; font:inherit; min-height:44px }
+button.au-wl { cursor:pointer } button.au-wl:hover { background:var(--sunken) }
+.au-wl-n { display:flex; flex-direction:column; min-width:0 } .au-wl-n b { font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.au-wl-bar { display:block; background:var(--sunken); border-radius:999px; overflow:hidden }
+@media (max-width:520px) { .au-wl { grid-template-columns:1fr; gap:6px } }
+/* Badge "perlu update" di menu */
+.wn-due { margin-left:auto; min-width:20px; height:20px; padding:0 6px; border-radius:999px; background:#C42B1C; color:#fff; font:700 11px/20px var(--mono, monospace); text-align:center }
+.wn-tabbar .wn-due { position:absolute; top:2px; left:calc(50% + 6px); margin:0; min-width:18px; height:18px; line-height:18px; font-size:10px; box-shadow:0 0 0 2px var(--surface) }

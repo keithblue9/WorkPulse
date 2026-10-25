@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { addedPics } from '@/lib/changeLog'
+import { currentActor, notifyNewPics } from '@/lib/notifyServer'
 import { connectDB } from '@/lib/db'
 import { InitiativeModel } from '@/models/Initiative'
 import { currentRoles } from '@/lib/session'
@@ -23,7 +25,10 @@ export async function POST(req: NextRequest) {
   try {
     await connectDB()
     const body = await req.json()
-    const initiative = await InitiativeModel.create(body)
+    const initiative: any = await InitiativeModel.create(body)
+    const actor = await currentActor()
+    const added = addedPics([], initiative.pic)
+    if (added.length) after(() => notifyNewPics({ kind: 'initiative', title: initiative.title, names: added, actor, url: `/dashboard/progress?i=${initiative._id}`, tagId: String(initiative._id) }))
     return NextResponse.json({ data: initiative }, { status: 201 })
   } catch (e) {
     return NextResponse.json({ error: 'Failed to create initiative' }, { status: 500 })

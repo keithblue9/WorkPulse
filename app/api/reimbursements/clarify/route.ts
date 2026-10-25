@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { currentActor, recordAudit } from '@/lib/notifyServer'
 import mongoose from 'mongoose'
 import { connectDB } from '@/lib/db'
 import { ReimbursementModel } from '@/models/Reimbursement'
@@ -27,6 +28,8 @@ export async function POST(req: NextRequest) {
     item.clarifiedAt = new Date().toISOString()
     item.clarifyCount = (item.clarifyCount || 0) + 1
     await item.save()
+    const actor = await currentActor()
+    after(() => recordAudit('reimbursement', String(item._id), 'update', actor, [{ field: 'status', label: 'Status', from: 'done', to: 'clarification' }, { field: 'clarifyNote', label: 'Klarifikasi', from: '—', to: item.clarifyNote }]))
 
     // Cari email member pengaju (userId bisa email atau _id; fallback ke userName)
     let email: string | null = null

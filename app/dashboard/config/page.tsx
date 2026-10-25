@@ -356,7 +356,7 @@ export default function ConfigPage() {
     { key:'login',      label:'Login & notifikasi', icon:'lock' },
     { key:'taxonomies', label:'Kategori & status', icon:'list' },
     { key:'attendance', label:'Tipe absensi', icon:'cal' },
-    { key:'budget',     label:'Kategori anggaran', icon:'budget' },
+    { key:'budget',     label:'Anggaran & transfer', icon:'budget' },
     { key:'roles',      label:'Roles & akses', icon:'shield' },
     { key:'widgets',    label:'Widget dashboard', icon:'dash' },
     { key:'enhancement', label:'Template enhancement', icon:'enh' },
@@ -510,6 +510,19 @@ export default function ConfigPage() {
               </div>
             </Section>
 
+            <Section title="Notifikasi terjadwal (push)" sub="Berjalan otomatis lewat cron pagi ±08:00 WIB">
+              <div className="au-ig">
+                <label className="au-igr" style={{ cursor:'pointer' }}>
+                  <span className="au-col" style={{ flex:1, minWidth:0, gap:1 }}><span className="au-small" style={{ fontWeight:600 }}>Ringkasan mingguan (Senin)</span><span className="au-xs au-muted">Tiap Senin, tiap member menerima ringkasan activity, tugas initiative, dan enhancement dengan PIC dirinya</span></span>
+                  <input type="checkbox" className="au-sw" checked={config.weeklyDigest !== false} onChange={()=>save({ weeklyDigest: config.weeklyDigest === false })} />
+                </label>
+                <div className="au-igr">
+                  <span className="au-col" style={{ flex:1, minWidth:0, gap:1 }}><span className="au-small" style={{ fontWeight:600 }}>Pengingat reimburse menggantung</span><span className="au-xs au-muted">Ingatkan semua cashier bila ada reimburse belum ditransfer lebih dari N hari (0 = mati)</span></span>
+                  <input type="number" min={0} max={30} className="input input-sm" aria-label="Batas hari reimburse menggantung" style={{ width:80 }} defaultValue={config.staleReimburseDays ?? 3} onBlur={e=>save({ staleReimburseDays: Math.max(0, Math.min(30, parseInt(e.target.value)||0)) })} />
+                </div>
+              </div>
+            </Section>
+
             <Section title="Pengingat harian (push)" sub="Notifikasi otomatis ke HP semua member (iOS & Android) tiap pagi ±08:00 WIB">
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                 <div className="au-small au-ink2" style={{ lineHeight:1.6 }}>
@@ -562,7 +575,16 @@ export default function ConfigPage() {
           </Section>
         )}
 
-        {tab === 'budget' && (
+        {tab === 'budget' && (<>
+          <Section title="Transfer reimburse · biaya antar bank" sub="Dipakai Cashier: biaya otomatis terisi bila bank tujuan berbeda dari bank sumber dana">
+            {(() => { const tf = { pettyBank:'Mandiri', cashCardBank:'Mandiri', amount:6500, auto:true, ...(config.transferFee||{}) }; const saveTf = (p:any) => save({ transferFee: { ...tf, ...p } }); return (
+              <div className="au-ig">
+                <label className="au-igr" style={{ cursor:'pointer' }}><span className="au-col" style={{ flex:1, minWidth:0, gap:1 }}><span className="au-small" style={{ fontWeight:600 }}>Isi biaya otomatis</span><span className="au-xs au-muted">Cashier tetap bisa mengubah per transfer</span></span><input type="checkbox" className="au-sw" checked={tf.auto !== false} onChange={()=>saveTf({ auto: tf.auto === false })} /></label>
+                <div className="au-igr"><span className="k" style={{ flex:1 }}>Bank rekening Petty Cash</span><input className="input input-sm" aria-label="Bank rekening Petty Cash" style={{ width:160 }} defaultValue={tf.pettyBank} onBlur={e=>saveTf({ pettyBank: e.target.value.trim() })} /></div>
+                <div className="au-igr"><span className="k" style={{ flex:1 }}>Bank Cash Card</span><input className="input input-sm" aria-label="Bank Cash Card" style={{ width:160 }} defaultValue={tf.cashCardBank} onBlur={e=>saveTf({ cashCardBank: e.target.value.trim() })} /></div>
+                <div className="au-igr"><span className="k" style={{ flex:1 }}>Biaya antar bank (Rp)</span><input type="number" min={0} className="input input-sm" aria-label="Biaya antar bank default" style={{ width:120 }} defaultValue={tf.amount} onBlur={e=>saveTf({ amount: Math.max(0, parseInt(e.target.value)||0) })} /></div>
+              </div>) })()}
+          </Section>
           <Section title="Kategori anggaran" sub="Dinas Travel / External Accommodation — set anggaran tahunan & threshold">
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               {(config.budgetCategories || []).map((cat:any, i:number) => (
@@ -579,7 +601,7 @@ export default function ConfigPage() {
               <button type="button" className="btn btn-sm" style={{ alignSelf:'flex-start' }} onClick={()=>save({ budgetCategories: [...(config.budgetCategories || []), { key:`cat_${Date.now()}`, label:'Kategori Baru', annualBudget:0, threshold:80, pic:'' }] })}><Icon name="plus" size={14} />Tambah kategori</button>
             </div>
           </Section>
-        )}
+       </>)}
 
         {tab === 'roles' && (
           <Section title="Roles & akses" sub="Atur role dan menu apa saja yang bisa diakses per role" action={

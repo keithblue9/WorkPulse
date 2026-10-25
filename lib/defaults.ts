@@ -60,6 +60,7 @@ export const DEFAULT_WIDGETS = [
   { key:'golive-insights',    label:'Go-Live per Aplikasi', segment:'main', active:true, order:9, size:'full' },
   { key:'progress-chart',     label:'Status Progress Project', segment:'main', active:true, order:11, size:'half' },
   { key:'upcoming-agenda',    label:'Agenda Mendatang',    segment:'main', active:true, order:12, size:'half' },
+  { key:'team-workload',      label:'Beban kerja per member', segment:'main', active:true, activeGuest:false, order:14, size:'full' },
 ]
 
 export const DEFAULT_LINK_CATEGORIES = [

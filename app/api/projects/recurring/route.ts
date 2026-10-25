@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { addedPics } from '@/lib/changeLog'
+import { currentActor, notifyNewPics } from '@/lib/notifyServer'
 import { connectDB } from '@/lib/db'
 import { ProjectModel } from '@/models/Project'
 
@@ -14,7 +16,10 @@ export async function PATCH(req: NextRequest) {
     delete safe.actionDate; delete safe._id; delete safe.recurrenceGroupId
     const q: any = { recurrenceGroupId: groupId }
     if (fromDate) q.actionDate = { $gte: fromDate }
+    const sample: any = 'pic' in safe ? await ProjectModel.findOne(q).lean() : null
     const res = await ProjectModel.updateMany(q, { $set: safe })
+    const added = sample ? addedPics(sample.pic, safe.pic) : []
+    if (added.length) { const actor = await currentActor(); after(() => notifyNewPics({ kind: 'activity', title: safe.title || sample.title, names: added, actor, url: '/dashboard/activities', tagId: String(groupId) })) }
     return NextResponse.json({ success: true, modified: res.modifiedCount })
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
 }

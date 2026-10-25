@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { ProjectModel } from '@/models/Project'
+import { addedPics } from '@/lib/changeLog'
+import { currentActor, notifyNewPics, recordAudit } from '@/lib/notifyServer'
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,7 +22,14 @@ export async function POST(req: NextRequest) {
   try {
     await connectDB()
     const body = await req.json()
-    const project = await ProjectModel.create(body)
+    const project: any = await ProjectModel.create(body)
+    const actor = await currentActor()
+    // Setelah respons: notifikasi PIC + riwayat. Recurring membuat banyak occurrence — notifikasi sekali per grup (occurrence pertama).
+    const firstOfGroup = !project.recurrenceGroupId || !(await ProjectModel.exists({ recurrenceGroupId: project.recurrenceGroupId, _id: { $ne: project._id } }))
+    after(async () => {
+      await recordAudit('activity', String(project._id), 'create', actor, [], 'Dibuat')
+      if (firstOfGroup) await notifyNewPics({ kind: 'activity', title: project.title, names: addedPics([], project.pic), actor, url: '/dashboard/activities', tagId: String(project.recurrenceGroupId || project._id) })
+    })
     return NextResponse.json({ data: project }, { status: 201 })
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
 }

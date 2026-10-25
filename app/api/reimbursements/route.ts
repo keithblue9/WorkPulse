@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { currentActor, recordAudit } from '@/lib/notifyServer'
 import { connectDB } from '@/lib/db'
 import { ReimbursementModel } from '@/models/Reimbursement'
 import { notifyReimburseSubmitted } from '@/lib/reimburseNotif'
@@ -35,8 +36,10 @@ export async function POST(req: NextRequest) {
     await connectDB()
     const body = await req.json()
     const item = await ReimbursementModel.create(body)
-    // Push notif: pengajuan baru -> member pengaju + cashier (non-blocking, jangan gagalin create)
-    notifyReimburseSubmitted(item).catch(() => {})
+    // Push notif & riwayat setelah respons terkirim. after() menjaga fungsi serverless tetap hidup
+    // sampai selesai — sebelumnya dipanggil tanpa await sehingga sering terputus di Vercel.
+    const actor = await currentActor()
+    after(async () => { await recordAudit('reimbursement', String(item._id), 'create', actor, [], 'Pengajuan dibuat'); await notifyReimburseSubmitted(item).catch(() => {}) })
     return NextResponse.json({ data: item }, { status: 201 })
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
 }

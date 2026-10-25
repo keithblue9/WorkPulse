@@ -10,6 +10,9 @@ import toast from 'react-hot-toast'
 import { useYear } from '@/lib/year'
 import { ConfirmSheet, Empty, Icon, PageHeader, Pill, Seg, Sheet, Tile, type Tone, Portal } from '@/components/ui'
 import { useTabParam } from '@/lib/useTabParam'
+import HistoryList from '@/components/HistoryList'
+import { getConfig } from '@/lib/configCache'
+import { suggestFee, type FeeCfg } from '@/lib/transferFee'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
 const short = (n:number) => { const a = Math.abs(n||0); const f = (v:number, u:string) => `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(v)} ${u}`; return a >= 1e9 ? f(n/1e9,'M') : a >= 1e6 ? f(n/1e6,'jt') : a >= 1e3 ? f(n/1e3,'rb') : fmt(n) }
@@ -326,6 +329,7 @@ function DetailSheet({ item, onClose, onDelete, onEdit, armDelete }: { item:any;
       {item.rejectReason && <div className="p-bad au-small" style={{ borderRadius: 14, padding: 12 }}>Alasan ditolak: {item.rejectReason}</div>}
       {item.status==='clarification' && item.clarifyNote && <div className="p-warn au-small" style={{ borderRadius: 14, padding: 12, lineHeight: 1.5 }}><b>Perlu klarifikasi{item.clarifiedBy?` (dari ${item.clarifiedBy})`:''}:</b><br/>{item.clarifyNote}</div>}
       {item.documents?.length > 0 && <EvidenceList itemId={item._id} documents={item.documents} zipName={`evidence_${(item.title||'reimburse').replace(/\s+/g,'_')}`} />}
+      <HistoryList entity="reimbursement" id={String(item._id)} />
       {(onDelete || onEdit) && <div className="au-row au-wrap" style={{ gap: 8, justifyContent: 'space-between' }}>
         {onDelete ? (confirmDel
           ? <div className="au-row au-wrap p-bad" style={{ borderRadius: 14, padding: 10, gap: 8, flex: 1 }}><span className="au-small" style={{ flex: 1 }}>Hapus reimburse yang ditolak ini?</span><button type="button" className="btn btn-sm" onClick={() => setConfirmDel(false)}>Batal</button><button type="button" className="btn btn-danger btn-sm" disabled={busy} onClick={async () => { setBusy(true); try { await onDelete() } finally { setBusy(false) } }}>Ya, hapus</button></div>
@@ -337,6 +341,24 @@ function DetailSheet({ item, onClose, onDelete, onEdit, armDelete }: { item:any;
 }
 
 // =====================  Transfer (Cashier)  =====================
+// Payload "tandai sudah ditransfer" — dipakai transfer satuan & transfer sekaligus (API tidak berubah).
+// Petty Cash: langsung SELESAI (verified). Cash Card: 'done' (Waiting for Verification) utk diverifikasi CC saat settlement.
+function transferBody(item:any, source:'cash_card'|'petty_cash', hasBiaya:boolean, biaya:number, userName?:string) {
+  const isCC = source === 'cash_card', now = new Date().toISOString()
+  const statusPayload: any = isCC ? { status:'done' } : { status:'verified', verifiedAt: now, verifiedBy: `${userName||'Cashier'} (Petty Cash)` }
+  const fee = hasBiaya ? (Number(biaya)||0) : 0
+  return { ...statusPayload, isCashCard:isCC, source, hasBiayaAntarBank: hasBiaya, biayaAntarBank: fee, totalTransfer: (Number(item.amount)||0) + fee, transferredAt: now, transferredBy: userName }
+}
+// Skema memberi default false, jadi hanya "true" atau nominal > 0 yang berarti biaya sudah pernah diisi.
+const savedFee = (item:any) => item.hasBiayaAntarBank === true || (Number(item.biayaAntarBank)||0) > 0
+
+/** Konfigurasi biaya antar bank (Configuration → Anggaran & transfer). */
+function useFeeCfg(): FeeCfg | undefined {
+  const [cfg, setCfg] = useState<FeeCfg | undefined>(undefined)
+  useEffect(() => { getConfig().then((c:any) => setCfg(c?.transferFee || null)).catch(() => setCfg(null)) }, [])
+  return cfg
+}
+
 function TransferSheet({ item, onClose, onSave }: { item:any; onClose:()=>void; onSave:()=>void }) {
   const { data:session } = useSession(); const user = session?.user as any
   const [hasBiaya, setHasBiaya] = useState(item.hasBiayaAntarBank || false)
@@ -344,21 +366,20 @@ function TransferSheet({ item, onClose, onSave }: { item:any; onClose:()=>void; 
   const [source, setSource] = useState<'cash_card'|'petty_cash'>(item.isCashCard ? 'cash_card' : 'petty_cash')
   const [processing, setProcessing] = useState(false)
   const [rejecting, setRejecting] = useState(false), [reason, setReason] = useState('')
+  // Biaya otomatis: bila bank tujuan beda dari bank sumber dana terpilih (Petty Cash / Cash Card).
+  // Berhenti mengikuti saran begitu cashier mengubah sendiri, atau bila item sudah punya biaya tersimpan.
+  const feeCfg = useFeeCfg()
+  const [touched, setTouched] = useState(savedFee(item))
+  const hint = feeCfg === undefined ? null : suggestFee(item.bank, source, feeCfg)
+  useEffect(() => { if (touched || !hint) return; setHasBiaya(hint.apply); if (hint.apply) setBiaya(hint.amount) }, [touched, hint?.apply, hint?.amount])  // eslint-disable-line react-hooks/exhaustive-deps
   const total = (item.amount || 0) + (hasBiaya ? biaya : 0)
 
   async function doTransfer() {
     setProcessing(true)
     try {
-      const isCC = source === 'cash_card'
-      // Petty Cash: setelah ditransfer cashier langsung SELESAI (verified), ga lewat settlement CC.
-      // Cash Card: masuk 'done' (Waiting for Verification) utk diverifikasi CC saat settlement.
-      const now = new Date().toISOString()
-      const statusPayload: any = isCC
-        ? { status:'done' }
-        : { status:'verified', verifiedAt: now, verifiedBy: `${user?.name||'Cashier'} (Petty Cash)` }
       const updateRes = await fetch(`/api/reimbursements/${item._id}`, {
         method:'PATCH', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ ...statusPayload, isCashCard:isCC, source, hasBiayaAntarBank: hasBiaya, biayaAntarBank: hasBiaya ? biaya : 0, totalTransfer: total, transferredAt: now, transferredBy: user?.name })
+        body: JSON.stringify(transferBody(item, source, hasBiaya, biaya, user?.name))
       })
       if (!updateRes.ok) { toast.error('Gagal update'); return }
       toast.success('Ditandai sudah ditransfer'); onSave(); onClose()
@@ -388,8 +409,8 @@ function TransferSheet({ item, onClose, onSave }: { item:any; onClose:()=>void; 
       <div className="au-col" style={{ gap: 6 }}><span className="lbl">Sumber dana</span>
         <Seg full label="Sumber dana" value={source} onChange={setSource} options={[['cash_card','Cash Card'],['petty_cash','Petty Cash']] as const} /></div>
       <div className="au-ig">
-        <label className="au-igr"><span className="k">Biaya antar bank</span><input type="checkbox" className="au-sw" style={{ marginLeft: 'auto' }} checked={hasBiaya} onChange={e=>setHasBiaya(e.target.checked)} /></label>
-        {hasBiaya && <div className="au-igr"><span className="k">Nominal biaya</span><MoneyInput currency="IDR" className="input input-sm" style={{ width: 150, marginLeft: 'auto' }} value={biaya} onChange={n=>setBiaya(n)} placeholder="6.500" /></div>}
+        <label className="au-igr"><span className="au-col" style={{ gap: 2, minWidth: 0 }}><span className="k">Biaya antar bank</span>{hint?.reason && !touched && <span className="au-xs au-muted">{hint.reason}</span>}</span><input type="checkbox" className="au-sw" style={{ marginLeft: 'auto', flexShrink: 0 }} checked={hasBiaya} onChange={e=>{ setTouched(true); setHasBiaya(e.target.checked); if (e.target.checked && !biaya) setBiaya(hint?.amount || 6500) }} /></label>
+        {hasBiaya && <div className="au-igr"><span className="k">Nominal biaya</span><MoneyInput currency="IDR" className="input input-sm" style={{ width: 150, marginLeft: 'auto' }} value={biaya} onChange={n=>{ setTouched(true); setBiaya(n) }} placeholder="6.500" ariaLabel="Nominal biaya antar bank" /></div>}
       </div>
       <div className="au-total"><span className="lbl">Total transfer</span><b>Rp {fmt(total)}</b></div>
       {rejecting
@@ -570,6 +591,54 @@ function PengajuanTab({ items, loading, reload, user, isAdminish, year, month, n
 }
 
 // ---------------------  TAB: Cashier  ---------------------
+/** Transfer sekaligus: beberapa reimburse yang dipilih ditandai sudah ditransfer, biaya otomatis per item. */
+function BulkTransferSheet({ items, onClose, onDone }: { items:any[]; onClose:()=>void; onDone:()=>void }) {
+  const { data:session } = useSession(); const user = session?.user as any
+  const feeCfg = useFeeCfg()
+  type Row = { source:'cash_card'|'petty_cash'; has:boolean; fee:number; touched:boolean }
+  const [rows, setRows] = useState<Record<string, Row>>(() => Object.fromEntries(items.map(r => [r._id, { source: r.isCashCard ? 'cash_card' : 'petty_cash', has: !!r.hasBiayaAntarBank, fee: Number(r.biayaAntarBank)||0, touched: savedFee(r) }])))
+  useEffect(() => {
+    if (feeCfg === undefined) return
+    setRows(prev => Object.fromEntries(items.map(r => { const x = prev[r._id]; if (x.touched) return [r._id, x]; const h = suggestFee(r.bank, x.source, feeCfg); return [r._id, { ...x, has: h.apply, fee: h.apply ? h.amount : 0 }] })))
+  }, [feeCfg, items])
+  const upd = (id:string, p:Partial<Row>) => setRows(prev => { const x = { ...prev[id], ...p }; if (!('has' in p) && !('fee' in p) && !x.touched && feeCfg) { const h = suggestFee(items.find(i=>i._id===id)?.bank, x.source, feeCfg); x.has = h.apply; x.fee = h.apply ? h.amount : 0 } return { ...prev, [id]: x } })
+  const [busy, setBusy] = useState(false), [progress, setProgress] = useState(0)
+  const fees = items.reduce((s, r) => s + (rows[r._id]?.has ? rows[r._id].fee : 0), 0)
+  const amount = items.reduce((s, r) => s + (Number(r.amount)||0), 0)
+  async function run() {
+    setBusy(true); setProgress(0)
+    const failed: string[] = []
+    for (const r of items) {
+      const x = rows[r._id]
+      try { await patch(r._id, transferBody(r, x.source, x.has, x.fee, user?.name)) } catch { failed.push(r.title || r._id) }
+      setProgress(p => p + 1)
+    }
+    setBusy(false)
+    if (failed.length) toast.error(`${items.length - failed.length} berhasil, ${failed.length} gagal: ${failed.slice(0,3).join(', ')}`)
+    else toast.success(`${items.length} reimburse ditandai sudah ditransfer`)
+    onDone(); onClose()
+  }
+  return (
+    <Sheet open wide title={`Transfer sekaligus (${items.length})`} onClose={busy ? ()=>{} : onClose}>
+      <p className="au-xs au-muted" style={{ marginTop: -4 }}>Biaya antar bank terisi otomatis bila bank tujuan berbeda dari bank sumber dana. Bisa diubah per item.</p>
+      <div className="au-ig">
+        {items.map(r => { const x = rows[r._id]; return (
+          <div key={r._id} className="au-igr" style={{ flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            <span className="au-col" style={{ flex: '1 1 180px', minWidth: 0, gap: 2 }}><b className="au-small">{r.userName} · Rp {fmt(r.amount)}</b><span className="au-xs au-muted">{r.title} · {r.bank || '—'} {r.noRekening || ''}</span></span>
+            <select className="input input-sm" aria-label={`Sumber dana ${r.title}`} style={{ width: 'auto' }} value={x.source} disabled={busy} onChange={e => upd(r._id, { source: e.target.value as any })}><option value="petty_cash">Petty Cash</option><option value="cash_card">Cash Card</option></select>
+            <label className="au-row au-xs" style={{ gap: 6 }}><input type="checkbox" className="au-check" checked={x.has} disabled={busy} onChange={e => upd(r._id, { has: e.target.checked, fee: e.target.checked ? (x.fee || feeCfg?.amount || 6500) : x.fee, touched: true })} />Biaya</label>
+            {x.has && <MoneyInput currency="IDR" className="input input-sm" style={{ width: 110 }} value={x.fee} onChange={n => upd(r._id, { fee: n, touched: true })} ariaLabel={`Biaya antar bank ${r.title}`} />}
+          </div>) })}
+      </div>
+      <div className="au-total"><span className="lbl">Total transfer{fees ? ` · biaya Rp ${fmt(fees)}` : ''}</span><b>Rp {fmt(amount + fees)}</b></div>
+      <div className="au-row au-wrap" style={{ gap: 8, justifyContent: 'flex-end' }}>
+        <button type="button" className="btn" disabled={busy} onClick={onClose}>Batal</button>
+        <button type="button" className="btn btn-primary" disabled={busy || feeCfg === undefined} onClick={run}><Icon name="check" size={15} stroke={2.4} />{busy ? `Memproses ${progress}/${items.length}…` : `Tandai ${items.length} sudah ditransfer`}</button>
+      </div>
+    </Sheet>
+  )
+}
+
 function CashierTab({ items, loading, reload, year, month }: { items:any[]; loading:boolean; reload:()=>void; year:number; month:number }) {
   const [transferring, setTransferring] = useState<any>(null)
   const [confirm, setConfirm] = useState<{ kind:'reverse'|'delete'; item:any } | null>(null)
@@ -581,6 +650,7 @@ function CashierTab({ items, loading, reload, year, month }: { items:any[]; load
   // Pilih beberapa antrian utk hitung total (cashier sering transfer sekaligus)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [showRincian, setShowRincian] = useState(false)
+  const [bulk, setBulk] = useState(false)
   const pendingKey = pending.map(r=>r._id).join(',')
   useEffect(() => {
     const ids = new Set(pending.map(r=>r._id))
@@ -644,6 +714,7 @@ function CashierTab({ items, loading, reload, year, month }: { items:any[]; load
         text={<>Hapus reimburse <b>“{confirm.item.title}”</b> yang sudah disetujui pembatalannya? Kas akan diperbarui.</>}
         onConfirm={() => delReversed(confirm.item)} onClose={() => setConfirm(null)} />}
 
+      {bulk && <BulkTransferSheet items={rekap.rows} onClose={()=>setBulk(false)} onDone={()=>{ setSelected(new Set()); reload() }} />}
       {showRincian && (
         <Sheet open title="Rincian transfer" onClose={()=>setShowRincian(false)}>
           <span className="au-xs au-muted">{rekap.rows.length} item dipilih · dikelompokkan per rekening</span>
@@ -668,7 +739,8 @@ function CashierTab({ items, loading, reload, year, month }: { items:any[]; load
       {selected.size > 0 && (
         <Portal><div className="au-selbar" role="status">
           <span className="au-col" style={{ gap: 1 }}><span className="au-xs au-muted">{selected.size} item · {rekap.groups.length} rekening</span><b>Rp {fmt(rekap.total)}</b></span>
-          <button type="button" onClick={()=>setShowRincian(true)} className="btn btn-sm btn-primary"><Icon name="list" size={14} />Rincian</button>
+          <button type="button" onClick={()=>setShowRincian(true)} className="btn btn-sm"><Icon name="list" size={14} />Rincian</button>
+          <button type="button" onClick={()=>setBulk(true)} className="btn btn-sm btn-primary"><Icon name="check" size={14} stroke={2.4} />Transfer sekaligus</button>
           <button type="button" onClick={()=>setSelected(new Set())} className="btn btn-sm">Batal pilih</button>
         </div></Portal>
       )}

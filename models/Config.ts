@@ -187,6 +187,19 @@ const ConfigSchema = new Schema({
 
   // Guard: tanggal terakhir broadcast pengingat harian (absen + agenda) dikirim — biar 1x/hari
   lastDailyBroadcast: { type:String, default:'' },
+  // Guard ringkasan mingguan (Senin) & pengingat reimburse menggantung — 1x per tanggal
+  lastWeeklyDigest: { type:String, default:'' },
+  lastStaleReimburse: { type:String, default:'' },
+  // Pengingat reimburse belum ditransfer setelah N hari (0 = mati)
+  staleReimburseDays: { type:Number, default:3 },
+  weeklyDigest: { type:Boolean, default:true },
+  // Biaya antar bank otomatis: bank rekening sumber transfer cashier & biaya default bila bank tujuan berbeda
+  transferFee: {
+    pettyBank: { type:String, default:'Mandiri' },     // bank rekening Petty Cash
+    cashCardBank: { type:String, default:'Mandiri' },  // bank Cash Card
+    amount: { type:Number, default:6500 },
+    auto: { type:Boolean, default:true },
+  },
 }, { timestamps:true })
 
 export const ConfigModel = models.Config || mongoose.model('Config', ConfigSchema)
