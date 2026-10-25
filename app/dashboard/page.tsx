@@ -24,7 +24,7 @@ import { showInYear } from '@/lib/initiativeView'
 import { CATS, STAGES_SHORT, enhActs, normWeights, score } from '@/lib/enhancement'
 import { activityInYear, activityStats, greeting, portfolio, samePerson, upcoming, wfoUserIds } from '@/lib/dashboard'
 
-type View = 'mgmt' | 'staff' | 'issues'
+type View = 'general' | 'staff' | 'issues'
 type Any = Record<string, any>
 const VIEW_KEY = 'wins-dash-view'
 const P = (v: number) => `${Math.round(v)}%`
@@ -52,14 +52,15 @@ export default function DashboardPage() {
   const { data: session } = useSession(); const user = session?.user as Any | undefined
   const roles = userRolesOf(user)
   const internal = isInternalUser(roles)
-  const isMgr = roles.some(r => r === 'admin' || r === 'manager')
   const { year } = useYear()
   const nowYear = new Date().getFullYear()
   const todayIso = format(new Date(), 'yyyy-MM-dd')
   const today = useMemo(() => todayUTC(), [])
   const first = String(user?.name || '').split(' ')[0] || 'kamu'
 
-  const [view, setView] = useState<View>('mgmt')
+  const [view, setView] = useState<View>('general')
+  // Fokus: default diri sendiri; bisa dipilih per nama member (filter PIC).
+  const [focus, setFocus] = useState<string>('')
   const [data, setData] = useState<{ acts: Any[]; inits: Any[]; enh: Any[]; members: Any[]; att: Any[]; notes: Any[] } | null>(null)
   const [failed, setFailed] = useState<string[]>([])
   const [config, setConfig] = useState<Any | null>(null)
@@ -68,10 +69,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return
-    let v: View = isMgr || !internal ? 'mgmt' : 'staff'
-    try { const s = localStorage.getItem(VIEW_KEY) as View | null; if (s && (internal || s !== 'staff')) v = s } catch {}
+    // General = tampilan standar untuk semua member (seperti versi lama). 'mgmt' = nama lama tab ini.
+    let v: View = 'general'
+    try { const raw = localStorage.getItem(VIEW_KEY); const s = (raw === 'mgmt' ? 'general' : raw) as View | null; if (s && ['general', 'staff', 'issues'].includes(s) && (internal || s !== 'staff')) v = s } catch {}
     setView(v)
-  }, [user, internal, isMgr])
+  }, [user, internal])
   const pickView = (v: View) => { setView(v); try { localStorage.setItem(VIEW_KEY, v) } catch {} }
 
   const load = useCallback(async () => {
@@ -119,22 +121,24 @@ export default function DashboardPage() {
   // ── Fokus saya ──
   const me = useMemo(() => {
     if (!data || !d || !user) return null
-    const name = String(user.name || '')
+    const self = !focus || samePerson(focus, String(user.name || ''))
+    const person = self ? null : d.staff.find((m: Any) => samePerson(String(m.name || ''), focus))
+    const name = self ? String(user.name || '') : focus
     const mineInits = d.inits.filter(x => picArray(x.i.pic).some(p => samePerson(p, name)))
     const tasks = mineInits.flatMap(x => x.acts.map((a, idx) => ({ x, a, idx }))).filter(t => t.a.pct < 100 && (!t.a.start || dUTC(t.a.start) <= today + 45 * DAY) && (!t.a.end || inYear([t.a], year) || !t.a.start))
     const late = tasks.filter(t => t.a.start && ptd(t.a, today) > t.a.pct + 0.5)
     const myActs = d.st.open.filter((a: Any) => picArray(a.pic).some(p => samePerson(p, name)) || samePerson(a.picName || '', name))
     const myEnh = d.enh.filter(v => (v.e.pic || []).some((p: string) => samePerson(p, name)))
-    const ids = [String(user.id || ''), String(user.email || '')]
+    const ids = self ? [String(user.id || ''), String(user.email || '')] : [String(person?._id || ''), String(person?.email || '')].filter(Boolean)
     const myAtt = data.att.filter(r => ids.includes(String(r.userId)))
     const wfoMonth = new Set(myAtt.filter(r => String(r.date || '').startsWith(todayIso.slice(0, 7)) && wfoUserIds([r], r.date).size).map(r => r.date)).size
     const c = tasks.length ? calc(tasks.map(t => t.a), today) : { plan: 0, actual: 0, spi: null }
-    return { tasks, late, myActs, myEnh, myAtt, wfoMonth, c }
-  }, [data, d, user, today, year, todayIso])
+    return { tasks, late, myActs, myEnh, myAtt, wfoMonth, c, self, name }
+  }, [data, d, user, today, year, todayIso, focus])
 
   const views: ReadonlyArray<readonly [View, React.ReactNode]> = internal
-    ? [['mgmt', <><Icon name="boss" size={15} />Manajemen</>], ['staff', <><Icon name="me" size={15} />Fokus saya</>], ['issues', <><Icon name="bolt" size={15} />Issues</>]]
-    : [['mgmt', <><Icon name="dash" size={15} />Ringkasan</>], ['issues', <><Icon name="bolt" size={15} />Issues</>]]
+    ? [['general', <><Icon name="dash" size={15} />General</>], ['staff', <><Icon name="me" size={15} />Fokus saya</>], ['issues', <><Icon name="bolt" size={15} />Issues</>]]
+    : [['general', <><Icon name="dash" size={15} />General</>], ['issues', <><Icon name="bolt" size={15} />Issues</>]]
   const dateLabel = format(new Date(), 'EEEE, d MMMM yyyy', { locale: idLocale })
 
   return (
@@ -154,7 +158,7 @@ export default function DashboardPage() {
       <div className="au-view au-anim">
         <PageHeader eyebrow={`${dateLabel} · ${year}`} title="Dashboard" actions={<>
           <Seg label="Tampilan dashboard" value={view} onChange={pickView} options={views} />
-          {internal && view === 'mgmt' && <button type="button" className="btn btn-ghost" onClick={() => setLayout(true)} disabled={!config}><Icon name="grid" size={15} />Atur layout</button>}
+          {internal && view === 'general' && <button type="button" className="btn btn-ghost" onClick={() => setLayout(true)} disabled={!config}><Icon name="grid" size={15} />Atur layout</button>}
         </>} />
         {failed.length > 0 && <div className="au-row au-wrap p-warn" role="status" style={{ borderRadius: 14, padding: 12 }}><span className="au-small" style={{ flex: 1 }}>Sebagian data gagal dimuat ({failed.join(', ')}).</span><button type="button" className="btn btn-sm" onClick={() => { ['/api/projects', '/api/initiatives?year=all', '/api/enhancements?year=all', '/api/users', '/api/notes'].forEach(u => invalidateFetch(u)); load() }}>Coba lagi</button></div>}
 
@@ -164,7 +168,7 @@ export default function DashboardPage() {
           if (!r?.ok) setData(x => x && ({ ...x, acts: x.acts.map(y => (y._id === a._id ? { ...y, hidden: !next } : y)) }))
           else invalidateFetch('/api/projects')
         }} />
-          : view === 'staff' && internal && me ? <Staff first={first} me={me} d={d} todayIso={todayIso} today={today} />
+          : view === 'staff' && internal && me ? <Staff first={first} me={me} d={d} todayIso={todayIso} today={today} focus={focus} setFocus={setFocus} selfName={String(user?.name || '')} />
           : <>
             {/* Hero */}
             <section className="au-hero rise" aria-labelledby="dash-h">
@@ -313,18 +317,29 @@ function renderWidget(key: string, x: Ctx): React.ReactNode {
 }
 
 /* ───────────── Fokus saya ───────────── */
-function Staff({ first, me, d, todayIso, today }: { first: string; me: Any; d: Any; todayIso: string; today: number }) {
+function Staff({ first, me, d, todayIso, today, focus, setFocus, selfName }: { first: string; me: Any; d: Any; todayIso: string; today: number; focus: string; setFocus: (v: string) => void; selfName: string }) {
   const mon = new Date(dUTC(todayIso)); mon.setUTCDate(mon.getUTCDate() - ((mon.getUTCDay() + 6) % 7))
   const week = Array.from({ length: 5 }, (_, i) => { const t = new Date(mon.getTime() + i * DAY); const iso = t.toISOString().slice(0, 10); const r = me.myAtt.find((x: Any) => x.date === iso); const ty = r ? String((r.slots?.[0]?.type) || r.type || '').toUpperCase() : ''; return { iso, d: t.getUTCDate(), h: HARI[t.getUTCDay()], ty } })
-  const nextMine = upcoming<Any>(me.myActs, todayIso, 1)[0] || upcoming<Any>(d.acts, todayIso, 1)[0]
+  // Hanya agenda dengan PIC orang ini — tidak jatuh ke agenda tim.
+  const nextMine = upcoming<Any>(me.myActs, todayIso, 1)[0]
+  const who = me.self ? first : String(me.name).split(' ')[0]
+  const others = d.staff.filter((m: Any) => m.name && !samePerson(String(m.name), selfName)).sort((a: Any, b: Any) => String(a.name).localeCompare(String(b.name)))
   const firstLate = me.late[0]
   return <>
+    <div className="au-row au-wrap" style={{ gap: 10 }}>
+      <label htmlFor="focus-who" className="au-small au-ink2" style={{ fontWeight: 600 }}>Fokus untuk</label>
+      <select id="focus-who" className="input" style={{ width: 'auto', minWidth: 200, minHeight: 40 }} value={me.self ? '' : focus} onChange={e => setFocus(e.target.value)}>
+        <option value="">Saya ({selfName.split(' ')[0] || 'saya'})</option>
+        {others.map((m: Any) => <option key={m._id} value={m.name}>{m.name}</option>)}
+      </select>
+      <span className="au-xs au-muted">Hanya initiative, activity, dan enhancement dengan PIC {me.self ? 'kamu' : me.name}.</span>
+    </div>
     <section className="au-hero rise" aria-labelledby="me-h">
-      <span className="au-sticker" aria-hidden="true"><Icon name="me" size={12} stroke={2.4} /> FOKUS SAYA</span>
+      <span className="au-sticker" aria-hidden="true"><Icon name="me" size={12} stroke={2.4} /> {me.self ? 'FOKUS SAYA' : `FOKUS ${String(me.name).toUpperCase()}`}</span>
       <div className="au-col" style={{ gap: 18, minWidth: 0 }}>
-        <h1 id="me-h">Hai {first}, {me.late.length ? <>ada <em>{me.late.length} update</em> yang ditunggu hari ini.</> : me.tasks.length ? <>semua tugasmu <em>sesuai jadwal</em>.</> : <>belum ada tugas initiative atas namamu.</>}</h1>
+        <h1 id="me-h">{me.self ? `Hai ${who}, ` : `${who}: `}{me.late.length ? <>ada <em>{me.late.length} update</em> yang ditunggu hari ini.</> : me.tasks.length ? <>semua tugas <em>sesuai jadwal</em>.</> : <>belum ada tugas initiative dengan PIC {me.self ? 'kamu' : who}.</>}</h1>
         <div className="au-hchips">
-          <div className="au-hchip"><b><CountUp to={me.tasks.length + me.myActs.length} /></b><span>Tugas saya</span></div>
+          <div className="au-hchip"><b><CountUp to={me.tasks.length + me.myActs.length} /></b><span>{me.self ? 'Tugas saya' : 'Tugas'}</span></div>
           <div className="au-hchip"><b><CountUp to={me.late.length} /></b><span>Perlu update</span></div>
           <div className="au-hchip"><b><CountUp to={me.wfoMonth} /></b><span>WFO bulan ini</span></div>
         </div>
@@ -333,11 +348,11 @@ function Staff({ first, me, d, todayIso, today }: { first: string; me: Any; d: A
           <Link href="/dashboard/attendance" className="btn btn-ghost" style={{ minHeight: 44 }}>Isi presensi</Link>
         </div>
       </div>
-      <Ring value={me.c.actual} plan={me.tasks.length && me.c.spi != null ? me.c.plan : null} size={210} stroke={20} label={`Tugas saya ${P(me.c.actual)}`}><b style={{ fontSize: 44 }}>{P(me.c.actual)}</b><span>tugas saya · plan {P(me.c.plan)}</span></Ring>
+      <Ring value={me.c.actual} plan={me.tasks.length && me.c.spi != null ? me.c.plan : null} size={210} stroke={20} label={`Tugas saya ${P(me.c.actual)}`}><b style={{ fontSize: 44 }}>{P(me.c.actual)}</b><span>{me.self ? 'tugas saya' : 'tugas'} · plan {P(me.c.plan)}</span></Ring>
     </section>
     <div className="au-bento">
       <section className="au-card s7 rise" style={{ ['--d' as any]: 1 }}>
-        <div className="au-row au-between"><h2>Perlu kamu update</h2><span className="lbl">ketuk untuk isi %</span></div>
+        <div className="au-row au-between"><h2>{me.self ? 'Perlu kamu update' : 'Perlu update'}</h2><span className="lbl">ketuk untuk isi %</span></div>
         {me.tasks.length ? me.tasks.slice(0, 8).map((t: Any) => {
           const pl = t.a.start ? ptd(t.a, today) : 0, late = t.a.start && pl > t.a.pct + 0.5
           return <Link key={`${t.x.i._id}-${t.idx}`} href={`/dashboard/progress?i=${t.x.i._id}`} className="au-task">
@@ -346,24 +361,24 @@ function Staff({ first, me, d, todayIso, today }: { first: string; me: Any; d: A
               <span className="au-row au-xs au-ink2" style={{ marginTop: 4 }}><span className="au-mini"><i style={{ width: `${t.a.pct}%` }} /></span>{P(t.a.pct)} · plan {P(pl)}</span></span>
             {late ? <Pill tone="warn">Tertinggal</Pill> : <Pill tone="ok">Aman</Pill>}
           </Link>
-        }) : <Empty title="Semua beres" text="Tidak ada aktivitas initiative atas namamu yang menunggu update." />}
+        }) : <Empty title="Semua beres" text={`Tidak ada aktivitas initiative dengan PIC ${me.self ? 'kamu' : who} yang menunggu update.`} />}
       </section>
       <section className="au-card s5 rise" style={{ ['--d' as any]: 2 }}>
-        <div className="au-row au-between"><h2>Presensi pekan ini</h2><Link href="/dashboard/attendance" className="au-link">Presensi</Link></div>
+        <div className="au-row au-between"><h2>Presensi pekan ini{me.self ? '' : ` · ${who}`}</h2><Link href="/dashboard/attendance" className="au-link">Presensi</Link></div>
         <div className="au-week">{week.map(w => <div key={w.iso} className={`day${w.ty === 'WFO' ? ' on' : ''}${w.iso === todayIso ? ' today' : ''}`}><span className="au-xs" style={{ fontFamily: 'var(--mono)', opacity: .75 }}>{w.h}</span><b>{w.d}</b><span className="au-xs">{w.ty || '–'}</span></div>)}</div>
         {nextMine && <div className="au-next"><div className="when">{whenLabel(nextMine.actionDate, todayIso)}</div><h3>{nextMine.title}</h3><div className="au-small" style={{ opacity: .75 }}>{[nextMine.category, nextMine.subType].filter(Boolean).join(' · ')}</div></div>}
       </section>
       <section className="au-card s6 rise" style={{ ['--d' as any]: 3 }}>
-        <div className="au-row au-between"><h2>Activities saya</h2><Link href="/dashboard/activities" className="au-link">Semua</Link></div>
+        <div className="au-row au-between"><h2>{me.self ? 'Activities saya' : `Activities ${who}`}</h2><Link href="/dashboard/activities" className="au-link">Semua</Link></div>
         {me.myActs.length ? <div className="au-ig" style={{ border: 0 }}>{me.myActs.slice(0, 6).map((a: Any) => <Link key={a._id} href="/dashboard/activities" className="au-igr"><span className="au-col" style={{ minWidth: 0, gap: 2 }}><b style={{ fontSize: 14 }}>{a.title}</b><span className="au-xs au-muted">{[a.category, a.subType, a.actionDate && fmtD(a.actionDate)].filter(Boolean).join(' · ')}</span></span>{a.priority && PRIO[a.priority] && <span style={{ marginLeft: 'auto' }}><Pill tone={PRIO[a.priority].t}>{PRIO[a.priority].l}</Pill></span>}</Link>)}</div>
-          : <span className="au-small au-muted">Tidak ada activity terbuka dengan PIC kamu.</span>}
+          : <span className="au-small au-muted">Tidak ada activity terbuka dengan PIC {me.self ? 'kamu' : who}.</span>}
       </section>
       <section className="au-card s6 rise" style={{ ['--d' as any]: 4 }}>
-        <div className="au-row au-between"><h2>Enhancement saya</h2><Link href="/dashboard/enhancement" className="au-link">Semua</Link></div>
+        <div className="au-row au-between"><h2>{me.self ? 'Enhancement saya' : `Enhancement ${who}`}</h2><Link href="/dashboard/enhancement" className="au-link">Semua</Link></div>
         {me.myEnh.length ? me.myEnh.slice(0, 4).map((v: Any) => <Link key={v.e._id} href={`/dashboard/enhancement?e=${v.e._id}`} className="au-erow">
           <span className="au-row au-between au-xs" style={{ width: '100%' }}><span className="au-muted" style={{ fontFamily: 'var(--mono)' }}>{v.e.code} · {v.e.app}</span><span className={`au-cat ${catK(v.s.cat)}`}>{v.s.cat}</span></span>
           <b>{v.e.title}</b><span className="au-dots">{STAGES_SHORT.map((_, k) => <i key={k} className={k < (v.e.stage || 1) ? 'on' : ''} />)}</span></Link>)
-          : <span className="au-small au-muted">Belum ada enhancement dengan PIC kamu. PIC diisi di menu Enhancement.</span>}
+          : <span className="au-small au-muted">Belum ada enhancement dengan PIC {me.self ? 'kamu' : who}. PIC diisi di menu Enhancement.</span>}
       </section>
     </div>
   </>
