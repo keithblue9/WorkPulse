@@ -753,3 +753,31 @@ a.au-pace:hover { background:var(--sunken) }
 .au-wslot { display:flex; min-width:0 } .au-wslot > * { flex:1; min-width:0 }
 a.au-erow { text-decoration:none; color:inherit }
 @media (max-width:900px) { .au-pace { grid-template-columns:minmax(0,1fr) auto } .au-pace .au-track { grid-column:1 / -1; order:3 } }
+.au-actrow { align-items:flex-start; padding:14px 16px 14px 20px; position:relative }
+.au-actrow::before { content:''; position:absolute; left:0; top:12px; bottom:12px; width:4px; border-radius:0 4px 4px 0; background:var(--sc, var(--accent)) }
+@media (max-width:600px) { .au-actrow { flex-direction:column } .au-actrow > .au-col + .au-col:last-child { flex-direction:row; align-items:center } }
+
+/* ═══ Calendar ═══ */
+.au-cal-wrap { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:16px; align-items:start }
+.au-cal-head, .au-cal-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:4px }
+.au-cal-head span { text-align:center; font:500 11px var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:4px 0 }
+.au-cal-day { position:relative; display:flex; flex-direction:column; align-items:stretch; gap:3px; min-height:92px; min-width:0; padding:8px; border-radius:14px; border:1px solid var(--line); background:var(--surface); text-align:left; cursor:pointer; color:inherit; font:inherit; overflow:hidden; transition:background .15s, border-color .15s, transform .18s var(--pop) }
+.au-cal-day:hover { border-color:var(--line2) } .au-cal-day:active { transform:scale(.97) }
+.au-cal-day .n { font:600 13px var(--sans); color:var(--ink2); width:26px; height:26px; display:grid; place-items:center; border-radius:50% }
+.au-cal-day.today .n { background:var(--hot); color:#fff }
+.au-cal-day.sel { background:var(--accent-soft); border-color:var(--accent) }
+.au-cal-day.out { opacity:.4; background:transparent }
+.au-cal-grid > .au-cal-day:nth-child(7n), .au-cal-grid > .au-cal-day:nth-child(7n-1) { background:var(--sunken) }
+.au-cal-day.hol { background:var(--bad-soft) } .au-cal-day.hol .n { color:var(--bad) }
+.au-cal-day .ev { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--ink2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0 }
+.au-cal-day .ev i { width:6px; height:6px; border-radius:50%; flex-shrink:0 }
+.au-cal-day .ev.hol { color:var(--bad); font-weight:700 }
+.au-cal-day .more { font-size:10.5px; color:var(--muted); font-weight:600 }
+.au-cal-day .dots { display:none; gap:3px; justify-content:center; margin-top:auto } .au-cal-day .dots i { width:5px; height:5px; border-radius:50% }
+@media (max-width:1180px) { .au-cal-wrap { grid-template-columns:minmax(0,1fr) } }
+@media (max-width:700px) {
+  .au-cal-day { min-height:52px; padding:4px; align-items:center; border-radius:12px }
+  .au-cal-day .ev, .au-cal-day .more { display:none } .au-cal-day .dots { display:flex }
+}
+.au-cal-grid > .au-cal-day.hol { background:var(--bad-soft) }
+.au-cal-grid > .au-cal-day.sel { background:var(--accent-soft); border-color:var(--accent) }

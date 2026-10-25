@@ -5,27 +5,35 @@ function normKey(s:any):string { return String(s||'').toLowerCase().replace(/[\s
 
 import { picArray } from '@/lib/defaults'
 import { useEffect, useState } from 'react'
-import { format, startOfWeek, subDays } from 'date-fns'
+import { format, subDays } from 'date-fns'
+import { Empty, Icon, PageHeader, Pill, Seg } from '@/components/ui'
+import { useYear } from '@/lib/year'
+import { activityInYear } from '@/lib/dashboard'
 
-const PRIORITY_CFG: Record<string,{label:string;color:string;bg:string}> = {
-  high:{label:'High', color:'var(--red)', bg:'var(--redbg)'},
-  medium:{label:'Medium', color:'var(--amber)', bg:'var(--amberbg)'},
-  low:{label:'Low', color:'var(--green)', bg:'var(--greenbg)'},
+const PRIORITY_CFG: Record<string,{label:string;tone:'bad'|'warn'|'ok'}> = {
+  high:{label:'High', tone:'bad'}, medium:{label:'Medium', tone:'warn'}, low:{label:'Low', tone:'ok'},
 }
+const BLN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
+const fmtD = (s?:string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s||'')); return m ? `${Number(m[3])} ${BLN[Number(m[2])-1]} ${m[1]}` : '–' }
 
 export default function IssuesPage() {
   const [activities, setActivities] = useState<any[]>([])
   const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
+  const { year } = useYear()
+  const nowYear = new Date().getFullYear()
   const [filterSub, setFilterSub] = useState('All')
   const [period, setPeriod] = useState<'today'|'lastweek'|'all'|'custom'>('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 
   async function load() {
-    setLoading(true)
-    const [a, c] = await Promise.all([fetch('/api/projects').then(r=>r.json()), getConfig().then((data:any)=>({ data }))])
-    setActivities(a.data||[]); setConfig(c.data); setLoading(false)
+    setLoading(true); setFailed(false)
+    try {
+      const [a, c] = await Promise.all([fetch('/api/projects').then(r=>{ if (!r.ok) throw new Error(); return r.json() }), getConfig().then((data:any)=>({ data }))])
+      setActivities(a.data||[]); setConfig(c.data)
+    } catch { setFailed(true) } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
 
@@ -41,6 +49,8 @@ export default function IssuesPage() {
   } else if (period === 'custom') { dateFrom = customFrom; dateTo = customTo }
 
   const filtered = activities.filter(a => {
+    if (a.showInList === false) return false
+    if (period === 'all' && !activityInYear(a, year, nowYear)) return false
     if (filterSub !== 'All' && normKey(a.subType) !== normKey(filterSub) && normKey(a.category) !== normKey(filterSub)) return false
     if (dateFrom && a.actionDate < dateFrom) return false
     if (dateTo && a.actionDate > dateTo) return false
@@ -48,83 +58,47 @@ export default function IssuesPage() {
   })
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', flexShrink:0 }}>
-        <div style={{ fontSize:14, fontWeight:600 }}>Issues — Overview</div>
-        <div style={{ fontSize:11, color:'var(--text3)' }}>Display dari Activities · Read-only. Edit lewat menu <b>Activities</b>.</div>
-      </div>
-
-      {/* Filter row */}
-      <div style={{ display:'flex', gap:10, padding:'10px 20px', background:'var(--bg2)', borderBottom:'1px solid var(--border)', flexShrink:0, flexWrap:'wrap', alignItems:'center' }}>
-        <div className="chip-row" style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-          <button onClick={()=>setFilterSub('All')} style={chip(filterSub==='All')}>All</button>
-          {subs.map((s:any) => (
-            <button key={s.key} onClick={()=>setFilterSub(s.key)} style={chip(filterSub===s.key, s.color)}>{s.label}</button>
-          ))}
+    <div className="au-page">
+      <div className="au-view au-anim">
+        <PageHeader eyebrow={`Activities · ${filtered.length} issue · baca saja`} title="Issues" actions={<a href="/dashboard/activities" className="btn btn-ghost"><Icon name="act" size={15} />Edit di Activities</a>} />
+        <div className="au-row au-wrap" style={{ gap:10 }}>
+          <Seg label="Periode" value={period} onChange={setPeriod} options={[['all', `Tahun ${year}`], ['today','Hari ini'], ['lastweek','7 hari'], ['custom','Rentang']] as const} />
+          {period === 'custom' && <span className="au-row" style={{ gap:6 }}>
+            <input type="date" className="input" aria-label="Dari tanggal" value={customFrom} onChange={e=>setCustomFrom(e.target.value)} style={{ width:160 }} />
+            <span className="au-muted">–</span>
+            <input type="date" className="input" aria-label="Sampai tanggal" value={customTo} min={customFrom||undefined} onChange={e=>setCustomTo(e.target.value)} style={{ width:160 }} />
+          </span>}
         </div>
-        <div style={{ width:1, height:20, background:'var(--border)' }} />
-        <div style={{ display:'flex', gap:5 }}>
-          {[['all','Semua'],['today','Today'],['lastweek','Last Week'],['custom','Custom']].map(([k,l]) => (
-            <button key={k} onClick={()=>setPeriod(k as any)} style={chip(period===k)}>{l}</button>
-          ))}
+        <div className="au-chips" role="group" aria-label="Filter sub tipe">
+          <button type="button" className="au-chip" aria-pressed={filterSub==='All'} onClick={()=>setFilterSub('All')}>Semua</button>
+          {subs.map((st:any) => <button key={st.key} type="button" className="au-chip" aria-pressed={filterSub===st.key} onClick={()=>setFilterSub(st.key)}>{st.label}</button>)}
         </div>
-        {period === 'custom' && (
-          <div style={{ display:'flex', gap:6 }}>
-            <input type="date" className="input" value={customFrom} onChange={e=>setCustomFrom(e.target.value)} style={{ width:140 }} />
-            <input type="date" className="input" value={customTo} onChange={e=>setCustomTo(e.target.value)} style={{ width:140 }} />
-          </div>
-        )}
-      </div>
-
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px' }} className="safe-bottom page-pad">
-        {loading ? <div style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>Memuat...</div> :
-         filtered.length === 0 ? (
-           <div className="card" style={{ textAlign:'center', padding:40, color:'var(--text3)' }}>
-             <div style={{ fontSize:34, marginBottom:8 }}>📋</div>
-             <div>Belum ada issue di filter ini</div>
-           </div>
-         ) : (
-          <div className="card" style={{ overflow:'auto' }}>
-            <table className="wp-table" style={{ minWidth:1100 }}>
-              <thead>
-                <tr>
-                  <th style={{ minWidth:200 }}>Issues</th>
-                  <th style={{ minWidth:240 }}>Progress</th>
-                  <th>Action Date</th>
-                  <th style={{ minWidth:200 }}>Next Plan</th>
-                  <th>Target Week</th>
-                  <th>Priority</th>
-                  <th>PIC</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(a => {
-                  const catColor = config?.activityCategories?.find((c:any)=>c.key===a.category)?.color || 'var(--brand)'
+        {failed && <div className="au-row au-wrap p-bad" role="alert" style={{ borderRadius:14, padding:12 }}><span className="au-small" style={{ flex:1 }}>Issues gagal dimuat.</span><button type="button" className="btn btn-sm" onClick={load}>Coba lagi</button></div>}
+        {loading ? <div className="au-card"><div className="au-skel" /><div className="au-skel" style={{ width:'70%' }} /><div className="au-skel" style={{ width:'50%' }} /></div>
+          : filtered.length === 0 ? <div className="au-card"><Empty title="Belum ada issue di filter ini" text="Issues diambil dari Activities. Ubah periode atau sub tipe." /></div>
+          : <div className="au-tblw" style={{ maxHeight:'calc(100dvh - 280px)', overflow:'auto' }}>
+              <table className="wp-table" style={{ minWidth:1100 }}>
+                <thead style={{ position:'sticky', top:0, zIndex:2 }}><tr><th style={{ minWidth:220 }}>Issue</th><th style={{ minWidth:240 }}>Progress</th><th>Tanggal</th><th style={{ minWidth:200 }}>Next plan</th><th>Target week</th><th>Status</th><th>Prioritas</th><th>PIC</th></tr></thead>
+                <tbody>{filtered.map(a => {
+                  const catColor = config?.activityCategories?.find((c:any)=>c.key===a.category)?.color || 'var(--accent)'
+                  const st = statuses.find((x:any)=>normKey(x.key)===normKey(a.status))
                   return (
                     <tr key={a._id}>
-                      <td>
-                        <div style={{ fontSize:12, fontWeight:600, color:'var(--text)' }}>{a.title}</div>
-                        <div style={{ display:'flex', gap:5, marginTop:4, flexWrap:'wrap' }}>
-                          <span className="badge" style={{ background:catColor+'22', color:catColor, fontSize:9 }}>{a.category}</span>
-                          <span className="badge" style={{ background:'var(--bg3)', color:'var(--text2)', fontSize:9 }}>{a.subType}</span>
-                        </div>
-                      </td>
-                      <td style={{ whiteSpace:'pre-wrap', fontSize:11 }}>{a.description || a.progressNotes || <span style={{ color:'var(--text3)' }}>—</span>}</td>
-                      <td style={{ fontSize:11 }}>{a.actionDate || '—'}</td>
-                      <td style={{ whiteSpace:'pre-wrap', fontSize:11 }}>{a.nextPlan || <span style={{ color:'var(--text3)' }}>—</span>}</td>
-                      <td style={{ fontSize:11 }}>{a.targetWeek || '—'}</td>
-                      <td>{a.priority && <span className="badge" style={{ background:PRIORITY_CFG[a.priority]?.bg, color:PRIORITY_CFG[a.priority]?.color, fontSize:10 }}>{PRIORITY_CFG[a.priority]?.label}</span>}</td>
-                      <td style={{ fontSize:11 }}>{picArray(a.pic).length ? picArray(a.pic).join(', ') : (a.picName || '—')}</td>
+                      <td><b style={{ fontSize:13.5, color:'var(--ink)' }}>{a.title}</b>
+                        <div className="au-row au-wrap" style={{ gap:4, marginTop:6 }}><span className="au-tag"><i style={{ background:catColor }} />{a.category}</span>{a.subType && <span className="au-tag">{a.subType}</span>}</div></td>
+                      <td style={{ whiteSpace:'pre-wrap' }}>{a.description || a.progressNotes || <span className="au-muted">–</span>}</td>
+                      <td style={{ whiteSpace:'nowrap' }}>{fmtD(a.actionDate)}</td>
+                      <td style={{ whiteSpace:'pre-wrap' }}>{a.nextPlan || <span className="au-muted">–</span>}</td>
+                      <td>{a.targetWeek || '–'}</td>
+                      <td>{st ? <span className="au-tag"><i style={{ background:st.color }} />{st.label}</span> : '–'}</td>
+                      <td>{a.priority && PRIORITY_CFG[a.priority] ? <Pill tone={PRIORITY_CFG[a.priority].tone}>{PRIORITY_CFG[a.priority].label}</Pill> : '–'}</td>
+                      <td>{picArray(a.pic).length ? picArray(a.pic).join(', ') : (a.picName || '–')}</td>
                     </tr>
                   )
-                })}
-              </tbody>
-            </table>
-          </div>
-         )
-        }
+                })}</tbody>
+              </table>
+            </div>}
       </div>
     </div>
   )
 }
-function chip(active:boolean, color:string='var(--brand)'):React.CSSProperties { return { padding:'4px 11px', borderRadius:20, fontSize:11, fontWeight:600, cursor:'pointer', border:`1px solid ${active?color:'var(--border)'}`, background:active?color+'1a':'var(--bg3)', color:active?color:'var(--text2)' } }

@@ -3,87 +3,75 @@ import { getConfig } from '@/lib/configCache'
 import { picArray } from '@/lib/defaults'
 import { useEffect, useState } from 'react'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, isSameMonth } from 'date-fns'
+import { id as idLocale } from 'date-fns/locale'
+import toast from 'react-hot-toast'
+import { Empty, Icon, PageHeader, Pill, Sheet } from '@/components/ui'
+import { useYear } from '@/lib/year'
 
-const PRIORITY_CFG: Record<string,{label:string;color:string}> = {
-  high:{label:'High', color:'var(--red)'},
-  medium:{label:'Medium', color:'var(--amber)'},
-  low:{label:'Low', color:'var(--green)'},
+const PRIORITY_CFG: Record<string,{label:string;tone:'bad'|'warn'|'ok'}> = {
+  high:{label:'High', tone:'bad'}, medium:{label:'Medium', tone:'warn'}, low:{label:'Low', tone:'ok'},
 }
 
-function ActivityDetail({ activity, onClose, onSave, members, config }: { activity:any; onClose:()=>void; onSave:()=>void; members:any[]; config:any }) {
+function ActivityDetail({ activity, onClose, onSave }: { activity:any; onClose:()=>void; onSave:()=>void; members:any[]; config:any }) {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState(activity)
   const [saving, setSaving] = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
   const set = (k:string, v:any) => setForm((f:any)=>({...f,[k]:v}))
 
   async function save() {
+    if (!String(form.title||'').trim()) { toast.error('Judul wajib diisi'); return }
     setSaving(true)
     try {
-      await fetch(`/api/projects/${activity._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(form) })
-      onSave(); onClose()
-    } finally { setSaving(false) }
+      const r = await fetch(`/api/projects/${activity._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(form) })
+      if (!r.ok) throw new Error()
+      toast.success('Aktivitas diperbarui'); onSave(); onClose()
+    } catch { toast.error('Gagal menyimpan') } finally { setSaving(false) }
   }
   async function del() {
-    if (!confirm('Hapus aktivitas?')) return
-    await fetch(`/api/projects/${activity._id}`, { method:'DELETE' })
-    onSave(); onClose()
+    setSaving(true)
+    try { const r = await fetch(`/api/projects/${activity._id}`, { method:'DELETE' }); if (!r.ok) throw new Error(); toast.success('Aktivitas dihapus'); onSave(); onClose() }
+    catch { toast.error('Gagal menghapus') } finally { setSaving(false) }
   }
-
+  const pics = picArray(activity.pic).length ? picArray(activity.pic) : picArray(activity.picName)
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:540 }}>
-        <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between' }}>
-          <span style={{ fontSize:14, fontWeight:600 }}>{editing?'Edit Activity':'Detail Activity'}</span>
-          <div style={{ display:'flex', gap:6 }}>
-            {!editing && <button onClick={()=>setEditing(true)} className="btn btn-sm">✏️ Edit</button>}
-            <button onClick={del} className="btn btn-sm btn-danger">🗑</button>
-            <button onClick={onClose} className="btn btn-icon">×</button>
-          </div>
+    <Sheet open title={editing ? 'Edit aktivitas' : 'Detail aktivitas'} onClose={onClose} onSave={editing ? save : undefined} saveDisabled={saving} saveLabel={saving ? 'Menyimpan…' : 'Simpan'}>
+      {editing ? <>
+        <label className="au-col" style={{ gap:6 }}><span className="lbl">Judul</span><input className="input" value={form.title} onChange={e=>set('title',e.target.value)} /></label>
+        <label className="au-col" style={{ gap:6 }}><span className="lbl">Narasi / progress</span><textarea className="input" rows={4} value={form.description||''} onChange={e=>set('description',e.target.value)} /></label>
+        <div className="au-grid" style={{ gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:10 }}>
+          <label className="au-col" style={{ gap:6 }}><span className="lbl">Tanggal</span><input type="date" className="input" value={form.actionDate||''} onChange={e=>set('actionDate',e.target.value)} /></label>
+          <label className="au-col" style={{ gap:6 }}><span className="lbl">Target week</span><input className="input" value={form.targetWeek||''} onChange={e=>set('targetWeek',e.target.value)} /></label>
         </div>
-        <div style={{ padding:'14px 20px', overflowY:'auto', maxHeight:'72vh', display:'flex', flexDirection:'column', gap:10 }}>
-          {editing ? (
-            <>
-              <div><label style={lbl}>Title</label><input className="input" value={form.title} onChange={e=>set('title',e.target.value)} /></div>
-              <div><label style={lbl}>Aktivitas</label><textarea className="input" rows={4} value={form.description||''} onChange={e=>set('description',e.target.value)} /></div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                <div><label style={lbl}>Action Date</label><input type="date" className="input" value={form.actionDate||''} onChange={e=>set('actionDate',e.target.value)} /></div>
-                <div><label style={lbl}>Target Week</label><input className="input" value={form.targetWeek||''} onChange={e=>set('targetWeek',e.target.value)} /></div>
-              </div>
-              <div><label style={lbl}>Next Plan</label><textarea className="input" rows={3} value={form.nextPlan||''} onChange={e=>set('nextPlan',e.target.value)} /></div>
-            </>
-          ) : (
-            <>
-              <div><div style={{ fontSize:11, color:'var(--text3)' }}>Title</div><div style={{ fontSize:14, fontWeight:600 }}>{activity.title}</div></div>
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                <span className="badge" style={{ background:'var(--brand-soft)', color:'var(--brand)', fontSize:10 }}>{activity.category}</span>
-                <span className="badge" style={{ background:'var(--bg3)', color:'var(--text2)', fontSize:10 }}>{activity.subType}</span>
-                {activity.priority && <span style={{ fontSize:10, color:PRIORITY_CFG[activity.priority]?.color, fontWeight:600 }}>● {PRIORITY_CFG[activity.priority]?.label}</span>}
-              </div>
-              {activity.description && <div><div style={{ fontSize:11, color:'var(--text3)' }}>Aktivitas / Progress</div><div style={{ fontSize:12, whiteSpace:'pre-wrap', marginTop:4, lineHeight:1.6 }}>{activity.description}</div></div>}
-              {activity.nextPlan && <div><div style={{ fontSize:11, color:'var(--text3)' }}>Next Plan</div><div style={{ fontSize:12, whiteSpace:'pre-wrap', marginTop:4, lineHeight:1.6 }}>{activity.nextPlan}</div></div>}
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                <div><div style={{ fontSize:10, color:'var(--text3)' }}>Action Date</div><div style={{ fontSize:12, fontWeight:500 }}>{activity.actionDate || '—'}{activity.actionDateEnd && activity.actionDateEnd!==activity.actionDate ? ` → ${activity.actionDateEnd}` : ''}</div></div>
-                <div><div style={{ fontSize:10, color:'var(--text3)' }}>Target Week</div><div style={{ fontSize:12, fontWeight:500 }}>{activity.targetWeek || '—'}</div></div>
-              </div>
-              <div><div style={{ fontSize:10, color:'var(--text3)' }}>PIC</div><div style={{ fontSize:12 }}>{(activity.pic||[]).join(', ') || activity.picName || '—'}</div></div>
-              {activity.mode === 'offline' && activity.location && (
-                <div><div style={{ fontSize:10, color:'var(--text3)' }}>Lokasi</div><div style={{ fontSize:12 }}>📍 {activity.location}</div></div>
-              )}
-            </>
-          )}
+        <label className="au-col" style={{ gap:6 }}><span className="lbl">Next plan</span><textarea className="input" rows={3} value={form.nextPlan||''} onChange={e=>set('nextPlan',e.target.value)} /></label>
+        <button type="button" className="btn" style={{ alignSelf:'flex-start' }} onClick={()=>{ setEditing(false); setForm(activity) }}>Batalkan perubahan</button>
+      </> : <>
+        <h3 style={{ font:'700 21px/1.25 var(--disp)' }}>{activity.title}</h3>
+        <div className="au-row au-wrap" style={{ gap:6 }}>
+          <span className="au-tag">{activity.category}</span>{activity.subType && <span className="au-tag">{activity.subType}</span>}
+          {activity.priority && PRIORITY_CFG[activity.priority] && <Pill tone={PRIORITY_CFG[activity.priority].tone}>{PRIORITY_CFG[activity.priority].label}</Pill>}
         </div>
-        {editing && (
-          <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'flex-end', gap:8 }}>
-            <button onClick={()=>{setEditing(false);setForm(activity)}} className="btn">Batal</button>
-            <button onClick={save} disabled={saving} className="btn btn-primary">{saving?'Menyimpan...':'Simpan'}</button>
-          </div>
-        )}
-      </div>
-    </div>
+        <div className="au-ig">
+          <div className="au-igr"><span className="k">Tanggal</span><span className="v">{activity.actionDate || '–'}{activity.actionDateEnd && activity.actionDateEnd!==activity.actionDate ? ` – ${activity.actionDateEnd}` : ''}</span></div>
+          {activity.startTime && <div className="au-igr"><span className="k">Waktu</span><span className="v">{activity.startTime}{activity.endTime ? ` – ${activity.endTime}` : ''}</span></div>}
+          <div className="au-igr"><span className="k">Target week</span><span className="v">{activity.targetWeek || '–'}</span></div>
+          <div className="au-igr"><span className="k">PIC</span><span className="v">{pics.join(', ') || '–'}</span></div>
+          {activity.mode === 'offline' && activity.location && <div className="au-igr"><span className="k">Lokasi</span><span className="v">{activity.location}</span></div>}
+        </div>
+        {activity.description && <div className="au-col" style={{ gap:6 }}><span className="lbl">Narasi / progress</span><p className="au-small au-ink2" style={{ whiteSpace:'pre-wrap', lineHeight:1.6 }}>{activity.description}</p></div>}
+        {activity.nextPlan && <div className="au-col" style={{ gap:6 }}><span className="lbl">Next plan</span><p className="au-small au-ink2" style={{ whiteSpace:'pre-wrap', lineHeight:1.6 }}>{activity.nextPlan}</p></div>}
+        <div className="au-row au-wrap" style={{ gap:8 }}>
+          <button type="button" className="btn btn-primary" onClick={()=>setEditing(true)}><Icon name="pnote" size={15} />Edit</button>
+          {confirmDel ? <span className="au-row p-bad" style={{ borderRadius:12, padding:'6px 8px', gap:6 }}><span className="au-small">Hapus aktivitas?</span><button type="button" className="btn btn-sm" onClick={()=>setConfirmDel(false)}>Batal</button><button type="button" className="btn btn-danger btn-sm" disabled={saving} onClick={del}>Ya, hapus</button></span>
+            : <button type="button" className="btn btn-danger" onClick={()=>setConfirmDel(true)}><Icon name="trash" size={15} />Hapus</button>}
+        </div>
+      </>}
+    </Sheet>
   )
 }
 
 export default function CalendarPage() {
+  const { year } = useYear()
   const [activities, setActivities] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [config, setConfig] = useState<any>(null)
@@ -97,8 +85,8 @@ export default function CalendarPage() {
   async function load() {
     setLoading(true)
     const [a,m,c] = await Promise.all([
-      fetch('/api/projects').then(r=>r.json()),
-      fetch('/api/users').then(r=>r.json()),
+      fetch('/api/projects').then(r=>r.ok ? r.json() : { data: [] }).catch(()=>({ data: [] })),
+      fetch('/api/users').then(r=>r.ok ? r.json() : { data: [] }).catch(()=>({ data: [] })),
       getConfig().then((data:any)=>({ data })),
     ])
     setActivities(a.data||[]); setMembers(m.data||[]); setConfig(c.data); setLoading(false)
@@ -111,6 +99,8 @@ export default function CalendarPage() {
     }
   }
   useEffect(() => { load() }, [])
+  // Tahun global: pindah ke bulan yang sama di tahun terpilih.
+  useEffect(() => { setCurrentMonth(m => (m.getFullYear() === year ? m : new Date(year, m.getMonth(), 1))) }, [year])
   // refetch libur saat ganti tahun
   useEffect(() => {
     const hType = (config?.attendanceTypes||[]).find((t:any)=> /libur|holiday/i.test(String(t.key)) || /libur/i.test(String(t.label)))
@@ -145,93 +135,63 @@ export default function CalendarPage() {
   const cats = config?.activityCategories || []
   function catColor(key:string) { return cats.find((c:any)=>c.key===key)?.color || '#4f8ef7' }
 
+  const holidayOf = (d:Date) => holidays.has(format(d,'yyyy-MM-dd'))
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+    <div className="au-page">
       {selected && <ActivityDetail activity={selected} onClose={()=>setSelected(null)} onSave={load} members={members} config={config} />}
-
-      <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg2)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-        <div>
-          <div style={{ fontSize:14, fontWeight:600 }}>Calendar</div>
-          <div style={{ fontSize:11, color:'var(--text3)' }}>Source: Activities · Klik tanggal untuk lihat detail · Add via menu Activities</div>
-        </div>
-        <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-          <button onClick={()=>setCurrentMonth(subMonths(currentMonth,1))} className="btn btn-icon">‹</button>
-          <div style={{ minWidth:140, textAlign:'center', fontSize:13, fontWeight:600 }}>{format(currentMonth,'MMMM yyyy')}</div>
-          <button onClick={()=>setCurrentMonth(addMonths(currentMonth,1))} className="btn btn-icon">›</button>
-          <button onClick={()=>{setCurrentMonth(new Date()); setSelectedDay(new Date())}} className="btn btn-sm">Today</button>
-        </div>
-      </div>
-
-      <div style={{ flex:1, overflowY:'auto', padding:'14px 20px', display:'grid', gridTemplateColumns:'1fr 320px', gap:14 }} className="safe-bottom page-pad dash-2col">
-        {/* Calendar grid */}
-        <div className="card" style={{ padding:14 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:1, fontSize:11, color:'var(--text3)', fontWeight:600, textAlign:'center', marginBottom:6 }}>
-            {['Sen','Sel','Rab','Kam','Jum','Sab','Min'].map(d => <div key={d} style={{ padding:'4px 0' }}>{d}</div>)}
+      <div className="au-view au-anim">
+        <PageHeader eyebrow="Team · sumber: Activities" title="Calendar" actions={<>
+          <div className="au-row" style={{ gap:6 }}>
+            <button type="button" onClick={()=>setCurrentMonth(subMonths(currentMonth,1))} className="btn btn-icon" aria-label="Bulan sebelumnya"><Icon name="left" size={18} /></button>
+            <b style={{ minWidth:150, textAlign:'center', font:'700 17px var(--disp)' }} aria-live="polite">{format(currentMonth,'MMMM yyyy', { locale:idLocale })}</b>
+            <button type="button" onClick={()=>setCurrentMonth(addMonths(currentMonth,1))} className="btn btn-icon" aria-label="Bulan berikutnya"><Icon name="right" size={18} /></button>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:2 }}>
-            {days.map(day => {
-              const dayActivities = activitiesOn(day)
-              const isCurrentMonth = isSameMonth(day, currentMonth)
-              const isToday = isSameDay(day, new Date())
-              const isSelected = isSameDay(day, selectedDay)
-              const isHoliday = holidays.has(format(day,'yyyy-MM-dd'))
-              return (
-                <div key={day.toISOString()} onClick={()=>setSelectedDay(day)} style={{
-                  minHeight:80, minWidth:0, padding:6, borderRadius:7, cursor:'pointer', overflow:'hidden',
-                  background: isSelected ? 'var(--brand-soft)' : isHoliday ? 'rgba(220,38,38,0.08)' : isToday ? 'var(--bg3)' : 'transparent',
-                  border: `1px solid ${isSelected?'var(--brand)':isHoliday?'rgba(220,38,38,0.5)':'var(--border)'}`,
-                  opacity: isCurrentMonth ? 1 : 0.4,
-                }}>
-                  <div style={{ fontSize:11, fontWeight: isToday?700:500, color: isHoliday?'#dc2626':isToday?'var(--brand)':'var(--text2)', marginBottom:3 }}>{format(day,'d')}</div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:2, minWidth:0 }}>
-                    {isHoliday && <div style={{ fontSize:9, fontWeight:700, color:'#dc2626', display:'flex', alignItems:'center', gap:3, minWidth:0 }}><span style={{ width:5, height:5, borderRadius:'50%', background:'#dc2626', flexShrink:0 }} />Hari Libur</div>}
-                    {dayActivities.slice(0, isHoliday?1:2).map(a => (
-                      <div key={a._id} title={a.title} style={{ display:'flex', alignItems:'center', gap:3, fontSize:9, minWidth:0 }}>
-                        <span style={{ width:5, height:5, borderRadius:'50%', background:catColor(a.category), flexShrink:0 }} />
-                        <span style={{ color:'var(--text2)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 }}>{a.title}</span>
-                      </div>
-                    ))}
-                    {dayActivities.length > (isHoliday?1:2) && <div style={{ fontSize:9, color:'var(--text3)', fontWeight:600 }}>+{dayActivities.length-(isHoliday?1:2)} lagi</div>}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Selected day detail */}
-        <div className="card" style={{ padding:14 }}>
-          <div style={{ fontSize:13, fontWeight:600, marginBottom:4 }}>{format(selectedDay,'EEEE, d MMM yyyy')}</div>
-          {holidays.has(format(selectedDay,'yyyy-MM-dd')) && (
-            <div style={{ fontSize:11.5, fontWeight:700, color:'#dc2626', background:'rgba(220,38,38,0.08)', border:'1px solid rgba(220,38,38,0.4)', borderRadius:7, padding:'7px 10px', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>🔴 Hari Libur</div>
-          )}
-          <div style={{ fontSize:11, color:'var(--text3)', marginBottom:10 }}>{selectedDayActivities.length} aktivitas</div>
-          {selectedDayActivities.length === 0 ? (
-            <div style={{ textAlign:'center', padding:20, color:'var(--text3)', fontSize:11 }}>Tidak ada aktivitas</div>
-          ) : (
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {selectedDayActivities.map(a => {
-                const pics = picArray(a.pic).length ? picArray(a.pic) : picArray(a.picName)
+          <button type="button" onClick={()=>{setCurrentMonth(new Date()); setSelectedDay(new Date())}} className="btn">Hari ini</button>
+          <a href="/dashboard/activities" className="btn btn-primary"><Icon name="plus" size={16} stroke={2.2} />Aktivitas</a>
+        </>} />
+        <div className="au-cal-wrap">
+          <section className="au-card rise" style={{ padding:14, gap:8 }}>
+            <div className="au-cal-head">{['Sen','Sel','Rab','Kam','Jum','Sab','Min'].map(d => <span key={d}>{d}</span>)}</div>
+            <div className="au-cal-grid" role="grid" aria-label="Kalender bulan">
+              {days.map(day => {
+                const dayActivities = activitiesOn(day)
+                const isCurrentMonth = isSameMonth(day, currentMonth)
+                const isToday = isSameDay(day, new Date())
+                const isSel = isSameDay(day, selectedDay)
+                const hol = holidayOf(day)
+                const cap = hol ? 1 : 2
                 return (
-                <div key={a._id} onClick={()=>setSelected(a)} style={{ padding:'8px 10px', borderRadius:7, cursor:'pointer', border:`1px solid var(--border)`, borderLeft:`3px solid ${catColor(a.category)}`, background:'var(--bg2)' }}>
-                  <div style={{ fontSize:12, fontWeight:600 }}>{a.title}</div>
-                  <div style={{ fontSize:10, color:'var(--text3)', marginTop:2 }}>{a.category} · {a.subType}</div>
-                  {a.startTime && <div style={{ fontSize:10, color:'var(--text2)' }}>🕐 {a.startTime}{a.endTime?' - '+a.endTime:''}</div>}
-                  {pics.length > 0 && (
-                    <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap', marginTop:4 }}>
-                      <span style={{ fontSize:10, color:'var(--text3)' }}>👤</span>
-                      {pics.map((p:string,i:number)=>(
-                        <span key={i} style={{ fontSize:9.5, fontWeight:600, padding:'1px 6px', borderRadius:5, background:'var(--brand-soft)', color:'var(--brand)' }}>{p}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )})}
+                  <button type="button" key={day.toISOString()} onClick={()=>setSelectedDay(day)} className={`au-cal-day${isSel ? ' sel' : ''}${isToday ? ' today' : ''}${hol ? ' hol' : ''}${isCurrentMonth ? '' : ' out'}`} aria-pressed={isSel} aria-label={`${format(day,'d MMMM yyyy', { locale:idLocale })}${hol ? ', hari libur' : ''}, ${dayActivities.length} aktivitas`}>
+                    <span className="n">{format(day,'d')}</span>
+                    {hol && <span className="ev hol">Hari libur</span>}
+                    {dayActivities.slice(0, cap).map(a => <span key={a._id} className="ev"><i style={{ background:catColor(a.category) }} />{a.title}</span>)}
+                    {dayActivities.length > cap && <span className="more">+{dayActivities.length-cap} lagi</span>}
+                    {dayActivities.length > 0 && <span className="dots" aria-hidden="true">{dayActivities.slice(0,4).map(a => <i key={a._id} style={{ background:catColor(a.category) }} />)}</span>}
+                  </button>
+                )
+              })}
             </div>
-          )}
+          </section>
+          <section className="au-card rise" style={{ ['--d' as any]:1, alignSelf:'start' }}>
+            <div className="au-col" style={{ gap:2 }}><span className="lbl">{selectedDayActivities.length} aktivitas</span><h2>{format(selectedDay,'EEEE, d MMMM yyyy', { locale:idLocale })}</h2></div>
+            {holidayOf(selectedDay) && <span className="au-pill p-bad" style={{ alignSelf:'flex-start' }}>Hari libur</span>}
+            {loading ? <><div className="au-skel" /><div className="au-skel" style={{ width:'70%' }} /></>
+              : selectedDayActivities.length === 0 ? <Empty title="Tidak ada aktivitas" text="Pilih tanggal lain atau tambahkan dari Activities." />
+              : <div className="au-ig">{selectedDayActivities.map(a => {
+                  const pics = picArray(a.pic).length ? picArray(a.pic) : picArray(a.picName)
+                  return (
+                    <button type="button" key={a._id} onClick={()=>setSelected(a)} className="au-igr au-actrow" style={{ ['--sc' as any]: catColor(a.category) }}>
+                      <span className="au-col" style={{ gap:4, minWidth:0 }}>
+                        <b style={{ fontSize:14.5 }}>{a.title}</b>
+                        <span className="au-xs au-muted">{[a.category, a.subType, a.startTime ? `${a.startTime}${a.endTime ? `–${a.endTime}` : ''}` : ''].filter(Boolean).join(' · ')}</span>
+                        {pics.length > 0 && <span className="au-row au-wrap" style={{ gap:4 }}>{pics.map((p:string,i:number) => <span key={i} className="au-tag">{p}</span>)}</span>}
+                      </span>
+                    </button>
+                  )
+                })}</div>}
+          </section>
         </div>
       </div>
     </div>
   )
 }
-const lbl: React.CSSProperties = { display:'block', fontSize:11, fontWeight:500, color:'var(--text2)', marginBottom:5 }
