@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import ExportMenu from '@/components/ExportMenu'
 import { Gantt } from '@/components/Gantt'
+import { EnhMatrix as Matrix } from '@/components/EnhMatrix'
 import { Empty, Icon, PageHeader, Pill, Ring, Seg, Sheet, Tile } from '@/components/ui'
 import { getConfig } from '@/lib/configCache'
 import { userRolesOf } from '@/lib/perms'
@@ -288,32 +289,6 @@ function UploadSheet({ year, years, onClose, onDone }: { year: number; years: nu
         <button type="button" className="btn btn-primary" style={{ width: '100%', minHeight: 46 }} disabled={!!busy || !toSave} onClick={commit}>{busy === 'save' ? 'Menyimpan…' : `Simpan ${toSave} enhancement ke ${yr}`}</button>
       </>}
     </Sheet>
-  )
-}
-
-/* ───────────── Matriks impact vs effort ───────────── */
-function Matrix({ list, onOpen, small }: { list: View[]; onOpen: (id: string) => void; small?: boolean }) {
-  // Posisi 8–92% agar label tidak terpotong; skor yang sama disusun bertingkat supaya tidak saling menutupi.
-  const seen = new Map<string, number>()
-  const placed = list.filter(v => CAT_ORD[v.s.cat]).map(v => {
-    const key = `${v.s.impact.toFixed(2)}|${v.s.effort.toFixed(2)}`, k = seen.get(key) || 0
-    seen.set(key, k + 1)
-    return { v, x: 8 + (Math.min(v.s.effort, 5) / 5) * 84, y: Math.min(94, 6 + (Math.min(v.s.impact, 5) / 5) * 84 + k * 7) }
-  })
-  return (
-    <div className="au-col" style={{ gap: 8 }}>
-      <div className="au-matrix" role="group" aria-label="Matriks impact dan effort" style={small ? { height: 220 } : undefined}>
-        <div className="qd k-qw" style={{ left: 0, top: 0, background: 'color-mix(in srgb,var(--qw) 12%,transparent)' }}>QUICK WIN</div>
-        <div className="qd k-st" style={{ right: 0, top: 0, textAlign: 'right', background: 'color-mix(in srgb,var(--st) 10%,transparent)' }}>STRATEGIS</div>
-        <div className="qd k-mi" style={{ left: 0, bottom: 0, display: 'flex', alignItems: 'flex-end' }}>MINOR</div>
-        <div className="qd k-tc" style={{ right: 0, bottom: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', background: 'color-mix(in srgb,var(--tc) 9%,transparent)' }}>TO BE CONSIDER</div>
-        {placed.map(({ v, x, y }) => (
-          <button key={v.e._id} type="button" className={`dot ${catK(v.s.cat)}`} style={{ left: `${x}%`, bottom: `${y}%` }}
-            title={`${v.e.code} · ${v.e.title}`} aria-label={`${v.e.code} ${v.e.title}: impact ${n1(v.s.impact)}, effort ${n1(v.s.effort)}`} onClick={() => onOpen(v.e._id)}>{String(v.e.code || '').replace(/^B-/, '')}</button>
-        ))}
-      </div>
-      <div className="au-row au-between au-xs au-muted"><span>← Effort rendah</span><span>Impact naik ke atas · ambang 2,5</span><span>Effort tinggi →</span></div>
-    </div>
   )
 }
 

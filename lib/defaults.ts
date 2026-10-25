@@ -39,6 +39,9 @@ export const DEFAULT_ROLES = [
 ]
 
 export const DEFAULT_WIDGETS = [
+  { key:'today-summary',      label:'Ringkasan hari ini & laju progress', segment:'main', active:true, order:0, size:'half' },
+  { key:'enhancement-map',    label:'Peta Enhancement', segment:'main', active:true, activeGuest:false, order:10, size:'half' },
+  { key:'pinned-notes',       label:'Catatan disematkan', segment:'main', active:true, activeGuest:false, order:13, size:'half' },
   { key:'stat-kpi',           label:'Stat: KPI',           segment:'stats', active:true, order:1 },
   { key:'stat-nonkpi',        label:'Stat: Non KPI',       segment:'stats', active:true, order:2 },
   { key:'stat-golive',        label:'Stat: Go Live',       segment:'stats', active:true, order:3 },
@@ -55,7 +58,7 @@ export const DEFAULT_WIDGETS = [
   { key:'mandatory-training', label:'Mandatory: Training', segment:'main', active:true, order:7, size:'half' },
   { key:'mandatory-kpi',      label:'Mandatory: Support KPI', segment:'main', active:true, order:8, size:'half' },
   { key:'golive-insights',    label:'Go-Live per Aplikasi', segment:'main', active:true, order:9, size:'full' },
-  { key:'progress-chart',     label:'Chart Progress (donut)', segment:'main', active:true, order:11, size:'half' },
+  { key:'progress-chart',     label:'Status Progress Project', segment:'main', active:true, order:11, size:'half' },
   { key:'upcoming-agenda',    label:'Agenda Mendatang',    segment:'main', active:true, order:12, size:'half' },
 ]
 
