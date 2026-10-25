@@ -9,6 +9,7 @@ import { CATS, STAGES_SHORT } from '@/lib/enhancement'
 import { statusOf, ptd, DAY, dUTC } from '@/lib/progress'
 import { upcoming } from '@/lib/dashboard'
 import { workload } from '@/lib/workload'
+import { EnhMatrix, catK } from '@/components/EnhMatrix'
 
 type Any = Record<string, any>
 export type WCtx = {
@@ -26,7 +27,11 @@ const rpS = (n: number) => { const a = Math.abs(n || 0), f = (v: number, u: stri
 const initials = (n: string) => String(n || '').split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase()
 const when = (iso: string, todayIso: string) => { const diff = Math.round((dUTC(iso) - dUTC(todayIso)) / DAY); const t = new Date(dUTC(iso)); return diff === 0 ? 'Hari ini' : diff === 1 ? 'Besok' : `${HARI[t.getUTCDay()]}, ${t.getUTCDate()} ${BLN[t.getUTCMonth()]}` }
 const ST_COLOR: Record<string, string> = { ok: 'var(--ok)', warn: 'var(--warn-bar)', bad: 'var(--hot, #E5484D)', none: 'var(--line2)' }
-const ATT: Record<string, { l: string; c: string }> = { wfo: { l: 'WFO', c: '#0FA898' }, wfh: { l: 'WFH', c: '#7B6BFF' }, dinas: { l: 'Dinas', c: '#E79A1E' }, cuti: { l: 'Cuti', c: '#2E9D5B' }, sakit: { l: 'Sakit', c: '#E5484D' }, izin: { l: 'Izin', c: '#8C8AA6' } }
+// Palet kategori presensi (tervalidasi dataviz: lolos CVD terang & gelap; label selalu tertulis). Warna lewat CSS var.
+const ATT: Record<string, { l: string; c: string; ink: string }> = {
+  wfo: { l: 'WFO', c: 'var(--att-wfo)', ink: 'var(--att-ink-dark)' }, wfh: { l: 'WFH', c: 'var(--att-wfh)', ink: '#fff' }, dinas: { l: 'Dinas', c: 'var(--att-dinas)', ink: '#fff' },
+  cuti: { l: 'Cuti', c: 'var(--att-cuti)', ink: '#fff' }, sakit: { l: 'Sakit', c: 'var(--att-sakit)', ink: 'var(--att-ink-dark)' }, izin: { l: 'Izin', c: 'var(--att-izin)', ink: 'var(--att-ink-dark)' },
+}
 const attType = (r: Any) => String((Array.isArray(r?.slots) && r.slots[0]?.type) || r?.type || '').toLowerCase()
 
 /** Bingkai widget: kaca + aurora keluarga, judul kecil, seluruh kartu bisa diketuk (link di lapisan bawah). */
@@ -121,7 +126,7 @@ export function renderWidget(id: string, size: Size, x: WCtx): React.ReactNode {
       const days = Array.from({ length: 5 }, (_, i) => new Date(mon.getTime() + i * DAY).toISOString().slice(0, 10))
       return <div className="wg-week" role="table" aria-label="Presensi pekan ini">
         <div className="r hd" role="row"><span role="columnheader" />{days.map(dd => <span key={dd} role="columnheader" className={dd === todayIso ? 'today' : ''}>{HARI[new Date(dUTC(dd)).getUTCDay()]}</span>)}</div>
-        {staff.slice(0, 8).map(m => <div key={m._id} className="r" role="row"><span role="rowheader" className="nm">{String(m.name).split(' ')[0]}</span>{days.map(dd => { const t = attType(rec(m, dd)); return <span key={dd} role="cell" className="c" title={`${m.name} ${dd}: ${ATT[t]?.l || '–'}`} style={{ ['--c' as any]: ATT[t]?.c || 'transparent' }}>{ATT[t]?.l || ''}</span> })}</div>)}
+        {staff.slice(0, 8).map(m => <div key={m._id} className="r" role="row"><span role="rowheader" className="nm">{String(m.name).split(' ')[0]}</span>{days.map(dd => { const t = attType(rec(m, dd)); return <span key={dd} role="cell" className="c" title={`${m.name} ${dd}: ${ATT[t]?.l || '–'}`} style={{ ['--c' as any]: ATT[t]?.c || 'transparent', color: ATT[t]?.ink }}>{ATT[t]?.l || ''}</span> })}</div>)}
       </div>
     }
     case 'workload': {
@@ -177,6 +182,53 @@ export function renderWidget(id: string, size: Size, x: WCtx): React.ReactNode {
       const ring = (sz: number) => <Ring value={Math.min(100, pct)} size={sz} stroke={sz / 9} color={pct >= 80 ? 'var(--ok)' : pct >= 50 ? 'var(--warn-bar)' : 'var(--bad)'} label={`Settlement ${pct}%`}><b style={{ fontSize: sz / 4.4 }}>{pct}%</b></Ring>
       if (size === 'S') return <div className="wg-center">{ring(88)}</div>
       return <div className="wg-split">{ring(100)}<div className="wg-list"><div className="wg-kv"><span>Settlement</span><b>Rp {rpS(c.settlement)}</b></div><div className="wg-kv"><span>Top up</span><b>Rp {rpS(c.topup)}</b></div></div></div>
+    }
+    case 'team-heatmap': {
+      const staff: Any[] = d.staff; const ym = todayIso.slice(0, 7)
+      const y = Number(ym.slice(0, 4)), mo = Number(ym.slice(5, 7)) - 1, dim = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate()
+      const days = Array.from({ length: dim }, (_, i) => new Date(Date.UTC(y, mo, i + 1))).filter(dt => dt.getUTCDay() > 0 && dt.getUTCDay() < 6)
+      const ids = new Set(staff.flatMap(m => [String(m._id), String(m.email)]))
+      const pctOf = (iso: string) => { if (!staff.length) return 0; const n = new Set((data.att || []).filter((r: Any) => r.date === iso && ids.has(String(r.userId)) && attType(r) === 'wfo').map((r: Any) => String(r.userId))).size; return n / staff.length }
+      const cells = days.map(dt => { const iso = dt.toISOString().slice(0, 10); return { iso, d: dt.getUTCDate(), dow: dt.getUTCDay(), p: pctOf(iso), future: iso > todayIso } })
+      const avg = cells.filter(c => !c.future).reduce((s, c) => s + c.p, 0) / Math.max(1, cells.filter(c => !c.future).length)
+      const lead = (cells[0]?.dow || 1) - 1
+      return <div className={`wg-heat${size === 'L' ? ' big' : ''}`}>
+        <div className="wg-heat-h"><Big v={`${Math.round(avg * 100)}%`} sub={`rata-rata WFO · ${BLN[mo]} ${y}`} /></div>
+        <div className="wg-heat-g" role="img" aria-label={`Peta WFO ${BLN[mo]} ${y}, rata-rata ${Math.round(avg * 100)}%`}>
+          {size === 'L' && ['Sen', 'Sel', 'Rab', 'Kam', 'Jum'].map(h => <span key={h} className="hd">{h}</span>)}
+          {size === 'L' && Array.from({ length: lead }, (_, i) => <span key={'x' + i} />)}
+          {cells.map(c => <span key={c.iso} className={`c${c.iso === todayIso ? ' today' : ''}${c.future ? ' fut' : ''}`} title={`${c.d} ${BLN[mo]}: ${Math.round(c.p * 100)}% WFO`} style={{ ['--p' as any]: c.future ? 0 : Math.max(.08, c.p) }}>{size === 'L' ? c.d : ''}</span>)}
+        </div>
+      </div>
+    }
+    case 'enh-map': {
+      if (!d.enh.length) return <Empty t={`Belum ada enhancement di ${year}`} />
+      const stageN = STAGES_SHORT.map((_, i) => d.enh.filter((v: Any) => (v.e.stage || 1) === i + 1).length), mx = Math.max(1, ...stageN)
+      return <><div className="wg-matrix"><EnhMatrix list={d.enh} small /></div>
+        <div className="wg-legend row">{CATS.map(c => <span key={c} className={catK(c)}><i style={{ background: 'var(--k)' }} />{c}<b>{d.enh.filter((v: Any) => v.s.cat === c).length}</b></span>)}</div>
+        <div className="wg-stages sm">{STAGES_SHORT.map((st, i) => <span key={st} title={`${st}: ${stageN[i]}`}><i style={{ height: `${8 + (stageN[i] / mx) * 26}px`, opacity: stageN[i] ? 1 : .25 }} /><small>{st.split(' ')[0]}</small></span>)}</div></>
+    }
+    case 'mcu-results': {
+      const recs = x.extra.mandatory; if (recs == null) return <Empty t="Memuat…" />
+      const staff: Any[] = d.staff; const byId = new Map(recs.map((r: Any) => [String(r.userId), r]))
+      const res = staff.map(m => { const r = (byId.get(String(m.email)) || byId.get(String(m._id))) as Any | undefined; return r?.mcu?.done === 'sudah' ? (r.mcu.result || 'Sudah') : 'Belum' })
+      const keys = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'Sudah', 'Belum'].filter(k => res.includes(k))
+      const col: Record<string, string> = { P1: 'var(--ok)', P2: 'color-mix(in srgb,var(--ok) 75%,var(--surface))', P3: 'color-mix(in srgb,var(--ok) 50%,var(--surface))', P4: 'var(--warn-bar)', P5: 'var(--bad)', P6: 'color-mix(in srgb,var(--bad) 70%,#000)', Sudah: 'var(--wf)', Belum: 'var(--line2)' }
+      const n = (k: string) => res.filter(r => r === k).length
+      return <>
+        <Big v={<>{staff.length - n('Belum')}<small>/{staff.length}</small></>} sub={`sudah MCU ${year}`} />
+        <div className="wg-stackbar" role="img" aria-label={keys.map(k => `${k} ${n(k)}`).join(', ')}>{keys.map(k => <i key={k} style={{ flex: n(k), background: col[k] }} />)}</div>
+        <div className="wg-legend row">{keys.map(k => <span key={k}><i style={{ background: col[k] }} />{k}<b>{n(k)}</b></span>)}</div>
+        {size === 'L' && <div className="wg-list"><span className="wg-cap">Belum MCU</span>{staff.filter((_, i) => res[i] === 'Belum').slice(0, 5).map(m => <div key={m._id} className="wg-row"><span className="t">{m.name}<small>{m.division || ''}</small></span></div>)}</div>}
+      </>
+    }
+    case 'progress-status': {
+      const keys = [['ok', 'On track'], ['warn', 'Perhatian'], ['bad', 'Terlambat'], ['none', 'Belum mulai']] as const
+      const cnt = keys.map(([k]) => d.inits.filter((v: Any) => statusOf(v.c.spi).key === k).length)
+      if (!d.inits.length) return <Empty t={`Belum ada initiative di ${year}`} />
+      return <><Big v={<CountUp to={d.inits.length} />} sub={`initiative di ${year}`} />
+        <div className="wg-stackbar">{keys.map(([k], i) => cnt[i] ? <i key={k} style={{ flex: cnt[i], background: ST_COLOR[k] }} /> : null)}</div>
+        <div className="wg-legend row">{keys.map(([k, l], i) => <span key={k}><i style={{ background: ST_COLOR[k] }} />{l}<b>{cnt[i]}</b></span>)}</div></>
     }
     case 'notes': {
       const pins = (data.notes || []).filter((n: Any) => n.pinned).slice(0, size === 'L' ? 5 : 2)

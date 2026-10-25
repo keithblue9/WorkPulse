@@ -5,7 +5,7 @@ const all = availableWidgets(null, true)
 describe('availableWidgets', () => {
   it('filter menu & internal', () => {
     const ids = availableWidgets(new Set(['dashboard', 'links']), false).map(w => w.id)
-    expect(ids).toEqual(['summary', 'enhancement'])
+    expect(ids).toEqual(['summary', 'enhancement', 'enh-map'])
     const m = availableWidgets(new Set(['progress', 'activities', 'attendance', 'notes']), true).map(w => w.id)
     expect(m).toEqual(expect.arrayContaining(['progress', 'myfocus', 'agenda', 'activity-stats', 'issues', 'team', 'workload', 'notes']))
     expect(m).not.toContain('budget')
@@ -36,5 +36,17 @@ describe('operasi layout', () => {
     expect(sanitizeLayoutInput([{ id: 'progress', size: 'XL' }])).toBeNull()
     expect(sanitizeLayoutInput([{ id: 'progress', size: 'S' }, { id: 'progress', size: 'M' }])).toBeNull()
     expect(sanitizeLayoutInput({})).toBeNull()
+  })
+})
+
+import { chunkLayout } from '../widgets'
+describe('chunkLayout & classic', () => {
+  it('memisah grid native dan blok infografis v3, indeks asli terjaga', () => {
+    const c = chunkLayout([{ id: 'progress', size: 'S' }, { id: 'team', size: 'S' }, { id: 'v3-team', size: 'F' }, { id: 'v3-mcu', size: 'H' }, { id: 'agenda', size: 'M' }])
+    expect(c.map(x => [x.kind, x.items.map(i => i.i)])).toEqual([['grid', [0, 1]], ['flow', [2, 3]], ['grid', [4]]])
+  })
+  it('ukuran H/F hanya untuk infografis v3', () => {
+    expect(sanitizeLayoutInput([{ id: 'v3-team', size: 'F' }])).toEqual([{ id: 'v3-team', size: 'F' }])
+    expect(sanitizeLayoutInput([{ id: 'progress', size: 'F' }])).toBeNull()
   })
 })
