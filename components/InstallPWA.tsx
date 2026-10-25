@@ -1,5 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { getConfig } from '@/lib/configCache'
+import { displayAppName } from '@/lib/appName'
 
 // Banner install PWA khusus guest/eksternal — hanya ajakan install, TANPA push notif.
 // (Guest ga butuh absen/pengingat, cukup akses cepat via home screen.)
@@ -7,6 +9,8 @@ export default function InstallPWA() {
   const [show, setShow] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [isIOS, setIsIOS] = useState(false)
+  const [appName, setAppName] = useState(displayAppName())
+  useEffect(() => { getConfig().then((c:any) => setAppName(displayAppName(c?.appName))).catch(() => {}) }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -42,7 +46,7 @@ export default function InstallPWA() {
     <div style={{ position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 300, width: 'min(420px, calc(100vw - 24px))', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.18)', padding: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
       <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 20 }}>📲</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>Install WorkPulse</div>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 3 }}>Install {appName}</div>
         {isIOS ? (
           <div style={{ fontSize: 11.5, color: 'var(--text2)', lineHeight: 1.5 }}>
             Tap tombol <b>Bagikan</b> (⬆️) di Safari, lalu pilih <b>“Add to Home Screen”</b> untuk akses cepat seperti aplikasi.

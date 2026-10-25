@@ -26,7 +26,7 @@ const DashboardWidgetSchema = new Schema({
 }, { _id:false })
 
 const ConfigSchema = new Schema({
-  appName: { type:String, default:'WorkPulse' },
+  appName: { type:String, default:'WINS' },
   appTagline: { type:String, default:'BPD Procurement' },
   appIcon: { type:String, default:'' },
   appColor: { type:String, default:'#4f8ef7' },

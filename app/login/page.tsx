@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
+import { displayAppName } from '@/lib/appName'
 
 // A user is "guest/external-only" if every role they hold is 'guest'. These accounts
 // are NOT shown in the Internal picker — external access is via the front-door button.
@@ -19,7 +20,7 @@ export default function LoginPage() {
   const [showUserPicker, setShowUserPicker] = useState(false)
   const [pin, setPin] = useState<string[]>(['', '', '', '', '', ''])
   const [loading, setLoading] = useState(false)
-  const [config, setConfig] = useState<any>({ appName: 'WorkPulse', loginTagline: 'BPD Procurement — Pertamina', appColor: '#4f8ef7', appIcon: '', loginBackgrounds: [], loginSlideInterval: 5000 })
+  const [config, setConfig] = useState<any>({ appName: 'WINS', loginTagline: 'BPD Procurement — Pertamina', appColor: '#4f8ef7', appIcon: '', loginBackgrounds: [], loginSlideInterval: 5000 })
   const [currentSlide, setCurrentSlide] = useState(0)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
   const pickerRef = useRef<HTMLDivElement>(null)
@@ -124,7 +125,7 @@ export default function LoginPage() {
           ) : (
             <div style={{ width: 56, height: 56, borderRadius: 14, background: appColor, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 700, color: '#fff', marginBottom: 12, boxShadow: `0 8px 20px ${appColor}40` }}>{(config.appName || 'W')[0]}</div>
           )}
-          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 3, color: '#1a1a1a' }}>{config.appName || 'WorkPulse'}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 3, color: '#1a1a1a' }}>{displayAppName(config.appName)}</div>
           <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.55)' }}>{config.loginTagline}</div>
         </div>
 

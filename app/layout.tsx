@@ -3,15 +3,16 @@ import './globals.css'
 import { Providers } from './providers'
 import { connectDB } from '@/lib/db'
 import { ConfigModel } from '@/models/Config'
+import { displayAppName } from '@/lib/appName'
 
 // App name is sourced from Config (config.appName) so renaming the app in-app also
 // updates the browser tab title, PWA name, and iOS home-screen title.
 export async function generateMetadata(): Promise<Metadata> {
-  let appName = 'WorkPulse'
+  let appName = displayAppName()
   try {
     await connectDB()
     const cfg = await ConfigModel.findOne({}).lean() as any
-    if (cfg?.appName) appName = cfg.appName
+    appName = displayAppName(cfg?.appName)
   } catch {}
   return {
     title: appName,

@@ -11,6 +11,7 @@ import OnlinePresence from '@/components/OnlinePresence'
 import DailyCheckin from '@/components/DailyCheckin'
 import NotifyEnabler from '@/components/NotifyEnabler'
 import InstallPWA from '@/components/InstallPWA'
+import { displayAppName } from '@/lib/appName'
 
 // Menu definitions with permission keys (matches config.roleDefs[].allowedMenus)
 const NAV_GROUPS = [
@@ -131,7 +132,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const initials = user?.name?.split(' ').map((n:string)=>n[0]).join('').slice(0,2)||'U'
   const allItems = NAV_GROUPS.flatMap(g=>g.items)
   const currentPage = allItems.find(n=>pathname===n.href||(n.href!=='/dashboard'&&pathname.startsWith(n.href)))?.label || (pathname==='/dashboard/profile'?'My Profile':'Dashboard')
-  const appName = appConfig?.appName || 'WorkPulse'
+  const appName = displayAppName(appConfig?.appName)
   const appTagline = appConfig?.appTagline || 'BPD Procurement'
 
   return (

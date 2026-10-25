@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
+import { displayAppName } from '@/lib/appName'
 
 // ─── PWA Install Prompt ─────────────────────────────────────
 function PWAInstallPrompt({ config }: { config:any }) {
@@ -46,7 +47,7 @@ function PWAInstallPrompt({ config }: { config:any }) {
     <div className="fade-in" style={{ position:'fixed', bottom:'max(20px, env(safe-area-inset-bottom))', left:'50%', transform:'translateX(-50%)', zIndex:9999, background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:14, padding:'14px 16px', boxShadow:'0 12px 40px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:12, maxWidth:'calc(100% - 32px)', width:380 }}>
       <div style={{ width:42, height:42, borderRadius:10, background:config.appColor||'var(--blue)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, color:'#fff', flexShrink:0 }}>📱</div>
       <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>Install {config.appName||'WinS'}</div>
+        <div style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>Install {displayAppName(config.appName)}</div>
         <div style={{ fontSize:11, color:'var(--text3)' }}>Akses lebih cepat dari home screen</div>
       </div>
       <button onClick={dismiss} className="btn btn-sm" style={{ fontSize:11 }}>Nanti</button>

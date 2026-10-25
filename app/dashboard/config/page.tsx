@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { DEFAULT_ROLES, DEFAULT_WIDGETS, DEFAULT_LINK_CATEGORIES } from '@/lib/defaults'
+import { displayAppName } from '@/lib/appName'
 
 type Tab = 'branding'|'login'|'taxonomies'|'attendance'|'budget'|'roles'|'widgets'|'reset'|'system'
 
@@ -374,7 +375,7 @@ export default function ConfigPage() {
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:11 }}>
                   <div><label style={lbl}>Nama Aplikasi</label>
-                    <input className="input" defaultValue={config.appName} onBlur={e=>e.target.value!==config.appName && save({ appName: e.target.value })} placeholder="WorkPulse" /></div>
+                    <input className="input" defaultValue={displayAppName(config.appName)} onBlur={e=>{ const v=e.target.value.trim(); if (v && v!==displayAppName(config.appName)) save({ appName: v }) }} placeholder="WINS" /></div>
                   <div><label style={lbl}>Tagline / Subtitle</label>
                     <input className="input" defaultValue={config.appTagline} onBlur={e=>e.target.value!==config.appTagline && save({ appTagline: e.target.value })} placeholder="BPD Procurement" /></div>
                   <div style={{ display:'flex', gap:10, alignItems:'flex-end' }}>
@@ -590,7 +591,7 @@ export default function ConfigPage() {
         {tab === 'system' && (
           <Section title="ℹ️ Informasi Sistem">
             {[
-              ['Versi App','WorkPulse v5.0'],
+              ['Versi App', displayAppName(config.appName) + ' v6.0 · Pulse Aurora'],
               ['Framework','Next.js 16 (App Router)'],
               ['Database','MongoDB Atlas'],
               ['Auth','NextAuth.js'],

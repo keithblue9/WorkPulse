@@ -66,7 +66,7 @@ export async function exportGoLiveExcel(apps: GoLiveApp[], entities: GoLiveEntit
   const mod: any = await import('exceljs')
   const ExcelJS = mod.default || mod
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'WorkPulse'
+  wb.creator = 'WINS'
   wb.created = new Date()
 
   const ws = wb.addWorksheet('Go-Live', {
@@ -87,7 +87,7 @@ export async function exportGoLiveExcel(apps: GoLiveApp[], entities: GoLiveEntit
 
   ws.mergeCells(2, 1, 2, Math.max(totalCols, 6))
   const t2 = ws.getCell(2, 1)
-  t2.value = `WorkPulse · ${entities.length} entitas${meta?.filterLabel ? ` · ${meta.filterLabel}` : ''} · diekspor ${nowLabel()}`
+  t2.value = `WINS · ${entities.length} entitas${meta?.filterLabel ? ` · ${meta.filterLabel}` : ''} · diekspor ${nowLabel()}`
   t2.font = { size: 12, color: { argb: 'FF6B7280' } }
   ws.getRow(2).height = 18
 
@@ -267,7 +267,7 @@ export async function buildGoLivePdfDoc(apps: GoLiveApp[], entities: GoLiveEntit
   const footer = () => {
     pageNo++
     doc.setFontSize(10); doc.setTextColor(150)
-    doc.text('WorkPulse · Go-Live', M, PH - 4)
+    doc.text('WINS · Go-Live', M, PH - 4)
     doc.text(`Halaman ${pageNo}`, PW - M, PH - 4, { align: 'right' })
     doc.setTextColor(17)
   }
@@ -276,7 +276,7 @@ export async function buildGoLivePdfDoc(apps: GoLiveApp[], entities: GoLiveEntit
   doc.setFontSize(FS_TITLE); doc.setFont('helvetica', 'bold'); doc.setTextColor(31, 41, 55)
   doc.text('Go-Live Status per Entitas', M, M + 9)
   doc.setFontSize(FS_SUB); doc.setFont('helvetica', 'normal'); doc.setTextColor(107, 114, 128)
-  doc.text(`WorkPulse · ${entities.length} entitas${meta?.filterLabel ? ` · ${meta.filterLabel}` : ''} · diekspor ${nowLabel()}`, M, M + 16)
+  doc.text(`WINS · ${entities.length} entitas${meta?.filterLabel ? ` · ${meta.filterLabel}` : ''} · diekspor ${nowLabel()}`, M, M + 16)
 
   let y = M + 28
   doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(31, 41, 55)

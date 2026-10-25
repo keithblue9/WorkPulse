@@ -115,7 +115,7 @@ function YieldTab() {
     try {
       const _xl:any = await import('exceljs'); const ExcelJS = _xl.default || _xl
       const wb = new ExcelJS.Workbook()
-      wb.creator = 'WinS'; wb.created = new Date()
+      wb.creator = 'WINS'; wb.created = new Date()
       const ws = wb.addWorksheet('Budget Yield', { views:[{ showGridLines:false }] })
       ws.columns = [{ width:32 },{ width:15 },{ width:15 },{ width:19 },{ width:19 },{ width:11 },{ width:11 },{ width:11 },{ width:11 },{ width:11 },{ width:11 }]
       const box = () => ({ top:{style:'thin' as const, color:{argb:'FFD0D5DD'}}, left:{style:'thin' as const, color:{argb:'FFD0D5DD'}}, bottom:{style:'thin' as const, color:{argb:'FFD0D5DD'}}, right:{style:'thin' as const, color:{argb:'FFD0D5DD'}} })

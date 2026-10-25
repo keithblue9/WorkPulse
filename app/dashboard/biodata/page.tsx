@@ -151,7 +151,7 @@ export default function BiodataPage() {
     setExporting(true)
     try {
       const _xl:any = await import('exceljs'); const ExcelJS = _xl.default || _xl
-      const wb = new ExcelJS.Workbook(); wb.creator = 'WinS'; wb.created = new Date()
+      const wb = new ExcelJS.Workbook(); wb.creator = 'WINS'; wb.created = new Date()
       const box = () => ({ top:{style:'thin' as const, color:{argb:'FFE0E4EA'}}, left:{style:'thin' as const, color:{argb:'FFE0E4EA'}}, bottom:{style:'thin' as const, color:{argb:'FFE0E4EA'}}, right:{style:'thin' as const, color:{argb:'FFE0E4EA'}} })
       const roleOf = (u:any)=> (u.roles?.length ? u.roles.join(', ') : (u.role||'-'))
 

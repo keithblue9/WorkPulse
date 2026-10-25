@@ -1,16 +1,17 @@
 import type { MetadataRoute } from 'next'
 import { connectDB } from '@/lib/db'
 import { ConfigModel } from '@/models/Config'
+import { displayAppName } from '@/lib/appName'
 
 export const dynamic = 'force-dynamic'
 
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
-  let appName = 'WorkPulse'
+  let appName = displayAppName()
   let appColor = '#4f8ef7'
   try {
     await connectDB()
     const cfg = await ConfigModel.findOne({}).lean() as any
-    if (cfg?.appName) appName = cfg.appName
+    appName = displayAppName(cfg?.appName)
     if (cfg?.appColor) appColor = cfg.appColor
   } catch {}
   return {
