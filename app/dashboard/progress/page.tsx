@@ -1,6 +1,7 @@
 'use client'
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import RichTextarea from '@/components/RichTextarea'
 import ExportMenu from '@/components/ExportMenu'
@@ -262,7 +263,21 @@ export default function ProgressPage() {
     if (!internal) return
     fetch('/api/users').then(r => (r.ok ? r.json() : { data: [] })).then(d => setMembers((d.data || []).filter((u: any) => u.active !== false))).catch(() => {})
   }, [internal])
-  useEffect(() => { try { const id = new URLSearchParams(location.search).get('i'); if (id) setSelId(id) } catch {} }, [])
+  // Progress Project sudah digabung ke Enhancement: tautan lama diarahkan ke enhancement hasil pindahan,
+  // dan halaman ini hanya tampil selama masih ada initiative yang belum dipindah.
+  const router = useRouter()
+  // 'wait' selama tautan ?i= masih dicek, supaya pengalihan umum tidak mendahului pengalihan ke enhancement-nya.
+  const [linkCheck, setLinkCheck] = useState<'wait' | 'done'>('wait')
+  useEffect(() => {
+    let id: string | null = null
+    try { id = new URLSearchParams(location.search).get('i') } catch {}
+    if (!id) { setLinkCheck('done'); return }
+    setSelId(id)
+    fetch(`/api/initiatives/${id}`).then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.data?.movedTo) router.replace(`/dashboard/enhancement?e=${d.data.movedTo}`); else setLinkCheck('done') })
+      .catch(() => setLinkCheck('done'))
+  }, [router])
+  useEffect(() => { if (linkCheck === 'done' && all && all.length === 0 && !failed) router.replace('/dashboard/enhancement?view=progress') }, [all, failed, router, linkCheck])
   const select = (id: string | null) => {
     setSelId(id)
     try { const u = new URL(location.href); id ? u.searchParams.set('i', id) : u.searchParams.delete('i'); history.replaceState(history.state, '', u) } catch {}
@@ -282,6 +297,7 @@ export default function ProgressPage() {
       {quick && quickIni && <QuickSheet ini={quickIni} idx={quick.idx} year={year} today={today} onClose={() => setQuick(null)} onSaved={load} />}
 
       <div className="au-view au-anim" ref={exportRef}>
+        <div className="au-mig" role="status"><Icon name="enh" size={20} /><span className="au-col" style={{ gap: 2, flex: 1, minWidth: 0 }}><b>Progress Project digabung ke Enhancement</b><span className="au-small au-ink2">Halaman ini tampil sampai admin memindahkan initiative di bawah. Setelah itu semuanya ada di menu Enhancement.</span></span><a className="btn btn-sm" href="/dashboard/enhancement?view=progress">Buka Enhancement</a></div>
         <PageHeader eyebrow={`Dashboard & Overview · ${year}`} title="Progress Project" actions={<>
           <ExportMenu getNodes={() => exportRef.current ? Array.from(exportRef.current.querySelectorAll<HTMLElement>('[data-export-card]')) : []} filename={`progress-initiatives-${year}`} title="Progress Initiative — WINS" />
           {internal && <button type="button" className="btn btn-primary" onClick={() => setEditor({ ini: null })}><Icon name="plus" size={16} stroke={2.2} />Initiative baru</button>}

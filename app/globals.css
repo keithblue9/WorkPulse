@@ -1177,3 +1177,34 @@ button.au-wl { cursor:pointer } button.au-wl:hover { background:var(--sunken) }
 /* Tombol ganti sorotan selalu di pojok kiri atas kartu (sejajar stiker di kanan atas) */
 .au-hero .au-hero-sw { position:absolute; top:20px; left:22px }
 .au-hero:has(.au-hero-sw) { padding-top:72px }
+
+/* ── Enhancement terpadu: klasifikasi SI/Non-SI, Carry Over, pemindahan Progress Project ── */
+:root { --si:#B45309; --si-ink:#8A3F06; --si-soft:#FDF0E1; --co:#0E7C86; --co-ink:#0A5E66; --co-soft:#E2F5F6 }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --si:#F5B35C; --si-ink:#F7C27E; --si-soft:rgba(245,179,92,.15); --co:#4FD3DE; --co-ink:#7FE0E8; --co-soft:rgba(79,211,222,.14) } }
+:root[data-theme="dark"] { --si:#F5B35C; --si-ink:#F7C27E; --si-soft:rgba(245,179,92,.15); --co:#4FD3DE; --co-ink:#7FE0E8; --co-soft:rgba(79,211,222,.14) }
+.au-tag.t-si { background:var(--si-soft); color:var(--si-ink) }
+.au-tag.t-co { background:var(--co-soft); color:var(--co-ink) }
+.au-pill.p-si { background:var(--si-soft); color:var(--si-ink) }
+.au-pill.p-co { background:var(--co-soft); color:var(--co-ink) }
+.au-pgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr)); gap:14px }
+.au-mig { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:14px 16px; border-radius:20px; background:linear-gradient(135deg,var(--accent-soft),var(--co-soft)); border:1px solid var(--line); color:var(--ink) }
+.au-mig > svg { color:var(--accent); flex:none }
+.au-carried > summary { display:flex; align-items:center; gap:10px; cursor:pointer; list-style:none; min-height:44px }
+.au-carried > summary::-webkit-details-marker { display:none }
+.au-carried > summary svg { color:var(--co); transition:transform .2s var(--ease) }
+.au-carried[open] > summary svg { transform:rotate(90deg) }
+.au-carried > summary .au-tag { margin-left:auto }
+.au-carrylog { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; border-left:2px solid var(--co-soft); padding-left:14px }
+.au-carrylog li { display:flex; flex-direction:column; gap:2px; position:relative }
+.au-carrylog li::before { content:''; position:absolute; left:-20px; top:6px; width:10px; height:10px; border-radius:50%; background:var(--co) }
+@media (prefers-reduced-motion: reduce) { .au-carried > summary svg { transition:none } }
+.au-enh-seg { display:contents }
+@media (max-width:719px) {
+  .au-ph .acts:has(.au-enh-seg) { min-width:0; width:100% }
+  .au-enh-seg { display:block; flex:1 1 100%; min-width:0 }
+  .au-enh-seg .au-seg { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); width:100% }
+  .au-enh-seg .au-seg button { justify-content:center; padding:7px 4px; min-height:40px }
+}
+@media (max-width:420px) { .au-enh-seg .au-seg button svg { display:none } }
+/* Daftar grup yang diberi tinggi maksimum (scroll) tidak boleh memampatkan barisnya hingga teks bertumpuk */
+.au-ig > * { flex-shrink:0 }

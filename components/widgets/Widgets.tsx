@@ -59,7 +59,7 @@ export function renderWidget(id: string, size: Size, x: WCtx): React.ReactNode {
       const qw = d.enh.filter((v: Any) => v.s.cat === 'Quick Win').length
       const next = upcoming<Any>(d.acts, year === nowYear ? todayIso : `${year}-01-01`, 1)[0]
       const lines = [
-        d.inits.length ? <>Realisasi <b>{P(d.port.actual)}</b> vs plan <b>{P(d.port.plan)}</b>{d.behind.length ? <> · <b className="wg-warn">{d.behind.length} tertinggal</b></> : ' · semua sesuai jadwal'}</> : <>Belum ada initiative di {year}</>,
+        d.inits.length ? <>Realisasi <b>{P(d.port.actual)}</b> vs plan <b>{P(d.port.plan)}</b>{d.behind.length ? <> · <b className="wg-warn">{d.behind.length} tertinggal</b></> : ' · semua sesuai jadwal'}</> : <>Belum ada enhancement di {year}</>,
         <><b>{d.enh.length}</b> enhancement{qw ? <> · <b>{qw}</b> Quick Win siap</> : ''}</>,
         <><b>{d.wfoToday.length}/{d.staff.length}</b> WFO hari ini{size === 'L' && next ? <> · berikutnya <b>{next.title}</b> ({dShort(next.actionDate)})</> : ''}</>,
       ]
@@ -72,7 +72,7 @@ export function renderWidget(id: string, size: Size, x: WCtx): React.ReactNode {
       const keys = [['ok', 'On track'], ['warn', 'Perhatian'], ['bad', 'Terlambat'], ['none', 'Belum mulai']] as const
       const cnt = keys.map(([k]) => d.inits.filter((v: Any) => statusOf(v.c.spi).key === k).length)
       const ring = (sz: number, st: number) => <Ring value={d.port.actual} plan={d.port.spi == null ? null : d.port.plan} size={sz} stroke={st} color="var(--wf)" label={`Realisasi ${P(d.port.actual)}, plan ${P(d.port.plan)}`}><b style={{ fontSize: sz / 4.2 }}>{P(d.port.actual)}</b>{sz > 90 && <span>plan {P(d.port.plan)}</span>}</Ring>
-      if (!d.inits.length) return <Empty t={`Belum ada initiative di ${year}`} />
+      if (!d.inits.length) return <Empty t={`Belum ada enhancement di ${year}`} />
       if (size === 'S') return <div className="wg-center">{ring(92, 10)}</div>
       const legend = <div className="wg-legend">{keys.map(([k, l], i) => <span key={k}><i style={{ background: ST_COLOR[k] }} />{l}<b>{cnt[i]}</b></span>)}</div>
       if (size === 'M') return <div className="wg-split">{ring(104, 11)}{legend}</div>
@@ -132,7 +132,7 @@ export function renderWidget(id: string, size: Size, x: WCtx): React.ReactNode {
       </div>
     }
     case 'workload': {
-      const rows = workload(d.staff, { acts: d.acts, inits: d.inits.map((v: Any) => v.i), enh: d.enh.map((v: Any) => v.e) }, today, x.tpl).slice(0, size === 'L' ? 8 : 4)
+      const rows = workload(d.staff, { acts: d.acts, inits: d.inits.filter((v: Any) => v.legacy).map((v: Any) => v.i), enh: d.enh.map((v: Any) => v.e) }, today, x.tpl).slice(0, size === 'L' ? 8 : 4)
       const max = Math.max(1, ...rows.map(r => r.total))
       return <div className="wg-list">{rows.map(r => <button key={r.name} type="button" className="wg-row wg-btn" onClick={() => x.onFocus?.(r.name)} title={`Fokus ${r.name}`}><span className="t">{r.name.split(' ').slice(0, 2).join(' ')}<small>{r.acts} act · {r.inits} init · {r.enh} enh{r.late ? ` · ${r.late} perlu update` : ''}</small></span><Bar v={(r.total / max) * 100} c={r.late ? 'var(--warn-bar)' : 'var(--wf)'} /><b className="n">{r.total}</b></button>)}</div>
     }
@@ -227,8 +227,8 @@ export function renderWidget(id: string, size: Size, x: WCtx): React.ReactNode {
     case 'progress-status': {
       const keys = [['ok', 'On track'], ['warn', 'Perhatian'], ['bad', 'Terlambat'], ['none', 'Belum mulai']] as const
       const cnt = keys.map(([k]) => d.inits.filter((v: Any) => statusOf(v.c.spi).key === k).length)
-      if (!d.inits.length) return <Empty t={`Belum ada initiative di ${year}`} />
-      return <><Big v={<CountUp to={d.inits.length} />} sub={`initiative di ${year}`} />
+      if (!d.inits.length) return <Empty t={`Belum ada enhancement di ${year}`} />
+      return <><Big v={<CountUp to={d.inits.length} />} sub={`enhancement di ${year}`} />
         <div className="wg-stackbar">{keys.map(([k], i) => cnt[i] ? <i key={k} style={{ flex: cnt[i], background: ST_COLOR[k] }} /> : null)}</div>
         <div className="wg-legend row">{keys.map(([k, l], i) => <span key={k}><i style={{ background: ST_COLOR[k] }} />{l}<b>{cnt[i]}</b></span>)}</div></>
     }

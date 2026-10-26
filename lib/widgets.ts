@@ -27,14 +27,14 @@ export const FAMILIES: Record<Fam, { label: string; art: string; icon: string }>
 
 export const WIDGETS: WidgetDef[] = [
   { id: 'summary', fam: 'progress', title: 'Ringkasan hari ini', desc: 'Tiga hal terpenting hari ini dari semua data', sizes: ['M', 'L'], menus: [], href: '/dashboard' },
-  { id: 'progress', fam: 'progress', title: 'Progress project', desc: 'Realisasi portofolio vs rencana, status tiap initiative', sizes: ['S', 'M', 'L'], menus: ['progress'], href: '/dashboard/progress' },
+  { id: 'progress', fam: 'progress', title: 'Progress enhancement', desc: 'Realisasi portofolio vs rencana, status tiap enhancement', sizes: ['S', 'M', 'L'], menus: ['progress'], href: '/dashboard/enhancement?view=progress' },
   { id: 'myfocus', fam: 'progress', title: 'Tugas saya', desc: 'Tugas dengan PIC kamu yang perlu di-update', sizes: ['S', 'M'], menus: ['progress'], internalOnly: true, href: '/dashboard' },
   { id: 'enhancement', fam: 'enhancement', title: 'Enhancement', desc: 'Jumlah, kategori Quick Win s.d. Strategis, dan tahap BRD', sizes: ['S', 'M', 'L'], menus: [], href: '/dashboard/enhancement' },
   { id: 'agenda', fam: 'agenda', title: 'Agenda berikutnya', desc: 'Aktivitas terjadwal paling dekat', sizes: ['S', 'M', 'L'], menus: ['activities', 'calendar'], href: '/dashboard/calendar' },
   { id: 'activity-stats', fam: 'agenda', title: 'Statistik aktivitas', desc: 'KPI, Non KPI, Go Live, Anggaran, Others, prioritas tinggi', sizes: ['M', 'L'], menus: ['activities'], href: '/dashboard/activities' },
   { id: 'issues', fam: 'issues', title: 'Prioritas tinggi', desc: 'Issue prioritas tinggi yang masih aktif', sizes: ['S', 'M'], menus: ['activities', 'issues'], href: '/dashboard/issues' },
   { id: 'team', fam: 'team', title: 'Tim hari ini', desc: 'Siapa WFO, WFH, dinas, atau cuti', sizes: ['S', 'M', 'L'], menus: ['attendance'], href: '/dashboard/attendance' },
-  { id: 'workload', fam: 'team', title: 'Beban kerja', desc: 'Activity, initiative & enhancement per member', sizes: ['M', 'L'], menus: [], internalOnly: true, href: '/dashboard' },
+  { id: 'workload', fam: 'team', title: 'Beban kerja', desc: 'Activity & enhancement per member', sizes: ['M', 'L'], menus: [], internalOnly: true, href: '/dashboard' },
   { id: 'mandatory', fam: 'mandatory', title: 'Mandatory', desc: 'Kepatuhan MCU, training, dan support KPI', sizes: ['S', 'M', 'L'], menus: ['mandatory'], needs: ['mandatory'], href: '/dashboard/mandatory' },
   { id: 'golive', fam: 'golive', title: 'Go-Live', desc: 'Entitas yang sudah go-live per aplikasi', sizes: ['S', 'M', 'L'], menus: ['golive'], needs: ['golive'], href: '/dashboard/golive' },
   { id: 'budget', fam: 'budget', title: 'Budget', desc: 'Realisasi vs RKAP per kategori dan prognosa', sizes: ['S', 'M', 'L'], menus: ['budget', 'budgetreport'], needs: ['budget'], href: '/dashboard/budget' },
@@ -43,7 +43,7 @@ export const WIDGETS: WidgetDef[] = [
   { id: 'team-heatmap', fam: 'team', title: 'Peta WFO bulan ini', desc: 'Heatmap kehadiran WFO per hari kerja, sekali lihat', sizes: ['M', 'L'], menus: ['attendance'], href: '/dashboard/attendance' },
   { id: 'enh-map', fam: 'enhancement', title: 'Peta enhancement', desc: 'Matriks impact vs effort dan sebaran tahap BRD', sizes: ['L'], menus: [], href: '/dashboard/enhancement' },
   { id: 'mcu-results', fam: 'mandatory', title: 'Hasil MCU', desc: 'Sebaran hasil P1–P6 dan yang belum MCU', sizes: ['M', 'L'], menus: ['mandatory'], needs: ['mandatory'], href: '/dashboard/mandatory' },
-  { id: 'progress-status', fam: 'progress', title: 'Status progress', desc: 'Komposisi on track, perhatian, terlambat', sizes: ['M'], menus: ['progress'], href: '/dashboard/progress' },
+  { id: 'progress-status', fam: 'progress', title: 'Status progress', desc: 'Komposisi on track, perhatian, terlambat', sizes: ['M'], menus: ['progress'], href: '/dashboard/enhancement?view=progress' },
   // ── Infografis Aurora v3 (klasik, interaktif penuh) ──
   { id: 'v3-team', fam: 'team', kind: 'classic', title: 'Ketersediaan tim · Aurora v3', desc: 'Presensi per hari/pekan, donut tipe kehadiran, rekap cuti — lengkap & interaktif', sizes: ['F', 'H'], menus: ['attendance'], href: '/dashboard/attendance' },
   { id: 'v3-budget-yield', fam: 'budget', kind: 'classic', title: 'Yield plan vs realisasi · Aurora v3', desc: 'Bullet chart RKAP vs realisasi per tahun', sizes: ['F', 'H'], menus: ['budget', 'budgetreport'], href: '/dashboard/budget' },

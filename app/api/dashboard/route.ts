@@ -7,7 +7,7 @@ export async function GET() {
   try {
     await connectDB()
     const [initiatives, issues] = await Promise.all([
-      InitiativeModel.find({ year: 2026 }).lean(),
+      InitiativeModel.find({ year: 2026, movedTo: { $exists: false } }).lean(),
       IssueModel.find({}).lean(),
     ])
 

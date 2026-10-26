@@ -1,11 +1,13 @@
 // Whitelist + validation for enhancement writes (POST/PATCH and Excel import). Pure.
 import { dUTC } from '@/lib/progress'
 import { ENH_APPS, ENH_TYPES, TPL, type EnhItem, type EnhPhase } from '@/lib/enhancement'
+import { KLAS, cleanActs, type CustomAct } from '@/lib/enhancementFlow'
 
 export type EnhInput = {
   app?: string; code?: string; title?: string; type?: string; initiator?: string; year?: number
   items?: EnhItem[]; stage?: number; weights?: number[] | null; phases?: EnhPhase[]
   pic?: string[]; notes?: string
+  klas?: string; acts?: CustomAct[]; hiddenGuest?: boolean
 }
 type Result = { ok: true; data: EnhInput } | { ok: false; error: string }
 
@@ -90,6 +92,18 @@ export function cleanEnhancement(body: Record<string, unknown>, partial: boolean
       phases.push({ key, start, end, pct })
     }
     out.phases = phases
+  }
+  if (has('klas')) {
+    const k = str(b.klas, 10)
+    if (k && !(KLAS as readonly string[]).includes(k)) return { ok: false, error: 'Klasifikasi harus SI atau Non-SI' }
+    out.klas = k || 'Non-SI'
+  }
+  if (has('hiddenGuest')) out.hiddenGuest = b.hiddenGuest === true
+  if (has('acts')) {
+    // [] = kembali ke template 5 aktivitas
+    const r = cleanActs(b.acts)
+    if (!r.ok) return r
+    out.acts = r.acts
   }
   return { ok: true, data: out }
 }

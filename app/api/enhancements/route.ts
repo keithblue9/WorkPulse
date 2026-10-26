@@ -5,6 +5,7 @@ import { connectDB } from '@/lib/db'
 import { EnhancementModel } from '@/models/Enhancement'
 import { cleanEnhancement } from '@/lib/enhancementInput'
 import { nextCode, sessionEmail } from '@/lib/enhancementServer'
+import { currentRoles } from '@/lib/session'
 
 // GET ?year=YYYY → enhancement tahun itu; tanpa year / year=all → semua (halaman memfilter lintas tahun).
 export async function GET(req: NextRequest) {
@@ -12,7 +13,9 @@ export async function GET(req: NextRequest) {
     await connectDB()
     const yp = new URL(req.url).searchParams.get('year')
     const y = Number(yp)
-    const filter = yp && yp !== 'all' && Number.isInteger(y) ? { year: y } : {}
+    const filter: Record<string, unknown> = yp && yp !== 'all' && Number.isInteger(y) ? { year: y } : {}
+    const roles = await currentRoles()
+    if (!roles || roles.every(r => r === 'guest')) filter.hiddenGuest = { $ne: true }
     const data = await EnhancementModel.find(filter).sort({ app: 1, code: 1 }).lean()
     return NextResponse.json({ data })
   } catch {

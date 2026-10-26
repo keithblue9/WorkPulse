@@ -23,8 +23,8 @@ async function weeklyBroadcast(jakartaToday: string) {
     PushSubscriptionModel.find({}, 'userEmail').lean(),
     UserModel.find({ active: { $ne: false } }, 'name email').lean(),
     ProjectModel.find({}, 'title pic picName status actionDate actionDateEnd showInList').lean(),
-    InitiativeModel.find({}, 'title pic phases year').lean(),
-    EnhancementModel.find({}, 'title pic stage').lean(),
+    InitiativeModel.find({ movedTo: { $exists: false } }, 'title pic phases year').lean(),
+    EnhancementModel.find({}, 'title pic stage acts year').lean(),
   ]) as any[]
   const emails = new Set((subs as any[]).map(s => String(s.userEmail || '').toLowerCase()).filter(Boolean))
   let recipients = 0, sent = 0

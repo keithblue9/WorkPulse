@@ -24,7 +24,7 @@ const NotifyEnabler = dynamic(() => import('@/components/NotifyEnabler'), { ssr:
 const InstallPWA = dynamic(() => import('@/components/InstallPWA'), { ssr: false })
 
 // Tab bar HP: 4 menu utama + Menu. Item tanpa izin diganti menu berikutnya yang diizinkan.
-const TAB_PREF = ['/dashboard', '/dashboard/progress', '/dashboard/enhancement', '/dashboard/notes', '/dashboard/activities', '/dashboard/links']
+const TAB_PREF = ['/dashboard', '/dashboard/enhancement', '/dashboard/notes', '/dashboard/activities', '/dashboard/links']
 const TAB_LABEL: Record<string, string> = { '/dashboard': 'Beranda', '/dashboard/progress': 'Progress', '/dashboard/enhancement': 'Enhance', '/dashboard/notes': 'Notes', '/dashboard/activities': 'Activities', '/dashboard/links': 'Link Hub' }
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -72,7 +72,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       .catch(() => {})
     return () => { alive = false }
   }, [idle, internal, myName, appConfig, pathname])
-  const dueOf = (href: string) => href === '/dashboard/progress' ? due?.progress || 0 : href === '/dashboard/enhancement' ? due?.enhancement || 0 : 0
+  // Progress Project kini bagian Enhancement: tugas tertinggal keduanya dihitung di badge Enhancement.
+  const dueOf = (href: string) => href === '/dashboard/enhancement' ? (due?.progress || 0) + (due?.enhancement || 0) : 0
   const dueBadge = (href: string) => { const n = dueOf(href); return n ? <span className="wn-due" aria-label={`${n} perlu update`}>{n > 99 ? '99+' : n}</span> : null }
 
   if (status === 'loading') return (

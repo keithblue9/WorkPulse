@@ -11,9 +11,10 @@ describe('nav permissions', () => {
     expect(all.length).toBe(NAV_GROUPS.flatMap(g => g.items).length)
   })
   it('a member sees Enhancement but not admin menus', () => {
+    // Progress Project digabung ke Enhancement (menu Progress Project dihapus).
     const roleDefs = [{ key: 'member', allowedMenus: ['dashboard', 'progress', 'activities'] }]
     const all = hrefs(visibleNav(getAllowedMenus(roleDefs, ['member'], true), ['member']))
-    expect(all).toEqual(['/dashboard', '/dashboard/progress', '/dashboard/enhancement', '/dashboard/activities'])
+    expect(all).toEqual(['/dashboard', '/dashboard/enhancement', '/dashboard/activities'])
   })
   it('a guest sees only the guest menus, never Enhancement', () => {
     const all = hrefs(visibleNav(getAllowedMenus([], ['guest'], true), ['guest']))

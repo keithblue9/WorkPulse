@@ -130,7 +130,7 @@ function HeroBody({ kind, p, switcher }: { kind: HeroKind; p: Props; switcher: R
   if (kind === 'fokus' && p.me) {
     const me = p.me
     return shell(
-      <>Hai {first}, {me.late.length ? <>ada <em>{me.late.length} update</em> yang ditunggu hari ini.</> : me.tasks.length ? <>semua tugasmu <em>sesuai jadwal</em>.</> : <>belum ada tugas initiative atas namamu.</>}</>,
+      <>Hai {first}, {me.late.length ? <>ada <em>{me.late.length} update</em> yang ditunggu hari ini.</> : me.tasks.length ? <>semua tugasmu <em>sesuai jadwal</em>.</> : <>belum ada tugas atas namamu.</>}</>,
       <>{chip(<CountUp to={me.tasks.length + me.myActs.length} />, 'Tugas saya')}{chip(<CountUp to={me.late.length} />, 'Perlu update')}{chip(<CountUp to={me.myEnh.length} />, 'Enhancement saya')}</>,
       <button type="button" className="btn btn-primary" style={{ minHeight: 44 }} onClick={p.onMyFocus}>Buka Fokus saya <Icon name="arrow" size={16} stroke={2.2} /></button>,
       <Ring value={me.c.actual} plan={me.tasks.length && me.c.spi != null ? me.c.plan : null} size={210} stroke={20} label={`Tugas saya ${P(me.c.actual)}`}><b style={{ fontSize: 44 }}>{P(me.c.actual)}</b><span>tugas saya · plan {P(me.c.plan)}</span></Ring>,
@@ -140,10 +140,10 @@ function HeroBody({ kind, p, switcher }: { kind: HeroKind; p: Props; switcher: R
   // progress (bawaan)
   return shell(
     <>{hello} {d.inits.length
-      ? (d.behind.length ? <><em>{d.behind.length} initiative</em> butuh perhatian{d.enh.length ? `, ${d.enh.filter((v: Any) => v.s.cat === 'Quick Win').length} Quick Win siap jalan.` : '.'}</> : <>Semua initiative <em>on track</em>.</>)
-      : d.enh.length ? <>{d.enh.length} enhancement terjadwal di {year}.</> : <>Belum ada pekerjaan tercatat di {year}.</>}</>,
-    <>{chip(<CountUp to={d.inits.length} />, 'Initiative')}{chip(<CountUp to={d.enh.length} />, 'Enhancement')}{chip(<><CountUp to={d.wfoToday.length} /><small style={{ fontSize: 16, opacity: .7 }}>/{d.staff.length}</small></>, 'WFO hari ini')}</>,
-    <>{internal && <><Link href="/dashboard/progress" className="btn btn-primary" style={{ minHeight: 44 }}>Lihat progress <Icon name="arrow" size={16} stroke={2.2} /></Link><Link href="/dashboard/enhancement" className="btn btn-ghost" style={{ minHeight: 44 }}>Buka enhancement</Link></>}{yearHint(d.enh.length, enhHint, 'enhancement')}</>,
+      ? (d.behind.length ? <><em>{d.behind.length} enhancement</em> butuh perhatian{d.enh.length ? `, ${d.enh.filter((v: Any) => v.s.cat === 'Quick Win').length} Quick Win siap jalan.` : '.'}</> : <>Semua enhancement <em>on track</em>.</>)
+      : <>Belum ada pekerjaan tercatat di {year}.</>}</>,
+    <>{chip(<CountUp to={d.inits.length} />, 'Enhancement')}{chip(<CountUp to={d.inits.filter((v: Any) => v.i.klas === 'SI').length} />, 'SI · KPI')}{chip(<><CountUp to={d.wfoToday.length} /><small style={{ fontSize: 16, opacity: .7 }}>/{d.staff.length}</small></>, 'WFO hari ini')}</>,
+    <>{internal && <><Link href="/dashboard/enhancement?view=progress" className="btn btn-primary" style={{ minHeight: 44 }}>Lihat progress <Icon name="arrow" size={16} stroke={2.2} /></Link></>}{yearHint(d.enh.length, enhHint, 'enhancement')}</>,
     <Ring value={d.port.actual} plan={d.port.spi == null ? null : d.port.plan} size={220} stroke={20} label={`Realisasi portofolio ${P(d.port.actual)} dari rencana ${P(d.port.plan)}`}><b style={{ fontSize: 46 }}>{P(d.port.actual)}</b><span>realisasi · plan {P(d.port.plan)}</span></Ring>,
     `LIVE · ${year}`)
 }

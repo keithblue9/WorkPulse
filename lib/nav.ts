@@ -6,7 +6,6 @@ export type NavGroup = { key: string; label: string; items: NavItem[] }
 export const NAV_GROUPS: NavGroup[] = [
   { key: 'dashboard', label: 'Dashboard & Overview', items: [
     { href: '/dashboard', label: 'Dashboard', icon: 'dash', permKey: 'dashboard' },
-    { href: '/dashboard/progress', label: 'Progress Project', icon: 'prog', permKey: 'progress' },
     { href: '/dashboard/enhancement', label: 'Enhancement', icon: 'enh', permKey: 'enhancement', internal: true, isNew: true },
   ] },
   { key: 'activities', label: 'Activities', items: [
