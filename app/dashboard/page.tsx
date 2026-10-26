@@ -20,7 +20,7 @@ import { DAY, actsFromPhases, calc, dUTC, inYear, ptd, todayUTC } from '@/lib/pr
 import { showInYear } from '@/lib/initiativeView'
 import { STAGES_SHORT, enhActs, normWeights, score } from '@/lib/enhancement'
 import { klasOf, yearRole } from '@/lib/enhancementFlow'
-import { activityInYear, activityStats, portfolio, samePerson, upcoming, wfoUserIds } from '@/lib/dashboard'
+import { activityInYear, activityStats, isFinished, portfolio, samePerson, upcoming, wfoUserIds } from '@/lib/dashboard'
 
 type View = 'general' | 'staff' | 'issues'
 type Any = Record<string, any>
@@ -33,7 +33,7 @@ const whenLabel = (iso: string, today: string) => {
   const d = dUTC(iso), t = dUTC(today); if (!Number.isFinite(d)) return iso
   const diff = Math.round((d - t) / DAY), dd = new Date(d)
   const tail = `${HARI[dd.getUTCDay()].toUpperCase()} ${dd.getUTCDate()} ${BLN[dd.getUTCMonth()].toUpperCase()}`
-  return diff === 0 ? `HARI INI · ${tail}` : diff === 1 ? `BESOK · ${tail}` : tail
+  return diff < 0 ? `BERLANGSUNG · sejak ${tail}` : diff === 0 ? `HARI INI · ${tail}` : diff === 1 ? `BESOK · ${tail}` : tail
 }
 const PRIO: Record<string, { l: string; t: 'bad' | 'warn' | 'ok' }> = { high: { l: 'High', t: 'bad' }, medium: { l: 'Medium', t: 'warn' }, low: { l: 'Low', t: 'ok' } }
 
@@ -82,6 +82,17 @@ export default function DashboardPage() {
   }, [internal, todayIso])
   const ready = session !== undefined
   useEffect(() => { if (ready) load() }, [load, ready])
+  // Kembali ke aplikasi (PWA dibuka lagi / tab aktif) atau ada data yang diubah → muat ulang,
+  // supaya agenda yang sudah selesai & angka "perlu update" tidak tertahan versi lama.
+  useEffect(() => {
+    if (!ready) return
+    let last = Date.now()
+    const refresh = () => { if (Date.now() - last < 2000) return; last = Date.now(); load() }
+    const onVis = () => { if (document.visibilityState === 'visible' && Date.now() - last > 30_000) refresh() }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('wins:data-changed', refresh)
+    return () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('wins:data-changed', refresh) }
+  }, [ready, load])
 
   const tpl = normWeights(config?.enhancementTemplate)
 
@@ -255,7 +266,7 @@ function Issues({ acts, config, internal, onToggleHidden }: { acts: Any[]; confi
   const vis = listed.filter(a => !a.hidden), hiddenN = listed.length - vis.length
   const statuses: Any[] = (config?.issueStatuses || []).filter((s: Any) => s.active)
   const dist: Any[] = statuses.map(s => ({ ...s, n: vis.filter(a => a.status === s.key).length }))
-  const high = vis.filter(a => a.priority === 'high' && !['completed', 'done'].includes(String(a.status)))
+  const high = vis.filter(a => a.priority === 'high' && !isFinished(a))
   const rows = (showHidden ? listed : vis).filter(a => status === 'all' || a.status === status)
   const catColor = (k: string) => (config?.activityCategories || []).find((c: Any) => c.key === k)?.color || 'var(--accent)'
   return (

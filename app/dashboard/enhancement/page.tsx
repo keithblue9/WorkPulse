@@ -9,6 +9,9 @@ import { ActsSheet, CarrySheet, MigrateSheet, QuickActSheet, useMigration, type 
 import { EnhMatrix as Matrix } from '@/components/EnhMatrix'
 import { Empty, Icon, PageHeader, Pill, Ring, Seg, Sheet, Tile } from '@/components/ui'
 import { getConfig } from '@/lib/configCache'
+import { cachedFetch } from '@/lib/fetchCache'
+import { needsUpdateList, type DueItem } from '@/lib/workload'
+import Link from 'next/link'
 import { userRolesOf } from '@/lib/perms'
 import { isInternalUser } from '@/lib/nav'
 import { useYear } from '@/lib/year'
@@ -319,12 +322,16 @@ export default function EnhancementPage() {
   const [sheet, setSheet] = useState<null | { k: 'edit'; e: Enh | null } | { k: 'upload' } | { k: 'phase'; idx: number } | { k: 'weights' } | { k: 'schedule' } | { k: 'acts' } | { k: 'quick'; idx: number } | { k: 'carry'; ids?: string[] } | { k: 'migrate' }>(null)
   const exportRef = useRef<HTMLDivElement>(null)
   const mig = useMigration(admin)
+  // Rincian angka badge menu (aktivitas dengan PIC saya yang tertinggal), termasuk Progress Project yang belum dipindah.
+  const [legacy, setLegacy] = useState<Enh[]>([])
+  const myName = String((session?.user as any)?.name || '')
 
   const load = useCallback(async () => {
     setFailed(false)
     try { const d = await send('/api/enhancements?year=all', 'GET'); startTransition(() => setAll(Array.isArray(d.data) ? d.data : [])) } catch { setFailed(true); setAll(a => a ?? []) }
   }, [])
   useEffect(() => { load(); getConfig().then(c => setTpl(normWeights(c?.enhancementTemplate))).catch(() => {}) }, [load])
+  useEffect(() => { if (internal) cachedFetch('/api/initiatives?year=all').then(d => setLegacy(Array.isArray(d?.data) ? d.data : [])).catch(() => {}) }, [internal, all])
   useEffect(() => {
     try {
       const sp = new URLSearchParams(location.search), id = sp.get('e'), v = sp.get('view')
@@ -360,6 +367,8 @@ export default function EnhancementPage() {
   const avg = yr.length ? yr.reduce((a, v) => a + v.c.actual, 0) / yr.length : 0
   const own = yr.filter(v => v.e.year === year)
   const carryRows = (vs: View[]): CarryRow[] => vs.map(v => ({ id: String(v.e._id), code: v.e.code, title: v.e.title, app: v.e.app, klas: v.klas, actual: v.c.actual, acts: v.acts }))
+  const due: DueItem[] = useMemo(() => (internal && myName && all ? needsUpdateList(myName, { inits: legacy, enh: all }, today, tpl) : []), [internal, myName, all, legacy, today, tpl])
+  const dueGroups = useMemo(() => { const m = new Map<string, DueItem[]>(); for (const x of due) m.set(x.kind + x.id, [...(m.get(x.kind + x.id) || []), x]); return Array.from(m.values()) }, [due])
   const filtered = app !== 'Semua' || cat !== 'Semua' || kl !== 'Semua' || stF !== 'Semua' || !!ql
   const resetFilters = () => { setApp('Semua'); setCat('Semua'); setKl('Semua'); setStF('Semua'); setQ('') }
 
@@ -510,6 +519,16 @@ export default function EnhancementPage() {
               <span className="au-small au-ink2">{mig.st.pending} initiative belum dipindah. Progress, aktivitas & PIC tetap sama; SI jadi klasifikasi KPI.</span></span>
             <button type="button" className="btn btn-primary btn-sm" onClick={() => setSheet({ k: 'migrate' })}>Tinjau & pindahkan</button>
           </div>
+        )}
+        {!sel && due.length > 0 && (
+          <details className="au-card au-due rise">
+            <summary><span className="wn-due" aria-hidden="true">{due.length}</span><b>aktivitas kamu tertinggal dari rencana</b><span className="au-xs au-muted">sama dengan angka di menu · ketuk untuk lihat</span></summary>
+            <div className="au-ig">{dueGroups.map(g => (
+              g[0].kind === 'enhancement'
+                ? <button key={g[0].id} type="button" className="au-igr" onClick={() => { const v = views.find(x => String(x.e._id) === g[0].id); if (v && v.e.year !== year) setYear(v.e.year); setMode('list'); select(g[0].id) }}><span className="au-col" style={{ gap: 2, flex: 1, minWidth: 0 }}><b style={{ fontSize: 14.5 }}>{g[0].title}</b><span className="au-xs au-muted">{g.map(x => x.act).join(' · ')}</span></span><span className="au-tag">{g.length} aktivitas</span></button>
+                : <Link key={g[0].id} href={g[0].href} className="au-igr"><span className="au-col" style={{ gap: 2, flex: 1, minWidth: 0 }}><b style={{ fontSize: 14.5 }}>{g[0].title}</b><span className="au-xs au-muted">Progress Project (belum dipindah) · {g.map(x => x.act).join(' · ')}</span></span><span className="au-tag">{g.length} aktivitas</span></Link>
+            ))}</div>
+          </details>
         )}
         {!sel && yr.length > 0 && (mode === 'list' || mode === 'prog') && (
           <div className="au-grid g4 au-tiles" data-export-card="">

@@ -64,6 +64,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   // Dihitung saat browser senggang; data diambil dari cache yang sama dengan dashboard.
   const [due, setDue] = useState<{ progress: number; enhancement: number } | null>(null)
   const myName = String(user?.name || '')
+  // Hitung ulang setelah data diubah (progress di-update) atau saat aplikasi dibuka lagi.
+  const [dueTick, setDueTick] = useState(0)
+  useEffect(() => {
+    const bump = () => setDueTick(t => t + 1)
+    const onVis = () => { if (document.visibilityState === 'visible') bump() }
+    window.addEventListener('wins:data-changed', bump); document.addEventListener('visibilitychange', onVis)
+    return () => { window.removeEventListener('wins:data-changed', bump); document.removeEventListener('visibilitychange', onVis) }
+  }, [])
   useEffect(() => {
     if (!idle || !internal || !myName || !appConfig) return
     let alive = true
@@ -71,10 +79,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       .then(([i, e]) => { if (alive) startTransition(() => setDue(needsUpdate(myName, { inits: i?.data || [], enh: e?.data || [] }, todayUTC(), normWeights(appConfig?.enhancementTemplate)))) })
       .catch(() => {})
     return () => { alive = false }
-  }, [idle, internal, myName, appConfig, pathname])
+  }, [idle, internal, myName, appConfig, pathname, dueTick])
   // Progress Project kini bagian Enhancement: tugas tertinggal keduanya dihitung di badge Enhancement.
   const dueOf = (href: string) => href === '/dashboard/enhancement' ? (due?.progress || 0) + (due?.enhancement || 0) : 0
-  const dueBadge = (href: string) => { const n = dueOf(href); return n ? <span className="wn-due" aria-label={`${n} perlu update`}>{n > 99 ? '99+' : n}</span> : null }
+  const dueBadge = (href: string) => { const n = dueOf(href); return n ? <span className="wn-due" aria-label={`${n} aktivitas tertinggal perlu di-update`} title={`${n} aktivitas dengan PIC kamu tertinggal dari rencana`}>{n > 99 ? '99+' : n}</span> : null }
 
   if (status === 'loading') return (
     <div style={{ display: 'flex', height: '100dvh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>

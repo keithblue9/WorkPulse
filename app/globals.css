@@ -1208,3 +1208,6 @@ button.au-wl { cursor:pointer } button.au-wl:hover { background:var(--sunken) }
 @media (max-width:420px) { .au-enh-seg .au-seg button svg { display:none } }
 /* Daftar grup yang diberi tinggi maksimum (scroll) tidak boleh memampatkan barisnya hingga teks bertumpuk */
 .au-ig > * { flex-shrink:0 }
+.au-due > summary { display:flex; align-items:center; gap:10px; flex-wrap:wrap; cursor:pointer; list-style:none; min-height:44px }
+.au-due > summary::-webkit-details-marker { display:none }
+.au-due > summary .wn-due { position:static; transform:none; margin-left:0 }

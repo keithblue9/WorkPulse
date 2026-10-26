@@ -40,3 +40,28 @@ describe('dashboard helpers', () => {
     expect(s).toMatchObject({ total: 2, kpi: 1, goLive: 1, highPriority: 1, nonKpi: 0 })
   })
 })
+
+describe('agenda mendatang (perbaikan: yang sudah selesai tidak muncul)', () => {
+  const T = '2026-10-26'
+  const acts = [
+    { _id: 'a', title: 'Persiapan Koordinasi SSP BPD', actionDate: '2026-10-26', status: 'completed' },
+    { _id: 'b', title: 'UAT Tokenisasi', actionDate: '2026-10-26', status: 'on_track' },
+    { _id: 'c', title: 'Bootcamp', actionDate: '2026-10-27', status: 'Done' },
+    { _id: 'd', title: 'Brainstorming iPro', actionDate: '2026-10-27', status: 'at_risk' },
+    { _id: 'e', title: 'Workshop 3 hari', actionDate: '2026-10-24', actionDateEnd: '2026-10-28', status: 'on_track' },
+    { _id: 'f', title: 'Kemarin', actionDate: '2026-10-25', status: 'on_track' },
+    { _id: 'g', title: 'Disembunyikan', actionDate: '2026-10-29', status: 'on_track', showInList: false },
+    { _id: 'h', title: 'Dibatalkan', actionDate: '2026-10-29', status: 'Cancelled' },
+  ]
+  it('tidak menampilkan agenda berstatus selesai / dibatalkan', () => {
+    const ids = upcoming(acts, T, 10).map(a => a._id)
+    expect(ids).not.toContain('a'); expect(ids).not.toContain('c'); expect(ids).not.toContain('h')
+  })
+  it('menampilkan agenda yang sedang berlangsung (mulai kemarin, selesai lusa) dan urut tanggal', () => {
+    expect(upcoming(acts, T, 10).map(a => a._id)).toEqual(['e', 'b', 'd'])
+  })
+  it('status selesai dikenali walau penulisan berbeda', () => {
+    for (const s of ['completed', 'Completed', 'COMPLETE', 'done', 'Selesai', 'finished', 'closed', 'cancelled', 'canceled', 'Batal', 'Dibatalkan']) expect(isFinished({ status: s })).toBe(true)
+    for (const s of ['on_track', 'at_risk', 'delayed', 'In Progress', '']) expect(isFinished({ status: s })).toBe(false)
+  })
+})

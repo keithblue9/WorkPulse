@@ -13,6 +13,7 @@ import { InitiativeModel } from '@/models/Initiative'
 import { EnhancementModel } from '@/models/Enhancement'
 import { ReimbursementModel } from '@/models/Reimbursement'
 import { cashierEmails } from '@/lib/reimburseNotif'
+import { isFinished } from '@/lib/dashboard'
 import { staleReimburses, weeklyDigest } from '@/lib/digest'
 
 const rupiah = (n: number) => new Intl.NumberFormat('id-ID').format(Math.round(n || 0))
@@ -62,14 +63,15 @@ async function dailyBroadcast(jakartaToday: string) {
     UserModel.find({}, 'name email active').lean(),
     DailyAgendaModel.find({ date: jakartaToday }).lean(),
     AttendanceModel.find({ date: jakartaToday }, 'userId').lean(),
-    ProjectModel.find({ $or: [{ actionDate: jakartaToday }, { actionDate: { $lte: jakartaToday }, actionDateEnd: { $gte: jakartaToday } }] }, 'title').lean(),
+    ProjectModel.find({ $or: [{ actionDate: jakartaToday }, { actionDate: { $lte: jakartaToday }, actionDateEnd: { $gte: jakartaToday } }] }, 'title status showInList').lean(),
   ]) as any[]
 
   const emails = Array.from(new Set((subs as any[]).map(s => s.userEmail).filter(Boolean)))
   const userByEmail = new Map<string, any>((users as any[]).map(u => [String(u.email).toLowerCase(), u]))
   const agendaByUser = new Map<string, any>((agendas as any[]).map(a => [String(a.userId), a]))
   const attendedIds = new Set<string>((attToday as any[]).map(a => String(a.userId)))
-  const teamCount = (acts as any[]).length
+  // Agenda tim yang sudah selesai/batal atau disembunyikan tidak ikut diingatkan.
+  const teamCount = (acts as any[]).filter(a => a.showInList !== false && !isFinished(a)).length
   const teamLine = teamCount > 0 ? ` 🗓 ${teamCount} agenda tim di calendar hari ini.` : ''
 
   let sent = 0

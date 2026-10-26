@@ -5,7 +5,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { CountUp, Icon, Ring, Seg, Sheet } from '@/components/ui'
 import { HERO_KINDS, HERO_META, heroFor, otherYearHint, type HeroKind } from '@/lib/hero'
-import { greeting, upcoming } from '@/lib/dashboard'
+import { greeting, isFinished, upcoming } from '@/lib/dashboard'
 import { CATS } from '@/lib/enhancement'
 import { DAY, dUTC } from '@/lib/progress'
 
@@ -101,12 +101,16 @@ function HeroBody({ kind, p, switcher }: { kind: HeroKind; p: Props; switcher: R
     const from = year === nowYear ? todayIso : `${year}-01-01`
     const list = upcoming<Any>(d.acts, from, 4); const n0 = list[0]
     const weekEnd = new Date(dUTC(todayIso) + 6 * DAY).toISOString().slice(0, 10)
-    const thisWeek = d.acts.filter((a: Any) => a.showInList !== false && a.actionDate >= todayIso && a.actionDate <= weekEnd).length
-    const todayN = d.acts.filter((a: Any) => a.showInList !== false && a.actionDate === todayIso).length
-    const dt = n0 ? new Date(dUTC(n0.actionDate)) : null
-    const diff = n0 ? Math.round((dUTC(n0.actionDate) - dUTC(todayIso)) / DAY) : 0
+    // Hanya agenda yang masih berjalan; yang sedang berlangsung (mulai sebelum hari ini) ikut dihitung hari ini.
+    const open = d.acts.filter((a: Any) => a.showInList !== false && !isFinished(a) && a.actionDate)
+    const endOf = (a: Any) => (a.actionDateEnd && a.actionDateEnd > a.actionDate ? a.actionDateEnd : a.actionDate)
+    const thisWeek = open.filter((a: Any) => endOf(a) >= todayIso && a.actionDate <= weekEnd).length
+    const todayN = open.filter((a: Any) => a.actionDate <= todayIso && endOf(a) >= todayIso).length
+    const ongoing = !!n0 && n0.actionDate < todayIso
+    const dt = n0 ? new Date(dUTC(ongoing ? todayIso : n0.actionDate)) : null
+    const diff = n0 && !ongoing ? Math.round((dUTC(n0.actionDate) - dUTC(todayIso)) / DAY) : 0
     return shell(
-      n0 ? <>{hello} Berikutnya <em>{n0.title}</em>, {diff === 0 ? 'hari ini' : diff === 1 ? 'besok' : `${diff} hari lagi`}.</> : <>{hello} Belum ada agenda terjadwal berikutnya.</>,
+      n0 ? <>{hello} {ongoing ? 'Sedang berlangsung' : 'Berikutnya'} <em>{n0.title}</em>{ongoing ? `, sampai ${Number(String(endOf(n0)).slice(8, 10))} ${BLN[Number(String(endOf(n0)).slice(5, 7)) - 1]}` : `, ${diff === 0 ? 'hari ini' : diff === 1 ? 'besok' : `${diff} hari lagi`}`}.</> : <>{hello} Belum ada agenda terjadwal berikutnya.</>,
       <>{chip(<CountUp to={todayN} />, 'Hari ini')}{chip(<CountUp to={thisWeek} />, '7 hari ke depan')}{chip(<CountUp to={d.st.highPriority || 0} />, 'Prioritas tinggi')}</>,
       internal && <><Link href="/dashboard/calendar" className="btn btn-primary" style={{ minHeight: 44 }}>Buka kalender <Icon name="arrow" size={16} stroke={2.2} /></Link><Link href="/dashboard/activities" className="btn btn-ghost" style={{ minHeight: 44 }}>Activities</Link></>,
       <div className="au-heroagenda">
