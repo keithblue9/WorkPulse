@@ -22,6 +22,21 @@ export function needsUpdate(name: string, data: { inits: any[]; enh: any[] }, to
   return { progress, enhancement }
 }
 
+export type DueItem = { kind: 'progress' | 'enhancement'; id: string; title: string; act: string; href: string }
+/** Rincian item di balik angka badge "perlu update" (urutan: Progress Project lama, lalu Enhancement). */
+export function needsUpdateList(name: string, data: { inits: any[]; enh: any[] }, today: number, tpl: number[], year?: number): DueItem[] {
+  const out: DueItem[] = []
+  for (const i of data.inits || []) {
+    if (!isPic(i?.pic, name)) continue
+    for (const a of actsFromPhases(i.phases || [], Number(i.year) || year || new Date(today).getUTCFullYear())) if (late(a, today)) out.push({ kind: 'progress', id: String(i._id), title: String(i.title || ''), act: a.name, href: `/dashboard/progress?i=${i._id}` })
+  }
+  for (const e of data.enh || []) {
+    if (!isPic(e?.pic, name)) continue
+    for (const a of enhActs(e, tpl)) if (late(a, today)) out.push({ kind: 'enhancement', id: String(e._id), title: String(e.title || ''), act: a.name, href: `/dashboard/enhancement?e=${e._id}` })
+  }
+  return out
+}
+
 export type Load = { name: string; acts: number; inits: number; enh: number; late: number; total: number }
 
 /** Beban kerja: activity terbuka, initiative & enhancement berjalan, dan tugas tertinggal — per member. */

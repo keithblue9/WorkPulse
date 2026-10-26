@@ -3,6 +3,10 @@ import { SessionProvider } from 'next-auth/react'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider } from '@/lib/theme'
 import VersionWatch from '@/components/VersionWatch'
+import { watchMutations } from '@/lib/fetchCache'
+
+// Pasang sedini mungkin (sebelum halaman pertama memuat data).
+watchMutations()
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (

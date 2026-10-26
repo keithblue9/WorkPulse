@@ -6,8 +6,11 @@ export function greeting(hour: number): 'Pagi' | 'Siang' | 'Sore' | 'Malam' {
   return 'Malam'
 }
 
-const DONE = ['completed', 'done', 'finished', 'closed', 'selesai']
-export const isFinished = (a: { status?: string }) => DONE.includes(String(a?.status || '').toLowerCase())
+// Status yang berarti activity sudah tidak berjalan (selesai atau batal). Key status bisa diubah di
+// Configuration, jadi penulisannya dinormalkan: "Completed", "COMPLETE", "Dibatalkan" → dikenali.
+const DONE = ['completed', 'complete', 'done', 'finished', 'closed', 'selesai', 'cancelled', 'canceled', 'batal', 'dibatalkan']
+const norm0 = (s: unknown) => String(s || '').toLowerCase().replace(/[^a-z]/g, '')
+export const isFinished = (a: { status?: string }) => DONE.includes(norm0(a?.status))
 
 /** Activity belongs to year Y; unfinished older or undated ones carry into the current year. */
 export function activityInYear(a: { actionDate?: string; status?: string }, y: number, nowYear: number): boolean {
@@ -29,8 +32,12 @@ export function wfoUserIds(rows: any[], date: string): Set<string> {
   return ids
 }
 
-export function upcoming<T extends { actionDate?: string; showInList?: boolean }>(list: T[], today: string, n: number): T[] {
-  return list.filter(a => a.showInList !== false && a.actionDate && a.actionDate >= today).sort((a, b) => String(a.actionDate).localeCompare(String(b.actionDate))).slice(0, n)
+/** Agenda berikutnya: belum selesai/batal, tampil di daftar, dan belum lewat (termasuk yang sedang berlangsung). */
+export function upcoming<T extends { actionDate?: string; actionDateEnd?: string; showInList?: boolean; status?: string }>(list: T[], today: string, n: number): T[] {
+  return (list || [])
+    .filter(a => a && a.showInList !== false && !isFinished(a) && a.actionDate && String(a.actionDateEnd && a.actionDateEnd > a.actionDate ? a.actionDateEnd : a.actionDate) >= today)
+    .sort((a, b) => String(a.actionDate).localeCompare(String(b.actionDate)))
+    .slice(0, n)
 }
 
 /** Portfolio = average of initiatives (each initiative counts once, whatever its weights). */

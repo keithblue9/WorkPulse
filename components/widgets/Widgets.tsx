@@ -26,7 +26,7 @@ const HARI = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 const dShort = (s?: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? `${Number(m[3])} ${BLN[Number(m[2]) - 1]}` : '–' }
 const rpS = (n: number) => { const a = Math.abs(n || 0), f = (v: number, u: string) => `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(v)} ${u}`; return a >= 1e9 ? f(n / 1e9, 'M') : a >= 1e6 ? f(n / 1e6, 'jt') : a >= 1e3 ? f(n / 1e3, 'rb') : String(Math.round(n || 0)) }
 const initials = (n: string) => String(n || '').split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase()
-const when = (iso: string, todayIso: string) => { const diff = Math.round((dUTC(iso) - dUTC(todayIso)) / DAY); const t = new Date(dUTC(iso)); return diff === 0 ? 'Hari ini' : diff === 1 ? 'Besok' : `${HARI[t.getUTCDay()]}, ${t.getUTCDate()} ${BLN[t.getUTCMonth()]}` }
+const when = (iso: string, todayIso: string) => { const diff = Math.round((dUTC(iso) - dUTC(todayIso)) / DAY); const t = new Date(dUTC(iso)); return diff < 0 ? 'Berlangsung' : diff === 0 ? 'Hari ini' : diff === 1 ? 'Besok' : `${HARI[t.getUTCDay()]}, ${t.getUTCDate()} ${BLN[t.getUTCMonth()]}` }
 const ST_COLOR: Record<string, string> = { ok: 'var(--ok)', warn: 'var(--warn-bar)', bad: 'var(--hot, #E5484D)', none: 'var(--line2)' }
 // Palet kategori presensi (tervalidasi dataviz: lolos CVD terang & gelap; label selalu tertulis). Warna lewat CSS var.
 const ATT: Record<string, { l: string; c: string; ink: string }> = {

@@ -42,3 +42,25 @@ export function invalidateFetch(prefix?: string) {
   if (!prefix) { cache.clear(); return }
   for (const k of Array.from(cache.keys())) if (k.startsWith(prefix)) cache.delete(k)
 }
+
+// Setiap simpan/ubah/hapus yang berhasil ke /api/* membuang cache, supaya dashboard, badge menu
+// dan widget langsung memakai data terbaru (sebelumnya bisa tertahan sampai 30 detik).
+// Dipasang sekali di Providers. Hanya memantau; respons tidak diubah.
+let watching = false
+export function watchMutations() {
+  if (watching || typeof window === 'undefined' || typeof window.fetch !== 'function') return
+  watching = true
+  const orig = window.fetch.bind(window)
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const res = await orig(input, init)
+    try {
+      const method = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (method !== 'GET' && method !== 'HEAD' && res.ok && /\/api\//.test(url) && !/\/api\/auth\//.test(url)) {
+        cache.clear()
+        window.dispatchEvent(new CustomEvent('wins:data-changed', { detail: { url, method } }))
+      }
+    } catch {}
+    return res
+  }
+}
