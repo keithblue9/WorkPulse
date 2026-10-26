@@ -190,6 +190,7 @@ const ConfigSchema = new Schema({
   // Guard ringkasan mingguan (Senin) & pengingat reimburse menggantung — 1x per tanggal
   // Susunan widget dashboard untuk tamu/eksternal (diatur admin)
   guestLayout: { type: [{ _id:false, id:String, size:String }], default: undefined },
+  guestHero: String,
   lastWeeklyDigest: { type:String, default:'' },
   lastStaleReimburse: { type:String, default:'' },
   // Pengingat reimburse belum ditransfer setelah N hari (0 = mati)

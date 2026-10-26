@@ -7,12 +7,14 @@ import { Icon, Seg, Sheet } from '@/components/ui'
 import { LazyMount } from '@/components/LazyMount'
 import {
   DEFAULT_GUEST_LAYOUT, DEFAULT_LAYOUT, FAMILIES, WIDGET_BY_ID, addWidget, availableWidgets, moveWidget, needsOf,
-  normalizeLayout, removeWidget, resizeWidget, type Fam, type Need, type Placed, type Size, type WidgetDef,
+  chunkLayout, normalizeLayout, removeWidget, resizeWidget, type Fam, type Need, type Placed, type Size, type WidgetDef,
 } from '@/lib/widgets'
 import { WidgetFrame, renderWidget, type WCtx } from './Widgets'
+import { renderClassic } from './Classic'
 
 type Extra = WCtx['extra']
-const SIZE_LABEL: Record<Size, string> = { S: 'Kecil', M: 'Sedang', L: 'Besar' }
+const SIZE_LABEL: Record<Size, string> = { S: 'Kecil', M: 'Sedang', L: 'Besar', H: 'Setengah', F: 'Penuh' }
+const SIZE_DIM: Record<Size, string> = { S: '1×1', M: '2×1', L: '2×2', H: '½ lebar', F: 'Penuh' }
 
 /** Ambil data tambahan hanya untuk widget yang dipasang/dilihat. */
 function useExtra(needs: Set<Need>, year: number): Extra {
@@ -94,31 +96,35 @@ export function WidgetBoard({ ctx, allowed, isAdmin }: { ctx: Omit<WCtx, 'extra'
         </>}
       </div>
 
-      <div className={`wg-grid${editing ? ' editing' : ''}`}>
-        {layout.map((p, i) => {
-          const def = WIDGET_BY_ID.get(p.id)!
-          const node = renderWidget(p.id, p.size, full)
-          const frame = <WidgetFrame id={p.id} size={p.size} preview={editing} href={def.id === 'myfocus' ? undefined : def.href} onOpen={def.id === 'myfocus' ? ctx.onMyFocus : undefined}>{node}</WidgetFrame>
-          if (!editing) return <div key={p.id} className={`wg-slot wg-${p.size} rise`} style={{ ['--d' as any]: Math.min(i, 8) }}><LazyMount eager={i < 4} minHeight={0}>{frame}</LazyMount></div>
-          return (
-            <div key={p.id} className={`wg-slot wg-${p.size} jiggle${over === p.id ? ' over' : ''}`} draggable
-              onDragStart={e => { drag.current = p.id; e.dataTransfer.effectAllowed = 'move' }} onDragEnd={() => { drag.current = null; setOver(null) }}
-              onDragOver={e => { if (drag.current && drag.current !== p.id) { e.preventDefault(); setOver(p.id) } }} onDragLeave={() => setOver(o => (o === p.id ? null : o))}
-              onDrop={e => { e.preventDefault(); const id = drag.current; setOver(null); if (id && id !== p.id) commit(moveWidget(layout, id, i)) }}>
-              {frame}
-              <button type="button" className="wg-del" aria-label={`Hapus widget ${def.title}`} onClick={() => commit(removeWidget(layout, p.id))}><span aria-hidden="true">−</span></button>
-              <div className="wg-ctl">
-                <button type="button" className="wg-mv" aria-label={`Geser ${def.title} ke depan`} disabled={i === 0} onClick={() => commit(moveWidget(layout, p.id, i - 1))}><Icon name="left" size={14} /></button>
-                <button type="button" className="wg-sz" disabled={def.sizes.length < 2} aria-label={`Ukuran ${def.title}: ${SIZE_LABEL[p.size]}. Ketuk untuk ganti`} title="Ganti ukuran"
-                  onClick={() => { const k = def.sizes.indexOf(p.size); commit(resizeWidget(layout, p.id, def.sizes[(k + 1) % def.sizes.length])) }}>{p.size}{def.sizes.length > 1 && <Icon name="resize" size={11} stroke={2.4} />}</button>
-                <button type="button" className="wg-mv" aria-label={`Geser ${def.title} ke belakang`} disabled={i === layout.length - 1} onClick={() => commit(moveWidget(layout, p.id, i + 1))}><Icon name="right" size={14} /></button>
+      {layout.length === 0 && !editing && <div className="wg-grid"><div className="wg-slot wg-M wg-add" role="note"><span>Belum ada widget.{canEdit ? ' Ketuk Edit widget untuk menambah.' : ''}</span></div></div>}
+      {chunkLayout(layout).map((ch, ci) => (
+        <div key={ci} className={`${ch.kind === 'grid' ? 'wg-grid' : 'wg-flow'}${editing ? ' editing' : ''}`}>
+          {ch.items.map(({ p, i }) => {
+            const def = WIDGET_BY_ID.get(p.id)!
+            const classic = def.kind === 'classic'
+            const inner = classic
+              ? <div className="wg-classic" data-fam={def.fam}>{renderClassic(p.id)}</div>
+              : <WidgetFrame id={p.id} size={p.size} preview={editing} href={def.id === 'myfocus' ? undefined : def.href} onOpen={def.id === 'myfocus' ? ctx.onMyFocus : undefined}>{renderWidget(p.id, p.size, full)}</WidgetFrame>
+            if (!editing) return <div key={p.id} data-id={p.id} className={`wg-slot wg-${p.size} rise`} style={{ ['--d' as any]: Math.min(i, 8) }}><LazyMount eager={i < 4} minHeight={classic ? 280 : 0}>{inner}</LazyMount></div>
+            return (
+              <div key={p.id} data-id={p.id} className={`wg-slot wg-${p.size} jiggle${over === p.id ? ' over' : ''}`} draggable
+                onDragStart={e => { drag.current = p.id; e.dataTransfer.effectAllowed = 'move' }} onDragEnd={() => { drag.current = null; setOver(null) }}
+                onDragOver={e => { if (drag.current && drag.current !== p.id) { e.preventDefault(); setOver(p.id) } }} onDragLeave={() => setOver(o => (o === p.id ? null : o))}
+                onDrop={e => { e.preventDefault(); const id = drag.current; setOver(null); if (id && id !== p.id) commit(moveWidget(layout, id, i)) }}>
+                {classic ? <div className="wg-classic-edit" inert>{inner}</div> : inner}
+                <button type="button" className="wg-del" aria-label={`Hapus widget ${def.title}`} onClick={() => commit(removeWidget(layout, p.id))}><span aria-hidden="true">−</span></button>
+                <div className="wg-ctl">
+                  <button type="button" className="wg-mv" aria-label={`Geser ${def.title} ke depan`} disabled={i === 0} onClick={() => commit(moveWidget(layout, p.id, i - 1))}><Icon name="left" size={14} /></button>
+                  <button type="button" className="wg-sz" disabled={def.sizes.length < 2} aria-label={`Ukuran ${def.title}: ${SIZE_LABEL[p.size]}. Ketuk untuk ganti`} title="Ganti ukuran"
+                    onClick={() => { const k = def.sizes.indexOf(p.size); commit(resizeWidget(layout, p.id, def.sizes[(k + 1) % def.sizes.length])) }}>{classic ? (p.size === 'F' ? 'Penuh' : '½') : p.size}{def.sizes.length > 1 && <Icon name="resize" size={11} stroke={2.4} />}</button>
+                  <button type="button" className="wg-mv" aria-label={`Geser ${def.title} ke belakang`} disabled={i === layout.length - 1} onClick={() => commit(moveWidget(layout, p.id, i + 1))}><Icon name="right" size={14} /></button>
+                </div>
               </div>
-            </div>
-          )
-        })}
-        {editing && <button type="button" className="wg-slot wg-S wg-add" onClick={() => setGallery(true)}><Icon name="plus" size={26} /><span>Tambah widget</span></button>}
-        {!layout.length && !editing && <div className="wg-slot wg-M wg-add" role="note"><span>Belum ada widget.{canEdit ? ' Ketuk Edit widget untuk menambah.' : ''}</span></div>}
-      </div>
+            )
+          })}
+        </div>
+      ))}
+      {editing && <div className="wg-grid"><button type="button" className="wg-slot wg-S wg-add" onClick={() => setGallery(true)}><Icon name="plus" size={26} /><span>Tambah widget</span></button></div>}
 
       {gallery && <Gallery pool={pool} layout={layout} ctx={full} onPeek={setPeekFam} onClose={() => { setGallery(false); setPeekFam(null) }}
         onAdd={(id, size) => { commit(addWidget(layout, id, size)); toast.success(`${WIDGET_BY_ID.get(id)!.title} (${SIZE_LABEL[size]}) ditambahkan`) }} />}
@@ -145,23 +151,32 @@ function Gallery({ pool, layout, ctx, onAdd, onClose, onPeek }: { pool: WidgetDe
         {!list.length && <span className="au-small au-muted">Tidak ada widget yang cocok.</span>}
       </> : <>
         <button type="button" className="au-link" style={{ alignSelf: 'flex-start' }} onClick={() => setFam(null)}><Icon name="left" size={14} />Semua menu</button>
-        {pool.filter(w => w.fam === fam).map(w => {
-          const cur = layout.find(p => p.id === w.id)
-          return (
-            <div key={w.id} className="wg-gitem">
-              <div className="au-col" style={{ gap: 2 }}><b>{w.title}</b><span className="au-xs au-muted">{w.desc}</span></div>
-              <div className="wg-carousel" role="list" aria-label={`Ukuran ${w.title}`}>
-                {w.sizes.map(s => (
-                  <div key={s} className="wg-gslide" role="listitem">
-                    <div className={`wg-prev wg-${s}`}><WidgetFrame id={w.id} size={s} preview>{renderWidget(w.id, s, ctx)}</WidgetFrame></div>
-                    <span className="au-xs au-muted" style={{ fontFamily: 'var(--mono)' }}>{SIZE_LABEL[s].toUpperCase()} · {s === 'S' ? '1×1' : s === 'M' ? '2×1' : '2×2'}</span>
-                    {cur?.size === s ? <span className="wg-on"><Icon name="check" size={13} stroke={2.4} />Terpasang</span>
-                      : <button type="button" className="btn btn-sm btn-primary" onClick={() => onAdd(w.id, s)}>{cur ? `Ganti ke ${SIZE_LABEL[s].toLowerCase()}` : 'Tambah'}</button>}
+        {(['native', 'classic'] as const).map(kind => {
+          const ws = pool.filter(w => w.fam === fam && (w.kind || 'native') === kind)
+          if (!ws.length) return null
+          return <div key={kind} className="au-col" style={{ gap: 4 }}>
+            <span className="au-igh">{kind === 'native' ? 'Widget · Instrument Light' : 'Infografis · Aurora v3'}</span>
+            {ws.map(w => {
+              const cur = layout.find(p => p.id === w.id)
+              return (
+                <div key={w.id} className="wg-gitem">
+                  <div className="au-col" style={{ gap: 2 }}><b>{w.title}</b><span className="au-xs au-muted">{w.desc}</span></div>
+                  <div className="wg-carousel" role="list" aria-label={`Ukuran ${w.title}`}>
+                    {(kind === 'classic' ? [w.sizes[0]] : w.sizes).map(s => (
+                      <div key={s} className="wg-gslide" role="listitem">
+                        {kind === 'classic'
+                          ? <div className="wg-prev-classic" inert><div className="scale">{renderClassic(w.id)}</div></div>
+                          : <div className={`wg-prev wg-${s}`}><WidgetFrame id={w.id} size={s} preview>{renderWidget(w.id, s, ctx)}</WidgetFrame></div>}
+                        <span className="au-xs au-muted" style={{ fontFamily: 'var(--mono)' }}>{kind === 'classic' ? w.sizes.map(z => SIZE_DIM[z]).join(' / ').toUpperCase() : `${SIZE_LABEL[s].toUpperCase()} · ${SIZE_DIM[s]}`}</span>
+                        {cur && (kind === 'classic' || cur.size === s) ? <span className="wg-on"><Icon name="check" size={13} stroke={2.4} />Terpasang</span>
+                          : <button type="button" className="btn btn-sm btn-primary" onClick={() => onAdd(w.id, s)}>{cur ? `Ganti ke ${SIZE_LABEL[s].toLowerCase()}` : 'Tambah'}</button>}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          )
+                </div>
+              )
+            })}
+          </div>
         })}
       </>}
     </Sheet>

@@ -67,7 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
-              navigator.serviceWorker.register('/sw.js').then(function(reg){
+              navigator.serviceWorker.register('/sw.js?v=${process.env.NEXT_PUBLIC_BUILD_ID || ''}').then(function(reg){
                 // Cek update tiap kali tab difokuskan + tiap 60 detik
                 try { reg.update(); } catch(e){}
                 setInterval(function(){ try { reg.update(); } catch(e){} }, 60000);

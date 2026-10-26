@@ -12,6 +12,7 @@ import { isInternalUser } from '@/lib/nav'
 import { useYear } from '@/lib/year'
 import { DAY, calc, dUTC, inYear, isoDay, ptd, statusOf, todayUTC, type Act } from '@/lib/progress'
 import { CATS, ENH_APPS, ENH_TYPES, INITIATORS, STAGES, STAGES_SHORT, TPL, brdPct, enhActs, normWeights, rankPrio, score, type Cat, type EnhItem, type EnhPhase } from '@/lib/enhancement'
+import { otherYearHint } from '@/lib/hero'
 
 type Enh = Record<string, any>
 type View = { e: Enh; s: ReturnType<typeof score>; acts: Act[]; c: ReturnType<typeof calc>; prio?: number }
@@ -296,7 +297,7 @@ function UploadSheet({ year, years, onClose, onDone }: { year: number; years: nu
 export default function EnhancementPage() {
   const { data: session } = useSession()
   const internal = isInternalUser(userRolesOf(session?.user))
-  const { year, years } = useYear()
+  const { year, years, setYear } = useYear()
   const today = useMemo(() => todayUTC(), [])
   const [all, setAll] = useState<Enh[] | null>(null)
   const [failed, setFailed] = useState(false)
@@ -365,7 +366,13 @@ export default function EnhancementPage() {
 
   let body: React.ReactNode
   if (all === null) body = <div className="au-col" style={{ gap: 10 }}>{[0, 1, 2].map(k => <div key={k} className="au-card"><div className="au-skel" style={{ width: '50%' }} /><div className="au-skel" style={{ width: '80%' }} /></div>)}</div>
-  else if (!yr.length) body = <div className="au-card"><Empty title={`Belum ada enhancement di ${year}`} text="Upload file IT Requirement atau tambah satu per satu. Pilih tahun lain di atas untuk melihat data lain." action={internal ? <div className="au-row"><button type="button" className="btn" onClick={() => setSheet({ k: 'upload' })}>Upload Excel</button><button type="button" className="btn btn-primary" onClick={() => setSheet({ k: 'edit', e: null })}>Tambah</button></div> : undefined} /></div>
+  else if (!yr.length) {
+    // Data ada di tahun lain → tawarkan pindah tahun (sebelumnya terlihat seperti "hilang").
+    const hint = otherYearHint((all || []) as any[], year)
+    body = <div className="au-card"><Empty title={`Belum ada enhancement di ${year}`}
+      text={hint ? `Ada ${hint.n} enhancement di ${hint.year}. Tahun dipilih dari pemilih tahun di kanan atas.` : 'Upload file IT Requirement atau tambah satu per satu. Pilih tahun lain di atas untuk melihat data lain.'}
+      action={<div className="au-row au-wrap" style={{ justifyContent: 'center' }}>{hint && <button type="button" className="btn btn-primary" onClick={() => setYear(hint.year)}>Lihat {hint.year} <Icon name="arrow" size={14} stroke={2.4} /></button>}{internal && <><button type="button" className="btn" onClick={() => setSheet({ k: 'upload' })}>Upload Excel</button><button type="button" className={`btn${hint ? '' : ' btn-primary'}`} onClick={() => setSheet({ k: 'edit', e: null })}>Tambah</button></>}</div>} /></div>
+  }
   else if (mode === 'matrix') body = (
     <div className="au-grid au-mgrid">
       <section className="au-card rise" data-export-card=""><div className="au-row au-between au-wrap"><h2>Impact vs Effort</h2><span className="au-xs au-muted">{list.length} enhancement · ketuk titik</span></div><Matrix list={list} onOpen={id => { setMode('list'); select(id) }} /></section>

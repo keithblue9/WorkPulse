@@ -1109,3 +1109,71 @@ button.au-wl { cursor:pointer } button.au-wl:hover { background:var(--sunken) }
 @media (max-width:520px) { .wg-prev.wg-M, .wg-prev.wg-L { width:min(342px, calc(100vw - 72px)) } .wg-prev.wg-L { height:min(342px, calc(100vw - 72px)) } }
 .wg-on { display:inline-flex; align-items:center; gap:5px; min-height:32px; font-size:12.5px; font-weight:600; color:var(--ok) }
 @media (max-width:719px) { .wg-story { font-size:12.5px; gap:5px } .wg-toolbar .au-seg { width:100% } }
+/* Scroll di sheet tidak "bocor" ke halaman di belakangnya (iOS) */
+.modal [data-modal-scroll] { overscroll-behavior:contain; touch-action:pan-y }
+
+/* ═══ Infografis: palet presensi (tervalidasi CVD terang & gelap) ═══ */
+:root { --att-wfo:#1baf7a; --att-wfh:#6250d6; --att-dinas:#eb6834; --att-cuti:#2a78d6; --att-sakit:#e87ba4; --att-izin:#eda100; --att-ink-dark:#0B0D17 }
+@media (prefers-color-scheme:dark) { :root:not([data-theme=light]) { --att-wfo:#199e70; --att-wfh:#9085e9; --att-dinas:#d95926; --att-cuti:#3987e5; --att-sakit:#d55181; --att-izin:#c98500 } }
+:root[data-theme=dark] { --att-wfo:#199e70; --att-wfh:#9085e9; --att-dinas:#d95926; --att-cuti:#3987e5; --att-sakit:#d55181; --att-izin:#c98500 }
+
+/* Blok infografis Aurora v3: tinggi natural, setengah / penuh lebar */
+.wg-flow { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; align-items:start; grid-auto-flow:row dense }
+@media (min-width:900px) { .wg-flow { grid-template-columns:repeat(2,minmax(0,1fr)) } .wg-flow .wg-slot.wg-F { grid-column:1 / -1 } }
+.wg-flow .wg-slot { height:auto }
+.wg-flow .wg-slot > .au-lazy, .wg-flow .wg-slot > div:not(.wg-ctl) { height:auto }
+.wg-classic > .au-card, .wg-classic > section { margin:0; width:100% }
+.wg-classic-edit { max-height:240px; overflow:hidden; border-radius:24px; -webkit-mask-image:linear-gradient(#000 70%,transparent); mask-image:linear-gradient(#000 70%,transparent); pointer-events:none }
+.wg-flow .wg-slot.jiggle > .wg-classic-edit { animation:wg-jig .32s ease-in-out infinite alternate }
+@media (prefers-reduced-motion:reduce) { .wg-flow .wg-slot.jiggle > .wg-classic-edit { animation:none } }
+.wg-prev-classic { width:min(420px, calc(100vw - 72px)); height:230px; overflow:hidden; border-radius:22px; border:1px solid var(--line); background:var(--bg); position:relative; pointer-events:none;
+  -webkit-mask-image:linear-gradient(#000 78%,transparent); mask-image:linear-gradient(#000 78%,transparent) }
+.wg-prev-classic .scale { width:182%; transform:scale(.55); transform-origin:0 0 }
+
+/* Heatmap WFO */
+.wg-heat { display:flex; flex-direction:column; gap:10px; height:100% }
+.wg-heat:not(.big) { flex-direction:row; align-items:flex-end; gap:14px }
+.wg-heat:not(.big) .wg-heat-h { flex-shrink:0 }
+.wg-heat-g { display:grid; gap:4px; flex:1; min-width:0 }
+.wg-heat:not(.big) .wg-heat-g { grid-template-columns:repeat(auto-fill,minmax(13px,1fr)); align-content:end }
+.wg-heat.big .wg-heat-g { grid-template-columns:repeat(5,minmax(0,1fr)) }
+.wg-heat-g .hd { font:600 10px var(--mono); color:var(--muted); text-align:center }
+.wg-heat-g .c { aspect-ratio:1; border-radius:6px; display:grid; place-items:center; font:600 10px var(--mono); color:var(--ink2);
+  background:color-mix(in srgb, var(--att-wfo) calc(var(--p) * 100%), color-mix(in srgb,var(--ink) 7%,transparent)) }
+.wg-heat:not(.big) .wg-heat-g .c { aspect-ratio:auto; height:13px; border-radius:4px }
+.wg-heat.big .wg-heat-g .c { aspect-ratio:auto; height:26px }
+.wg-heat-g .c.fut { background:transparent; box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ink) 10%,transparent) }
+.wg-heat-g .c.today { box-shadow:0 0 0 2px var(--wf) }
+.wg-stackbar { display:flex; gap:2px; height:12px; border-radius:99px; overflow:hidden }
+.wg-stackbar i { min-width:4px }
+.wg-legend.row { flex-direction:row; flex-wrap:wrap; gap:6px 12px; font-size:11.5px }
+.wg-legend.row b { margin-left:4px }
+.wg-matrix { flex:1; min-height:0; overflow:hidden }
+.wg-matrix > * { max-height:100% }
+.wg-stages.sm { height:52px }
+.au-next h3 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+@media (max-width:768px) { .wn-content { padding-bottom:calc(92px + env(safe-area-inset-bottom,0px)) } }
+
+/* ═══ Sorotan dashboard (hero) yang bisa diganti ═══ */
+.au-hero-sw { align-self:flex-start; display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:0 12px; border-radius:99px; border:1px solid color-mix(in srgb,var(--ink) 10%,transparent);
+  background:color-mix(in srgb,var(--surface) 70%,transparent); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); color:var(--ink); font:600 12.5px var(--sans, inherit); cursor:pointer; position:relative; z-index:2 }
+.au-hero-sw:hover { background:var(--surface) }
+.au-yearhint { display:inline-flex; align-items:center; gap:6px; min-height:44px; padding:0 16px; border-radius:99px; border:0; background:#ECFF5A; color:#0B0D17; font:700 13.5px var(--disp); cursor:pointer; box-shadow:0 8px 20px -12px rgba(0,0,0,.35) }
+.au-heropick { display:flex; flex-direction:column; gap:8px }
+.au-heroopt { display:flex; align-items:center; gap:12px; padding:12px 14px; min-height:60px; border-radius:18px; border:1px solid var(--line); background:var(--surface); color:var(--ink); text-align:left; font:inherit; cursor:pointer }
+.au-heroopt[aria-checked=true] { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset }
+.au-heroopt .ic { display:grid; place-items:center; width:38px; height:38px; border-radius:12px; flex-shrink:0; color:#fff; background:var(--accent) }
+.au-heroopt.k-presensi .ic { background:#0B8578 } .au-heroopt.k-agenda .ic { background:#1F66D1 } .au-heroopt.k-enhancement .ic { background:#8C3FD6 } .au-heroopt.k-fokus .ic { background:#C9481F } .au-heroopt.k-none .ic { background:var(--muted) }
+.au-heroweek { display:flex; align-items:flex-end; gap:10px; height:66px }
+.au-heroweek > span { display:flex; flex-direction:column; align-items:center; gap:4px } .au-heroweek i { width:18px; border-radius:6px 6px 3px 3px; background:var(--att-wfo) }
+.au-heroweek small { font:600 10.5px var(--mono); color:var(--ink2) } .au-heroweek .today small { color:var(--ink) } .au-heroweek .today i { box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--att-wfo) }
+.au-heroagenda { display:flex; flex-direction:column; align-items:center; gap:14px; min-width:220px }
+.au-heroagenda .cal { width:150px; border-radius:30px; overflow:hidden; background:var(--surface); box-shadow:0 22px 50px -26px rgba(43,30,140,.55); text-align:center; display:flex; flex-direction:column }
+.au-heroagenda .cal .m { background:#E5484D; color:#fff; font:700 13px var(--mono); letter-spacing:.14em; padding:8px 0 }
+.au-heroagenda .cal b { font:800 72px/1 var(--disp); letter-spacing:-.04em; padding:10px 0 2px; color:var(--ink) } .au-heroagenda .cal .w { font-size:13px; color:var(--ink2); padding-bottom:12px }
+.au-heroagenda ol { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; width:100%; max-width:260px }
+.au-heroagenda li { display:grid; grid-template-columns:54px 1fr; gap:8px; font-size:13px; padding:8px 12px; border-radius:14px; background:color-mix(in srgb,var(--surface) 72%,transparent) }
+.au-heroagenda li .d { font:600 11px var(--mono); color:var(--ink2) } .au-heroagenda li .t { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+/* Tombol ganti sorotan selalu di pojok kiri atas kartu (sejajar stiker di kanan atas) */
+.au-hero .au-hero-sw { position:absolute; top:20px; left:22px }
+.au-hero:has(.au-hero-sw) { padding-top:72px }

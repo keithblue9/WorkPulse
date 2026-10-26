@@ -8,7 +8,7 @@ export type Decision =
 /** True when `path` equals `base` or is nested below it (no lookalike prefixes). */
 const under = (path: string, base: string) => path === base || path.startsWith(base + '/')
 
-const PUBLIC_API = ['/api/auth', '/api/warmup', '/api/cron']
+const PUBLIC_API = ['/api/auth', '/api/warmup', '/api/cron', '/api/version']
 
 // Read-only endpoints a guest (external) session needs for the guest dashboard and Link Hub.
 const GUEST_GET_API = [

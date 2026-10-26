@@ -10,6 +10,7 @@ import { picArray } from '@/lib/defaults'
 import ExportMenu from '@/components/ExportMenu'
 import { catK } from '@/components/EnhMatrix'
 import { WidgetBoard } from '@/components/widgets/WidgetBoard'
+import { DashHero } from '@/components/DashHero'
 import { getAllowedMenus } from '@/lib/nav'
 import { CountUp, Empty, Icon, PageHeader, Pill, Ring, Seg, Sheet } from '@/components/ui'
 import { userRolesOf } from '@/lib/perms'
@@ -18,7 +19,7 @@ import { useYear } from '@/lib/year'
 import { DAY, actsFromPhases, calc, dUTC, inYear, ptd, todayUTC } from '@/lib/progress'
 import { showInYear } from '@/lib/initiativeView'
 import { STAGES_SHORT, enhActs, normWeights, score } from '@/lib/enhancement'
-import { activityInYear, activityStats, greeting, portfolio, samePerson, upcoming, wfoUserIds } from '@/lib/dashboard'
+import { activityInYear, activityStats, portfolio, samePerson, upcoming, wfoUserIds } from '@/lib/dashboard'
 
 type View = 'general' | 'staff' | 'issues'
 type Any = Record<string, any>
@@ -39,7 +40,7 @@ export default function DashboardPage() {
   const { data: session } = useSession(); const user = session?.user as Any | undefined
   const roles = userRolesOf(user)
   const internal = isInternalUser(roles)
-  const { year } = useYear()
+  const { year, setYear } = useYear()
   const nowYear = new Date().getFullYear()
   const todayIso = format(new Date(), 'yyyy-MM-dd')
   const today = useMemo(() => todayUTC(), [])
@@ -148,34 +149,15 @@ export default function DashboardPage() {
         }} />
           : view === 'staff' && internal && me ? <Staff first={first} me={me} d={d} todayIso={todayIso} today={today} focus={focus} setFocus={setFocus} selfName={String(user?.name || '')} />
           : <>
-            {/* Hero */}
-            <section className="au-hero rise" aria-labelledby="dash-h">
-              <span className="au-sticker" aria-hidden="true"><Icon name="bolt" size={12} stroke={2.4} /> LIVE · {year}</span>
-              <div className="au-col" style={{ gap: 18, minWidth: 0 }}>
-                <h1 id="dash-h">{greeting(new Date().getHours())}, {first}. {d.inits.length
-                  ? (d.behind.length ? <><em>{d.behind.length} initiative</em> butuh perhatian{d.enh.length ? `, ${d.enh.filter(v => v.s.cat === 'Quick Win').length} Quick Win siap jalan.` : '.'}</> : <>Semua initiative <em>on track</em>.</>)
-                  : d.enh.length ? <>{d.enh.length} enhancement terjadwal di {year}.</> : <>Belum ada pekerjaan tercatat di {year}.</>}</h1>
-                <div className="au-hchips">
-                  <div className="au-hchip"><b><CountUp to={d.inits.length} /></b><span>Initiative</span></div>
-                  <div className="au-hchip"><b><CountUp to={d.enh.length} /></b><span>Enhancement</span></div>
-                  <div className="au-hchip"><b><CountUp to={d.wfoToday.length} /><small style={{ fontSize: 16, opacity: .7 }}>/{d.staff.length}</small></b><span>WFO hari ini</span></div>
-                </div>
-                {internal && <div className="au-row au-wrap">
-                  <Link href="/dashboard/progress" className="btn btn-primary" style={{ minHeight: 44 }}>Lihat progress <Icon name="arrow" size={16} stroke={2.2} /></Link>
-                  <Link href="/dashboard/enhancement" className="btn btn-ghost" style={{ minHeight: 44 }}>Buka enhancement</Link>
-                </div>}
-              </div>
-              <Ring value={d.port.actual} plan={d.port.spi == null ? null : d.port.plan} size={220} stroke={20} label={`Realisasi portofolio ${P(d.port.actual)} dari rencana ${P(d.port.plan)}`}>
-                <b style={{ fontSize: 46 }}>{P(d.port.actual)}</b><span>realisasi · plan {P(d.port.plan)}</span>
-              </Ring>
-            </section>
+            {/* Sorotan: bisa diganti (progress, presensi, agenda, enhancement, tugas saya) */}
+            <DashHero d={d} data={data!} me={me} first={first} year={year} nowYear={nowYear} todayIso={todayIso} internal={internal} isAdmin={roles.includes('admin')} setYear={setYear} onMyFocus={internal ? () => { setFocus(''); pickView('staff') } : undefined} />
 
             {/* Widget ala Apple: dipilih & disusun per user (galeri per menu) */}
             <WidgetBoard isAdmin={roles.includes('admin')} allowed={config ? getAllowedMenus(config.roleDefs || [], roles, true) : null}
               ctx={{ d, data: data!, me, today, todayIso, year, nowYear, tpl, internal, config,
                 onDetail: (title, items) => setDetail({ title, items }),
                 onFocus: internal ? (name: string) => { setFocus(name); pickView('staff') } : undefined,
-                onMyFocus: internal ? () => { setFocus(''); pickView('staff') } : undefined }} />
+                onMyFocus: internal ? () => { setFocus(''); pickView('staff') } : undefined, onYear: setYear }} />
           </>}
       </div>
     </div>
