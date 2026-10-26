@@ -19,6 +19,7 @@ import { useYear } from '@/lib/year'
 import { DAY, actsFromPhases, calc, dUTC, inYear, ptd, todayUTC } from '@/lib/progress'
 import { showInYear } from '@/lib/initiativeView'
 import { STAGES_SHORT, enhActs, normWeights, score } from '@/lib/enhancement'
+import { klasOf, yearRole } from '@/lib/enhancementFlow'
 import { activityInYear, activityStats, portfolio, samePerson, upcoming, wfoUserIds } from '@/lib/dashboard'
 
 type View = 'general' | 'staff' | 'issues'
@@ -87,13 +88,19 @@ export default function DashboardPage() {
   // ── Derived data ──
   const d = useMemo(() => {
     if (!data) return null
-    const inits = data.inits.filter(i => (internal || !i.hiddenGuest) && showInYear(i, year)).map(i => {
-      const acts = actsFromPhases(i.phases || [], Number(i.year) || year)
-      return { i, acts, c: calc(acts, today) }
-    })
+    // Progress Project digabung ke Enhancement: "progress" = enhancement tahun ini + initiative lama yang belum dipindah.
+    // Enhancement yang sudah Carry Over ke tahun berikutnya tidak dihitung di tahun asalnya.
+    const enh = data.enh.map(e => { const acts = enhActs(e, tpl); return { e, s: score(e.items), acts, c: calc(acts, today), klas: klasOf(e) } })
+      .filter(v => (internal || !v.e.hiddenGuest) && ['own', 'span'].includes(String(yearRole(v.e, v.acts, year))))
+    const inits = [
+      ...data.inits.filter(i => (internal || !i.hiddenGuest) && showInYear(i, year)).map(i => {
+        const acts = actsFromPhases(i.phases || [], Number(i.year) || year)
+        return { i: { ...i, klas: klasOf(i) } as Any, acts, c: calc(acts, today), legacy: true, href: `/dashboard/progress?i=${i._id}` }
+      }),
+      ...enh.map(v => ({ i: { ...v.e, klas: v.klas } as Any, acts: v.acts, c: v.c, legacy: false, href: `/dashboard/enhancement?e=${v.e._id}` })),
+    ]
     const scheduled = inits.filter(x => x.acts.some(a => a.start))
     const port = portfolio(scheduled.map(x => x.c))
-    const enh = data.enh.map(e => { const acts = enhActs(e, tpl); return { e, s: score(e.items), acts, c: calc(acts, today) } }).filter(v => v.e.year === year || inYear(v.acts, year))
     const acts = data.acts.filter(a => activityInYear(a, year, nowYear))
     const st = activityStats(acts)
     const staff = data.members.filter(m => m.active !== false && !userRolesOf(m).every(r => r === 'guest'))
@@ -110,7 +117,10 @@ export default function DashboardPage() {
     const person = self ? null : d.staff.find((m: Any) => samePerson(String(m.name || ''), focus))
     const name = self ? String(user.name || '') : focus
     const mineInits = d.inits.filter(x => picArray(x.i.pic).some(p => samePerson(p, name)))
-    const tasks = mineInits.flatMap(x => x.acts.map((a, idx) => ({ x, a, idx }))).filter(t => t.a.pct < 100 && (!t.a.start || dUTC(t.a.start) <= today + 45 * DAY) && (!t.a.end || inYear([t.a], year) || !t.a.start))
+    const tasks = mineInits.flatMap(x => x.acts.map((a, idx) => ({ x, a, idx })))
+      // Template 5 aktivitas tanpa tanggal bukan tugas yang bisa di-update; aktivitas kustom & initiative lama tetap.
+      .filter(t => t.x.legacy || t.a.start || (Array.isArray(t.x.i.acts) && t.x.i.acts.length))
+      .filter(t => t.a.pct < 100 && (!t.a.start || dUTC(t.a.start) <= today + 45 * DAY) && (!t.a.end || inYear([t.a], year) || !t.a.start))
     const late = tasks.filter(t => t.a.start && ptd(t.a, today) > t.a.pct + 0.5)
     const myActs = d.st.open.filter((a: Any) => picArray(a.pic).some(p => samePerson(p, name)) || samePerson(a.picName || '', name))
     const myEnh = d.enh.filter(v => (v.e.pic || []).some((p: string) => samePerson(p, name)))
@@ -197,7 +207,7 @@ function Staff({ first, me, d, todayIso, today, focus, setFocus, selfName }: { f
           <div className="au-hchip"><b><CountUp to={me.wfoMonth} /></b><span>WFO bulan ini</span></div>
         </div>
         <div className="au-row au-wrap">
-          {firstLate && <Link href={`/dashboard/progress?i=${firstLate.x.i._id}`} className="btn btn-primary" style={{ minHeight: 44 }}>Update {firstLate.a.name} <Icon name="arrow" size={16} stroke={2.2} /></Link>}
+          {firstLate && <Link href={firstLate.x.href} className="btn btn-primary" style={{ minHeight: 44 }}>Update {firstLate.a.name} <Icon name="arrow" size={16} stroke={2.2} /></Link>}
           <Link href="/dashboard/attendance" className="btn btn-ghost" style={{ minHeight: 44 }}>Isi presensi</Link>
         </div>
       </div>
@@ -208,7 +218,7 @@ function Staff({ first, me, d, todayIso, today, focus, setFocus, selfName }: { f
         <div className="au-row au-between"><h2>{me.self ? 'Perlu kamu update' : 'Perlu update'}</h2><span className="lbl">ketuk untuk isi %</span></div>
         {me.tasks.length ? me.tasks.slice(0, 8).map((t: Any) => {
           const pl = t.a.start ? ptd(t.a, today) : 0, late = t.a.start && pl > t.a.pct + 0.5
-          return <Link key={`${t.x.i._id}-${t.idx}`} href={`/dashboard/progress?i=${t.x.i._id}`} className="au-task">
+          return <Link key={`${t.x.i._id}-${t.idx}`} href={t.x.href} className="au-task">
             <span className="ic" style={late ? { background: 'var(--warn-soft)', color: 'var(--warn)' } : undefined}><Icon name={late ? 'clock' : 'check'} size={20} /></span>
             <span className="au-col" style={{ minWidth: 0, gap: 2 }}><b>{t.a.name}</b><span className="au-xs au-muted">{t.x.i.title}{t.a.end ? ` · selesai ${fmtD(t.a.end)}` : ' · belum dijadwal'}</span>
               <span className="au-row au-xs au-ink2" style={{ marginTop: 4 }}><span className="au-mini"><i style={{ width: `${t.a.pct}%` }} /></span>{P(t.a.pct)} · plan {P(pl)}</span></span>

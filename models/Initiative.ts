@@ -33,6 +33,8 @@ const InitiativeSchema = new Schema({
   pic: { type:[String], default:[] },
   progressNotes: String,
   phases: { type:[PhaseSchema], default:[] },
+  movedTo: { type:String },  // _id enhancement hasil migrasi; initiative disembunyikan tapi tidak dihapus (bisa dibatalkan)
+  movedAt: { type:Date },
 }, { timestamps:true })
 
 InitiativeSchema.index({ year: 1 })

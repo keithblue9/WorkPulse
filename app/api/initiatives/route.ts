@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
     // year=all → semua tahun (halaman Progress memfilter lintas tahun sendiri); default tetap tahun berjalan.
     const yp = searchParams.get('year')
     const filter: Record<string, unknown> = yp === 'all' ? {} : { year: yp || new Date().getFullYear() }
+    // Initiative yang sudah dipindah ke Enhancement tidak ditampilkan lagi (data tetap ada untuk pembatalan).
+    filter.movedTo = { $exists: false }
     const roles = await currentRoles()
     if (!roles || roles.every(r => r === 'guest')) filter.hiddenGuest = { $ne: true }
     const initiatives = await InitiativeModel.find(filter).sort({ app: 1, title: 1 }).lean()

@@ -9,6 +9,9 @@ const ItemSchema = new Schema({
 
 const PhaseSchema = new Schema({ key: String, start: String, end: String, pct: Number }, { _id: false })
 
+const ActSchema = new Schema({ name: String, start: String, end: String, w: Number, pct: Number, notes: String }, { _id: false })
+const CarrySchema = new Schema({ from: Number, to: Number, at: Date, by: String, prevType: String, prevCode: String }, { _id: false })
+
 const EnhancementSchema = new Schema({
   code: { type: String, default: '' },
   app: { type: String, required: true },
@@ -23,6 +26,13 @@ const EnhancementSchema = new Schema({
   pic: { type: [String], default: [] },
   notes: { type: String, default: '' },
   source: { file: String, sheet: String, row: Number, importedAt: Date },
+  // Alur terpadu (Progress Project → Enhancement). Semua opsional; dokumen lama tetap terbaca apa adanya.
+  klas: { type: String },                          // 'SI' (KPI) | 'Non-SI'; kosong dibaca Non-SI
+  acts: { type: [ActSchema], default: undefined }, // aktivitas kustom; kosong = template 5 aktivitas
+  hiddenGuest: { type: Boolean },
+  carriedFrom: { type: Number },                   // tahun asal pertama sebelum Carry Over
+  carryLog: { type: [CarrySchema], default: undefined },
+  fromInitiative: { type: String, index: true },   // _id initiative asal (migrasi Progress Project)
   createdBy: String,
   updatedBy: String,
 }, { timestamps: true })

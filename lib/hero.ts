@@ -2,7 +2,7 @@
 export const HERO_KINDS = ['progress', 'presensi', 'agenda', 'enhancement', 'fokus', 'none'] as const
 export type HeroKind = (typeof HERO_KINDS)[number]
 export const HERO_META: Record<HeroKind, { label: string; desc: string; icon: string; internalOnly?: boolean }> = {
-  progress: { label: 'Progress project', desc: 'Realisasi portofolio vs rencana dan initiative yang tertinggal', icon: 'prog' },
+  progress: { label: 'Progress enhancement', desc: 'Realisasi portofolio vs rencana dan enhancement yang tertinggal', icon: 'prog' },
   presensi: { label: 'Presensi tim', desc: 'Siapa WFO, WFH, dinas, atau cuti hari ini dan pekan ini', icon: 'user' },
   agenda: { label: 'Agenda mendatang', desc: 'Agenda tim berikutnya dan jadwal pekan ini', icon: 'cal' },
   enhancement: { label: 'Enhancement', desc: 'Jumlah enhancement, Quick Win, dan tahap BRD', icon: 'enh' },

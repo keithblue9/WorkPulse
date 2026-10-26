@@ -3,6 +3,7 @@ import { picArray } from '@/lib/defaults'
 import { isFinished, samePerson } from '@/lib/dashboard'
 import { actsFromPhases, ptd, type Act } from '@/lib/progress'
 import { enhActs } from '@/lib/enhancement'
+import { enhRunning } from '@/lib/digest'
 
 const isPic = (pic: unknown, name: string, legacy?: string) => !!name && (picArray(pic).some(p => samePerson(String(p), name)) || (!!legacy && samePerson(legacy, name)))
 const late = (a: Act, today: number) => !!a.start && a.pct < 100 && ptd(a, today) > a.pct + 0.5
@@ -29,7 +30,7 @@ export function workload(staff: { name?: string }[], data: { acts: any[]; inits:
     const name = String(m.name)
     const acts = (data.acts || []).filter(a => a && a.showInList !== false && !isFinished(a) && isPic(a.pic, name, a.picName)).length
     const inits = (data.inits || []).filter(i => isPic(i?.pic, name)).length
-    const enh = (data.enh || []).filter(e => isPic(e?.pic, name) && (Number(e.stage) || 1) < 7).length
+    const enh = (data.enh || []).filter(e => isPic(e?.pic, name) && enhRunning(e)).length
     const nu = needsUpdate(name, { inits: data.inits, enh: data.enh }, today, tpl)
     return { name, acts, inits, enh, late: nu.progress + nu.enhancement, total: acts + inits + enh }
   }).sort((a, b) => b.total - a.total || b.late - a.late || a.name.localeCompare(b.name))

@@ -71,7 +71,11 @@ const validW = (w: unknown): w is number[] => Array.isArray(w) && w.length === T
 
 export type EnhPhase = { key: string; start?: string; end?: string; pct?: number }
 /** The 5 template activities; BRD % follows the stage (stage ÷ 7). */
-export function enhActs(e: { stage?: number; weights?: number[] | null; phases?: EnhPhase[] }, tpl: number[]): Act[] {
+export function enhActs(e: { stage?: number; weights?: number[] | null; phases?: EnhPhase[]; acts?: any[] }, tpl: number[]): Act[] {
+  // Aktivitas kustom (mis. hasil pindahan Progress Project) menggantikan template 5 aktivitas.
+  if (Array.isArray(e.acts) && e.acts.length) {
+    return e.acts.map((a: any, i: number) => ({ name: String(a?.name || `Aktivitas ${i + 1}`), start: a?.start || '', end: a?.end || '', w: Number(a?.w) > 0 ? Number(a.w) : 0, pct: Math.min(100, Math.max(0, Number(a?.pct) || 0)), notes: a?.notes || '' }))
+  }
   const w = validW(e.weights) ? e.weights : tpl
   return TPL.map((name, i) => {
     const p = (e.phases || []).find(x => x?.key === name) || ({} as EnhPhase)

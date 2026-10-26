@@ -4,6 +4,8 @@ import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import ExportMenu from '@/components/ExportMenu'
 import { Gantt } from '@/components/Gantt'
+import { SCurve } from '@/components/SCurve'
+import { ActsSheet, CarrySheet, MigrateSheet, QuickActSheet, useMigration, type CarryRow } from '@/components/EnhFlow'
 import { EnhMatrix as Matrix } from '@/components/EnhMatrix'
 import { Empty, Icon, PageHeader, Pill, Ring, Seg, Sheet, Tile } from '@/components/ui'
 import { getConfig } from '@/lib/configCache'
@@ -13,10 +15,13 @@ import { useYear } from '@/lib/year'
 import { DAY, calc, dUTC, inYear, isoDay, ptd, statusOf, todayUTC, type Act } from '@/lib/progress'
 import { CATS, ENH_APPS, ENH_TYPES, INITIATORS, STAGES, STAGES_SHORT, TPL, brdPct, enhActs, normWeights, rankPrio, score, type Cat, type EnhItem, type EnhPhase } from '@/lib/enhancement'
 import { otherYearHint } from '@/lib/hero'
+import { KLAS, actsFromTemplate, carriedTo, isCustom, isDone, klasOf, yearRole, type CustomAct } from '@/lib/enhancementFlow'
 
 type Enh = Record<string, any>
-type View = { e: Enh; s: ReturnType<typeof score>; acts: Act[]; c: ReturnType<typeof calc>; prio?: number }
-type Mode = 'list' | 'matrix' | 'road'
+type View = { e: Enh; s: ReturnType<typeof score>; acts: Act[]; c: ReturnType<typeof calc>; prio?: number; klas: string; custom: boolean; st: ReturnType<typeof statusOf>; done: boolean; cur?: Act }
+type Mode = 'list' | 'prog' | 'matrix' | 'road'
+type StF = 'Semua' | 'ok' | 'warn' | 'bad' | 'done'
+const ST_LABEL: Record<StF, string> = { Semua: 'Semua status', ok: 'On track', warn: 'Perlu perhatian', bad: 'Terlambat', done: 'Selesai' }
 
 const n1 = (v: number) => (Math.round(v * 100) / 100).toLocaleString('id-ID')
 const P = (v: number) => `${Math.round(v)}%`
@@ -128,11 +133,11 @@ function ScheduleSheet({ v, onClose, onSave }: { v: View; onClose: () => void; o
 }
 
 /* ───────────── Sheet: tambah / edit enhancement ───────────── */
-type Draft = { app: string; type: string; initiator: string; year: number; title: string; notes: string; pic: string; items: (EnhItem & { open?: boolean })[] }
+type Draft = { app: string; type: string; initiator: string; year: number; title: string; notes: string; pic: string; klas: string; hiddenGuest: boolean; items: (EnhItem & { open?: boolean })[] }
 function EditSheet({ e, year, years, onClose, onSaved, onDeleted }: { e: Enh | null; year: number; years: number[]; onClose: () => void; onSaved: (id?: string) => void; onDeleted: () => void }) {
   const [d, setD] = useState<Draft>(() => ({
     app: e?.app || 'iVendor', type: e?.type || 'New', initiator: e?.initiator || '', year: e?.year || year, title: e?.title || '', notes: e?.notes || '',
-    pic: (e?.pic || []).join(', '), items: (e?.items?.length ? e.items : [{ t: '', u: null, f: null, fl: null, pb: null }]).map((i: EnhItem) => ({ ...i })),
+    pic: (e?.pic || []).join(', '), klas: klasOf(e), hiddenGuest: !!e?.hiddenGuest, items: (e?.items?.length ? e.items : [{ t: '', u: null, f: null, fl: null, pb: null }]).map((i: EnhItem) => ({ ...i })),
   }))
   const [tried, setTried] = useState(false), [saving, setSaving] = useState(false), [confirmDel, setConfirmDel] = useState(false)
   const s = score(d.items)
@@ -144,7 +149,7 @@ function EditSheet({ e, year, years, onClose, onSaved, onDeleted }: { e: Enh | n
     if (titleErr) { toast.error(titleErr); return }
     setSaving(true)
     try {
-      const body = { app: d.app, type: d.type, initiator: d.initiator, year: d.year, title: d.title, notes: d.notes, pic: d.pic.split(',').map(x => x.trim()).filter(Boolean), items: d.items.map(({ open, ...it }) => it) }
+      const body = { app: d.app, type: d.type, initiator: d.initiator, year: d.year, title: d.title, notes: d.notes, klas: d.klas, hiddenGuest: d.hiddenGuest, pic: d.pic.split(',').map(x => x.trim()).filter(Boolean), items: d.items.map(({ open, ...it }) => it) }
       const out = await send(e ? `/api/enhancements/${e._id}` : '/api/enhancements', e ? 'PATCH' : 'POST', body)
       toast.success(e ? 'Enhancement diperbarui' : `Enhancement ${out?.data?.code || ''} dibuat`); onSaved(out?.data?._id); onClose()
     } catch (err: any) { toast.error(err.message) } finally { setSaving(false) }
@@ -166,6 +171,9 @@ function EditSheet({ e, year, years, onClose, onSaved, onDeleted }: { e: Enh | n
       <label className="au-col" style={{ gap: 6 }}><span className="lbl">Judul *</span>
         <input className="input" value={d.title} maxLength={300} placeholder="Mis. Integrasi e-Sign pada iVendor" aria-invalid={tried && !!titleErr} onChange={x => setD({ ...d, title: x.target.value })} />
         {tried && titleErr && <span role="alert" className="au-xs" style={{ color: 'var(--bad)', fontWeight: 600 }}>{titleErr}</span>}</label>
+      <div className="au-col" style={{ gap: 6 }}><span className="lbl">Klasifikasi {d.year}</span>
+        <Seg label="Klasifikasi" full value={d.klas} onChange={k => setD({ ...d, klas: k })} options={[['SI', 'SI · masuk KPI'], ['Non-SI', 'Non-SI']] as const} />
+        {e?.type === 'Carry Over' || d.type === 'Carry Over' ? <span className="au-xs au-muted">Carry Over: klasifikasi bisa berbeda dari tahun sebelumnya, sesuaikan dengan KPI {d.year}.</span> : null}</div>
       <label className="au-col" style={{ gap: 6 }}><span className="lbl">PIC (pisahkan dengan koma)</span><input className="input" value={d.pic} onChange={x => setD({ ...d, pic: x.target.value })} placeholder="Nama PIC" /></label>
 
       <div className="au-row au-between" style={{ marginTop: 4 }}>
@@ -201,6 +209,8 @@ function EditSheet({ e, year, years, onClose, onSaved, onDeleted }: { e: Enh | n
         <div><span className="lbl">Kategori</span><div className={`au-cat ${catK(s.cat)}`} style={{ marginTop: 10, justifyContent: 'center' }}>{s.cat}</div></div>
       </div>
       <label className="au-col" style={{ gap: 6 }}><span className="lbl">Catatan</span><textarea className="input" rows={3} value={d.notes} maxLength={5000} onChange={x => setD({ ...d, notes: x.target.value })} /></label>
+      <label className="au-igr" style={{ border: '1px solid var(--line)', borderRadius: 16 }}><span className="k">Sembunyikan dari tamu (eksternal)</span>
+        <input type="checkbox" className="au-sw" style={{ marginLeft: 'auto' }} checked={d.hiddenGuest} onChange={x => setD({ ...d, hiddenGuest: x.target.checked })} /></label>
       {e && (confirmDel
         ? <div className="au-row au-wrap p-bad" style={{ borderRadius: 14, padding: 12, gap: 10 }}>
             <span className="au-small" style={{ flex: 1 }}>Hapus {e.code} “{e.title}”? Tidak bisa dibatalkan.</span>
@@ -296,43 +306,62 @@ function UploadSheet({ year, years, onClose, onDone }: { year: number; years: nu
 /* ───────────── Halaman ───────────── */
 export default function EnhancementPage() {
   const { data: session } = useSession()
-  const internal = isInternalUser(userRolesOf(session?.user))
+  const roles = userRolesOf(session?.user)
+  const internal = isInternalUser(roles), admin = roles.includes('admin')
   const { year, years, setYear } = useYear()
   const today = useMemo(() => todayUTC(), [])
   const [all, setAll] = useState<Enh[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [tpl, setTpl] = useState<number[]>(normWeights(null))
   const [mode, setMode] = useState<Mode>('list')
-  const [q, setQ] = useState(''), [app, setApp] = useState('Semua'), [cat, setCat] = useState('Semua')
+  const [q, setQ] = useState(''), [app, setApp] = useState('Semua'), [cat, setCat] = useState('Semua'), [kl, setKl] = useState('Semua'), [stF, setStF] = useState<StF>('Semua')
   const [selId, setSelId] = useState<string | null>(null)
-  const [sheet, setSheet] = useState<null | { k: 'edit'; e: Enh | null } | { k: 'upload' } | { k: 'phase'; idx: number } | { k: 'weights' } | { k: 'schedule' }>(null)
+  const [sheet, setSheet] = useState<null | { k: 'edit'; e: Enh | null } | { k: 'upload' } | { k: 'phase'; idx: number } | { k: 'weights' } | { k: 'schedule' } | { k: 'acts' } | { k: 'quick'; idx: number } | { k: 'carry'; ids?: string[] } | { k: 'migrate' }>(null)
   const exportRef = useRef<HTMLDivElement>(null)
+  const mig = useMigration(admin)
 
   const load = useCallback(async () => {
     setFailed(false)
     try { const d = await send('/api/enhancements?year=all', 'GET'); startTransition(() => setAll(Array.isArray(d.data) ? d.data : [])) } catch { setFailed(true); setAll(a => a ?? []) }
   }, [])
   useEffect(() => { load(); getConfig().then(c => setTpl(normWeights(c?.enhancementTemplate))).catch(() => {}) }, [load])
-  useEffect(() => { try { const id = new URLSearchParams(location.search).get('e'); if (id) setSelId(id) } catch {} }, [])
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(location.search), id = sp.get('e'), v = sp.get('view')
+      if (id) setSelId(id)
+      if (v === 'progress') setMode('prog')
+    } catch {}
+  }, [])
   const select = (id: string | null) => {
     setSelId(id)
-    try { const u = new URL(location.href); id ? u.searchParams.set('e', id) : u.searchParams.delete('e'); history.replaceState(history.state, '', u) } catch {}
+    try { const u = new URL(location.href); id ? u.searchParams.set('e', id) : u.searchParams.delete('e'); u.searchParams.delete('view'); history.replaceState(history.state, '', u) } catch {}
     if (id) requestAnimationFrame(() => document.querySelector('.au-page')?.scrollTo({ top: 0, behavior: 'smooth' }))
   }
 
   const views = useMemo(() => {
     const list = all || []
     const pr = rankPrio(list.map(e => ({ _id: String(e._id), app: `${e.app}|${e.year}`, items: e.items || [] })))
-    return list.map(e => { const acts = enhActs(e, tpl); return { e, s: score(e.items), acts, c: calc(acts, today), prio: pr.get(String(e._id)) } as View })
+    return list.map(e => {
+      const acts = enhActs(e, tpl), c = calc(acts, today), done = isDone(c.actual)
+      const cur = acts.find(a => dUTC(a.start) <= today && dUTC(a.end) + DAY > today && a.pct < 100) || acts.find(a => a.pct < 100)
+      return { e, s: score(e.items), acts, c, prio: pr.get(String(e._id)), klas: klasOf(e), custom: isCustom(e), st: statusOf(c.spi), done, cur } as View
+    })
   }, [all, tpl, today])
-  const yr = views.filter(v => v.e.year === year || inYear(v.acts, year))
+  const roleOf = (v: View) => yearRole(v.e, v.acts, year)
+  const yr = views.filter(v => { const r = roleOf(v); return r === 'own' || r === 'span' })
+  const carried = views.filter(v => roleOf(v) === 'carried')
   const ql = q.trim().toLowerCase()
+  const stOk = (v: View) => stF === 'Semua' || (stF === 'done' ? v.done : !v.done && v.st.key === stF)
   const list = yr
-    .filter(v => (app === 'Semua' || v.e.app === app) && (cat === 'Semua' || v.s.cat === cat) && (!ql || `${v.e.code} ${v.e.title}`.toLowerCase().includes(ql)))
-    .sort((a, b) => a.e.app.localeCompare(b.e.app) || (CAT_ORD[a.s.cat] || 9) - (CAT_ORD[b.s.cat] || 9) || b.s.impact - a.s.impact || a.s.effort - b.s.effort || String(a.e.code).localeCompare(String(b.e.code)))
+    .filter(v => (app === 'Semua' || v.e.app === app) && (cat === 'Semua' || v.s.cat === cat) && (kl === 'Semua' || v.klas === kl) && stOk(v) && (!ql || `${v.e.code} ${v.e.title}`.toLowerCase().includes(ql)))
+    .sort((a, b) => (a.klas === b.klas ? 0 : a.klas === 'SI' ? -1 : 1) || a.e.app.localeCompare(b.e.app) || (CAT_ORD[a.s.cat] || 9) - (CAT_ORD[b.s.cat] || 9) || b.s.impact - a.s.impact || a.s.effort - b.s.effort || String(a.e.code).localeCompare(String(b.e.code)))
   const apps = ['Semua', ...Array.from(new Set(yr.map(v => v.e.app))).sort()]
   const sel = views.find(v => String(v.e._id) === selId) || null
   const avg = yr.length ? yr.reduce((a, v) => a + v.c.actual, 0) / yr.length : 0
+  const own = yr.filter(v => v.e.year === year)
+  const carryRows = (vs: View[]): CarryRow[] => vs.map(v => ({ id: String(v.e._id), code: v.e.code, title: v.e.title, app: v.e.app, klas: v.klas, actual: v.c.actual, acts: v.acts }))
+  const filtered = app !== 'Semua' || cat !== 'Semua' || kl !== 'Semua' || stF !== 'Semua' || !!ql
+  const resetFilters = () => { setApp('Semua'); setCat('Semua'); setKl('Semua'); setStF('Semua'); setQ('') }
 
   async function patch(id: string, body: Record<string, unknown>, msg?: string) {
     const out = await send(`/api/enhancements/${id}`, 'PATCH', body)
@@ -346,29 +375,51 @@ export default function EnhancementPage() {
     const phases = TPL.map(k => (k === p.key ? p : (v.e.phases || []).find((x: EnhPhase) => x.key === k))).filter(Boolean)
     await patch(v.e._id, { phases }, `${p.key} diperbarui`)
   }
+  async function uncarry(v: View) {
+    try {
+      const out = await send('/api/enhancements/carry', 'POST', { ids: [v.e._id], undo: true })
+      const back = out.data?.[0]
+      setAll(a => (a || []).map(x => (String(x._id) === String(v.e._id) && back ? back : x)))
+      toast.success(`Carry Over dibatalkan · kembali ke ${back?.year ?? ''}`)
+      if (back?.year && back.year !== year) setYear(back.year)
+    } catch (e: any) { toast.error(e.message) }
+  }
 
   const head = (
-    <PageHeader eyebrow={`IT Requirement BPDP · ${year}`} title="Enhancement" actions={<>
-      <Seg label="Tampilan" value={mode} onChange={m => setMode(m)} options={[['list', <><Icon name="list" size={15} />Daftar</>], ['matrix', <><Icon name="grid" size={15} />Matriks</>], ['road', <><Icon name="road" size={15} />Roadmap</>]] as const} />
+    <PageHeader eyebrow={`Enhancement & Progress · ${year}`} title="Enhancement" actions={<>
+      <span className="au-enh-seg"><Seg label="Tampilan" value={mode} onChange={m => setMode(m)} options={[['list', <><Icon name="list" size={15} />Daftar</>], ['prog', <><Icon name="prog" size={15} />Progress</>], ['matrix', <><Icon name="grid" size={15} />Matriks</>], ['road', <><Icon name="road" size={15} />Roadmap</>]] as const} /></span>
       <ExportMenu getNodes={() => exportRef.current ? Array.from(exportRef.current.querySelectorAll<HTMLElement>('[data-export-card]')) : []} filename={`enhancement-${year}`} title="Enhancement — WINS" />
+      {internal && own.some(v => !v.done) && <button type="button" className="btn btn-ghost" onClick={() => setSheet({ k: 'carry' })}><Icon name="arrow" size={16} stroke={2.2} />Carry Over</button>}
       {internal && <button type="button" className="btn btn-ghost" onClick={() => setSheet({ k: 'upload' })}><Icon name="up" size={16} stroke={2.2} />Upload Excel</button>}
       {internal && <button type="button" className="btn btn-primary" onClick={() => setSheet({ k: 'edit', e: null })}><Icon name="plus" size={16} stroke={2.2} />Tambah</button>}
     </>} />
+  )
+  const chips = (label: string, opts: readonly (readonly [string, string])[], val: string, set: (v: any) => void) => (
+    <div className="au-chips wrap" role="group" aria-label={label}>{opts.map(([k, l]) => <button key={k} type="button" className="au-chip" aria-pressed={val === k} onClick={() => set(k)}>{l}</button>)}</div>
   )
   const filters = (
     <div className="au-col" style={{ gap: 10 }}>
       <label className="input au-row" style={{ gap: 8, padding: '0 12px' }}><Icon name="search" size={16} />
         <input value={q} onChange={x => setQ(x.target.value)} placeholder="Cari kode atau judul" aria-label="Cari enhancement" style={{ border: 0, background: 'transparent', flex: 1, minHeight: 40, outline: 0, color: 'var(--ink)' }} /></label>
+      {chips('Filter klasifikasi', [['Semua', `Semua · ${yr.length}`], ...KLAS.map(k => [k, `${k} · ${yr.filter(v => v.klas === k).length}`] as const)], kl, setKl)}
+      {chips('Filter status', (Object.keys(ST_LABEL) as StF[]).map(k => [k, ST_LABEL[k]] as const), stF, setStF)}
       <div className="au-chips wrap" role="group" aria-label="Filter aplikasi">{apps.map(a => <button key={a} type="button" className="au-chip" aria-pressed={app === a} onClick={() => setApp(a)}>{a} <span style={{ opacity: .65 }}>{a === 'Semua' ? yr.length : yr.filter(v => v.e.app === a).length}</span></button>)}</div>
-      <div className="au-chips wrap" role="group" aria-label="Filter kategori">{['Semua', ...CATS].map(c => <button key={c} type="button" className="au-chip" aria-pressed={cat === c} onClick={() => setCat(c)}>{c === 'Semua' ? 'Semua kategori' : c}</button>)}</div>
+      {chips('Filter kategori', [['Semua', 'Semua kategori'], ...CATS.map(c => [c, c] as const)], cat, setCat)}
+      {filtered && <button type="button" className="au-link" style={{ alignSelf: 'flex-start', padding: 0 }} onClick={resetFilters}>Reset filter</button>}
     </div>
   )
+  const tags = (v: View) => <>
+    <span className={`au-tag${v.klas === 'SI' ? ' t-si' : ''}`}>{v.klas}</span>
+    {v.e.type === 'Carry Over' && <span className="au-tag t-co">Carry Over{v.e.carriedFrom ? ` · ${v.e.carriedFrom}` : ''}</span>}
+    {internal && v.e.hiddenGuest && <span className="au-tag">Tersembunyi dari tamu</span>}
+  </>
+  const stPill = (v: View) => v.done ? <Pill tone="ok">Selesai</Pill> : <Pill tone={v.st.key}>{v.st.label}</Pill>
 
   let body: React.ReactNode
   if (all === null) body = <div className="au-col" style={{ gap: 10 }}>{[0, 1, 2].map(k => <div key={k} className="au-card"><div className="au-skel" style={{ width: '50%' }} /><div className="au-skel" style={{ width: '80%' }} /></div>)}</div>
   else if (!yr.length) {
     // Data ada di tahun lain → tawarkan pindah tahun (sebelumnya terlihat seperti "hilang").
-    const hint = otherYearHint((all || []) as any[], year)
+    const hint = otherYearHint((all || []).filter(e => !(carried.some(v => v.e._id === e._id))) as any[], year)
     body = <div className="au-card"><Empty title={`Belum ada enhancement di ${year}`}
       text={hint ? `Ada ${hint.n} enhancement di ${hint.year}. Tahun dipilih dari pemilih tahun di kanan atas.` : 'Upload file IT Requirement atau tambah satu per satu. Pilih tahun lain di atas untuk melihat data lain.'}
       action={<div className="au-row au-wrap" style={{ justifyContent: 'center' }}>{hint && <button type="button" className="btn btn-primary" onClick={() => setYear(hint.year)}>Lihat {hint.year} <Icon name="arrow" size={14} stroke={2.4} /></button>}{internal && <><button type="button" className="btn" onClick={() => setSheet({ k: 'upload' })}>Upload Excel</button><button type="button" className={`btn${hint ? '' : ' btn-primary'}`} onClick={() => setSheet({ k: 'edit', e: null })}>Tambah</button></>}</div>} /></div>
@@ -385,33 +436,55 @@ export default function EnhancementPage() {
     body = (
       <section className="au-card rise" data-export-card="">
         <div className="au-row au-between au-wrap"><h2>Roadmap {app === 'Semua' ? 'semua aplikasi' : app}</h2><div className="au-chips">{apps.map(a => <button key={a} type="button" className="au-chip" aria-pressed={app === a} onClick={() => setApp(a)}>{a}</button>)}</div></div>
-        {ra.some(a => a.start) ? <Gantt acts={ra} today={today} labels={rows.map((v, i) => `${v.e.app} · ${STAGES_SHORT[(v.e.stage || 1) - 1]} · ${ra[i].start ? P(v.c.actual) : 'belum dijadwal'}`)} onSelect={i => { setMode('list'); select(rows[i].e._id) }} />
+        {ra.some(a => a.start) ? <Gantt acts={ra} today={today} labels={rows.map((v, i) => `${v.e.app} · ${v.klas} · ${v.custom ? (v.cur?.name || 'aktivitas') : STAGES_SHORT[(v.e.stage || 1) - 1]} · ${ra[i].start ? P(v.c.actual) : 'belum dijadwal'}`)} onSelect={i => { setMode('list'); select(rows[i].e._id) }} />
           : <Empty title="Belum ada jadwal" text="Isi timeline di detail enhancement (atau pakai Isi jadwal otomatis) agar tampil di roadmap." />}
         {list.length > rows.length && <span className="au-xs au-muted">{rows.length} dari {list.length} ditampilkan. Persempit dengan filter.</span>}
       </section>
     )
-  } else body = (
+  } else if (mode === 'prog') body = (
+    <div className="au-col" style={{ gap: 14 }}>
+      <section className="au-card rise">{filters}</section>
+      {list.length ? <div className="au-pgrid">
+        {list.map((v, k) => (
+          <button type="button" key={v.e._id} className="au-icard rise" style={{ ['--d' as any]: Math.min(k, 8) }} onClick={() => { setMode('list'); select(v.e._id) }} data-export-card="">
+            <Ring value={v.c.actual} plan={v.c.spi == null ? null : v.c.plan} size={88} stroke={10} label={`Realisasi ${P(v.c.actual)} dari rencana ${P(v.c.plan)}`}><b>{P(v.c.actual)}</b><span>plan {P(v.c.plan)}</span></Ring>
+            <span className="au-col" style={{ gap: 6, minWidth: 0 }}>
+              <span className="au-row au-wrap" style={{ gap: 5 }}><span className="au-tag">{v.e.app}</span>{tags(v)}</span>
+              <h3>{v.e.title}</h3>
+              <span>{stPill(v)}</span>
+              <span className="au-xs au-muted" style={{ overflowWrap: 'anywhere' }}>{v.custom ? (v.cur ? `Sekarang: ${v.cur.name}` : 'Semua aktivitas selesai') : `Tahap BRD: ${STAGES_SHORT[(v.e.stage || 1) - 1]}`}{v.e.pic?.length ? ` · PIC ${v.e.pic.join(', ')}` : ''}</span>
+            </span>
+          </button>
+        ))}
+      </div> : <div className="au-card"><Empty title="Tidak ada yang cocok" text="Ubah filter klasifikasi, status, aplikasi atau kategori." action={<button type="button" className="btn" onClick={resetFilters}>Reset filter</button>} /></div>}
+    </div>
+  )
+  else body = (
     <div className={`au-split${sel ? ' has' : ''}`}>
       <div className="au-lp au-lpane au-card" style={{ padding: 14, gap: 12 }}>
         {filters}
         <div className="au-col" style={{ gap: 4 }}>
           {list.map(v => (
             <button type="button" key={v.e._id} className="au-erow" aria-current={sel?.e._id === v.e._id} onClick={() => select(v.e._id)}>
-              <span className="au-row au-between au-xs" style={{ width: '100%' }}><span style={{ fontFamily: 'var(--mono)' }} className="au-muted">{v.e.code} · {v.e.app}{v.prio ? ` · P${v.prio}` : ''}</span><span className={`au-cat ${catK(v.s.cat)}`}>{v.s.cat}</span></span>
+              <span className="au-row au-between au-xs" style={{ width: '100%' }}><span style={{ fontFamily: 'var(--mono)' }} className="au-muted">{v.e.code} · {v.e.app}{v.prio ? ` · P${v.prio}` : ''}</span>{(!v.custom || v.s.n > 0) && <span className={`au-cat ${catK(v.s.cat)}`}>{v.s.cat}</span>}</span>
               <b>{v.e.title}</b>
-              <span className="au-dots" aria-label={`Tahap ${v.e.stage || 1} dari 7`}>{STAGES.map((_, k) => <i key={k} className={k < (v.e.stage || 1) ? 'on' : ''} />)}</span>
-              <span className="au-row au-xs au-ink2" style={{ width: '100%' }}><span className="au-mini"><i style={{ width: `${v.c.actual}%` }} /></span><b>{P(v.c.actual)}</b><span>{STAGES_SHORT[(v.e.stage || 1) - 1]}</span></span>
+              <span className="au-row au-wrap" style={{ gap: 5 }}>{tags(v)}{(v.done || v.c.spi != null) && stPill(v)}</span>
+              {!v.custom && <span className="au-dots" aria-label={`Tahap ${v.e.stage || 1} dari 7`}>{STAGES.map((_, k) => <i key={k} className={k < (v.e.stage || 1) ? 'on' : ''} />)}</span>}
+              <span className="au-row au-xs au-ink2" style={{ width: '100%' }}><span className="au-mini"><i style={{ width: `${v.c.actual}%` }} /></span><b>{P(v.c.actual)}</b><span>{v.custom ? (v.cur?.name || 'Selesai') : STAGES_SHORT[(v.e.stage || 1) - 1]}</span></span>
             </button>
           ))}
           {!list.length && <span className="au-small au-muted" style={{ padding: 14 }}>Tidak ada yang cocok dengan filter.</span>}
         </div>
       </div>
       <div className="au-dp au-col" style={{ gap: 16, minWidth: 0 }}>
-        {sel ? <Detail v={sel} today={today} internal={internal} onBack={() => select(null)} onEdit={() => setSheet({ k: 'edit', e: sel.e })} onStage={s => setStage(sel, s)} onPhase={i => setSheet({ k: 'phase', idx: i })} onWeights={() => setSheet({ k: 'weights' })} onSchedule={() => setSheet({ k: 'schedule' })} />
-          : <div className="au-card"><Empty title="Pilih enhancement" text="Detail, tahap BRD, timeline dan skor tampil di sini. Coba juga tampilan Matriks dan Roadmap." /></div>}
+        {sel ? <Detail v={sel} year={year} today={today} internal={internal} onBack={() => select(null)} onEdit={() => setSheet({ k: 'edit', e: sel.e })} onStage={s => setStage(sel, s)} onPhase={i => setSheet(sel.custom ? { k: 'quick', idx: i } : { k: 'phase', idx: i })} onWeights={() => setSheet({ k: 'weights' })} onSchedule={() => setSheet({ k: 'schedule' })} onActs={() => setSheet({ k: 'acts' })} onCarry={() => setSheet({ k: 'carry', ids: [String(sel.e._id)] })} onUncarry={() => uncarry(sel)} onYear={setYear} />
+          : <div className="au-card"><Empty title="Pilih enhancement" text="Detail, klasifikasi, progress, timeline dan skor tampil di sini. Coba juga tampilan Progress, Matriks dan Roadmap." /></div>}
       </div>
     </div>
   )
+
+  const selCustomActs: CustomAct[] = sel ? (sel.custom ? sel.e.acts : actsFromTemplate(sel.acts)) : []
+  const carryTarget = sheet?.k === 'carry' ? (sheet.ids ? views.filter(v => sheet.ids!.includes(String(v.e._id))) : own) : []
 
   return (
     <div className="au-page">
@@ -420,74 +493,137 @@ export default function EnhancementPage() {
       {sheet?.k === 'phase' && sel && <PhaseSheet v={sel} idx={sheet.idx} today={today} onClose={() => setSheet(null)} onSave={p => savePhase(sel, p)} />}
       {sheet?.k === 'weights' && sel && <WeightSheet v={sel} tpl={tpl} onClose={() => setSheet(null)} onSave={w => patch(sel.e._id, { weights: w }, w ? 'Bobot disimpan' : 'Kembali ke bobot template')} />}
       {sheet?.k === 'schedule' && sel && <ScheduleSheet v={sel} onClose={() => setSheet(null)} onSave={ph => patch(sel.e._id, { phases: ph }, 'Jadwal dibuat')} />}
+      {sheet?.k === 'acts' && sel && <ActsSheet title={sel.custom ? 'Edit aktivitas' : 'Aktivitas sendiri'} initial={selCustomActs} year={sel.e.year} today={today} canReset={sel.custom}
+        onClose={() => setSheet(null)} onSave={acts => patch(sel.e._id, { acts }, acts.length ? 'Aktivitas disimpan' : 'Kembali ke template 5 aktivitas')} />}
+      {sheet?.k === 'quick' && sel && sel.custom && sel.e.acts[sheet.idx] && <QuickActSheet act={sel.e.acts[sheet.idx]} today={today} onClose={() => setSheet(null)}
+        onSave={(pct, notes) => patch(sel.e._id, { acts: sel.e.acts.map((a: CustomAct, i: number) => (i === sheet.idx ? { ...a, pct, notes } : a)) }, 'Progress diperbarui')} />}
+      {sheet?.k === 'carry' && carryTarget.length > 0 && <CarrySheet rows={carryRows(carryTarget)} year={sheet.ids ? Number(carryTarget[0].e.year) : year} preselect={sheet.ids} onClose={() => setSheet(null)}
+        onDone={(ids, to) => { load(); if (ids.length === 1 && sel && ids[0] === String(sel.e._id)) { setYear(to) } }} />}
+      {sheet?.k === 'migrate' && mig.st && <MigrateSheet st={mig.st} onClose={() => setSheet(null)} onDone={() => { load(); mig.reload() }} />}
 
       <div className="au-view au-anim" ref={exportRef}>
         {head}
-        {!sel && yr.length > 0 && mode === 'list' && (
+        {admin && mig.st && mig.st.pending > 0 && (
+          <div className="au-mig rise" role="status">
+            <Icon name="prog" size={20} />
+            <span className="au-col" style={{ gap: 2, flex: 1, minWidth: 0 }}><b>Progress Project kini bagian dari Enhancement</b>
+              <span className="au-small au-ink2">{mig.st.pending} initiative belum dipindah. Progress, aktivitas & PIC tetap sama; SI jadi klasifikasi KPI.</span></span>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setSheet({ k: 'migrate' })}>Tinjau & pindahkan</button>
+          </div>
+        )}
+        {!sel && yr.length > 0 && (mode === 'list' || mode === 'prog') && (
           <div className="au-grid g4 au-tiles" data-export-card="">
-            <Tile icon="enh" color="var(--accent)" value={yr.length} label="Enhancement" hint={String(year)} />
-            <Tile icon="bolt" color="var(--qw)" value={yr.filter(v => v.s.cat === 'Quick Win').length} label="Quick Win" active={cat === 'Quick Win'} onClick={() => setCat(cat === 'Quick Win' ? 'Semua' : 'Quick Win')} />
+            <Tile icon="enh" color="var(--accent)" value={yr.length} label="Enhancement" hint={String(year)} active={kl === 'Semua' && stF === 'Semua'} onClick={() => { setKl('Semua'); setStF('Semua') }} />
+            <Tile icon="shield" color="var(--si)" value={yr.filter(v => v.klas === 'SI').length} label="SI · KPI" active={kl === 'SI'} onClick={() => setKl(kl === 'SI' ? 'Semua' : 'SI')} />
             <Tile icon="prog" color="#7B6BFF" value={`${Math.round(avg)}%`} label="Rata-rata progress" />
-            <Tile icon="rocket" color="var(--hot)" value={yr.filter(v => (v.e.stage || 1) >= 7).length} label="Sudah Development" />
+            <Tile icon="bolt" color="var(--bad)" value={yr.filter(v => !v.done && v.st.key === 'bad').length} label="Terlambat" active={stF === 'bad'} onClick={() => setStF(stF === 'bad' ? 'Semua' : 'bad')} />
           </div>
         )}
         {failed && <div className="au-row au-wrap p-bad" role="alert" style={{ borderRadius: 14, padding: 12 }}><span className="au-small" style={{ flex: 1 }}>Data enhancement gagal dimuat.</span><button type="button" className="btn btn-sm" onClick={load}>Coba lagi</button></div>}
         {body}
+        {!sel && carried.length > 0 && (
+          <details className="au-card au-carried rise" data-export-card="">
+            <summary><Icon name="arrow" size={16} stroke={2.2} /><b>Dibawa ke tahun berikutnya</b><span className="au-tag t-co">{carried.length} Carry Over</span></summary>
+            <p className="au-xs au-muted">Enhancement {year} yang tidak selesai dan dipindah (Carry Over). Tidak dihitung di ringkasan {year}.</p>
+            <div className="au-ig">{carried.map(v => { const to = carriedTo(v.e, year) || v.e.year; return (
+              <div key={v.e._id} className="au-igr" style={{ gap: 12 }}>
+                <span className="au-col" style={{ gap: 2, minWidth: 0, flex: 1 }}><b style={{ fontSize: 14.5 }}>{v.e.title}</b><span className="au-xs au-muted">{v.e.app} · {v.klas} · progress {P(v.c.actual)}</span></span>
+                <button type="button" className="btn btn-sm" onClick={() => { setYear(v.e.year); setMode('list'); select(String(v.e._id)) }}>Lihat di {to}<Icon name="arrow" size={13} stroke={2.4} /></button>
+              </div>) })}</div>
+          </details>
+        )}
+        {admin && mig.st && !mig.st.pending && mig.st.moved > 0 && <button type="button" className="au-link au-xs" style={{ alignSelf: 'center', opacity: .7 }} onClick={() => setSheet({ k: 'migrate' })}>{mig.st.moved} enhancement berasal dari Progress Project · kelola pemindahan</button>}
       </div>
     </div>
   )
 }
 
-function Detail({ v, today, internal, onBack, onEdit, onStage, onPhase, onWeights, onSchedule }: { v: View; today: number; internal: boolean; onBack: () => void; onEdit: () => void; onStage: (s: number) => void; onPhase: (i: number) => void; onWeights: () => void; onSchedule: () => void }) {
+function Detail({ v, year, today, internal, onBack, onEdit, onStage, onPhase, onWeights, onSchedule, onActs, onCarry, onUncarry, onYear }: { v: View; year: number; today: number; internal: boolean; onBack: () => void; onEdit: () => void; onStage: (s: number) => void; onPhase: (i: number) => void; onWeights: () => void; onSchedule: () => void; onActs: () => void; onCarry: () => void; onUncarry: () => void; onYear: (y: number) => void }) {
   const { e, s, acts, c } = v
   const stage = e.stage || 1
-  const st = statusOf(c.spi)
   const noDates = !acts.some(a => a.start)
+  const log: any[] = Array.isArray(e.carryLog) ? e.carryLog : []
+  const lastCarry = log[log.length - 1]
+  const ends = acts.map(a => dUTC(a.end)).filter(Number.isFinite)
+  const left = ends.length ? Math.ceil((Math.max(...ends) + DAY - today) / DAY) : null
+  const away = e.year !== year
   return (
     <>
       <button type="button" className="au-link au-row" style={{ alignSelf: 'flex-start', gap: 4 }} onClick={onBack}><Icon name="back" size={14} />Semua enhancement</button>
+      {away && <div className="au-row au-wrap p-warn" role="status" style={{ borderRadius: 14, padding: 12, gap: 10 }}><span className="au-small" style={{ flex: 1 }}>Enhancement ini sekarang tercatat di {e.year}.</span><button type="button" className="btn btn-sm" onClick={() => onYear(e.year)}>Buka {e.year}</button></div>}
       <section className="au-hero ini rise" data-export-card="">
         <span className="au-sticker" aria-hidden="true">{e.code}</span>
         <div className="au-col" style={{ gap: 12, minWidth: 0 }}>
-          <span className="lbl">{[e.app, e.type, e.initiator].filter(Boolean).join(' · ')} · {e.year}</span>
+          <span className="lbl">{[e.app, e.initiator].filter(Boolean).join(' · ')} · {e.year}</span>
           <h1 style={{ fontSize: 'clamp(22px,2.6vw,34px)', overflowWrap: 'anywhere', paddingRight: 60 }}>{e.title}</h1>
           <div className="au-row au-wrap" style={{ gap: 8 }}>
-            <span className={`au-pill p-none ${catK(s.cat)}`}><span className={`au-cat ${catK(s.cat)}`}>{s.cat}</span>{v.prio ? ` · prioritas ${v.prio}` : ''}</span>
-            <Pill tone={st.key}>{st.label}</Pill>
+            <span className={`au-pill ${v.klas === 'SI' ? 'p-si' : 'p-none'}`}>{v.klas === 'SI' ? 'SI · KPI' : 'Non-SI'}</span>
+            {e.type === 'Carry Over' && <span className="au-pill p-co">Carry Over{e.carriedFrom ? ` dari ${e.carriedFrom}` : ''}</span>}
+            {!v.custom || e.items?.length ? <span className={`au-pill p-none ${catK(s.cat)}`}><span className={`au-cat ${catK(s.cat)}`}>{s.cat}</span>{v.prio ? ` · prioritas ${v.prio}` : ''}</span> : null}
+            {v.done ? <Pill tone="ok">Selesai</Pill> : <Pill tone={v.st.key}>{v.st.label}</Pill>}
           </div>
           <div className="au-hchips">
-            <div className="au-hchip"><b>{n1(s.impact)}</b><span>Impact</span></div>
-            <div className="au-hchip"><b>{n1(s.effort)}</b><span>Effort</span></div>
-            <div className="au-hchip"><b>{s.n}</b><span>Item</span></div>
+            <div className="au-hchip"><b>{P(c.plan)}</b><span>Plan hari ini</span></div>
+            <div className="au-hchip"><b>{c.spi == null ? '–' : n1(c.spi)}</b><span>SPI</span></div>
+            {v.custom ? <div className="au-hchip"><b>{left == null ? '–' : Math.max(0, left)}</b><span>Hari tersisa</span></div> : <div className="au-hchip"><b>{n1(s.impact)}</b><span>Impact</span></div>}
           </div>
-          {internal && <button type="button" className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }} onClick={onEdit}><Icon name="pnote" size={14} />Edit data & skor</button>}
+          {internal && <div className="au-row au-wrap" style={{ gap: 6 }}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onEdit}><Icon name="pnote" size={14} />Edit data & klasifikasi</button>
+            {!v.done && <button type="button" className="btn btn-ghost btn-sm" onClick={onCarry}><Icon name="arrow" size={14} stroke={2.2} />Carry Over ke {Number(e.year) + 1}</button>}
+            {lastCarry && Number(lastCarry.to) === Number(e.year) && <button type="button" className="btn btn-ghost btn-sm" onClick={onUncarry}>Batalkan Carry Over (kembali ke {lastCarry.from})</button>}
+          </div>}
         </div>
-        <Ring value={c.actual} plan={c.spi == null ? null : c.plan} size={170} stroke={16} label={`Progress gabungan ${P(c.actual)}`}><b style={{ fontSize: 36 }}>{P(c.actual)}</b><span>gabungan</span></Ring>
+        <Ring value={c.actual} plan={c.spi == null ? null : c.plan} size={170} stroke={16} label={`Progress ${P(c.actual)}`}><b style={{ fontSize: 36 }}>{P(c.actual)}</b><span>realisasi</span></Ring>
       </section>
 
-      <section className="au-card rise" style={{ ['--d' as any]: 1 }} data-export-card="">
+      {log.length > 0 && <section className="au-card rise" style={{ ['--d' as any]: 1 }}>
+        <h2>Riwayat Carry Over</h2>
+        <ol className="au-carrylog">{log.map((x, i) => <li key={i}><b>{x.from} → {x.to}</b><span className="au-xs au-muted">{x.at ? new Date(x.at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}{x.by ? ` · ${x.by}` : ''}{x.prevCode ? ` · kode lama ${x.prevCode}` : ''}</span></li>)}</ol>
+      </section>}
+
+      {!v.custom && <section className="au-card rise" style={{ ['--d' as any]: 1 }} data-export-card="">
         <div className="au-row au-between au-wrap"><h2>Tahap BRD</h2><span className="au-xs au-muted" style={{ fontFamily: 'var(--mono)' }}>{stage}/7 · BRD {P(brdPct(stage))} · bobot {n1(acts[0].w)}%</span></div>
         <ol className="au-stepper">{STAGES_SHORT.map((x, i) => <li key={x} className={`${i < stage ? 'done' : ''} ${i === stage - 1 ? 'cur' : ''}`} aria-current={i === stage - 1 ? 'step' : undefined}>{x}</li>)}</ol>
         {internal && <div className="au-row au-wrap">
           <button type="button" className="btn btn-sm" disabled={stage <= 1} onClick={() => onStage(stage - 1)}>Mundur</button>
           <button type="button" className="btn btn-primary btn-sm" disabled={stage >= 7} onClick={() => onStage(stage + 1)}>{stage < 7 ? `Naikkan ke ${STAGES_SHORT[stage]}` : 'BRD selesai'}{stage < 7 && <Icon name="arrow" size={14} stroke={2.2} />}</button>
         </div>}
-      </section>
+      </section>}
 
-      <section className="au-card rise" style={{ ['--d' as any]: 2 }} data-export-card="">
-        <div className="au-row au-between au-wrap"><h2>Timeline</h2>
-          {internal && <span className="au-row" style={{ gap: 6 }}>
-            <button type="button" className="btn btn-sm" onClick={onSchedule}>{noDates ? 'Isi jadwal otomatis' : 'Susun ulang jadwal'}</button>
-            <button type="button" className="btn btn-sm" onClick={onWeights}>Atur bobot</button>
-          </span>}
-        </div>
-        <div className="au-stack" aria-label="Bobot aktivitas">{acts.map((a, i) => <i key={a.name} style={{ flex: Math.max(0.0001, a.w), background: TPL_COLORS[i] }} title={`${a.name} ${n1(a.w)}%`} />)}</div>
-        <div className="au-key">{acts.map((a, i) => <span key={a.name}><i style={{ background: TPL_COLORS[i] }} />{a.name} {n1(a.w)}%</span>)}{!(e.weights && e.weights.length) && <span className="au-muted">· template</span>}</div>
-        {noDates ? <p className="au-small au-muted">Belum ada tanggal. {internal ? 'Pakai “Isi jadwal otomatis” atau ketuk aktivitas di bawah.' : ''}</p> : <Gantt acts={acts} today={today} onSelect={internal ? onPhase : undefined} />}
-        {noDates && internal && <div className="au-ig">{acts.map((a, i) => <button key={a.name} type="button" className="au-igr" onClick={() => onPhase(i)}><span className="k">{a.name}</span><span className="v au-muted">Atur tanggal</span></button>)}</div>}
-      </section>
+      {acts.some(a => a.start && a.end) && <section className="au-card rise" style={{ ['--d' as any]: 2 }} data-export-card="">
+        <div className="au-row au-between"><h2>Kurva S</h2><span className="lbl">plan kumulatif</span></div>
+        <SCurve acts={acts} today={today} />
+        <p className="au-xs au-muted">Area = rencana kumulatif dari tanggal & bobot. Titik = realisasi hari ini. SPI ≥ 1 on track · 0,9–1 perlu perhatian · &lt; 0,9 terlambat.</p>
+      </section>}
 
       <section className="au-card rise" style={{ ['--d' as any]: 3 }} data-export-card="">
+        <div className="au-row au-between au-wrap"><h2>{v.custom ? 'Aktivitas' : 'Timeline'}</h2>
+          {internal && <span className="au-row au-wrap" style={{ gap: 6 }}>
+            {v.custom ? <button type="button" className="btn btn-sm" onClick={onActs}>Edit aktivitas</button> : <>
+              <button type="button" className="btn btn-sm" onClick={onSchedule}>{noDates ? 'Isi jadwal otomatis' : 'Susun ulang jadwal'}</button>
+              <button type="button" className="btn btn-sm" onClick={onWeights}>Atur bobot</button>
+              <button type="button" className="btn btn-sm" onClick={onActs} title="Ganti template 5 aktivitas dengan aktivitas sendiri">Aktivitas sendiri</button></>}
+          </span>}
+        </div>
+        {!v.custom && <>
+          <div className="au-stack" aria-label="Bobot aktivitas">{acts.map((a, i) => <i key={a.name} style={{ flex: Math.max(0.0001, a.w), background: TPL_COLORS[i] }} title={`${a.name} ${n1(a.w)}%`} />)}</div>
+          <div className="au-key">{acts.map((a, i) => <span key={a.name}><i style={{ background: TPL_COLORS[i] }} />{a.name} {n1(a.w)}%</span>)}{!(e.weights && e.weights.length) && <span className="au-muted">· template</span>}</div>
+        </>}
+        {noDates ? <p className="au-small au-muted">Belum ada tanggal. {internal ? (v.custom ? 'Isi tanggal lewat “Edit aktivitas”.' : 'Pakai “Isi jadwal otomatis” atau ketuk aktivitas di bawah.') : ''}</p> : <Gantt acts={acts} today={today} onSelect={internal ? onPhase : undefined} />}
+        {noDates && internal && !v.custom && <div className="au-ig">{acts.map((a, i) => <button key={a.name} type="button" className="au-igr" onClick={() => onPhase(i)}><span className="k">{a.name}</span><span className="v au-muted">Atur tanggal</span></button>)}</div>}
+        {v.custom && <div className="au-ig" aria-label="Daftar aktivitas">{acts.map((a, i) => {
+          const due = ptd(a, today), late = a.start && due > a.pct + 0.5 && today > dUTC(a.start)
+          const inner = <>
+            <span className="au-col" style={{ minWidth: 0, gap: 2, flex: 1 }}><b style={{ fontSize: 14.5 }}>{a.name}</b>
+              <span className="au-xs au-muted">{a.start ? `${fmtD(a.start)} – ${fmtD(a.end)}` : 'Belum ada jadwal'}{a.w > 0 ? ` · bobot ${n1(a.w)}%` : ''} · plan {P(due)}</span>
+              {a.notes && <span className="au-xs au-ink2" style={{ whiteSpace: 'pre-wrap', marginTop: 2 }}>{a.notes}</span>}</span>
+            <span className="au-col" style={{ alignItems: 'flex-end', gap: 4 }}><b style={{ font: '700 18px var(--disp)' }}>{P(a.pct)}</b>{late ? <Pill tone="bad">Tertinggal</Pill> : a.pct >= 100 ? <Pill tone="ok">Selesai</Pill> : null}</span>
+          </>
+          return internal ? <button type="button" key={i} className="au-igr" onClick={() => onPhase(i)}>{inner}</button> : <div key={i} className="au-igr">{inner}</div>
+        })}</div>}
+      </section>
+
+      {(!v.custom || e.items?.length > 0) && <section className="au-card rise" style={{ ['--d' as any]: 4 }} data-export-card="">
         <h2>Item &amp; penilaian</h2>
         {e.items?.length ? <div className="au-tblw" style={{ border: 0 }}>
           <table className="au-tbl">
@@ -502,13 +638,13 @@ function Detail({ v, today, internal, onBack, onEdit, onStage, onPhase, onWeight
           </table>
         </div> : <p className="au-small au-muted">Belum ada item.</p>}
         <span className="au-xs au-muted">Impact = rata-rata skor User &amp; Fulfiller. Effort = rata-rata (Flow + Proses bisnis) ÷ 2{s.n > 10 ? ', +1 karena item lebih dari 10' : ''}. Ambang tinggi 2,5.</span>
-      </section>
+      </section>}
 
-      {(e.notes || e.pic?.length || e.source?.file) && <section className="au-card rise" style={{ ['--d' as any]: 4 }}>
+      {(e.notes || e.pic?.length || e.source?.file) && <section className="au-card rise" style={{ ['--d' as any]: 5 }}>
         <h2>Info</h2>
         {e.pic?.length > 0 && <span className="au-small"><b>PIC:</b> {e.pic.join(', ')}</span>}
         {e.notes && <p className="au-small au-ink2" style={{ whiteSpace: 'pre-wrap' }}>{e.notes}</p>}
-        {e.source?.file && <span className="au-xs au-muted">Diimpor dari {e.source.file} · {e.source.sheet} baris {e.source.row}</span>}
+        {e.source?.file && <span className="au-xs au-muted">{e.fromInitiative ? 'Dipindah dari Progress Project' : `Diimpor dari ${e.source.file} · ${e.source.sheet} baris ${e.source.row}`}</span>}
       </section>}
     </>
   )
