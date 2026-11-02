@@ -11,6 +11,7 @@ import toast from 'react-hot-toast'
 import { useYear } from '@/lib/year'
 import { ConfirmSheet, Empty, Icon, PageHeader, Pill, Seg, Sheet, Tile, type Tone, Portal } from '@/components/ui'
 import { useTabParam } from '@/lib/useTabParam'
+import { selectSettlementItems, toEvidenceItems, documentTitle, fileBaseName, sortDocs } from '@/lib/settlementEvidence'
 
 const fmt = (n:number) => new Intl.NumberFormat('id-ID').format(n||0)
 const short = (n:number) => { const a = Math.abs(n||0); const f = (v:number, u:string) => `${new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 }).format(v)} ${u}`; return a >= 1e9 ? f(n/1e9,'M') : a >= 1e6 ? f(n/1e6,'jt') : a >= 1e3 ? f(n/1e3,'rb') : fmt(n) }
@@ -81,6 +82,8 @@ function SettlementTab({ user, month, year }: { user:any; month:number; year:num
   const [verifying, setVerifying] = useState(false)
   const [loadError, setLoadError] = useState<string>('')
   const [ask, setAsk] = useState<Ask>(null)
+  const [evOpen, setEvOpen] = useState(false)
+  const [evBusy, setEvBusy] = useState<{ format:'pdf'|'docx'; done:number; total:number } | null>(null)
 
   const load = useCallback(async (force = false) => {
     setLoading(true); setLoadError('')
@@ -266,48 +269,44 @@ function SettlementTab({ user, month, year }: { user:any; month:number; year:num
     } catch (e:any) { toast.error('Gagal export Excel: '+(e?.message||'')) } finally { setExporting(false) }
   }
 
-  async function exportPDF() {
-    if (!exportsEnabled) { toast.error('Export aktif setelah minimal 1 item diverify dulu'); return }
+  // ===== Dokumen evidence (format "Rincian Kuitansi/Nota Settlement Cash Card") =====
+  // Isi: HANYA transaksi Cash Card berstatus Verified pada periode terpilih (terlepas dari filter "Semua sumber"),
+  // 1 transaksi per halaman dengan semua evidence-nya. Output Word (.docx) atau PDF.
+  const evidenceSource = useMemo(() => selectSettlementItems(items, month, year), [items, month, year])
+  const evidenceTotal = evidenceSource.reduce((s, r) => s + (Math.round(Number(r.amount) || 0)), 0)
+  async function exportEvidence(format: 'pdf' | 'docx') {
+    if (evidenceSource.length === 0) { toast.error('Belum ada transaksi Cash Card yang Verified di periode ini'); return }
+    setEvBusy({ format, done: 0, total: evidenceSource.length })
     try {
-      const mod:any = await import('jspdf'); const JsPDF = mod.jsPDF || mod.default
-      const doc = new JsPDF({ orientation:'landscape', unit:'mm', format:'a4' })
-      const pageW = doc.internal.pageSize.getWidth()
-      doc.setFontSize(12); doc.setFont('helvetica','bold')
-      doc.text('RINCIAN KUITANSI/NOTA SETTLEMENT CASH CARD', pageW/2, 12, { align:'center' })
-      doc.setFontSize(8); doc.setFont('helvetica','normal')
-      doc.text(`REALISASI BIAYA OPERATIONAL FUNGSI BPD PROCUREMENT PERIODE ${MONTHS[month].toUpperCase()} ${year}`, pageW/2, 18, { align:'center' })
-      let managerName = user?.name || '-'
-      try { const ur = await fetch('/api/users').then(r=>r.json()); const mgr=(ur.data||[]).find((u:any)=>(u.roles||[]).includes('manager')||u.role==='manager'); if (mgr?.name) managerName = mgr.name } catch {}
-      doc.text(`Nama: ${managerName}`, 12, 26)
-
-      const cols = [
-        { h:'NO', w:10 }, { h:'Kat', w:14 }, { h:'Keterangan Transaksi', w:55 }, { h:'Nama Toko/Penerima', w:45 },
-        { h:'Tanggal', w:22 }, { h:'Jumlah', w:26 }, { h:'GL Number', w:26 }, { h:'Keterangan', w:75 },
-      ]
-      let x0 = 12, y = 32
-      doc.setFillColor(37,99,235); doc.setTextColor(255,255,255); doc.setFontSize(7); doc.setFont('helvetica','bold')
-      let cx = x0
-      cols.forEach(c => { doc.rect(cx, y, c.w, 7, 'F'); doc.text(c.h, cx+1.5, y+4.7); cx += c.w })
-      y += 7
-      doc.setTextColor(20,20,20); doc.setFont('helvetica','normal')
-      const lineH = 6
-      exportItems.forEach((r,i) => {
-        if (y > 185) { doc.addPage(); y = 16 }
-        const d = periodDate(r)
-        const cells = [ String(i+1), oeExcelCode(r.category), (oeLookup(r.category).name||'').slice(0,42), (r.tokoPenjual||r.description||'-').slice(0,34),
-          d?d.toLocaleDateString('id-ID'):'-', fmt(r.amount), '6001016170', (r.title||'-').slice(0,58) ]
-        cx = x0
-        cols.forEach((c,ci) => { doc.rect(cx, y, c.w, lineH); doc.text(String(cells[ci]), cx+1.5, y+4); cx += c.w })
-        y += lineH
-      })
-      // total
-      if (y > 185) { doc.addPage(); y = 16 }
-      const totalW = cols.slice(0,5).reduce((s,c)=>s+c.w,0)
-      doc.setFont('helvetica','bold'); doc.rect(x0, y, totalW, lineH); doc.text('Total', x0+totalW-12, y+4)
-      doc.rect(x0+totalW, y, cols[5].w, lineH); doc.text(fmt(exportTotal), x0+totalW+1.5, y+4)
-      doc.save(`Rincian_Settlement_${MONTHS[month]}_${year}.pdf`)
-      toast.success('PDF settlement diunduh')
-    } catch (e:any) { toast.error('Gagal export PDF: '+(e?.message||'')) }
+      const [{ fetchFullReimbursement }, { docsToImages }, exp] = await Promise.all([
+        import('@/lib/reimbursementDetail'), import('@/lib/settlementEvidenceImages'), import('@/lib/settlementEvidenceExport'),
+      ])
+      const images: any[][] = new Array(evidenceSource.length)
+      const failed: string[] = []
+      let next = 0, done = 0
+      // Ambil isi file per transaksi (3 sekaligus) — daftar sengaja dimuat tanpa isi file supaya ringan.
+      const worker = async () => {
+        while (next < evidenceSource.length) {
+          const idx = next++
+          const r = evidenceSource[idx]
+          const full = (Array.isArray(r.documents) && r.documents.length && r.documents.every((d:any) => !!d?.url)) ? r : await fetchFullReimbursement(r._id)
+          const docs = sortDocs(Array.isArray(full?.documents) && full.documents.length ? full.documents : (r.documents || []))
+          const res = await docsToImages(docs)
+          images[idx] = res.images
+          res.failed.forEach(n => failed.push(`${r.title}: ${n}`))
+          done++; setEvBusy(b => b ? { ...b, done } : b)
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(3, evidenceSource.length) }, worker))
+      const input = { title: documentTitle(month, year), items: toEvidenceItems(evidenceSource), images }
+      const blob = format === 'pdf' ? await exp.buildEvidencePdf(input) : await exp.buildEvidenceDocx(input)
+      downloadBlob(blob, `${fileBaseName(month, year)}.${format}`)
+      if (failed.length) toast(`Dokumen diunduh. ${failed.length} lampiran tidak bisa ditampilkan (ditandai kotak abu-abu).`, { icon: '⚠️', duration: 6000 })
+      else toast.success(`Dokumen ${format === 'pdf' ? 'PDF' : 'Word'} diunduh · ${evidenceSource.length} transaksi`)
+      setEvOpen(false)
+    } catch (e:any) {
+      toast.error('Gagal membuat dokumen: ' + (e?.message || 'coba lagi'))
+    } finally { setEvBusy(null) }
   }
 
   async function exportZIP() {
@@ -361,6 +360,29 @@ function SettlementTab({ user, month, year }: { user:any; month:number; year:num
         text={<>Kembalikan <b>“{ask.item.title}”</b> dari Verified ke Waiting for Verification? Settlement Cash Card bulan itu akan dihitung ulang.</>}
         onConfirm={() => reverseItem(ask.item)} onClose={() => setAsk(null)} />}
 
+      {evOpen && <Sheet open title="Dokumen evidence settlement" onClose={() => { if (!evBusy) setEvOpen(false) }}>
+        <div className="au-col" style={{ gap: 4 }}>
+          <b className="au-small">Rincian Kuitansi/Nota Settlement Cash Card · {MONTHS[month]} {year}</b>
+          <span className="au-xs au-muted">Halaman judul, lalu 1 transaksi per halaman berisi No, Ket. Transaksi, Tanggal, Jumlah, dan semua evidence (Calmeet → Dokumentasi → Invoice → Bukti TF).</span>
+        </div>
+        <div className="au-ig">
+          <div className="au-igr"><span className="k">Transaksi</span><span className="v">{evidenceSource.length} Cash Card · Verified</span></div>
+          <div className="au-igr"><span className="k">Total</span><span className="v" style={{ fontVariantNumeric: 'tabular-nums' }}>Rp {fmt(evidenceTotal)}</span></div>
+          {waiting > 0 && <div className="au-igr"><span className="k">Belum masuk</span><span className="v au-muted">{waiting} item masih Waiting for Verification</span></div>}
+        </div>
+        {evBusy ? (
+          <div className="au-col" role="status" aria-live="polite" style={{ gap: 8 }}>
+            <span className="au-small">Menyiapkan {evBusy.format === 'pdf' ? 'PDF' : 'Word'}… {evBusy.done < evBusy.total ? `memuat evidence ${evBusy.done}/${evBusy.total}` : 'menyusun dokumen'}</span>
+            <div className="prog-bar" aria-hidden="true"><div className="prog-fill" style={{ width: `${Math.round((evBusy.done / Math.max(1, evBusy.total)) * 100)}%`, background: 'var(--accent)' }} /></div>
+          </div>
+        ) : (
+          <div className="au-row au-wrap" style={{ gap: 8, justifyContent: 'flex-end' }}>
+            <button type="button" className="btn" onClick={() => exportEvidence('docx')}><Icon name="file" size={15} />Word (.docx)</button>
+            <button type="button" className="btn btn-primary" onClick={() => exportEvidence('pdf')}><Icon name="down" size={15} />PDF</button>
+          </div>
+        )}
+      </Sheet>}
+
       {loadError && <div className="au-row au-wrap p-bad" role="alert" style={{ borderRadius: 14, padding: 12, gap: 10 }}>
         <span className="au-small" style={{ flex: 1 }}><b>Gagal memuat data</b> — data kamu tidak hilang, hanya belum berhasil dimuat. <span className="au-muted">{loadError}</span></span>
         <button type="button" className="btn btn-sm" onClick={reloadFresh}>Coba lagi</button></div>}
@@ -379,7 +401,7 @@ function SettlementTab({ user, month, year }: { user:any; month:number; year:num
         <Seg label="Sumber" value={allSources ? 'all' : 'cc'} onChange={v => setAllSources(v === 'all')} options={[['cc','Cash Card'],['all','Semua sumber']] as const} />
         <span style={{ flex: 1 }} />
         <button type="button" onClick={exportXLSX} className="btn" disabled={exporting || !exportsEnabled} title={exportsEnabled ? 'Export item verified ke Excel' : 'Aktif setelah minimal 1 item diverify'}><Icon name="down" size={15} />{exporting ? 'Menyiapkan…' : 'Excel'}</button>
-        <button type="button" onClick={exportPDF} className="btn" disabled={!exportsEnabled} title={exportsEnabled ? 'Export item verified ke PDF' : 'Aktif setelah minimal 1 item diverify'}><Icon name="file" size={15} />PDF</button>
+        <button type="button" onClick={() => setEvOpen(true)} className="btn" disabled={evidenceSource.length === 0} title={evidenceSource.length ? 'Dokumen rincian kuitansi + evidence (Word / PDF)' : 'Aktif setelah minimal 1 transaksi Cash Card diverify'}><Icon name="file" size={15} />Dokumen evidence</button>
       </div>
 
       {loading ? <div className="au-card">{[0,1,2].map(k => <div key={k} className="au-skel" />)}</div>
