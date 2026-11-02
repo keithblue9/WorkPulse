@@ -250,9 +250,12 @@ function ActivityForm({ editing, onClose, onSave, config, members }: { editing?:
       {form.mode === 'offline' && (
         <div className="au-box" style={{ padding:14, gap:10 }}>
           <label className="au-col" style={{ gap:6 }}><span className="lbl">Lokasi</span><input className="input" value={form.location} onChange={e=>set('location', e.target.value)} placeholder="Gedung, ruangan, kota" /></label>
-          <div className="au-col" style={{ gap:6 }}><span className="lbl">Area offline</span>
-            <div className="au-row" style={{ gap:8 }}>{opt('jakarta', form.offlineScope, 'Jakarta', ()=>set('offlineScope','jakarta'))}{opt('luar', form.offlineScope, 'Luar Jakarta', ()=>set('offlineScope','luar'))}</div>
-            {form.offlineScope && <span className="au-xs au-muted">Presensi PIC otomatis diisi <b style={{ color:'var(--accent-ink)' }}>{form.offlineScope==='luar' ? 'Dinas Luar Kota' : 'Izin / Meeting Luar Kantor'}</b> untuk tanggal kegiatan.</span>}
+          <div className="au-col" style={{ gap:6 }}><span className="lbl">Area offline (opsional)</span>
+            {/* Opsional: ketuk lagi untuk melepas. Tanpa area = kegiatan di kantor, presensi tidak diubah. */}
+            <div className="au-row" style={{ gap:8 }}>{opt('jakarta', form.offlineScope, 'Jakarta', ()=>set('offlineScope', form.offlineScope==='jakarta' ? '' : 'jakarta'))}{opt('luar', form.offlineScope, 'Luar Jakarta', ()=>set('offlineScope', form.offlineScope==='luar' ? '' : 'luar'))}</div>
+            {form.offlineScope
+              ? <span className="au-xs au-muted">Presensi PIC otomatis diisi <b style={{ color:'var(--accent-ink)' }}>{form.offlineScope==='luar' ? 'Dinas Luar Kota' : 'Izin / Meeting Luar Kantor'}</b> untuk tanggal kegiatan. Ketuk lagi untuk membatalkan.</span>
+              : <span className="au-xs au-muted">Opsional. Kosongkan bila kegiatan di kantor sendiri — presensi PIC tidak diubah.</span>}
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { AttendanceModel } from '@/models/Attendance'
+import { isDuplicateSlot } from '@/lib/attendanceSlots'
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,6 +25,10 @@ export async function POST(req: NextRequest) {
     const existing = await AttendanceModel.findOne({ userId: body.userId, date: body.date })
     if (existing) {
       if (body.slot) {
+        // Cegah entri dobel (mis. tombol tertekan 2x): tipe + jam sama sudah ada -> 409
+        if (isDuplicateSlot(existing.slots, body.slot)) {
+          return NextResponse.json({ error: 'Kehadiran ini sudah tercatat di tanggal tersebut', duplicate: true, data: existing }, { status: 409 })
+        }
         existing.slots.push(body.slot)
         await existing.save()
         return NextResponse.json({ data: existing })
