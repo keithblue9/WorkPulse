@@ -112,10 +112,12 @@ function SettlementTab({ user, month, year }: { user:any; month:number; year:num
   const verifiableIds = periodItems.filter(r => r.status==='done'||r.status==='paid').map(r=>r._id)
   const allVerified = periodItems.length>0 && periodItems.every(r => r.status==='verified')
   const anyVerified = periodItems.some(r => r.status==='verified')
-  const exportsEnabled = anyVerified  // aktif begitu minimal 1 item sudah diverify
-  // Isi export HANYA item yang sudah diverify, bukan semua periode.
-  const exportItems = periodItems.filter(r => r.status === 'verified')
-  const exportTotal = exportItems.reduce((s,r)=>s+(r.amount||0),0)
+  // Semua export (Excel rekap, PDF rekap, Dokumen evidence Word/PDF) HANYA berisi transaksi Cash Card
+  // berstatus Verified pada periode terpilih — terlepas dari filter tampilan "Semua sumber".
+  const evidenceSource = useMemo(() => selectSettlementItems(items, month, year), [items, month, year])
+  const exportItems = evidenceSource
+  const exportTotal = exportItems.reduce((s,r)=>s+(Math.round(Number(r.amount)||0)),0)
+  const exportsEnabled = exportItems.length > 0  // aktif begitu minimal 1 transaksi Cash Card sudah diverify
 
   function toggleSel(id:string) { setSelected(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   function selectAll() { setSelected(new Set(verifiableIds)) }
@@ -269,11 +271,54 @@ function SettlementTab({ user, month, year }: { user:any; month:number; year:num
     } catch (e:any) { toast.error('Gagal export Excel: '+(e?.message||'')) } finally { setExporting(false) }
   }
 
+  async function exportPDF() {
+    if (!exportsEnabled) { toast.error('Export aktif setelah minimal 1 item diverify dulu'); return }
+    try {
+      const mod:any = await import('jspdf'); const JsPDF = mod.jsPDF || mod.default
+      const doc = new JsPDF({ orientation:'landscape', unit:'mm', format:'a4' })
+      const pageW = doc.internal.pageSize.getWidth()
+      doc.setFontSize(12); doc.setFont('helvetica','bold')
+      doc.text('RINCIAN KUITANSI/NOTA SETTLEMENT CASH CARD', pageW/2, 12, { align:'center' })
+      doc.setFontSize(8); doc.setFont('helvetica','normal')
+      doc.text(`REALISASI BIAYA OPERATIONAL FUNGSI BPD PROCUREMENT PERIODE ${MONTHS[month].toUpperCase()} ${year}`, pageW/2, 18, { align:'center' })
+      let managerName = user?.name || '-'
+      try { const ur = await fetch('/api/users').then(r=>r.json()); const mgr=(ur.data||[]).find((u:any)=>(u.roles||[]).includes('manager')||u.role==='manager'); if (mgr?.name) managerName = mgr.name } catch {}
+      doc.text(`Nama: ${managerName}`, 12, 26)
+
+      const cols = [
+        { h:'NO', w:10 }, { h:'Kat', w:14 }, { h:'Keterangan Transaksi', w:55 }, { h:'Nama Toko/Penerima', w:45 },
+        { h:'Tanggal', w:22 }, { h:'Jumlah', w:26 }, { h:'GL Number', w:26 }, { h:'Keterangan', w:75 },
+      ]
+      let x0 = 12, y = 32
+      doc.setFillColor(37,99,235); doc.setTextColor(255,255,255); doc.setFontSize(7); doc.setFont('helvetica','bold')
+      let cx = x0
+      cols.forEach(c => { doc.rect(cx, y, c.w, 7, 'F'); doc.text(c.h, cx+1.5, y+4.7); cx += c.w })
+      y += 7
+      doc.setTextColor(20,20,20); doc.setFont('helvetica','normal')
+      const lineH = 6
+      exportItems.forEach((r,i) => {
+        if (y > 185) { doc.addPage(); y = 16 }
+        const d = periodDate(r)
+        const cells = [ String(i+1), oeExcelCode(r.category), (oeLookup(r.category).name||'').slice(0,42), (r.tokoPenjual||r.description||'-').slice(0,34),
+          d?d.toLocaleDateString('id-ID'):'-', fmt(r.amount), '6001016170', (r.title||'-').slice(0,58) ]
+        cx = x0
+        cols.forEach((c,ci) => { doc.rect(cx, y, c.w, lineH); doc.text(String(cells[ci]), cx+1.5, y+4); cx += c.w })
+        y += lineH
+      })
+      // total
+      if (y > 185) { doc.addPage(); y = 16 }
+      const totalW = cols.slice(0,5).reduce((s,c)=>s+c.w,0)
+      doc.setFont('helvetica','bold'); doc.rect(x0, y, totalW, lineH); doc.text('Total', x0+totalW-12, y+4)
+      doc.rect(x0+totalW, y, cols[5].w, lineH); doc.text(fmt(exportTotal), x0+totalW+1.5, y+4)
+      doc.save(`Rincian_Settlement_${MONTHS[month]}_${year}.pdf`)
+      toast.success('PDF settlement diunduh')
+    } catch (e:any) { toast.error('Gagal export PDF: '+(e?.message||'')) }
+  }
+
   // ===== Dokumen evidence (format "Rincian Kuitansi/Nota Settlement Cash Card") =====
   // Isi: HANYA transaksi Cash Card berstatus Verified pada periode terpilih (terlepas dari filter "Semua sumber"),
   // 1 transaksi per halaman dengan semua evidence-nya. Output Word (.docx) atau PDF.
-  const evidenceSource = useMemo(() => selectSettlementItems(items, month, year), [items, month, year])
-  const evidenceTotal = evidenceSource.reduce((s, r) => s + (Math.round(Number(r.amount) || 0)), 0)
+  const evidenceTotal = exportTotal
   async function exportEvidence(format: 'pdf' | 'docx') {
     if (evidenceSource.length === 0) { toast.error('Belum ada transaksi Cash Card yang Verified di periode ini'); return }
     setEvBusy({ format, done: 0, total: evidenceSource.length })
@@ -390,7 +435,7 @@ function SettlementTab({ user, month, year }: { user:any; month:number; year:num
       <div className="au-grid au-tiles" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))' }}>
         <Tile icon="card" color="var(--ink)" iconInk="var(--bg)" value={loading ? '–' : periodItems.length} label="Transaksi periode" hint={totalNominal ? `Rp ${short(totalNominal)}` : undefined} />
         <Tile icon="clock" color="var(--warn)" value={loading ? '–' : waiting} label="Menunggu verifikasi" />
-        <Tile icon="check" color="var(--accent)" value={loading ? '–' : exportItems.length} label="Verified · siap export" hint={exportTotal ? `Rp ${short(exportTotal)}` : undefined} />
+        <Tile icon="check" color="var(--accent)" value={loading ? '–' : exportItems.length} label="Verified Cash Card · siap export" hint={exportTotal ? `Rp ${short(exportTotal)}` : undefined} />
       </div>
 
       <ol className="au-flow rise" aria-label="Alur settlement">
@@ -400,7 +445,8 @@ function SettlementTab({ user, month, year }: { user:any; month:number; year:num
       <div className="au-row au-wrap rise" style={{ gap: 8 }}>
         <Seg label="Sumber" value={allSources ? 'all' : 'cc'} onChange={v => setAllSources(v === 'all')} options={[['cc','Cash Card'],['all','Semua sumber']] as const} />
         <span style={{ flex: 1 }} />
-        <button type="button" onClick={exportXLSX} className="btn" disabled={exporting || !exportsEnabled} title={exportsEnabled ? 'Export item verified ke Excel' : 'Aktif setelah minimal 1 item diverify'}><Icon name="down" size={15} />{exporting ? 'Menyiapkan…' : 'Excel'}</button>
+        <button type="button" onClick={exportXLSX} className="btn" disabled={exporting || !exportsEnabled} title={exportsEnabled ? 'Rekap transaksi Cash Card Verified ke Excel' : 'Aktif setelah minimal 1 transaksi Cash Card diverify'}><Icon name="down" size={15} />{exporting ? 'Menyiapkan…' : 'Excel'}</button>
+        <button type="button" onClick={exportPDF} className="btn" disabled={!exportsEnabled} title={exportsEnabled ? 'Rekap transaksi Cash Card Verified ke PDF' : 'Aktif setelah minimal 1 transaksi Cash Card diverify'}><Icon name="file" size={15} />PDF rekap</button>
         <button type="button" onClick={() => setEvOpen(true)} className="btn" disabled={evidenceSource.length === 0} title={evidenceSource.length ? 'Dokumen rincian kuitansi + evidence (Word / PDF)' : 'Aktif setelah minimal 1 transaksi Cash Card diverify'}><Icon name="file" size={15} />Dokumen evidence</button>
       </div>
 
