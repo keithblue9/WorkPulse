@@ -1212,3 +1212,22 @@ button.au-wl { cursor:pointer } button.au-wl:hover { background:var(--sunken) }
 .au-due > summary::-webkit-details-marker { display:none }
 .au-due > summary .wn-due { position:static; transform:none; margin-left:0 }
 .au-due a.au-igr { text-decoration:none; color:inherit }
+
+/* ═══ Presensi: sheet per tanggal + perbaikan mobile (2026-11-03) ═══ */
+.au-tap { min-height:44px }
+.btn-icon.au-tap { width:44px; min-width:44px; height:44px }
+.au-dayl { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px }
+.au-dayl-row { display:flex; align-items:center; gap:10px; padding:8px 8px 8px 12px; border-radius:16px; background:color-mix(in srgb, var(--tc) 14%, var(--surface)); border:1px solid color-mix(in srgb, var(--tc) 30%, var(--line)); animation:au-dayl-in .22s var(--ease) both }
+.au-dayl-row .dot { width:10px; height:10px; border-radius:3px; background:var(--tc); flex-shrink:0 }
+.au-dayl-row .ttl { font-size:15px; display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+@keyframes au-dayl-in { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:none } }
+@media (prefers-reduced-motion:reduce) { .au-dayl-row { animation:none } }
+.au-att-dup { position:relative; z-index:1; pointer-events:none; align-self:flex-start; font:700 9px/1 var(--sans); text-transform:uppercase; letter-spacing:.04em; padding:3px 5px; border-radius:6px; background:var(--warn-soft); color:var(--warn) }
+.au-att-dup.inl { align-self:auto; font-size:10px }
+@media (max-width:700px) {
+  /* Label slot tidak lagi terpotong di kedua sisi; sel diketuk utuh → buka sheet tanggal */
+  .au-att-day > .au-att-slot { align-self:stretch; pointer-events:none }
+  .au-att-day > .au-att-slot button { text-align:center; padding:2px 2px }
+  .au-att-day > .au-att-slot:nth-of-type(n+4) { display:none }  /* .n = span ke-1 → tampil maks 2 slot */
+  .au-att-dup { align-self:center; font-size:8px; padding:2px 4px }
+}

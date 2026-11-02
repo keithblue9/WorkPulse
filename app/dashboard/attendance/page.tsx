@@ -1,12 +1,13 @@
 'use client'
 import { getConfig } from '@/lib/configCache'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { AppConfig, AttendanceType } from '@/types'
 import toast from 'react-hot-toast'
 import { format, getDaysInMonth, getDay, startOfMonth } from 'date-fns'
 import { Empty, Icon, PageHeader, Seg, Sheet } from '@/components/ui'
 import { useYear } from '@/lib/year'
+import { isDuplicateSlot, duplicateSlotIds } from '@/lib/attendanceSlots'
 
 // External/guest collaborators are not internal staff → excluded from presensi & biodata
 const NON_STAFF_ROLES = ['external', 'guest']
@@ -35,7 +36,7 @@ const TEAM_COLORS = ['#4B3BFF','#7B6BFF','#0FA898','#F2A33A','#16a34a','#FF5D3B'
 const tint = (c?:string, pct=16) => c ? `color-mix(in srgb, ${c} ${pct}%, var(--surface))` : 'var(--sunken)'
 const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 
-function SlotForm({ date, editing, attTypes, team, selfId, onClose, onSave }: { date:string; editing?:any; attTypes:AttendanceType[]; team?:any[]; selfId?:string; onClose:()=>void; onSave:(slot:any, taggedIds:string[])=>void }) {
+function SlotForm({ date, editing, attTypes, team, selfId, existing, onClose, onSave, onDelete }: { date:string; editing?:any; attTypes:AttendanceType[]; team?:any[]; selfId?:string; existing?:any[]; onClose:()=>void; onSave:(slot:any, taggedIds:string[])=>void; onDelete?:()=>void }) {
   const isEdit = !!editing
   // Initialize from editing slot if provided; helpers handle legacy time shape
   const editIsFullDay = editing ? (
@@ -51,8 +52,17 @@ function SlotForm({ date, editing, attTypes, team, selfId, onClose, onSave }: { 
   const isHoliday = /libur|holiday/i.test(String(type)) || /libur/i.test(String(typeDef?.label))
   const others = (team || []).filter(m => m.id !== selfId)
 
+  const draft = { type, isFullDay, startTime: isFullDay ? 'fullday' : startTime, endTime: isFullDay ? 'fullday' : endTime }
+  // Slot lain di tanggal ini (saat edit, slot yang sedang diedit tidak dihitung)
+  const others0 = (existing || []).filter((s:any) => !editing || s._id !== editing._id)
+  const dup = isDuplicateSlot(others0, draft)
+  const sent = useRef(false)   // cegah tombol tertekan 2x → entri dobel
   function save() {
-    onSave({ type, label: typeDef?.label, isFullDay, startTime: isFullDay ? 'fullday' : startTime, endTime: isFullDay ? 'fullday' : endTime, note }, tagged)
+    if (sent.current) return
+    if (dup) { toast.error(`${typeDef?.label || type} ${isFullDay ? 'seharian' : `${startTime}–${endTime}`} sudah tercatat di tanggal ini`); return }
+    if (!isFullDay && startTime >= endTime) { toast.error('Jam selesai harus setelah jam mulai'); return }
+    sent.current = true
+    onSave({ ...draft, label: typeDef?.label, note }, tagged)
     onClose()
   }
 
@@ -86,6 +96,8 @@ function SlotForm({ date, editing, attTypes, team, selfId, onClose, onSave }: { 
       )}
       {isHoliday && !isEdit && <div className="p-warn" style={{ borderRadius:12, padding:'10px 12px', fontSize:13 }}>Hari libur otomatis diterapkan ke <b>semua member</b> dan tampil di Calendar.</div>}
       {typeDef && <div style={{ padding:'10px 14px', background:tint(typeDef.textColor, 18), borderRadius:14, fontWeight:600, color:'var(--ink)', display:'flex', alignItems:'center', gap:8 }}><i style={{ width:10, height:10, borderRadius:3, background:typeDef.textColor, display:'inline-block' }} />{typeDef.label} · {isFullDay ? 'Seharian' : `${startTime}–${endTime}`}</div>}
+      {dup && <div role="alert" className="p-warn" style={{ borderRadius:12, padding:'10px 12px', fontSize:13 }}>Kehadiran yang sama sudah tercatat di tanggal ini — pilih tipe atau jam lain.</div>}
+      {isEdit && onDelete && <button type="button" className="btn btn-danger au-tap" onClick={()=>{ onDelete(); onClose() }}><Icon name="trash" size={15} />Hapus kehadiran ini</button>}
     </Sheet>
   )
 }
@@ -102,9 +114,12 @@ export default function AttendancePage() {
   const [summary, setSummary] = useState<any>(null)
   const [selectedUserId, setSelectedUserId] = useState('')
   const [team, setTeam] = useState<any[]>([])
+  const selectedUserIdRef = useRef('')
   const [showSlotForm, setShowSlotForm] = useState<string|null>(null)
   const [editingSlot, setEditingSlot] = useState<{date:string; slot:any}|null>(null)
+  const [dayOpen, setDayOpen] = useState<string|null>(null)   // sheet daftar kehadiran per tanggal (mudah edit/hapus di HP)
   const [loading, setLoading] = useState(true)
+  useEffect(() => { selectedUserIdRef.current = selectedUserId }, [selectedUserId])
   const [view, setView] = useState<'calendar'|'cuti'|'team'>('calendar')
   const [leave, setLeave] = useState<any[]|null>(null)
   // View "Tim per Hari": lihat siapa saja WFO/WFH/Dinas/dll pada tanggal tertentu
@@ -212,9 +227,12 @@ export default function AttendancePage() {
       toast.success(`Hari Libur ${dateStr} diterapkan ke semua member (${d.applied})`)
       return
     }
+    const current = records.find(r => r.date === dateStr)?.slots || []
+    if (isDuplicateSlot(current, slot)) { toast.error('Kehadiran ini sudah tercatat di tanggal tersebut'); return }
     const r = await fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ userId:selectedUserId, date:dateStr, slot }) })
     const d = await r.json().catch(()=>({}))
+    if (r.status === 409 && d.data) { setRecords(prev => [...prev.filter(x=>x.date!==dateStr), d.data]); toast.error(d.error); return }
     if (!r.ok || !d.data) { toast.error(d.error || 'Gagal menyimpan presensi'); return }
     setRecords(prev => { const filtered=prev.filter(r=>r.date!==dateStr); return [...filtered, d.data] })
     if (taggedIds.length) {
@@ -236,21 +254,50 @@ export default function AttendancePage() {
       toast.success('Hari Libur dihapus dari semua member')
       return
     }
-    const r = await fetch(`/api/attendance?userId=${selectedUserId}&date=${dateStr}&slotId=${slotId}`, { method:'DELETE' })
-    if (!r.ok) { toast.error('Gagal menghapus slot'); return }
+    // Optimistis: langsung hilang dari layar, kembalikan bila server gagal
     setRecords(prev => prev.map(r => r.date===dateStr ? {...r, slots:r.slots.filter((s:any)=>s._id!==slotId)} : r))
-    toast.success('Slot dihapus')
+    const r = await fetch(`/api/attendance?userId=${selectedUserId}&date=${dateStr}&slotId=${slotId}`, { method:'DELETE' }).catch(()=>null)
+    if (!r?.ok) { toast.error('Gagal menghapus, coba lagi'); await reloadRecords(); return }
+    if (!slot) return
+    const uid = selectedUserId
+    const label = attTypes.find(t=>t.key===slot.type)?.label || slot.type
+    toast(t => (
+      <span className="au-row" style={{ gap:10 }}>
+        <span>{label} {day} dihapus</span>
+        <button type="button" className="au-link" style={{ fontWeight:800 }} onClick={async ()=>{
+          toast.dismiss(t.id)
+          const { _id, ...rest } = slot
+          const rr = await fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId:uid, date:dateStr, slot:rest }) })
+          const dd = await rr.json().catch(()=>({}))
+          if (dd?.data && uid === selectedUserIdRef.current) setRecords(prev => [...prev.filter(x=>x.date!==dateStr), dd.data])
+        }}>Urungkan</button>
+      </span>
+    ), { duration: 5000 })
+  }
+
+  // Hapus semua salinan dobel pada satu tanggal (sisakan satu per tipe+jam)
+  async function removeDuplicates(day:number) {
+    const dateStr = `${month}-${String(day).padStart(2,'0')}`
+    const ids = duplicateSlotIds(records.find(r => r.date===dateStr)?.slots)
+    if (!ids.length) return
+    setRecords(prev => prev.map(r => r.date===dateStr ? {...r, slots:r.slots.filter((s:any)=>!ids.includes(String(s._id)))} : r))
+    const res = await Promise.all(ids.map(id => fetch(`/api/attendance?userId=${selectedUserId}&date=${dateStr}&slotId=${id}`, { method:'DELETE' }).then(r=>r.ok).catch(()=>false)))
+    if (res.every(Boolean)) toast.success(`${ids.length} entri dobel dihapus`)
+    else { toast.error('Sebagian gagal dihapus'); await reloadRecords() }
   }
 
   async function updateSlot(day:number, slotId:string, newSlot:any) {
     const dateStr = `${month}-${String(day).padStart(2,'0')}`
-    // Delete old slot then add the new one (atomic enough for our purposes)
+    const othersOnDay = (records.find(r => r.date===dateStr)?.slots || []).filter((s:any)=>s._id!==slotId)
+    if (isDuplicateSlot(othersOnDay, newSlot)) { toast.error('Kehadiran yang sama sudah tercatat di tanggal ini'); return }
+    // Hapus slot lama lalu tambah yang baru
     await fetch(`/api/attendance?userId=${selectedUserId}&date=${dateStr}&slotId=${slotId}`, { method:'DELETE' })
     const r = await fetch('/api/attendance', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ userId:selectedUserId, date:dateStr, slot:newSlot }) })
-    const d = await r.json()
+    const d = await r.json().catch(()=>({}))
+    if (!r.ok || !d.data) { toast.error(d.error || 'Gagal memperbarui'); await reloadRecords(); return }
     setRecords(prev => { const filtered=prev.filter(r=>r.date!==dateStr); return [...filtered, d.data] })
-    toast.success('Slot diperbarui')
+    toast.success('Kehadiran diperbarui')
   }
 
   const daysInMonth = getDaysInMonth(new Date(month+'-01'))
@@ -268,8 +315,13 @@ export default function AttendancePage() {
   const monthLabel = `${BULAN[Number(month.slice(5,7))-1]} ${month.slice(0,4)}`
   return (
     <div className="au-page">
-      {showSlotForm && <SlotForm date={showSlotForm} attTypes={attTypes} team={team} selfId={selectedUserId} onClose={()=>setShowSlotForm(null)} onSave={(slot, tagged) => { const day=parseInt(showSlotForm.split('-')[2]); addSlot(day,slot,tagged); setShowSlotForm(null) }} />}
-      {editingSlot && <SlotForm date={editingSlot.date} editing={editingSlot.slot} attTypes={attTypes} onClose={()=>setEditingSlot(null)} onSave={async (slot)=>{ const day=parseInt(editingSlot.date.split('-')[2]); await updateSlot(day, editingSlot.slot._id, slot); setEditingSlot(null) }} />}
+      {dayOpen && !showSlotForm && !editingSlot && <DaySheet date={dayOpen} slots={records.find(r=>r.date===dayOpen)?.slots || []} attTypes={attTypes} member={team.find(t=>t.id===selectedUserId)?.name}
+        onClose={()=>setDayOpen(null)} onAdd={()=>setShowSlotForm(dayOpen)} onEdit={slot=>setEditingSlot({ date:dayOpen, slot })}
+        onDelete={slot=>removeSlot(parseInt(dayOpen.split('-')[2]), slot._id)} onDedupe={()=>removeDuplicates(parseInt(dayOpen.split('-')[2]))} />}
+      {showSlotForm && <SlotForm date={showSlotForm} attTypes={attTypes} team={team} selfId={selectedUserId} existing={records.find(r=>r.date===showSlotForm)?.slots} onClose={()=>setShowSlotForm(null)} onSave={(slot, tagged) => { const day=parseInt(showSlotForm.split('-')[2]); addSlot(day,slot,tagged); setShowSlotForm(null) }} />}
+      {editingSlot && <SlotForm date={editingSlot.date} editing={editingSlot.slot} attTypes={attTypes} existing={records.find(r=>r.date===editingSlot.date)?.slots} onClose={()=>setEditingSlot(null)}
+        onDelete={()=>removeSlot(parseInt(editingSlot.date.split('-')[2]), editingSlot.slot._id)}
+        onSave={async (slot)=>{ const day=parseInt(editingSlot.date.split('-')[2]); await updateSlot(day, editingSlot.slot._id, slot); setEditingSlot(null) }} />}
       <div className="au-view au-anim">
         <PageHeader eyebrow={`Team · ${view==='calendar' ? 'ketuk tanggal untuk menambah kehadiran' : view==='team' ? 'siapa di mana per hari' : 'rekap cuti setahun'}`} title="Presensi" actions={<>
           <Seg label="Tampilan presensi" value={view} onChange={setView} options={[['calendar', <><Icon name="cal" size={15} />Kalender</>], ['team', <><Icon name="team" size={15} />Tim per hari</>], ['cuti', <><Icon name="sun" size={15} />Rekap cuti</>]] as const} />
@@ -306,8 +358,9 @@ export default function AttendancePage() {
                       className={`au-cal-day au-att-day${isToday ? ' today' : ''}${isWeekend && !pt ? ' out' : ''}`}
                       style={pt ? { background:tint(pt.textColor, 18), borderColor:tint(pt.textColor, 45) } : isWeekend ? { cursor:'default' } : undefined}>
                       {/* Tombol tambah menutupi sel; tombol edit/hapus slot berada di atasnya (tidak bersarang). */}
-                      {!isWeekend && <button type="button" className="add" onClick={()=>setShowSlotForm(dateStr)}
-                        aria-label={`${day} ${monthLabel}${slots.length ? ': ' + slots.map((sl:any)=>`${sl.label||sl.type} ${slotTimeLabel(sl)}`).join(', ') + ', tambah kehadiran' : ', tambah kehadiran'}`} />}
+                      {/* Tanggal kosong → langsung form tambah. Sudah terisi → sheet daftar (edit/hapus/tambah), supaya tidak tak sengaja dobel. */}
+                      {(!isWeekend || slots.length > 0) && <button type="button" className="add" onClick={()=>slots.length ? setDayOpen(dateStr) : setShowSlotForm(dateStr)}
+                        aria-label={`${day} ${monthLabel}${slots.length ? ': ' + slots.map((sl:any)=>`${sl.label||sl.type} ${slotTimeLabel(sl)}`).join(', ') + ', lihat atau ubah kehadiran' : ', tambah kehadiran'}`} />}
                       <span className="n">{day}</span>
                       {slots.slice(0,3).map((slot:any, si:number) => {
                         const t = attTypes.find(x=>x.key===slot.type)
@@ -319,6 +372,7 @@ export default function AttendancePage() {
                         )
                       })}
                       {slots.length>3 && <span className="more">+{slots.length-3} lagi</span>}
+                      {duplicateSlotIds(slots).length > 0 && <span className="au-att-dup" aria-hidden="true">dobel</span>}
                     </div>
                   )
                 })}
@@ -454,5 +508,46 @@ function TeamDayView({ date, setDate, data, total }:{ date:string; setDate:(d:st
         </section>
       </>}
     </div>
+  )
+}
+
+// ── Sheet per tanggal: daftar kehadiran dengan tombol besar (≥44px) untuk Edit / Hapus.
+//    Dibuka saat tanggal yang sudah terisi diketuk — terutama untuk HP, di mana tombol kecil di sel sulit dijangkau.
+function DaySheet({ date, slots, attTypes, member, onClose, onAdd, onEdit, onDelete, onDedupe }:{
+  date:string; slots:any[]; attTypes:AttendanceType[]; member?:string
+  onClose:()=>void; onAdd:()=>void; onEdit:(slot:any)=>void; onDelete:(slot:any)=>void; onDedupe:()=>void
+}) {
+  const dupIds = duplicateSlotIds(slots)
+  const label = new Date(date+'T00:00:00').toLocaleDateString('id-ID',{ weekday:'long', day:'numeric', month:'long', year:'numeric' })
+  return (
+    <Sheet open title="Kehadiran" onClose={onClose}>
+      <p className="au-small au-ink2" style={{ marginTop:-6, textAlign:'center' }}>{label}{member ? ` · ${member}` : ''}</p>
+      {dupIds.length > 0 && (
+        <div className="p-warn au-row au-between au-wrap" style={{ borderRadius:12, padding:'10px 12px', gap:8, fontSize:13 }}>
+          <span><b>{dupIds.length} entri dobel</b> terdeteksi di tanggal ini.</span>
+          <button type="button" className="btn btn-danger au-tap" onClick={onDedupe}>Hapus dobel</button>
+        </div>
+      )}
+      {slots.length === 0 ? <span className="au-small au-muted" style={{ textAlign:'center', padding:'12px 0' }}>Belum ada kehadiran di tanggal ini.</span> : (
+        <ul className="au-dayl" aria-label="Daftar kehadiran">
+          {slots.map((slot:any) => {
+            const t = attTypes.find(x=>x.key===slot.type)
+            const isDup = dupIds.includes(String(slot._id))
+            return (
+              <li key={slot._id} className="au-dayl-row" style={{ ['--tc' as any]: t?.textColor || 'var(--muted)' }}>
+                <i className="dot" aria-hidden="true" />
+                <span className="au-col" style={{ minWidth:0, flex:1, gap:2 }}>
+                  <b className="ttl">{t?.label || slot.label || slot.type}{isDup && <span className="au-att-dup inl">dobel</span>}</b>
+                  <span className="au-xs au-muted">{slotTimeLabel(slot)}{slot.sourceActivityId ? ' · dari aktivitas' : ''}{slot.note ? ` · ${slot.note}` : ''}</span>
+                </span>
+                <button type="button" className="btn btn-icon au-tap" onClick={()=>onEdit(slot)} aria-label={`Edit ${t?.label||slot.type}`}><Icon name="edit" size={16} /></button>
+                <button type="button" className="btn btn-icon btn-danger au-tap" onClick={()=>onDelete(slot)} aria-label={`Hapus ${t?.label||slot.type}`}><Icon name="trash" size={16} /></button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <button type="button" className="btn btn-primary au-tap" onClick={onAdd}><Icon name="plus" size={16} />Tambah kehadiran</button>
+    </Sheet>
   )
 }
