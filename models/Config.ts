@@ -193,6 +193,8 @@ const ConfigSchema = new Schema({
   guestHero: String,
   lastWeeklyDigest: { type:String, default:'' },
   lastStaleReimburse: { type:String, default:'' },
+  // Guard ringkasan to-do pagi (tugas yang di-assign, sampai due date) — 1x per tanggal
+  lastTodoDigest: { type:String, default:'' },
   // Pengingat reimburse belum ditransfer setelah N hari (0 = mati)
   staleReimburseDays: { type:Number, default:3 },
   weeklyDigest: { type:Boolean, default:true },

@@ -179,7 +179,7 @@ function ResetSection() {
 const MENU_KEYS = ['dashboard','progress','activities','mandatory','golive','calendar','issues','attendance','biodata','links','notes','quicknotes','reimbursement','operasional','pettycash','cashcard','thirdparty','budgetreport','cashier','settlementcc','members','config','biodata-export']
 const MENU_LABELS: Record<string,string> = {
   dashboard:'Dashboard', progress:'Progress Project', activities:'Activities', mandatory:'Mandatory', golive:'Go-Live', calendar:'Calendar', issues:'Issues',
-  attendance:'Presensi', biodata:'Biodata', links:'Link Hub', notes:'[Team] Notes', quicknotes:'[Personal] Notes',
+  attendance:'Presensi', biodata:'Biodata', links:'Link Hub', notes:'[Team] Notes', quicknotes:'[Personal] To-do',
   reimbursement:'Reimbursement', operasional:'Operasional', pettycash:'Petty Cash (tab)', cashcard:'Cash Card', thirdparty:'[3rd Party] Event', budgetreport:'Budget Report',
   cashier:'Akses Cashier (tab)', settlementcc:'Akses Settlement CC (CC Holder)',
   members:'Member', config:'Configuration', 'biodata-export':'Export Biodata (Excel) — admin'

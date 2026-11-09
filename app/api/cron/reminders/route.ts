@@ -15,6 +15,8 @@ import { ReimbursementModel } from '@/models/Reimbursement'
 import { cashierEmails } from '@/lib/reimburseNotif'
 import { isFinished } from '@/lib/dashboard'
 import { staleReimburses, weeklyDigest } from '@/lib/digest'
+import { TodoModel } from '@/models/Todo'
+import { morningDigest } from '@/lib/todo'
 
 const rupiah = (n: number) => new Intl.NumberFormat('id-ID').format(Math.round(n || 0))
 
@@ -53,6 +55,22 @@ async function staleReimburseBroadcast(jakartaToday: string, days: number) {
     if (r?.sent) sent++
   }
   return { stale: stale.length, sent }
+}
+
+// Pagi: ringkasan tugas yang di-assign orang lain & belum selesai (sampai tenggat, termasuk yang terlambat).
+async function todoBroadcast(jakartaToday: string) {
+  const todos: any[] = await TodoModel.find({ archived: { $ne: true }, dueDate: { $ne: '' } }, 'title createdByEmail assignees dueDate archived').lean()
+  const emails = new Set<string>()
+  for (const t of todos) for (const a of t.assignees || []) if (a.status !== 'done') emails.add(String(a.email).toLowerCase())
+  let recipients = 0, sent = 0
+  for (const e of emails) {
+    const d = morningDigest(todos, e, jakartaToday)
+    if (!d) continue
+    recipients++
+    const r: any = await sendPushToUser(e, { title: d.title, body: d.body, url: '/dashboard/quicknotes', tag: `todo-digest-${jakartaToday}` }).catch(() => null)
+    if (r?.sent) sent++
+  }
+  return { recipients, sent }
 }
 
 // Kirim pengingat harian (absen + agenda hari ini) ke SEMUA member yg subscribe push.
@@ -165,9 +183,13 @@ export async function GET(req: NextRequest) {
     }
 
     // ===== Senin: ringkasan mingguan · Harian: reimburse menggantung =====
-    let weekly: any = null, stale: any = null
+    let weekly: any = null, stale: any = null, todos: any = null
     if (jamWIB >= 8) {
-      const cfg2: any = await ConfigModel.findOne({}, 'lastWeeklyDigest lastStaleReimburse weeklyDigest staleReimburseDays').lean()
+      const cfg2: any = await ConfigModel.findOne({}, 'lastWeeklyDigest lastStaleReimburse weeklyDigest staleReimburseDays lastTodoDigest').lean()
+      if (cfg2?.lastTodoDigest !== jakartaToday) {
+        todos = await todoBroadcast(jakartaToday)
+        await ConfigModel.updateOne({}, { $set: { lastTodoDigest: jakartaToday } }, { upsert: true })
+      }
       const isMonday = jakarta.getUTCDay() === 1
       if (isMonday && cfg2?.weeklyDigest !== false && cfg2?.lastWeeklyDigest !== jakartaToday) {
         weekly = await weeklyBroadcast(jakartaToday)
@@ -180,7 +202,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true, checked: notes.length, fired, broadcast, weekly, stale })
+    return NextResponse.json({ ok: true, checked: notes.length, fired, broadcast, weekly, stale, todos })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

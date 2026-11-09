@@ -13,7 +13,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { href: '/dashboard/mandatory', label: 'Mandatory', icon: 'shield', permKey: 'mandatory' },
     { href: '/dashboard/golive', label: 'Go-Live', icon: 'rocket', permKey: 'golive' },
     { href: '/dashboard/notes', label: '[Team] Notes', icon: 'notes', permKey: 'notes' },
-    { href: '/dashboard/quicknotes', label: '[Personal] Notes', icon: 'pnote', permKey: 'quicknotes' },
+    { href: '/dashboard/quicknotes', label: '[Personal] To-do', icon: 'pnote', permKey: 'quicknotes' },
   ] },
   { key: 'team', label: 'Team', items: [
     { href: '/dashboard/attendance', label: 'Presensi', icon: 'user', permKey: 'attendance' },

@@ -1,349 +1,365 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+// [Personal] To-do — to-do pribadi + tugas yang di-assign ke / dari member lain.
+// Catatan & checklist lama (QuickNote) tetap tersedia di tab "Catatan".
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
-import { ensurePushSubscription } from '@/lib/pushClient'
-import { reminderLabel } from '@/lib/reminderDue'
-import { Empty, Icon, PageHeader, Pill, Sheet } from '@/components/ui'
+import { Empty, Icon, PageHeader, Seg, Sheet } from '@/components/ui'
+import { Avatar } from '@/components/TodoAvatar'
+import {
+  groupTodos, inScope, viewStatus, assigneeOf, isCreator, othersAssigned, progressRatio, dueLabel, dueBucket, fmtDate,
+  jakartaToday, addDays, BUCKET_LABEL, STATUS_LABEL, type TodoLike, type TodoStatus,
+} from '@/lib/todo'
 
-type ItemType = 'bullet' | 'number' | 'text'
-type Item = { id: string; text: string; checked: boolean; type: ItemType }
-type Reminder = { enabled: boolean; mode: 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly'; datetime: string; time: string; weekday?: number | null; dayOfMonth?: number | null; anchorDate?: string }
-type QuickNote = {
-  _id: string; title: string; items: Item[]; reminder: Reminder
-  ownerEmail: string; sharedWith: string[]; lastEditedBy: string; updatedAt: string
+const QuickNotesBoard = dynamic(() => import('@/components/QuickNotesBoard'), { ssr: false, loading: () => <div className="au-card"><div className="au-skel" /><div className="au-skel" style={{ width: '60%' }} /></div> })
+
+type Todo = TodoLike & { _id: string }
+type Member = { _id: string; name: string; email: string }
+type Tab = 'mine' | 'given' | 'notes'
+type Quick = 'all' | 'overdue' | 'today' | 'progress'
+
+const lc = (s: unknown) => String(s || '').trim().toLowerCase()
+const first = (s?: string) => String(s || '').split(' ')[0]
+
+async function api(url: string, method = 'GET', body?: unknown) {
+  const res = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data?.error || 'Gagal menyimpan, coba lagi')
+  return data
 }
 
-function uid() { return Math.random().toString(36).slice(2, 9) }
-function emptyReminder(): Reminder { return { enabled: false, mode: 'once', datetime: '', time: '', weekday: null, dayOfMonth: null, anchorDate: '' } }
 
-export default function QuickNotesPage() {
-  const { data: session } = useSession()
-  const user = session?.user as any
-  const myEmail = user?.email
+function DueChip({ t, today }: { t: TodoLike; today: string }) {
+  if (!t.dueDate) return null
+  const b = dueBucket(t.dueDate, today)
+  const tone = b === 'overdue' ? 'bad' : b === 'today' ? 'warn' : ''
+  return <span className={`td-due ${tone}`}><Icon name="cal" size={12} />{dueLabel(t.dueDate, today)}{t.dueTime ? ` · ${t.dueTime}` : ''}</span>
+}
 
-  const [notes, setNotes] = useState<QuickNote[]>([])
-  const [members, setMembers] = useState<any[]>([])
-  // Filter diri sendiri saat render, bukan saat load — sesi bisa belum siap
-  // ketika data pertama kali diambil sehingga diri sendiri ikut muncul.
-  const shareMembers = members.filter((m: any) => !myEmail || m.email !== myEmail)
-  const [loading, setLoading] = useState(true)
-  const [detailId, setDetailId] = useState<string | null>(null)
-  const [shareOpenId, setShareOpenId] = useState<string | null>(null)
-  const [justCreatedId, setJustCreatedId] = useState<string | null>(null)
-  const [reminderOpenId, setReminderOpenId] = useState<string | null>(null)
-  const [confirmDelId, setConfirmDelId] = useState<string | null>(null)
-  const [filter, setFilter] = useState<'all' | 'mine' | 'shared' | 'reminder'>('all')
-  const checkedOnce = useRef(false)
+/** Cincin kecil progres penerima (tugas yang saya berikan). */
+function MiniRing({ done, total }: { done: number; total: number }) {
+  const r = 10, c = 2 * Math.PI * r, p = total ? done / total : 0
+  return (
+    <span className="td-ring" aria-label={`${done} dari ${total} selesai`}>
+      <svg viewBox="0 0 26 26" width="26" height="26" aria-hidden="true"><circle cx="13" cy="13" r={r} className="bg" /><circle cx="13" cy="13" r={r} className="fg" strokeDasharray={c} strokeDashoffset={c * (1 - p)} /></svg>
+      <b>{done}/{total}</b>
+    </span>
+  )
+}
 
-  async function load() {
+// ───────────────────────────── Baris to-do
+function TodoRow({ t, me, today, onOpen, onToggle, idx }: { t: Todo; me: string; today: string; onOpen: () => void; onToggle: () => void; idx: number }) {
+  const mine = assigneeOf(t, me)
+  const st = viewStatus(t, me)
+  const others = othersAssigned(t)
+  const [d, n] = progressRatio({ ...t, assignees: others })
+  const fromOther = !isCreator(t, me)
+  const lastComment = [...(t.updates || [])].reverse().find(u => u.kind === 'comment' || (u.kind === 'progress' && u.text))
+  const replies = (t.updates || []).filter(u => u.kind === 'comment' || (u.kind === 'progress' && u.text)).length
+  return (
+    <li className={`td-row${st === 'done' ? ' done' : ''}`} style={{ ['--i' as any]: Math.min(idx, 10) }}>
+      {mine ? (
+        <button type="button" className={`td-check s-${st}`} onClick={onToggle} aria-label={st === 'done' ? `Tandai belum selesai: ${t.title}` : `Tandai selesai: ${t.title}`} aria-pressed={st === 'done'}>
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" /></svg>
+        </button>
+      ) : <MiniRing done={d} total={n} />}
+      <button type="button" className="td-main" onClick={onOpen}>
+        <span className="td-title">{t.priority === 'high' && <i className="td-flag" aria-label="Prioritas tinggi" />}{t.title}</span>
+        <span className="td-meta">
+          <DueChip t={t} today={today} />
+          {mine && st === 'in_progress' && <span className="td-st prog">Dikerjakan{mine.eta ? ` · target ${fmtDate(mine.eta)}` : ''}</span>}
+          {fromOther && <span className="td-who"><Avatar name={t.createdByName} size={18} />dari {first(t.createdByName)}</span>}
+          {!fromOther && others.length > 0 && <span className="td-who"><span className="td-avs">{others.slice(0, 3).map(a => <Avatar key={a.email} name={a.name} size={18} />)}</span>{others.length === 1 ? first(others[0].name) : `${others.length} orang`}</span>}
+          {replies > 0 && <span className="td-rep" title={lastComment?.text}><Icon name="chat" size={12} />{replies}</span>}
+        </span>
+      </button>
+    </li>
+  )
+}
+
+// ───────────────────────────── Form buat / edit
+function TodoEditor({ editing, members, me, myName, today, onClose, onSaved }: { editing: Todo | null; members: Member[]; me: string; myName: string; today: string; onClose: () => void; onSaved: (t: Todo) => void }) {
+  const [title, setTitle] = useState(editing?.title || '')
+  const [note, setNote] = useState(editing?.note || '')
+  const [due, setDue] = useState(editing?.dueDate || '')
+  const [time, setTime] = useState(editing?.dueTime || '')
+  const [high, setHigh] = useState(editing?.priority === 'high')
+  const [to, setTo] = useState<string[]>(editing ? editing.assignees.map(a => lc(a.email)).filter(e => e !== me) : [])
+  const [q, setQ] = useState('')
+  const [saving, setSaving] = useState(false), [tried, setTried] = useState(false)
+  const sent = useRef(false)
+  const others = members.filter(m => lc(m.email) !== me)
+  const shown = others.filter(m => !q || m.name.toLowerCase().includes(q.toLowerCase()))
+  const fri = (() => { const d = new Date(today + 'T00:00:00Z').getUTCDay(); return addDays(today, ((5 - d + 7) % 7) || 7) })()
+  const quick: [string, string][] = [['Hari ini', today], ['Besok', addDays(today, 1)], ['Jumat', fri], ['Minggu depan', addDays(today, 7)]]
+
+  async function save() {
+    setTried(true)
+    if (!title.trim()) { toast.error('Judul wajib diisi'); return }
+    if (sent.current) return
+    sent.current = true; setSaving(true)
     try {
-      const [n, u] = await Promise.all([
-        fetch('/api/quicknotes').then(r => r.json()),
-        fetch('/api/users').then(r => r.json()),
-      ])
-      setNotes(n.data || [])
-      setMembers((u.data || []).filter((m: any) => m.active !== false))
-    } catch { toast.error('Gagal memuat catatan personal') }
-    setLoading(false)
+      const body = { title: title.trim(), note, dueDate: due, dueTime: due ? time : '', priority: high ? 'high' : 'normal', assignees: to.length ? to : [me] }
+      const d = editing ? await api(`/api/todos/${editing._id}`, 'PATCH', { action: 'edit', ...body }) : await api('/api/todos', 'POST', body)
+      toast.success(editing ? 'Tugas diperbarui' : to.length ? `Tugas dikirim ke ${to.length === 1 ? first(members.find(m => lc(m.email) === to[0])?.name) : `${to.length} orang`}` : 'To-do ditambahkan')
+      onSaved(d.data); onClose()
+    } catch (e: any) { toast.error(e.message); sent.current = false } finally { setSaving(false) }
   }
-  useEffect(() => { load() }, [])
 
-  useEffect(() => {
-    if (checkedOnce.current) return
-    checkedOnce.current = true
-    ensurePushSubscription()
-    const id = setInterval(() => { fetch('/api/quicknotes/check-reminders', { method: 'POST' }).catch(() => {}) }, 60000)
-    fetch('/api/quicknotes/check-reminders', { method: 'POST' }).catch(() => {})
-    return () => clearInterval(id)
+  return (
+    <Sheet open title={editing ? 'Edit tugas' : 'Tugas baru'} onClose={onClose} onSave={save} saveDisabled={saving} saveLabel={saving ? 'Menyimpan…' : editing ? 'Simpan' : to.length ? 'Kirim' : 'Tambah'}>
+      <label className="au-col" style={{ gap: 6 }}><span className="lbl">Apa yang perlu dikerjakan?</span>
+        <input className="input td-big" autoFocus={!editing} value={title} maxLength={200} onChange={e => setTitle(e.target.value)} placeholder="Mis. Kirim draft BRD iPRO ke VP" aria-invalid={tried && !title.trim()} onKeyDown={e => { if (e.key === 'Enter') save() }} />
+        {tried && !title.trim() && <span role="alert" className="au-xs" style={{ color: 'var(--bad)', fontWeight: 600 }}>Judul wajib diisi</span>}</label>
+      <label className="au-col" style={{ gap: 6 }}><span className="lbl">Detail (opsional)</span>
+        <textarea className="input" rows={3} maxLength={4000} value={note} onChange={e => setNote(e.target.value)} placeholder="Konteks, link dokumen, atau hasil yang diharapkan" /></label>
+
+      <div className="au-col" style={{ gap: 8 }}>
+        <span className="lbl">Tenggat</span>
+        <div className="au-chips wrap">{quick.map(([l, v]) => <button key={l} type="button" className="au-chip" aria-pressed={due === v} onClick={() => setDue(due === v ? '' : v)}>{l}</button>)}</div>
+        <div className="au-grid" style={{ gridTemplateColumns: '1fr 120px', gap: 8 }}>
+          <input type="date" className="input" value={due} min={editing ? undefined : today} onChange={e => setDue(e.target.value)} aria-label="Tanggal tenggat" />
+          <input type="time" className="input" value={time} disabled={!due} onChange={e => setTime(e.target.value)} aria-label="Jam tenggat (opsional)" />
+        </div>
+        {due && <span className="au-xs au-muted">{fmtDate(due, true)} · {dueLabel(due, today).toLowerCase()}{to.length ? '. Penerima diingatkan tiap pagi sampai tugas selesai.' : ''}</span>}
+      </div>
+
+      <div className="au-col" style={{ gap: 8 }}>
+        <div className="au-row au-between"><span className="lbl">Tugaskan ke</span>{to.length > 0 && <button type="button" className="au-link au-xs" onClick={() => setTo([])}>Untuk saya saja</button>}</div>
+        {to.length === 0 && <span className="au-xs au-muted">Tidak memilih siapa pun = to-do pribadi untuk {first(myName)}.</span>}
+        {others.length > 8 && <input className="input input-sm" value={q} onChange={e => setQ(e.target.value)} placeholder="Cari member" aria-label="Cari member" />}
+        <div className="td-pick" role="group" aria-label="Pilih penerima">
+          {shown.map(m => { const on = to.includes(lc(m.email)); return (
+            <button key={m._id} type="button" className="td-pickb" aria-pressed={on} onClick={() => setTo(on ? to.filter(e => e !== lc(m.email)) : [...to, lc(m.email)])}>
+              <Avatar name={m.name} size={30} /><span>{m.name}</span>
+              <i className="tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="12" height="12"><path d="M5 12.5l4.2 4.2L19 7" /></svg></i>
+            </button>) })}
+        </div>
+      </div>
+      <label className="au-igr" style={{ border: '1px solid var(--line)', borderRadius: 16 }}><span className="k">Prioritas tinggi</span><input type="checkbox" className="au-sw" style={{ marginLeft: 'auto' }} checked={high} onChange={e => setHigh(e.target.checked)} /></label>
+    </Sheet>
+  )
+}
+
+// ───────────────────────────── Detail + progres + respon
+function TodoDetail({ t, me, today, onClose, onChanged, onEdit, onDeleted }: { t: Todo; me: string; today: string; onClose: () => void; onChanged: (t: Todo) => void; onEdit: () => void; onDeleted: (id: string) => void }) {
+  const mine = assigneeOf(t, me)
+  const creator = isCreator(t, me)
+  const [status, setStatus] = useState<TodoStatus>(mine?.status || 'todo')
+  const [eta, setEta] = useState(mine?.eta || '')
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false), [confirmDel, setConfirmDel] = useState(false)
+  const dirty = !!mine && (status !== mine.status || (status !== 'done' && eta !== (mine.eta || '')))
+  const others = othersAssigned(t)
+  const personal = others.length === 0
+
+  async function send(kind: 'progress' | 'comment') {
+    if (busy) return
+    if (kind === 'comment' && !msg.trim()) return
+    setBusy(true)
+    try {
+      const d = await api(`/api/todos/${t._id}`, 'PATCH', kind === 'progress' ? { action: 'progress', status, eta: status === 'done' ? '' : eta, text: msg } : { action: 'comment', text: msg })
+      onChanged(d.data); setMsg('')
+      toast.success(kind === 'progress' ? (status === 'done' ? 'Ditandai selesai' : 'Progres dikirim') : 'Respon terkirim')
+    } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
+  }
+  async function del() {
+    setBusy(true)
+    try { await api(`/api/todos/${t._id}`, 'DELETE'); toast.success('Tugas dihapus'); onDeleted(t._id); onClose() } catch (e: any) { toast.error(e.message) } finally { setBusy(false) }
+  }
+
+  const timeline = [...(t.updates || [])].filter(u => u.kind !== 'edit').reverse()
+  return (
+    <Sheet open title={personal ? 'To-do' : 'Tugas'} onClose={onClose}>
+      <div className="td-dhead">
+        <h3>{t.priority === 'high' && <i className="td-flag" aria-label="Prioritas tinggi" />}{t.title}</h3>
+        <div className="au-row au-wrap" style={{ gap: 6 }}>
+          <DueChip t={t} today={today} />
+          {t.dueDate && <span className="au-xs au-muted">{fmtDate(t.dueDate, true)}</span>}
+        </div>
+        {t.note && <p className="td-note">{t.note}</p>}
+      </div>
+
+      {!personal && (
+        <div className="td-people">
+          <div className="td-prow"><Avatar name={t.createdByName} size={32} /><span className="au-col" style={{ gap: 1, minWidth: 0 }}><b>{t.createdByName}</b><span className="au-xs au-muted">Pemberi tugas</span></span></div>
+          {others.map(a => (
+            <div key={a.email} className="td-prow">
+              <Avatar name={a.name} size={32} />
+              <span className="au-col" style={{ gap: 1, minWidth: 0, flex: 1 }}><b>{a.name}{lc(a.email) === me ? ' (kamu)' : ''}</b><span className="au-xs au-muted">{a.status !== 'done' && a.eta ? `Target ${fmtDate(a.eta, true)}` : a.updatedAt ? `Update ${new Date(a.updatedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}` : 'Belum ada update'}</span></span>
+              <span className={`td-st s-${a.status}`}>{STATUS_LABEL[a.status]}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {mine && (
+        <div className="td-prog">
+          <span className="lbl">{personal ? 'Status' : 'Progres kamu'}</span>
+          <Seg full label="Status pekerjaan" value={status} onChange={setStatus} options={[['todo', 'Belum mulai'], ['in_progress', 'Dikerjakan'], ['done', 'Selesai']] as const} />
+          {status !== 'done' && !personal && (
+            <label className="au-col" style={{ gap: 6 }}><span className="au-xs au-muted">Selesai per kapan?</span>
+              <input type="date" className="input" value={eta} min={today} onChange={e => setEta(e.target.value)} aria-label="Target selesai" /></label>
+          )}
+        </div>
+      )}
+
+      {!personal && (
+        <div className="td-reply">
+          <textarea className="input" rows={2} maxLength={1000} value={msg} onChange={e => setMsg(e.target.value)} placeholder={mine ? 'Tambahkan catatan progres atau respon…' : 'Tulis respon untuk penerima…'} aria-label="Respon" />
+          <div className="au-row" style={{ gap: 8, justifyContent: 'flex-end' }}>
+            {mine && dirty && <button type="button" className="btn btn-primary au-tap" disabled={busy} onClick={() => send('progress')}>Kirim update</button>}
+            {(!mine || !dirty) && <button type="button" className="btn btn-primary au-tap" disabled={busy || !msg.trim()} onClick={() => send('comment')}>Kirim respon</button>}
+          </div>
+        </div>
+      )}
+      {personal && mine && dirty && <button type="button" className="btn btn-primary au-tap" disabled={busy} onClick={() => send('progress')}>Simpan status</button>}
+
+      {!personal && timeline.length > 0 && (
+        <ol className="td-tl" aria-label="Riwayat">
+          {timeline.map(u => (
+            <li key={u.id}>
+              <Avatar name={u.byName} size={24} />
+              <div className="au-col" style={{ gap: 2, minWidth: 0 }}>
+                <span className="au-small"><b>{first(u.byName)}</b> {u.kind === 'created' ? 'membuat tugas ini' : u.kind === 'progress' ? <>menandai <b>{STATUS_LABEL[u.status as TodoStatus] || u.status}</b>{u.eta ? ` · target ${fmtDate(u.eta)}` : ''}</> : 'merespon'}</span>
+                {u.text && <span className="td-bubble">{u.text}</span>}
+                <span className="au-xs au-muted">{u.at ? new Date(u.at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {creator && (confirmDel
+        ? <div className="au-row au-wrap p-bad" style={{ borderRadius: 14, padding: 12, gap: 10 }}><span className="au-small" style={{ flex: 1 }}>Hapus “{t.title}”{personal ? '' : ' untuk semua penerima'}?</span><button type="button" className="btn btn-sm" onClick={() => setConfirmDel(false)}>Batal</button><button type="button" className="btn btn-danger btn-sm" disabled={busy} onClick={del}>Ya, hapus</button></div>
+        : <div className="au-row" style={{ gap: 8 }}><button type="button" className="btn au-tap" onClick={onEdit}><Icon name="edit" size={15} />Edit</button><button type="button" className="btn btn-danger au-tap" onClick={() => setConfirmDel(true)}><Icon name="trash" size={15} />Hapus</button></div>)}
+    </Sheet>
+  )
+}
+
+// ───────────────────────────── Halaman
+export default function TodoPage() {
+  const { data: session } = useSession()
+  const me = lc(session?.user?.email)
+  const myName = String(session?.user?.name || '')
+  const [todos, setTodos] = useState<Todo[] | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [members, setMembers] = useState<Member[]>([])
+  const [tab, setTab] = useState<Tab>('mine')
+  const [quick, setQuick] = useState<Quick>('all')
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [editor, setEditor] = useState<{ t: Todo | null } | null>(null)
+  const [draft, setDraft] = useState('')
+  const [showDone, setShowDone] = useState(false)
+  const [today, setToday] = useState(() => jakartaToday())
+  const adding = useRef(false)
+
+  const load = useCallback(async () => {
+    setFailed(false)
+    try { const d = await api('/api/todos'); setTodos(d.data || []) } catch { setFailed(true); setTodos(t => t ?? []) }
   }, [])
+  useEffect(() => {
+    load()
+    fetch('/api/users').then(r => (r.ok ? r.json() : { data: [] })).then(d => setMembers((d.data || []).filter((u: any) => u.active !== false && u.email))).catch(() => {})
+    const p = new URLSearchParams(window.location.search)
+    const id = p.get('todo'); if (id) setOpenId(id)
+    const tb = p.get('tab'); if (tb === 'notes' || tb === 'given') setTab(tb)
+    const iv = setInterval(() => setToday(jakartaToday()), 60_000)
+    const onFocus = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onFocus)
+    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onFocus) }
+  }, [load])
 
-  async function createNote() {
-    // Judul sengaja dikosongkan supaya user langsung mengetik (input di-autofocus),
-    // tidak perlu menghapus teks "Catatan baru" dulu.
-    const res = await fetch('/api/quicknotes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: '', items: [{ id: uid(), text: '', checked: false, type: 'bullet' }] }) })
-    const d = await res.json()
-    if (d.data) { setNotes(n => [d.data, ...n]); setDetailId(d.data._id); setJustCreatedId(d.data._id) }
-    else toast.error(d.error || 'Gagal membuat catatan')
-  }
-
-  // Perubahan per catatan dikirim berurutan; hanya respons permintaan TERAKHIR yang diterapkan,
-  // supaya respons lama tidak menimpa ketikan yang lebih baru (mis. item hilang setelah menambah baris).
-  const queue = useRef<Record<string, Promise<void>>>({})
-  const seq = useRef<Record<string, number>>({})
-  function patchNote(id: string, updates: Partial<QuickNote>, optimistic = true): Promise<void> {
-    if (optimistic) setNotes(n => n.map(x => x._id === id ? { ...x, ...updates } as QuickNote : x))
-    const mine = (seq.current[id] = (seq.current[id] || 0) + 1)
-    const run = async () => {
-      try {
-        const res = await fetch('/api/quicknotes', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...updates }) })
-        const d = await res.json().catch(() => ({}))
-        // Judul & isi lokal tetap dipakai (bisa sudah diketik lagi sejak permintaan dikirim);
-        // dari server hanya metadata (share, reminder, penyunting terakhir, waktu).
-        if (d.data) { if (seq.current[id] === mine) setNotes(n => n.map(x => x._id === id ? { ...d.data, title: x.title, items: x.items } : x)) }
-        else { toast.error(d.error || 'Gagal menyimpan catatan'); load() }
-      } catch { toast.error('Gagal menyimpan catatan'); load() }
+  const upsert = (t: Todo) => setTodos(list => [t, ...(list || []).filter(x => x._id !== t._id)])
+  const scoped = useMemo(() => (todos || []).filter(t => tab !== 'notes' && inScope(t, me, tab)), [todos, me, tab])
+  const counts = useMemo(() => {
+    const open = scoped.filter(t => viewStatus(t, me) !== 'done')
+    return {
+      all: open.length,
+      overdue: open.filter(t => dueBucket(t.dueDate, today) === 'overdue').length,
+      today: open.filter(t => dueBucket(t.dueDate, today) === 'today').length,
+      progress: open.filter(t => viewStatus(t, me) === 'in_progress').length,
     }
-    const p = (queue.current[id] || Promise.resolve()).then(run)
-    queue.current[id] = p
-    return p
+  }, [scoped, me, today])
+  const filtered = scoped.filter(t => quick === 'all' || (viewStatus(t, me) !== 'done' && (quick === 'progress' ? viewStatus(t, me) === 'in_progress' : dueBucket(t.dueDate, today) === quick)))
+  const groups = groupTodos(filtered, me, today)
+  const mineOpen = (todos || []).filter(t => inScope(t, me, 'mine') && viewStatus(t, me) !== 'done').length
+  const givenOpen = (todos || []).filter(t => inScope(t, me, 'given') && viewStatus(t, me) !== 'done').length
+
+  async function quickAdd() {
+    const title = draft.trim()
+    if (!title || adding.current) return
+    adding.current = true
+    try { const d = await api('/api/todos', 'POST', { title, assignees: [me] }); upsert(d.data); setDraft('') }
+    catch (e: any) { toast.error(e.message) } finally { adding.current = false }
+  }
+  async function toggle(t: Todo) {
+    const mine = assigneeOf(t, me); if (!mine) return
+    const next: TodoStatus = mine.status === 'done' ? 'todo' : 'done'
+    const prev = todos
+    setTodos(list => (list || []).map(x => x._id === t._id ? { ...x, assignees: x.assignees.map(a => lc(a.email) === me ? { ...a, status: next } : a) } : x))
+    try {
+      const d = await api(`/api/todos/${t._id}`, 'PATCH', { action: 'progress', status: next, eta: next === 'done' ? '' : mine.eta || '' })
+      upsert(d.data)
+      if (next === 'done') toast.success(isCreator(t, me) ? 'Selesai' : `Selesai — ${first(t.createdByName)} diberi tahu`)
+    } catch (e: any) { setTodos(prev); toast.error(e.message) }
   }
 
-  async function deleteNote(id: string) {
-    setConfirmDelId(null)
-    const res = await fetch('/api/quicknotes', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    const d = await res.json()
-    if (d.ok) { setNotes(n => n.filter(x => x._id !== id)); toast.success('Catatan dihapus') }
-    else toast.error(d.error || 'Gagal menghapus')
-  }
-
-  function updateItems(note: QuickNote, items: Item[]) { patchNote(note._id, { items }) }
-  function addItem(note: QuickNote, type: ItemType) {
-    updateItems(note, [...note.items, { id: uid(), text: '', checked: false, type }])
-  }
-  function setItemText(note: QuickNote, itemId: string, text: string) {
-    setNotes(n => n.map(x => x._id === note._id ? { ...x, items: x.items.map(i => i.id === itemId ? { ...i, text } : i) } : x))
-  }
-  function commitItemText(note: QuickNote) {
-    const fresh = notes.find(x => x._id === note._id)
-    if (fresh) patchNote(note._id, { items: fresh.items }, false)
-  }
-  function toggleItemChecked(note: QuickNote, itemId: string) {
-    updateItems(note, note.items.map(i => i.id === itemId ? { ...i, checked: !i.checked } : i))
-  }
-  function removeItem(note: QuickNote, itemId: string) {
-    updateItems(note, note.items.filter(i => i.id !== itemId))
-  }
-
-  async function saveReminder(note: QuickNote, r: Reminder) {
-    if (r.enabled) {
-      const perm = await ensurePushSubscription()
-      if (!perm.ok) {
-        const msg = perm.reason === 'denied'
-          ? 'Notifikasi diblokir di browser. Reminder tetap tersimpan, tapi push notif tidak akan muncul sampai izin diaktifkan.'
-          : 'Push notification tidak didukung di perangkat ini. Reminder tetap tersimpan sebagai pengingat di app.'
-        toast(msg, { duration: 5000 })
-      }
-    }
-    await patchNote(note._id, { reminder: r })
-    setReminderOpenId(null)
-    toast.success(r.enabled ? 'Reminder diset' : 'Reminder dimatikan')
-  }
-
-  async function saveShare(note: QuickNote, sharedWith: string[]) {
-    await patchNote(note._id, { sharedWith })
-    setShareOpenId(null)
-    toast.success('Daftar share diperbarui')
-  }
-
-  const shown = notes.filter(n => filter === 'all' || (filter === 'mine' ? n.ownerEmail === myEmail : filter === 'shared' ? (n.ownerEmail !== myEmail || n.sharedWith?.length > 0) : n.reminder?.enabled))
-  const counts = { all: notes.length, mine: notes.filter(n => n.ownerEmail === myEmail).length, shared: notes.filter(n => n.ownerEmail !== myEmail || n.sharedWith?.length > 0).length, reminder: notes.filter(n => n.reminder?.enabled).length }
-  const closeDetail = () => { setDetailId(null); setReminderOpenId(null); setShareOpenId(null); setConfirmDelId(null) }
+  const open = (todos || []).find(t => t._id === openId) || null
+  const loading = todos === null
 
   return (
     <div className="au-page">
+      {editor && <TodoEditor editing={editor.t} members={members} me={me} myName={myName} today={today} onClose={() => setEditor(null)} onSaved={t => { upsert(t); if (!editor.t && othersAssigned(t).length) setTab('given') }} />}
+      {open && !editor && <TodoDetail key={open._id + String(open.updatedAt)} t={open} me={me} today={today} onClose={() => { setOpenId(null); if (window.location.search.includes('todo=')) window.history.replaceState(null, '', window.location.pathname) }} onChanged={upsert} onEdit={() => setEditor({ t: open })} onDeleted={id => setTodos(l => (l || []).filter(x => x._id !== id))} />}
       <div className="au-view au-anim">
-        <PageHeader eyebrow="Activities · pribadi, terlihat hanya oleh kamu & yang kamu share" title="[Personal] Notes" actions={
-          <button type="button" className="btn btn-primary" onClick={createNote}><Icon name="plus" size={16} stroke={2.2} />Catatan baru</button>
+        <PageHeader eyebrow={`Activities · ${mineOpen} to-do aktif${givenOpen ? ` · ${givenOpen} kamu berikan` : ''}`} title="[Personal] To-do" actions={
+          <button type="button" className="btn btn-primary" onClick={() => setEditor({ t: null })}><Icon name="plus" size={16} stroke={2.2} />Tugas baru</button>
         } />
-        <div className="au-chips" role="group" aria-label="Filter catatan">
-          {([['all', 'Semua'], ['mine', 'Milik saya'], ['shared', 'Dibagikan'], ['reminder', 'Ada reminder']] as const).map(([k, l]) => (
-            <button key={k} type="button" className="au-chip" aria-pressed={filter === k} onClick={() => setFilter(k)}>{l} <span style={{ opacity: .6 }}>{counts[k]}</span></button>
-          ))}
-        </div>
+        <Seg label="Tampilan" value={tab} onChange={v => { setTab(v); setQuick('all') }} options={[['mine', <span key="m">Untuk saya{mineOpen ? <em className="td-count">{mineOpen}</em> : null}</span>], ['given', <span key="g">Saya berikan{givenOpen ? <em className="td-count">{givenOpen}</em> : null}</span>], ['notes', 'Catatan']] as const} />
 
-        {loading ? <div className="au-grid" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>{[0, 1, 2].map(k => <div key={k} className="au-card"><div className="au-skel" style={{ width: '55%' }} /><div className="au-skel" /><div className="au-skel" style={{ width: '35%' }} /></div>)}</div>
-          : shown.length === 0 ? <div className="au-card"><Empty title={notes.length ? 'Tidak ada catatan di filter ini' : 'Belum ada catatan'} text={notes.length ? 'Pilih filter lain.' : 'Buat catatan atau to-do pertama kamu.'} action={<button type="button" className="btn btn-primary" onClick={createNote}>Catatan baru</button>} /></div>
-          : <div className="au-grid" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>
-            {shown.map((note, k) => {
-              const isOwner = note.ownerEmail === myEmail
-              const isShared = note.sharedWith?.length > 0
-              const checklist = note.items.filter(i => i.type !== 'text')
-              const textCount = note.items.filter(i => i.type === 'text' && i.text.trim()).length
-              const doneCount = checklist.filter(i => i.checked).length
-              const total = checklist.length
-              const progress = total > 0 ? Math.round((doneCount / total) * 100) : 0
-              const preview = note.items.filter(i => i.text.trim()).slice(0, 3)
-              return (
-                <button type="button" key={note._id} className="au-qnote rise" style={{ ['--d' as any]: Math.min(k, 8) }} onClick={() => setDetailId(note._id)}>
-                  <b className="t">{note.title || <span className="au-muted" style={{ fontStyle: 'italic', fontWeight: 500 }}>Tanpa judul</span>}</b>
-                  {preview.length > 0 && <ul className="pv">{preview.map(i => <li key={i.id} className={i.checked ? 'done' : ''}><i className={i.type} />{i.text}</li>)}</ul>}
-                  <span className="au-row au-wrap" style={{ gap: 6 }}>
-                    {!isOwner && <span className="au-tag" style={{ background: 'var(--accent-soft)', color: 'var(--accent-ink)' }}><Icon name="user" size={12} />{note.ownerEmail.split('@')[0]}</span>}
-                    {isOwner && isShared && <span className="au-tag"><Icon name="team" size={12} />{note.sharedWith.length} orang</span>}
-                    {textCount > 0 && <span className="au-tag">{textCount} teks</span>}
-                    {note.reminder?.enabled && <span className="au-tag" style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}><Icon name="bell" size={12} />{reminderLabel(note.reminder)}</span>}
-                  </span>
-                  {total > 0 && <span className="au-col" style={{ gap: 4, width: '100%' }}>
-                    <span className="au-row au-between au-xs"><span className="au-muted">{doneCount}/{total} selesai</span><b style={{ color: doneCount === total ? 'var(--ok)' : 'var(--ink2)' }}>{doneCount === total ? 'Selesai' : `${progress}%`}</b></span>
-                    <span className="au-track" style={{ height: 6 }}><i className="a" style={{ width: `${progress}%`, background: doneCount === total ? 'var(--ok)' : undefined }} /></span>
-                  </span>}
-                </button>
-              )
-            })}
-          </div>}
-      </div>
+        {tab === 'notes' ? <QuickNotesBoard embedded /> : <>
+          {tab === 'mine' && (
+            <form className="td-add" onSubmit={e => { e.preventDefault(); quickAdd() }}>
+              <span className="td-addic" aria-hidden="true"><Icon name="plus" size={16} stroke={2.4} /></span>
+              <input value={draft} onChange={e => setDraft(e.target.value)} maxLength={200} placeholder="Tambah to-do, tekan Enter" aria-label="Tambah to-do cepat" />
+              {draft.trim() && <button type="submit" className="btn btn-sm btn-primary">Tambah</button>}
+            </form>
+          )}
+          <div className="au-chips" role="group" aria-label="Saring">
+            {([['all', 'Semua aktif'], ['overdue', 'Terlambat'], ['today', 'Hari ini'], ['progress', 'Dikerjakan']] as const).map(([k, l]) => (
+              <button key={k} type="button" className={`au-chip${k === 'overdue' && counts.overdue ? ' td-hot' : ''}`} aria-pressed={quick === k} onClick={() => setQuick(k)}>{l} <span style={{ opacity: .6 }}>{counts[k]}</span></button>
+            ))}
+          </div>
+          {failed && <div className="au-row au-wrap p-bad" role="alert" style={{ borderRadius: 14, padding: 12 }}><span className="au-small" style={{ flex: 1 }}>To-do gagal dimuat.</span><button type="button" className="btn btn-sm" onClick={load}>Coba lagi</button></div>}
 
-      {detailId && (() => {
-        const note = notes.find(n => n._id === detailId)
-        if (!note) return null
-        const isOwner = note.ownerEmail === myEmail
-        const canEdit = isOwner || note.sharedWith?.includes(myEmail)
-        let numberCounter = 0
-        return (
-          <Sheet open title={isOwner ? 'Catatan' : `Catatan ${note.ownerEmail.split('@')[0]}`} onClose={closeDetail}>
-            <input value={note.title} disabled={!canEdit} aria-label="Judul catatan"
-              autoFocus={justCreatedId === note._id}
-              onChange={e => setNotes(n => n.map(x => x._id === note._id ? { ...x, title: e.target.value } : x))}
-              onBlur={e => { patchNote(note._id, { title: e.target.value }, false); if (justCreatedId === note._id) setJustCreatedId(null) }}
-              placeholder="Judul catatan"
-              style={{ border: 'none', background: 'transparent', font: '700 22px var(--disp)', color: 'var(--ink)', outline: 'none', padding: '2px 0', width: '100%' }} />
-            <div className="au-col" style={{ gap: 6 }}>
-              {note.items.length === 0 && <span className="au-small au-muted" style={{ padding: '12px 0' }}>Belum ada isi. Tambah teks atau checklist di bawah.</span>}
-              {note.items.map(item => {
-                if (item.type === 'number') numberCounter++
-                const grow = (el: HTMLTextAreaElement) => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }
-                if (item.type === 'text') {
+          {loading ? <div className="au-card">{[0, 1, 2].map(k => <div key={k} className="au-skel" style={{ width: `${80 - k * 15}%` }} />)}</div>
+            : !groups.length || (groups.length === 1 && groups[0].key === 'done' && quick !== 'all') ? (
+              <div className="au-card"><Empty
+                title={quick !== 'all' ? 'Tidak ada di saringan ini' : tab === 'mine' ? 'Belum ada to-do' : 'Belum ada tugas yang kamu berikan'}
+                text={quick !== 'all' ? 'Pilih saringan lain.' : tab === 'mine' ? 'Ketik di kolom atas untuk to-do cepat, atau buat tugas dengan tenggat.' : 'Tugaskan pekerjaan ke member lain — mereka diingatkan tiap pagi sampai selesai.'}
+                action={quick !== 'all' ? <button type="button" className="btn" onClick={() => setQuick('all')}>Lihat semua</button> : <button type="button" className="btn btn-primary" onClick={() => setEditor({ t: null })}>Tugas baru</button>} /></div>
+            ) : (
+              <div className="td-groups">
+                {groups.map(g => {
+                  if (g.key === 'done' && quick !== 'all') return null
+                  const collapsed = g.key === 'done' && !showDone
                   return (
-                    <div key={item.id} className="au-row" style={{ alignItems: 'flex-start', gap: 6 }}>
-                      <textarea value={item.text} disabled={!canEdit} aria-label="Teks"
-                        onChange={e => { setItemText(note, item.id, e.target.value); grow(e.target) }} onBlur={e => { commitItemText(note); grow(e.target) }} onFocus={e => grow(e.target)}
-                        rows={1} placeholder="Tulis catatan"
-                        style={{ flex: 1, border: 'none', background: 'var(--sunken)', borderRadius: 12, padding: '11px 13px', fontSize: 15, color: 'var(--ink)', outline: 'none', resize: 'none', overflow: 'hidden', lineHeight: 1.6, fontFamily: 'inherit' }} />
-                      {canEdit && <button type="button" aria-label="Hapus baris" onClick={() => removeItem(note, item.id)} className="btn btn-icon btn-sm" style={{ border: 0, background: 'none', color: 'var(--muted)' }}><Icon name="x" size={14} /></button>}
-                    </div>
+                    <section key={g.key} className={`td-grp g-${g.key}`} aria-label={BUCKET_LABEL[g.key]}>
+                      <header>
+                        {g.key === 'done'
+                          ? <button type="button" className="td-ghd" aria-expanded={!collapsed} onClick={() => setShowDone(v => !v)}><b>{BUCKET_LABEL[g.key]}</b><span>{g.items.length}</span><span className="chev" style={{ transform: `rotate(${collapsed ? -90 : 0}deg)` }}><Icon name="chev" size={16} /></span></button>
+                          : <div className="td-ghd"><b>{BUCKET_LABEL[g.key]}</b><span>{g.items.length}</span></div>}
+                      </header>
+                      {!collapsed && <ul className="td-list">{(g.key === 'done' ? g.items.slice(0, 30) : g.items).map((t, i) => <TodoRow key={t._id} t={t} me={me} today={today} idx={i} onOpen={() => setOpenId(t._id)} onToggle={() => toggle(t)} />)}</ul>}
+                    </section>
                   )
-                }
-                return (
-                  <div key={item.id} className="au-row" style={{ alignItems: 'flex-start', gap: 10 }}>
-                    <button type="button" role="checkbox" aria-checked={item.checked} aria-label={item.text || 'Item'} onClick={() => canEdit && toggleItemChecked(note, item.id)} className={`au-qchk${item.type === 'number' ? ' num' : ''}${item.checked ? ' on' : ''}`} disabled={!canEdit}>
-                      {item.checked ? <Icon name="check" size={14} stroke={3} /> : (item.type === 'number' ? numberCounter : '')}
-                    </button>
-                    <textarea value={item.text} disabled={!canEdit} aria-label="Item to-do"
-                      onChange={e => { setItemText(note, item.id, e.target.value); grow(e.target) }} onBlur={e => { commitItemText(note); grow(e.target) }} onFocus={e => grow(e.target)}
-                      rows={1} placeholder="Tulis item to-do"
-                      style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 15, color: item.checked ? 'var(--muted)' : 'var(--ink)', textDecoration: item.checked ? 'line-through' : 'none', outline: 'none', padding: '4px 0', resize: 'none', overflow: 'hidden', lineHeight: 1.6, fontFamily: 'inherit' }} />
-                    {canEdit && <button type="button" aria-label="Hapus item" onClick={() => removeItem(note, item.id)} className="btn btn-icon btn-sm" style={{ border: 0, background: 'none', color: 'var(--muted)' }}><Icon name="x" size={14} /></button>}
-                  </div>
-                )
-              })}
-            </div>
-            {canEdit && <div className="au-row au-wrap" style={{ gap: 6 }}>
-              <button type="button" onClick={() => addItem(note, 'text')} className="btn btn-sm">¶ Teks</button>
-              <button type="button" onClick={() => addItem(note, 'bullet')} className="btn btn-sm">• Checklist</button>
-              <button type="button" onClick={() => addItem(note, 'number')} className="btn btn-sm">1. Bernomor</button>
-            </div>}
-            <div className="au-row au-wrap" style={{ gap: 8, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
-              <button type="button" onClick={() => { setReminderOpenId(reminderOpenId === note._id ? null : note._id); setShareOpenId(null) }} className="btn" aria-expanded={reminderOpenId === note._id}>
-                <Icon name="bell" size={15} />{note.reminder?.enabled ? reminderLabel(note.reminder) : 'Reminder'}
-              </button>
-              {isOwner && <button type="button" onClick={() => { setShareOpenId(note._id); setReminderOpenId(null) }} className={`btn${note.sharedWith?.length ? ' btn-ghost' : ''}`}><Icon name="team" size={15} />{note.sharedWith?.length ? `Dishare ke ${note.sharedWith.length}` : 'Share'}</button>}
-              {isOwner && (confirmDelId === note._id
-                ? <span className="au-row p-bad" style={{ borderRadius: 12, padding: '6px 8px', gap: 6, marginLeft: 'auto' }}><span className="au-small">Hapus catatan?</span><button type="button" className="btn btn-sm" onClick={() => setConfirmDelId(null)}>Batal</button><button type="button" className="btn btn-danger btn-sm" onClick={() => { deleteNote(note._id); setDetailId(null) }}>Ya, hapus</button></span>
-                : <button type="button" onClick={() => setConfirmDelId(note._id)} className="btn btn-danger" style={{ marginLeft: 'auto' }}><Icon name="trash" size={15} />Hapus</button>)}
-            </div>
-            {reminderOpenId === note._id && <ReminderEditor note={note} onSave={r => saveReminder(note, r)} onClose={() => setReminderOpenId(null)} />}
-            {shareOpenId === note._id && <ShareEditor note={note} members={shareMembers} onSave={list => saveShare(note, list)} onClose={() => setShareOpenId(null)} />}
-          </Sheet>
-        )
-      })()}
-    </div>
-  )
-}
-
-function ReminderEditor({ note, onSave, onClose }: { note: QuickNote; onSave: (r: Reminder) => void; onClose: () => void }) {
-  const [r, setR] = useState<Reminder>(note.reminder?.enabled ? { ...note.reminder } : { ...emptyReminder(), mode: 'daily' })
-  const DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
-  const recurring = r.mode !== 'once'
-
-  function setMode(mode: Reminder['mode']) {
-    setR(x => {
-      const nx: Reminder = { ...x, mode }
-      const now = new Date()
-      if ((mode === 'weekly' || mode === 'biweekly') && (x.weekday === null || x.weekday === undefined)) nx.weekday = now.getDay()
-      if (mode === 'monthly' && !x.dayOfMonth) nx.dayOfMonth = now.getDate()
-      if (!x.time) nx.time = '08:00'
-      return nx
-    })
-  }
-  function save() {
-    const out = { ...r }
-    if (out.enabled && out.mode === 'once' && !out.datetime) { toast.error('Isi tanggal & jam reminder'); return }
-    if (out.enabled && (out.mode === 'weekly' || out.mode === 'biweekly' || out.mode === 'monthly')) {
-      const d = new Date(); out.anchorDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    }
-    onSave(out)
-  }
-  return (
-    <div className="au-box rise" style={{ padding: 14, gap: 10 }}>
-      <label className="au-row au-between" style={{ cursor: 'pointer' }}><b style={{ fontSize: 15 }}>Reminder</b><input type="checkbox" className="au-sw" checked={r.enabled} onChange={e => setR(x => ({ ...x, enabled: e.target.checked }))} aria-label="Aktifkan reminder" /></label>
-      {r.enabled && (
-        <div className="au-grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
-          <label className="au-col" style={{ gap: 6 }}><span className="lbl">Pengulangan</span>
-            <select value={r.mode} onChange={e => setMode(e.target.value as Reminder['mode'])} className="input">
-              <option value="once">Sekali</option><option value="daily">Tiap hari</option><option value="weekly">Tiap pekan</option><option value="biweekly">Tiap 2 pekan</option><option value="monthly">Tiap bulan</option>
-            </select></label>
-          {r.mode === 'once' && <label className="au-col" style={{ gap: 6 }}><span className="lbl">Tanggal & jam</span><input type="datetime-local" value={r.datetime} onChange={e => setR(x => ({ ...x, datetime: e.target.value }))} className="input" /></label>}
-          {(r.mode === 'weekly' || r.mode === 'biweekly') && <label className="au-col" style={{ gap: 6 }}><span className="lbl">Hari</span>
-            <select value={r.weekday ?? new Date().getDay()} onChange={e => setR(x => ({ ...x, weekday: Number(e.target.value) }))} className="input">{DAYS.map((d, i) => <option key={i} value={i}>{d}</option>)}</select></label>}
-          {r.mode === 'monthly' && <label className="au-col" style={{ gap: 6 }}><span className="lbl">Tanggal (1–31)</span><input type="number" min={1} max={31} value={r.dayOfMonth ?? new Date().getDate()} onChange={e => setR(x => ({ ...x, dayOfMonth: Math.min(31, Math.max(1, Number(e.target.value) || 1)) }))} className="input" /></label>}
-          {recurring && <label className="au-col" style={{ gap: 6 }}><span className="lbl">Jam</span><input type="time" value={r.time} onChange={e => setR(x => ({ ...x, time: e.target.value }))} className="input" /></label>}
-        </div>
-      )}
-      <div className="au-row" style={{ gap: 8, justifyContent: 'flex-end' }}><button type="button" className="btn" onClick={onClose}>Batal</button><button type="button" onClick={save} className="btn btn-primary">Simpan reminder</button></div>
-    </div>
-  )
-}
-
-function ShareEditor({ note, members, onSave, onClose }: { note: QuickNote; members: any[]; onSave: (list: string[]) => void; onClose: () => void }) {
-  const [selected, setSelected] = useState<string[]>(() => (note.sharedWith || []).filter(Boolean))
-  const [q, setQ] = useState('')
-
-  // Tutup dengan tombol Esc
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  function toggle(email: string) {
-    if (!email) return   // member tanpa email tidak bisa di-share (sharedWith berbasis email)
-    setSelected(s => s.includes(email) ? s.filter(x => x !== email) : [...s, email])
-  }
-
-  // Hanya member yang punya email yang bisa di-tag; sisanya ditampilkan tapi nonaktif
-  const shown = members.filter(m => {
-    const t = q.trim().toLowerCase()
-    return !t || String(m.name || '').toLowerCase().includes(t) || String(m.email || '').toLowerCase().includes(t)
-  })
-  const taggable = shown.filter(m => !!m.email)
-  const allShownSelected = taggable.length > 0 && taggable.every(m => selected.includes(m.email))
-  const initial = (n: string) => String(n || '?').trim().charAt(0).toUpperCase()
-
-  return (
-    <Sheet open title="Share catatan" onClose={onClose} onSave={() => onSave(selected.filter(Boolean))}>
-      <p className="au-small au-ink2" style={{ marginTop: -4 }}>Member terpilih bisa melihat &amp; mengedit catatan ini.</p>
-      <label className="input au-row" style={{ gap: 8, padding: '0 12px' }}><Icon name="search" size={16} />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari nama member" aria-label="Cari member" style={{ border: 0, background: 'transparent', flex: 1, minHeight: 42, outline: 0, color: 'var(--ink)' }} /></label>
-      <div className="au-row au-between au-wrap" style={{ gap: 8 }}>
-        <span className="au-small au-ink2">{selected.length > 0 ? <><b style={{ color: 'var(--accent-ink)' }}>{selected.length}</b> member dipilih</> : 'Belum ada yang dipilih'}</span>
-        <span className="au-row" style={{ gap: 6 }}>
-          <button type="button" disabled={taggable.length === 0} className="btn btn-sm" onClick={() => setSelected(s => allShownSelected ? s.filter(e => !taggable.some(m => m.email === e)) : Array.from(new Set([...s, ...taggable.map(m => m.email)])))}>{allShownSelected ? 'Batal pilih semua' : 'Pilih semua'}</button>
-          {selected.length > 0 && <button type="button" onClick={() => setSelected([])} className="btn btn-sm">Kosongkan</button>}
-        </span>
+                })}
+              </div>
+            )}
+        </>}
       </div>
-      <div className="au-ig">
-        {shown.length === 0 && <div className="au-igr au-muted au-small">{members.length === 0 ? 'Tidak ada member lain.' : 'Tidak ada member yang cocok.'}</div>}
-        {shown.map((m, i) => {
-          const canTag = !!m.email, on = canTag && selected.includes(m.email)
-          return (
-            <label key={m.email || m._id || `m-${i}`} className="au-igr" style={{ opacity: canTag ? 1 : .5, cursor: canTag ? 'pointer' : 'not-allowed' }} title={canTag ? undefined : 'Member ini belum punya email, tidak bisa di-share'}>
-              <span className={`au-av${on ? ' c1' : ''}`} style={on ? undefined : { background: 'var(--sunken)', color: 'var(--ink2)' }}>{initial(m.name)}</span>
-              <span className="au-col" style={{ flex: 1, minWidth: 0 }}><b style={{ fontSize: 14 }}>{m.name || m.email || '(tanpa nama)'}</b><span className="au-xs au-muted">{m.email || 'belum punya email'}</span></span>
-              <input type="checkbox" className="au-chk" checked={on} disabled={!canTag} onChange={() => toggle(m.email)} aria-label={`Share ke ${m.name || m.email}`} />
-            </label>
-          )
-        })}
-      </div>
-    </Sheet>
+    </div>
   )
 }
