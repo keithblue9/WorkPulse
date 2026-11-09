@@ -1231,3 +1231,8 @@ button.au-wl { cursor:pointer } button.au-wl:hover { background:var(--sunken) }
   .au-att-day > .au-att-slot:nth-of-type(n+4) { display:none }  /* .n = span ke-1 → tampil maks 2 slot */
   .au-att-dup { align-self:center; font-size:8px; padding:2px 4px }
 }
+
+/* Widget Tim hari ini: semua member tampil (dulu dipotong 8 → member ke-9 hilang). >8 baris → gulir halus */
+.wg-week-body { display:flex; flex-direction:column; gap:4px; max-height:236px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; margin-right:-4px; padding-right:4px }
+.wg-week-body:focus-visible { outline:2px solid var(--wf); outline-offset:2px; border-radius:8px }
+

@@ -122,13 +122,13 @@ export function renderWidget(id: string, size: Size, x: WCtx): React.ReactNode {
         const counts = Object.keys(ATT).map(k => [k, staff.filter(m => todayType(m) === k).length] as const).filter(c => c[1])
         const empty = staff.filter(m => !todayType(m)).length
         return <><div className="wg-chips">{counts.map(([k, n]) => <span key={k} style={{ ['--c' as any]: ATT[k].c }}><i />{ATT[k].l}<b>{n}</b></span>)}{empty > 0 && <span style={{ ['--c' as any]: 'var(--line2)' }}><i />Belum isi<b>{empty}</b></span>}</div>
-          <div className="wg-avs">{staff.slice(0, 9).map(m => { const t = todayType(m); return <span key={m._id} className="av" title={`${m.name}: ${ATT[t]?.l || 'belum isi'}`} style={{ ['--c' as any]: ATT[t]?.c || 'var(--line2)' }}>{initials(m.name)}</span> })}</div></>
+          <div className="wg-avs">{staff.map(m => { const t = todayType(m); return <span key={m._id} className="av" title={`${m.name}: ${ATT[t]?.l || 'belum isi'}`} style={{ ['--c' as any]: ATT[t]?.c || 'var(--line2)' }}>{initials(m.name)}</span> })}</div></>
       }
       const mon = new Date(dUTC(todayIso)); mon.setUTCDate(mon.getUTCDate() - ((mon.getUTCDay() + 6) % 7))
       const days = Array.from({ length: 5 }, (_, i) => new Date(mon.getTime() + i * DAY).toISOString().slice(0, 10))
       return <div className="wg-week" role="table" aria-label="Presensi pekan ini">
         <div className="r hd" role="row"><span role="columnheader" />{days.map(dd => <span key={dd} role="columnheader" className={dd === todayIso ? 'today' : ''}>{HARI[new Date(dUTC(dd)).getUTCDay()]}</span>)}</div>
-        {staff.slice(0, 8).map(m => <div key={m._id} className="r" role="row"><span role="rowheader" className="nm">{String(m.name).split(' ')[0]}</span>{days.map(dd => { const t = attType(rec(m, dd)); return <span key={dd} role="cell" className="c" title={`${m.name} ${dd}: ${ATT[t]?.l || '–'}`} style={{ ['--c' as any]: ATT[t]?.c || 'transparent', color: ATT[t]?.ink }}>{ATT[t]?.l || ''}</span> })}</div>)}
+        <div className="wg-week-body" role="rowgroup" tabIndex={staff.length > 8 ? 0 : undefined} aria-label={staff.length > 8 ? `${staff.length} member, gulir untuk melihat semua` : undefined}>{staff.map(m => <div key={m._id} className="r" role="row"><span role="rowheader" className="nm">{String(m.name).split(' ')[0]}</span>{days.map(dd => { const t = attType(rec(m, dd)); return <span key={dd} role="cell" className="c" title={`${m.name} ${dd}: ${ATT[t]?.l || '–'}`} style={{ ['--c' as any]: ATT[t]?.c || 'transparent', color: ATT[t]?.ink }}>{ATT[t]?.l || ''}</span> })}</div>)}</div>
       </div>
     }
     case 'workload': {
