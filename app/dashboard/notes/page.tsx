@@ -6,11 +6,13 @@ import { format } from 'date-fns'
 import { getConfig } from '@/lib/configCache'
 import { Empty, Icon, PageHeader, Sheet, Portal } from '@/components/ui'
 import { useYear } from '@/lib/year'
-import { groupNotes, matches, notesForYear } from '@/lib/notesView'
+import { matches, notesForYear, sortNotes } from '@/lib/notesView'
+import { monthGroups, catCounts } from '@/lib/notesFeed'
 
 type Note = Record<string, any>
 type Cat = { key: string; label: string; color?: string }
-const COLLAPSE_KEY = 'wins-notes-collapsed'
+const CAT_KEY = 'wins-notes-cat'
+const HARI = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 const initials = (s: string) => s.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('')
 const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 const fmtD = (s?: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || '')); return m ? `${Number(m[3])} ${BLN[Number(m[2]) - 1]} ${m[1]}` : '' }
@@ -130,9 +132,12 @@ export default function NotesPage() {
   const [cats, setCats] = useState<Cat[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [q, setQ] = useState('')
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const [cat, setCat] = useState<string>('all')
+  const [sel, setSel] = useState<string | null>(null)
+  const [readerOpen, setReaderOpen] = useState(false)   // HP: pembaca sebagai sheet
   const [sheet, setSheet] = useState<{ note: Note | null; cat: string } | null>(null)
   const [lightbox, setLightbox] = useState<string | null>(null)
+  const [wide, setWide] = useState(false)
 
   const load = useCallback(async () => {
     setFailed(false)
@@ -142,9 +147,12 @@ export default function NotesPage() {
     load()
     getConfig().then((c: any) => setCats((c?.activityCategories || []).filter((x: any) => x.active))).catch(() => {})
     fetch('/api/users').then(r => (r.ok ? r.json() : { data: [] })).then(d => setMembers((d.data || []).filter((u: any) => u.active !== false))).catch(() => {})
-    try { setCollapsed(JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '{}') || {}) } catch {}
+    try { const c = localStorage.getItem(CAT_KEY); if (c) setCat(c) } catch {}
+    const mq = window.matchMedia('(min-width: 1000px)')
+    const on = () => setWide(mq.matches); on(); mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
   }, [load])
-  const toggle = (k: string) => setCollapsed(c => { const n = { ...c, [k]: !c[k] }; try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(n)) } catch {} return n })
+  const pickCat = (k: string) => { setCat(k); try { localStorage.setItem(CAT_KEY, k) } catch {} }
 
   async function update(n: Note, patch: Record<string, unknown>, msg: string) {
     const prev = notes
@@ -152,70 +160,107 @@ export default function NotesPage() {
     try { await send(`/api/notes/${n._id}`, 'PATCH', patch); toast.success(msg) } catch (e: any) { setNotes(prev); toast.error(e.message) }
   }
 
+  const catOf = (k: string) => cats.find(c => c.key === k)
+  const catName = (k: string) => catOf(k)?.label || k || 'Lainnya'
+  const catColor = (k: string) => catOf(k)?.color || 'var(--muted)'
   const inYear = notesForYear(notes || [], year)
-  const shown = inYear.filter(n => matches(n, q))
-  const groups = groupNotes(shown, cats)
-  const catName = (k: string) => cats.find(c => c.key === k)?.label || k
-  const defaultCat = cats[0]?.key || 'Others'
+  const searched = inYear.filter(n => matches(n, q))
+  const counts = catCounts(searched)
+  const shown = searched.filter(n => cat === 'all' || n.category === cat || (cat === '__orphan' && !catOf(n.category)))
+  const pinned = sortNotes(shown.filter(n => n.pinned))
+  const months = monthGroups(shown.filter(n => !n.pinned))
+  const orphanCount = searched.filter(n => !catOf(n.category)).length
+  const defaultCat = (cat !== 'all' && cat !== '__orphan' ? cat : cats[0]?.key) || 'Others'
+  const current = shown.find(n => n._id === sel) || (wide ? pinned[0] || months[0]?.items[0] : null) || null
+
+  function openNote(n: Note) { setSel(n._id); if (!wide) setReaderOpen(true) }
+
+  const card = (n: Note, i: number) => {
+    const d = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(n.date || ''))
+    const wd = d ? HARI[new Date(Number(d[1]), Number(d[2]) - 1, Number(d[3])).getDay()] : ''
+    return (
+      <li key={n._id} style={{ ['--i' as any]: Math.min(i, 12), ['--cc' as any]: catColor(n.category) }}>
+        <button type="button" className={`nt-item${current?._id === n._id && wide ? ' on' : ''}`} aria-current={current?._id === n._id && wide ? 'true' : undefined} onClick={() => openNote(n)}>
+          <span className="nt-stamp" aria-hidden="true"><b>{d ? Number(d[3]) : '–'}</b><small>{wd}</small></span>
+          <span className="nt-body">
+            <span className="nt-cat"><i />{catName(n.category)}</span>
+            <b className="nt-ttl">{n.title}</b>
+            {n.content && <span className="nt-ex">{n.content}</span>}
+            <span className="nt-foot">
+              {n.picTags?.length > 0 && <span className="au-avs">{n.picTags.slice(0, 3).map((p: string, k: number) => <span key={p} className={`au-av s c${(k % 7) + 1}`} title={p}>{initials(p)}</span>)}</span>}
+              {n.images?.length > 0 && <span className="nt-img">{n.images.length} gambar</span>}
+              {n.authorName && <span>{String(n.authorName).split(' ')[0]}</span>}
+            </span>
+          </span>
+          {n.images?.[0] && <img className="nt-thumb" src={n.images[0]} alt="" loading="lazy" />}
+        </button>
+      </li>
+    )
+  }
+
+  const reader = current && (
+    <article className="nt-reader" style={{ ['--cc' as any]: catColor(current.category) }} aria-label={current.title}>
+      <div className="nt-rtop">
+        <span className="nt-cat"><i />{catName(current.category)}{current.pinned ? ' · disematkan' : ''}</span>
+        <div className="au-row" style={{ gap: 6 }}>
+          <button type="button" className="btn btn-icon btn-sm au-tap" aria-pressed={!!current.pinned} aria-label={current.pinned ? 'Lepas sematan' : 'Sematkan'} title={current.pinned ? 'Lepas sematan' : 'Sematkan'} onClick={() => update(current, { pinned: !current.pinned }, current.pinned ? 'Sematan dilepas' : 'Disematkan')}><Icon name="pin" size={15} /></button>
+          <button type="button" className="btn btn-sm au-tap" onClick={() => { setReaderOpen(false); setSheet({ note: current, cat: current.category }) }}><Icon name="edit" size={15} />Edit</button>
+        </div>
+      </div>
+      <h2 className="nt-rttl">{current.title}</h2>
+      <div className="nt-rmeta">
+        <span>{fmtD(current.date) || 'Tanpa tanggal'}</span>
+        {current.authorName && <span>Ditulis {current.authorName}</span>}
+      </div>
+      {current.picTags?.length > 0 && <div className="au-row au-wrap" style={{ gap: 6 }}>{current.picTags.map((p: string, k: number) => <span key={p} className="nt-pic"><span className={`au-av s c${(k % 7) + 1}`}>{initials(p)}</span>{p}</span>)}</div>}
+      {current.content ? <div className="nt-rtext">{current.content}</div> : <p className="au-muted au-small">Belum ada isi catatan.</p>}
+      {current.images?.length > 0 && <div className="nt-gal">{current.images.map((img: string, i: number) => <button key={i} type="button" onClick={() => setLightbox(img)} aria-label={`Perbesar gambar ${i + 1}`}><img src={img} alt="" loading="lazy" /></button>)}</div>}
+      <label className="au-row au-xs au-muted nt-move" style={{ gap: 8 }}>Pindah kategori
+        <select className="input input-sm" style={{ width: 'auto', minHeight: 34 }} value={current.category} onChange={e => update(current, { category: e.target.value }, `Dipindah ke ${catName(e.target.value)}`)}>
+          {(catOf(current.category) ? cats : [...cats, { key: current.category, label: current.category }]).map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+        </select></label>
+    </article>
+  )
 
   return (
     <div className="au-page">
       {sheet && <NoteSheet editing={sheet.note} defaultCat={sheet.cat} cats={cats} members={members} onClose={() => setSheet(null)} onSaved={load} />}
       <Lightbox src={lightbox} onClose={() => setLightbox(null)} />
+      {!wide && readerOpen && current && <Sheet open title="Catatan" onClose={() => setReaderOpen(false)}>{reader}</Sheet>}
       <div className="au-view au-anim">
         <PageHeader eyebrow={`Activities · ${inYear.length} catatan di ${year}`} title="[Team] Notes" actions={
           <button type="button" className="btn btn-primary" onClick={() => setSheet({ note: null, cat: defaultCat })}><Icon name="plus" size={16} stroke={2.2} />Catatan baru</button>
         } />
-        <label className="input au-row rise" style={{ gap: 8, padding: '0 12px', maxWidth: 520 }}><Icon name="search" size={16} />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari judul, isi atau PIC" aria-label="Cari catatan" style={{ border: 0, background: 'transparent', flex: 1, minHeight: 42, outline: 0, color: 'var(--ink)' }} /></label>
+        <div className="nt-tools">
+          <label className="input au-row" style={{ gap: 8, padding: '0 12px' }}><Icon name="search" size={16} />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari judul, isi atau PIC" aria-label="Cari catatan" style={{ border: 0, background: 'transparent', flex: 1, minHeight: 42, outline: 0, color: 'var(--ink)' }} />
+            {q && <button type="button" className="au-link au-xs" onClick={() => setQ('')}>Hapus</button>}</label>
+          <div className="au-chips" role="group" aria-label="Kategori">
+            <button type="button" className="au-chip" aria-pressed={cat === 'all'} onClick={() => pickCat('all')}>Semua <span style={{ opacity: .6 }}>{searched.length}</span></button>
+            {cats.map(c => <button key={c.key} type="button" className="au-chip nt-chip" aria-pressed={cat === c.key} onClick={() => pickCat(c.key)} style={{ ['--cc' as any]: c.color || 'var(--muted)' }}><i />{c.label} <span style={{ opacity: .6 }}>{counts[c.key] || 0}</span></button>)}
+            {orphanCount > 0 && <button type="button" className="au-chip" aria-pressed={cat === '__orphan'} onClick={() => pickCat('__orphan')}>Lainnya <span style={{ opacity: .6 }}>{orphanCount}</span></button>}
+          </div>
+        </div>
         {failed && <div className="au-row au-wrap p-bad" role="alert" style={{ borderRadius: 14, padding: 12 }}><span className="au-small" style={{ flex: 1 }}>Catatan gagal dimuat.</span><button type="button" className="btn btn-sm" onClick={load}>Coba lagi</button></div>}
 
-        {notes === null ? <div className="au-col" style={{ gap: 10 }}>{[0, 1].map(k => <div key={k} className="au-card"><div className="au-skel" style={{ width: '40%' }} /><div className="au-skel" /></div>)}</div>
-          : !groups.length ? <div className="au-card"><Empty title="Belum ada kategori" text="Tambahkan kategori activities di Configuration." /></div>
-          : <>
-            {q && !shown.length && <div className="au-card"><Empty title="Tidak ada yang cocok" text={`Tidak ada catatan di ${year} yang memuat “${q}”.`} action={<button type="button" className="btn" onClick={() => setQ('')}>Hapus pencarian</button>} /></div>}
-            <div className="au-ngrid">
-              {groups.filter(g => !q || g.items.length).map((g, gi) => {
-                const col = !!collapsed[g.key]
-                return (
-                  <section key={g.key} className="au-ngrp rise" style={{ ['--d' as any]: Math.min(gi, 8) }}>
-                    <button type="button" className="au-nhd" aria-expanded={!col} onClick={() => toggle(g.key)}>
-                      <span className="au-row" style={{ gap: 10 }}><i className="tag" style={{ background: g.color }} /><b>{g.label}</b><span className="au-xs au-muted" style={{ fontFamily: 'var(--mono)' }}>{g.items.length}</span></span>
-                      <span style={{ transform: `rotate(${col ? -90 : 0}deg)`, transition: 'transform .2s', display: 'grid' }}><Icon name="chev" size={18} /></span>
-                    </button>
-                    {!col && <>
-                      {g.items.map(n => (
-                        <article key={n._id} className="au-note">
-                          <button type="button" className="au-note-main" onClick={() => setSheet({ note: n, cat: n.category })}>
-                            <span className="au-row au-wrap" style={{ gap: 8 }}>{n.pinned && <span className="au-pin">PIN</span>}<b>{n.title}</b></span>
-                            {n.content && <span className="au-note-body">{n.content}</span>}
-                          </button>
-                          <div className="au-note-side">
-                            <button type="button" className="btn btn-icon btn-sm" aria-pressed={!!n.pinned} aria-label={n.pinned ? `Lepas sematan ${n.title}` : `Sematkan ${n.title}`} title={n.pinned ? 'Lepas sematan' : 'Sematkan'} onClick={() => update(n, { pinned: !n.pinned }, n.pinned ? 'Sematan dilepas' : 'Disematkan')} style={n.pinned ? { background: 'var(--volt)', color: 'var(--on-volt)', borderColor: 'var(--volt)' } : undefined}><Icon name="pin" size={15} /></button>
-                            <label className="au-row au-xs au-muted" style={{ gap: 6 }}>Pindah
-                              <select className="input input-sm" style={{ width: 'auto', minHeight: 32 }} value={n.category} aria-label={`Pindahkan ${n.title}`} onChange={e => update(n, { category: e.target.value }, `Dipindah ke ${catName(e.target.value)}`)}>
-                                {(cats.some(c => c.key === n.category) ? cats : [...cats, { key: n.category, label: n.category }]).map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
-                              </select></label>
-                          </div>
-                          {n.images?.length > 0 && <div className="au-row au-wrap" style={{ gap: 6, gridColumn: '1 / -1' }}>
-                            {n.images.slice(0, 4).map((img: string, i: number) => <button key={i} type="button" onClick={() => setLightbox(img)} aria-label={`Lihat gambar ${i + 1} dari ${n.title}`} style={{ border: 0, padding: 0, background: 'none', cursor: 'zoom-in' }}><img src={img} alt="" loading="lazy" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--line)' }} /></button>)}
-                            {n.images.length > 4 && <span className="au-tag">+{n.images.length - 4}</span>}
-                          </div>}
-                          <div className="au-row au-wrap au-xs au-muted" style={{ gap: 8, gridColumn: '1 / -1' }}>
-                            {n.picTags?.length > 0 && <span className="au-avs">{n.picTags.slice(0, 4).map((p: string, i: number) => <span key={p} className={`au-av s c${(i % 7) + 1}`} title={p}>{initials(p)}</span>)}</span>}
-                            {n.categoryTags?.filter((k: string) => k !== n.category).slice(0, 3).map((k: string) => <span key={k} className="au-tag">{catName(k)}</span>)}
-                            <span>{fmtD(n.date)}{n.authorName ? ` · ${String(n.authorName).split(' ')[0]}` : ''}</span>
-                          </div>
-                        </article>
-                      ))}
-                      {!g.items.length && <div className="au-note au-muted au-small" style={{ display: 'flex' }}>Belum ada catatan di {g.label}{year ? ` (${year})` : ''}.</div>}
-                      {g.key !== '__orphan' && <button type="button" className="au-nadd" onClick={() => setSheet({ note: null, cat: g.key })}><Icon name="plus" size={14} />Tambah ke {g.label}</button>}
-                    </>}
-                  </section>
-                )
-              })}
+        {notes === null ? <div className="au-card">{[0, 1, 2].map(k => <div key={k} className="au-skel" style={{ width: `${85 - k * 20}%` }} />)}</div>
+          : !shown.length ? <div className="au-card"><Empty
+              title={q ? 'Tidak ada yang cocok' : cat !== 'all' ? `Belum ada catatan ${catName(cat)}` : `Belum ada catatan di ${year}`}
+              text={q ? `Tidak ada catatan di ${year} yang memuat “${q}”.` : 'Catat hasil rapat, keputusan, atau temuan supaya seluruh tim bisa membacanya.'}
+              action={q ? <button type="button" className="btn" onClick={() => setQ('')}>Hapus pencarian</button> : <button type="button" className="btn btn-primary" onClick={() => setSheet({ note: null, cat: defaultCat })}>Catatan baru</button>} /></div>
+          : <div className="nt-split">
+            <div className="nt-feed">
+              {pinned.length > 0 && <section aria-label="Disematkan">
+                <h3 className="nt-mh"><Icon name="pin" size={14} />Disematkan<span>{pinned.length}</span></h3>
+                <ul className="nt-list">{pinned.map(card)}</ul>
+              </section>}
+              {months.map(m => <section key={m.key} aria-label={m.label}>
+                <h3 className="nt-mh">{m.label}<span>{m.items.length}</span></h3>
+                <ul className="nt-list">{m.items.map(card)}</ul>
+              </section>)}
             </div>
-          </>}
+            {wide && <div className="nt-pane">{reader || <div className="nt-reader au-muted">Pilih catatan untuk dibaca.</div>}</div>}
+          </div>}
       </div>
     </div>
   )
