@@ -1236,8 +1236,110 @@ button.au-wl { cursor:pointer } button.au-wl:hover { background:var(--sunken) }
 .wg-week-body { display:flex; flex-direction:column; gap:4px; max-height:236px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; margin-right:-4px; padding-right:4px }
 .wg-week-body:focus-visible { outline:2px solid var(--wf); outline-offset:2px; border-radius:8px }
 
+/* ═══════════ [Personal] To-do (2026-11-09) ═══════════ */
+.td-av { display:inline-grid; place-items:center; border-radius:50%; flex-shrink:0; font-weight:700; letter-spacing:-.02em; color:hsl(var(--h) 55% 28%); background:hsl(var(--h) 70% 88%); box-shadow:0 0 0 2px var(--surface) }
+@media (prefers-color-scheme:dark) { :root:not([data-theme=light]) .td-av { color:hsl(var(--h) 80% 86%); background:hsl(var(--h) 35% 26%) } }
+:root[data-theme=dark] .td-av { color:hsl(var(--h) 80% 86%); background:hsl(var(--h) 35% 26%) }
+.td-avs { display:inline-flex } .td-avs .td-av + .td-av { margin-left:-6px }
+.td-count { font-style:normal; font:700 11px var(--sans); min-width:18px; height:18px; padding:0 5px; border-radius:9px; display:inline-grid; place-items:center; background:var(--accent); color:var(--on-accent); margin-left:2px }
 
+/* Tambah cepat — terasa seperti baris kosong di Reminders */
+.td-add { display:flex; align-items:center; gap:10px; padding:6px 8px 6px 12px; border-radius:18px; background:var(--surface); border:1px solid var(--line); transition:border-color .2s, box-shadow .2s }
+.td-add:focus-within { border-color:var(--accent); box-shadow:0 0 0 4px var(--accent-soft) }
+.td-add input { flex:1; min-width:0; border:0; background:transparent; outline:0; font:500 15px var(--sans); color:var(--ink); min-height:40px }
+.td-addic { width:24px; height:24px; border-radius:50%; display:grid; place-items:center; background:var(--accent-soft); color:var(--accent-ink); flex-shrink:0 }
+.au-chip.td-hot:not([aria-pressed=true]) { border-color:color-mix(in srgb,var(--bad) 45%,var(--line)); color:var(--bad) }
+
+.td-groups { display:flex; flex-direction:column; gap:18px }
+.td-grp { background:var(--surface); border:1px solid var(--line); border-radius:24px; overflow:hidden }
+.td-ghd { width:100%; display:flex; align-items:center; gap:8px; padding:12px 18px 6px; border:0; background:none; color:var(--ink); font:inherit; text-align:left }
+button.td-ghd { cursor:pointer; padding-bottom:12px }
+.td-ghd b { font:700 15px var(--disp); letter-spacing:-.01em }
+.td-ghd span { font:600 12px var(--sans); color:var(--muted) }
+.td-ghd .chev { margin-left:auto; display:grid; transition:transform .25s var(--ease) }
+.td-grp.g-overdue .td-ghd b { color:var(--bad) }
+.td-grp.g-today .td-ghd b { color:var(--accent-ink) }
+.td-list { list-style:none; margin:0; padding:0 0 6px }
+.td-row { display:flex; align-items:flex-start; gap:12px; padding:10px 18px; position:relative; animation:td-in .32s var(--ease) both; animation-delay:calc(var(--i) * 18ms) }
+.td-row + .td-row::before { content:''; position:absolute; top:0; left:54px; right:0; border-top:1px solid var(--line) }
 @keyframes td-in { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:none } }
+.td-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; border:0; background:none; padding:2px 0; text-align:left; color:inherit; font:inherit; cursor:pointer; min-height:0 !important }
+.td-title { font:500 15px/1.35 var(--sans); color:var(--ink); display:flex; align-items:baseline; gap:6px; transition:color .25s, opacity .25s }
+.td-row.done .td-title { color:var(--muted); text-decoration:line-through; text-decoration-color:color-mix(in srgb,var(--muted) 60%,transparent) }
+.td-meta { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; font-size:12px; color:var(--muted) }
+.td-flag { width:8px; height:8px; border-radius:2px; background:var(--hot); transform:rotate(45deg); flex-shrink:0; display:inline-block; position:relative; top:-1px }
+.td-due { display:inline-flex; align-items:center; gap:4px; font-weight:600; color:var(--ink2) }
+.td-due.warn { color:var(--warn) } .td-due.bad { color:var(--bad) }
+.td-who { display:inline-flex; align-items:center; gap:5px }
+.td-rep { display:inline-flex; align-items:center; gap:3px }
+.td-st { font:600 11.5px var(--sans); padding:3px 8px; border-radius:8px; background:var(--sunken); color:var(--ink2); white-space:nowrap }
+.td-st.prog, .td-st.s-in_progress { background:var(--accent-soft); color:var(--accent-ink) }
+.td-st.s-done { background:var(--ok-soft); color:var(--ok) }
+
+/* Lingkaran centang: pop + garis centang tergambar (stroke-dashoffset) */
+.td-check { width:26px; height:26px; margin-top:1px; border-radius:50%; border:2px solid var(--line2); background:transparent; display:grid; place-items:center; flex-shrink:0; cursor:pointer; padding:0; min-height:0 !important; position:relative; transition:background .2s, border-color .2s, transform .2s var(--pop) }
+.td-check::after { content:''; position:absolute; inset:-9px; border-radius:50% }   /* area sentuh 44px */
+.td-check:active { transform:scale(.86) }
+.td-check svg path { fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:22; stroke-dashoffset:22; transition:stroke-dashoffset .28s var(--ease) .05s }
+.td-check.s-in_progress { border-color:var(--accent); background:conic-gradient(var(--accent) 0 50%, transparent 50% 100%) }
+.td-check.s-done { background:var(--ok); border-color:var(--ok); animation:td-pop .36s var(--pop) }
+.td-check.s-done svg path { stroke-dashoffset:0 }
+@keyframes td-pop { 0% { transform:scale(.7) } 60% { transform:scale(1.12) } 100% { transform:scale(1) } }
+.td-ring { position:relative; width:26px; height:26px; flex-shrink:0; margin-top:1px; display:grid; place-items:center }
+.td-ring svg { position:absolute; inset:0; transform:rotate(-90deg) }
+.td-ring circle { fill:none; stroke-width:3 } .td-ring .bg { stroke:var(--sunken) }
+.td-ring .fg { stroke:var(--ok); stroke-linecap:round; transition:stroke-dashoffset .5s var(--ease) }
+.td-ring b { font:700 7.5px var(--sans); color:var(--ink2); letter-spacing:-.03em }
+
+/* Sheet tugas */
+.td-big { font-size:17px !important; font-weight:600 }
+.td-pick { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; max-height:240px; overflow-y:auto; overscroll-behavior:contain; padding:2px }
+.td-pickb { display:flex; align-items:center; gap:8px; padding:7px 10px 7px 7px; border-radius:14px; border:1px solid var(--line); background:var(--surface); color:var(--ink); font:600 13px var(--sans); text-align:left; cursor:pointer; min-height:44px; transition:border-color .2s, background .2s, transform .18s var(--pop) }
+.td-pickb span:not(.td-av) { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.td-pickb:active { transform:scale(.97) }
+.td-pickb .tick { width:20px; height:20px; border-radius:50%; border:1.5px solid var(--line2); display:grid; place-items:center; flex-shrink:0; transition:background .2s, border-color .2s }
+.td-pickb .tick path { fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; opacity:0; transform:scale(.6); transform-origin:center; transition:opacity .2s, transform .25s var(--pop) }
+.td-pickb[aria-pressed=true] { border-color:var(--accent); background:var(--accent-soft) }
+.td-pickb[aria-pressed=true] .tick { background:var(--accent); border-color:var(--accent) }
+.td-pickb[aria-pressed=true] .tick path { opacity:1; transform:none }
+.td-dhead { display:flex; flex-direction:column; gap:8px }
+.td-dhead h3 { font:700 21px/1.25 var(--disp); letter-spacing:-.015em; display:flex; align-items:baseline; gap:8px; margin:0 }
+.td-note { margin:0; white-space:pre-wrap; color:var(--ink2); font-size:14.5px; line-height:1.55; max-width:62ch }
+.td-people { display:flex; flex-direction:column; border:1px solid var(--line); border-radius:18px; background:var(--surface); overflow:hidden }
+.td-prow { display:flex; align-items:center; gap:10px; padding:10px 12px; min-width:0 }
+.td-prow + .td-prow { border-top:1px solid var(--line) }
+.td-prow b { font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.td-prog { display:flex; flex-direction:column; gap:8px; padding:14px; border-radius:18px; background:var(--sunken) }
+.td-prog .au-seg { background:var(--surface) }
+.td-prog .au-seg button[aria-pressed=true] { background:var(--accent); color:var(--on-accent) }
+.td-reply { display:flex; flex-direction:column; gap:8px }
+.td-tl { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px; position:relative }
+.td-tl::before { content:''; position:absolute; left:11px; top:6px; bottom:6px; border-left:1.5px dashed var(--line2) }
+.td-tl li { display:flex; gap:10px; position:relative }
+.td-bubble { background:var(--surface); border:1px solid var(--line); padding:8px 12px; border-radius:4px 14px 14px 14px; font-size:14px; line-height:1.45; white-space:pre-wrap; overflow-wrap:anywhere; max-width:52ch }
+
+/* Popup "tugas menunggu kamu" */
+.td-pop-ov { z-index:320 }
+.td-pop { width:440px; max-width:100%; background:var(--bg); border:1px solid var(--line); border-radius:28px; box-shadow:var(--shadow-l); padding:20px; display:flex; flex-direction:column; gap:14px; animation:scaleIn .32s var(--ease) }
+.td-pop-hd { display:flex; gap:12px; align-items:flex-start }
+.td-pop-hd h2 { font:700 19px/1.2 var(--disp); letter-spacing:-.015em; margin:0 }
+.td-pop-ic { width:42px; height:42px; border-radius:14px; display:grid; place-items:center; font-size:20px; background:var(--accent-soft); flex-shrink:0 }
+.td-pop-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px }
+.td-pop-list li { display:flex; align-items:center; gap:8px; padding:10px; border-radius:18px; background:var(--surface); border:1px solid var(--line); animation:td-in .34s var(--ease) both; animation-delay:calc(var(--i) * 50ms + 120ms) }
+.td-pop-main { flex:1; min-width:0; display:flex; align-items:center; gap:10px; border:0; background:none; padding:0; color:inherit; font:inherit; text-align:left; cursor:pointer; min-height:0 !important }
+.td-pop-main .t { font-size:14.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.td-pop-act { display:flex; gap:6px; flex-shrink:0 }
+.td-pop-act .btn { min-height:36px }
+.td-pop-ft { display:grid; grid-template-columns:1fr 1fr; gap:8px }
+@media (max-width:640px) {
+  .td-pop-ov { align-items:flex-end !important; padding:0 !important }
+  .td-pop { border-radius:28px 28px 0 0; animation:sheetUp .38s var(--ease); padding-bottom:calc(20px + env(safe-area-inset-bottom)) }
+  .td-pop-list li { flex-wrap:wrap } .td-pop-act { width:100%; padding-left:40px } .td-pop-act .btn { flex:1 }
+  .td-row { padding:10px 14px } .td-row + .td-row::before { left:50px }
+  .td-ghd { padding-left:14px; padding-right:14px }
+}
+@media (prefers-reduced-motion:reduce) { .td-row, .td-pop-list li, .td-check.s-done, .td-pop { animation:none } }
+
 /* ═══════════ [Team] Notes — feed + panel baca (2026-11-09) ═══════════ */
 .nt-tools { display:flex; flex-direction:column; gap:10px }
 .nt-tools > label { max-width:520px }

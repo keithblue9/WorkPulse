@@ -22,7 +22,7 @@ export const MENU_LABELS: Record<string,string> = {
   mandatory: 'Mandatory',
   golive: 'Go-Live',
   dashboard:'Dashboard', activities:'Activities', calendar:'Calendar', issues:'Issues', progress:'Progress',
-  attendance:'Presensi', biodata:'Biodata', links:'Link Hub', notes:'[Team] Notes', quicknotes:'[Personal] Notes',
+  attendance:'Presensi', biodata:'Biodata', links:'Link Hub', notes:'[Team] Notes', quicknotes:'[Personal] To-do',
   budget:'Budget Report', budgetreport:'Budget Report', reimbursement:'Reimbursement', operasional:'Operasional', pettycash:'Petty Cash', cashcard:'Cash Card', cashier:'Cashier', settlementcc:'Settlement CC', thirdparty:'[3rd Party] Event',
   members:'Member', config:'Configuration', 'biodata-export':'Export Biodata (Excel)'
 }

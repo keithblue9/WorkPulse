@@ -20,6 +20,7 @@ const CommandPalette = dynamic(() => import('@/components/CommandPalette'), { ss
 const AppPopups = dynamic(() => import('@/components/AppPopups'), { ssr: false })
 const BirthdayPopup = dynamic(() => import('@/components/BirthdayPopup'), { ssr: false })
 const DailyCheckin = dynamic(() => import('@/components/DailyCheckin'), { ssr: false })
+const TodoPopup = dynamic(() => import('@/components/TodoPopup'), { ssr: false })
 const NotifyEnabler = dynamic(() => import('@/components/NotifyEnabler'), { ssr: false })
 const InstallPWA = dynamic(() => import('@/components/InstallPWA'), { ssr: false })
 
@@ -170,7 +171,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         <Portal>
         {idle && <>
           <AppPopups />
-          {internal && <><BirthdayPopup /><DailyCheckin /></>}
+          {internal && <><BirthdayPopup /><DailyCheckin /><TodoPopup /></>}
           {internal ? <NotifyEnabler /> : <InstallPWA />}
         </>}
         {palOpen && <CommandPalette open={palOpen} onClose={() => setPalOpen(false)} items={flat} onTheme={() => setTheme(nextTheme)} years={years} onYear={setYear} />}
