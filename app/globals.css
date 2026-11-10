@@ -1385,3 +1385,24 @@ button.td-ghd { cursor:pointer; padding-bottom:12px }
 .modal .nt-reader::before { display:none }
 @media (max-width:640px) { .nt-thumb { width:48px; height:48px } .nt-item { padding:12px } }
 @media (prefers-reduced-motion:reduce) { .nt-list li, .nt-reader { animation:none } }
+
+/* Mode lihat saja (tamu): fieldset tanpa gaya; input terkunci tetap terbaca jelas */
+fieldset.au-ro { border:0; margin:0; padding:0; min-width:0 }
+fieldset.au-ro:disabled input, fieldset.au-ro:disabled select { opacity:1; cursor:default; color:var(--ink); -webkit-text-fill-color:var(--ink) }
+fieldset.au-ro:disabled input[type=checkbox] { opacity:.95 }
+fieldset.au-ro:disabled select { appearance:none; -webkit-appearance:none; background-image:none }
+
+/* Konfigurasi → Akses tamu */
+.ga { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; align-items:start }
+@media (min-width:1100px) { .ga { grid-template-columns:minmax(0,1fr) 300px } }
+.ga-main { display:flex; flex-direction:column; gap:16px; min-width:0 }
+.ga-list { display:flex; flex-direction:column; border:1px solid var(--line); border-radius:18px; overflow:hidden }
+.ga-row { display:flex; align-items:center; gap:14px; padding:12px 14px; min-height:56px; cursor:pointer; transition:background .18s }
+.ga-row + .ga-row { border-top:1px solid var(--line) }
+.ga-row:hover { background:color-mix(in srgb,var(--sunken) 60%,transparent) }
+.ga-row b { font-size:14.5px }
+.ga-side { position:sticky; top:calc(var(--topbar, 72px) + 12px) }
+.ga-sum ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px }
+.ga-sum li { display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px }
+.ga-sum li svg { color:var(--accent-ink) }
+@media (max-width:1099px) { .ga-side { position:static } }

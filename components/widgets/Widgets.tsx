@@ -17,6 +17,8 @@ export type WCtx = {
   d: Any; data: Any; me: Any | null; today: number; todayIso: string; year: number; nowYear: number; tpl: number[]
   extra: { mandatory?: Any[] | null; golive?: Any | null; budget?: Any[] | null; cashcard?: Any | null }
   internal: boolean; config: Any | null
+  /** Tamu: boleh membuka halaman tujuan? (tautan widget dimatikan bila tidak) */
+  canOpen?: (href?: string) => boolean; attOn?: boolean
   onDetail: (title: string, items: Any[]) => void; onFocus?: (name: string) => void; onMyFocus?: () => void; onYear?: (y: number) => void
 }
 
@@ -85,14 +87,21 @@ export function renderWidget(id: string, size: Size, x: WCtx): React.ReactNode {
       return <div className="wg-list">{me.tasks.length ? me.tasks.slice(0, 3).map((t: Any) => { const pl = t.a.start ? ptd(t.a, today) : 0; return <div key={`${t.x.i._id}-${t.idx}`} className="wg-row"><span className="t">{t.a.name}<small>{t.x.i.title}</small></span><Bar v={t.a.pct} tick={pl} c={t.a.start && pl > t.a.pct + .5 ? 'var(--warn-bar)' : 'var(--wf)'} /></div> }) : <Empty t="Tidak ada tugas yang menunggu" />}</div>
     }
     case 'enhancement': {
-      const total = d.enh.length; const by = CATS.map(c => [c, d.enh.filter((v: Any) => v.s.cat === c).length] as const)
+      // Enhancement yang belum (lengkap) dinilai impact/effort tidak masuk 4 kategori → tampil sebagai baris sendiri
+      // (dulu disembunyikan, sehingga "7 enhancement" tampil dengan semua kategori 0).
+      const total = d.enh.length
+      const unscored = d.enh.filter((v: Any) => !(CATS as readonly string[]).includes(v.s.cat)).length
+      const by4 = CATS.map(c => [c, d.enh.filter((v: Any) => v.s.cat === c).length] as const)
+      // L: baris "Belum dinilai" ikut daftar; M: cukup keterangan di bawah angka (ruang 4 baris).
+      const by = size === 'L' && unscored ? [...by4, ['Belum dinilai', unscored] as const] : by4
+      const sub = unscored ? <>enhancement<br />{unscored} belum dinilai</> : 'enhancement'
       if (!total) return <EnhEmpty x={x} />
       if (size === 'S') return <Big v={<CountUp to={total} />} sub={`${by[0][1]} Quick Win`} />
       const max = Math.max(1, ...by.map(b => b[1]))
       const cats = <div className="wg-list">{by.map(([c, n]) => <div key={c} className="wg-row"><span className="t">{c}</span><Bar v={(n / max) * 100} /><b className="n">{n}</b></div>)}</div>
-      if (size === 'M') return <div className="wg-split"><Big v={<CountUp to={total} />} sub="enhancement" />{cats}</div>
+      if (size === 'M') return <div className="wg-split"><Big v={<CountUp to={total} />} sub={sub} />{cats}</div>
       const stageN = STAGES_SHORT.map((_, i) => d.enh.filter((v: Any) => (v.e.stage || 1) === i + 1).length), mx = Math.max(1, ...stageN)
-      return <><div className="wg-split"><Big v={<CountUp to={total} />} sub="enhancement" />{cats}</div>
+      return <><div className="wg-split"><Big v={<CountUp to={total} />} sub={sub} />{cats}</div>
         <div className="wg-stages">{STAGES_SHORT.map((s, i) => <span key={s} title={`${s}: ${stageN[i]}`}><i style={{ height: `${12 + (stageN[i] / mx) * 44}px`, opacity: stageN[i] ? 1 : .25 }} /><small>{s.split(' ')[0]}</small></span>)}</div></>
     }
     case 'agenda': {

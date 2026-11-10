@@ -16,14 +16,16 @@ const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
 const attType = (r: Any) => String((Array.isArray(r?.slots) && r.slots[0]?.type) || r?.type || '').toLowerCase()
 const TYPES: [string, string][] = [['wfo', 'WFO'], ['wfh', 'WFH'], ['dinas', 'Dinas'], ['cuti', 'Cuti'], ['sakit', 'Sakit'], ['izin', 'Izin']]
 
-type Props = { d: Any; data: Any; me: Any | null; first: string; year: number; nowYear: number; todayIso: string; internal: boolean; isAdmin: boolean; setYear: (y: number) => void; onMyFocus?: () => void }
+type Props = { d: Any; data: Any; me: Any | null; first: string; year: number; nowYear: number; todayIso: string; internal: boolean; canOpen?: (href?: string) => boolean; attOn?: boolean; isAdmin: boolean; setYear: (y: number) => void; onMyFocus?: () => void }
 
 export function DashHero(p: Props) {
   const [saved, setSaved] = useState<{ hero: HeroKind | null; guestHero: HeroKind | null } | null>(null)
   const [pick, setPick] = useState(false)
   useEffect(() => { fetch('/api/me/widgets', { cache: 'no-store' }).then(r => r.ok ? r.json() : Promise.reject()).then(j => setSaved({ hero: j.data?.hero || null, guestHero: j.data?.guestHero || null })).catch(() => setSaved({ hero: null, guestHero: null })) }, [])
   if (!saved) return <div className="au-hero" style={{ minHeight: 260 }} aria-hidden="true"><div className="au-col" style={{ gap: 12, flex: 1 }}><div className="au-skel" style={{ width: '70%', height: 34 }} /><div className="au-skel" style={{ width: '45%', height: 34 }} /></div></div>
-  const kind = p.internal ? heroFor(saved.hero, true) : heroFor(saved.guestHero, false)
+  const k0 = p.internal ? heroFor(saved.hero, true) : heroFor(saved.guestHero, false)
+  // Tamu tanpa akses data presensi tidak bisa melihat sorotan Presensi → pakai Progress.
+  const kind: HeroKind = !p.internal && k0 === 'presensi' && p.attOn === false ? 'progress' : k0
 
   async function choose(k: HeroKind, scope: 'mine' | 'guest') {
     const prev = saved
@@ -60,6 +62,9 @@ function HeroPicker({ current, isAdmin, onClose, onChoose }: { current: { hero: 
 
 function HeroBody({ kind, p, switcher }: { kind: HeroKind; p: Props; switcher: React.ReactNode }) {
   const { d, data, year, todayIso, nowYear, first, internal } = p
+  // Tombol aksi hanya untuk halaman yang memang bisa dibuka (tamu: sesuai Akses tamu).
+  const can = (href: string) => internal || !!p.canOpen?.(href)
+  const go = (href: string, label: string, primary = true) => can(href) ? <Link key={href} href={href} className={`btn ${primary ? 'btn-primary' : 'btn-ghost'}`} style={{ minHeight: 44 }}>{label}{primary && <> <Icon name="arrow" size={16} stroke={2.2} /></>}</Link> : null
   const hello = `${greeting(new Date().getHours())}, ${first}.`
   const shell = (title: React.ReactNode, chips: React.ReactNode, actions: React.ReactNode, visual: React.ReactNode, tag: string) => (
     <section className={`au-hero rise hero-${kind}`} aria-labelledby="dash-h">
@@ -89,7 +94,7 @@ function HeroBody({ kind, p, switcher }: { kind: HeroKind; p: Props; switcher: R
     return shell(
       <>{hello} <em>{cnt('wfo')} dari {staff.length}</em> orang WFO hari ini{staff.length - filled > 0 ? `, ${staff.length - filled} belum isi presensi.` : '.'}</>,
       <>{TYPES.filter(([k]) => k === 'wfo' || cnt(k)).slice(0, 3).map(([k, l]) => chip(<CountUp to={cnt(k)} />, l, k))}{chip(<CountUp to={staff.length - filled} />, 'Belum isi', 'none')}</>,
-      internal && <><Link href="/dashboard/attendance" className="btn btn-primary" style={{ minHeight: 44 }}>Isi presensi <Icon name="arrow" size={16} stroke={2.2} /></Link><Link href="/dashboard/calendar" className="btn btn-ghost" style={{ minHeight: 44 }}>Kalender tim</Link></>,
+      <>{internal && go('/dashboard/attendance', 'Isi presensi')}{go('/dashboard/calendar', 'Kalender tim', !internal)}</>,
       <div className="au-col" style={{ alignItems: 'center', gap: 14 }}>
         <Ring value={pct} size={200} stroke={18} color="var(--att-wfo)" label={`${P(pct)} WFO hari ini`}><b style={{ fontSize: 44 }}>{P(pct)}</b><span>WFO hari ini</span></Ring>
         <div className="au-heroweek" aria-label="WFO pekan ini">{week.map(w => <span key={w.iso} className={w.iso === todayIso ? 'today' : ''} title={`${w.h}: ${w.n} WFO`}><i style={{ height: `${8 + (staff.length ? w.n / staff.length : 0) * 40}px` }} /><small>{w.h}</small></span>)}</div>
@@ -112,7 +117,7 @@ function HeroBody({ kind, p, switcher }: { kind: HeroKind; p: Props; switcher: R
     return shell(
       n0 ? <>{hello} {ongoing ? 'Sedang berlangsung' : 'Berikutnya'} <em>{n0.title}</em>{ongoing ? `, sampai ${Number(String(endOf(n0)).slice(8, 10))} ${BLN[Number(String(endOf(n0)).slice(5, 7)) - 1]}` : `, ${diff === 0 ? 'hari ini' : diff === 1 ? 'besok' : `${diff} hari lagi`}`}.</> : <>{hello} Belum ada agenda terjadwal berikutnya.</>,
       <>{chip(<CountUp to={todayN} />, 'Hari ini')}{chip(<CountUp to={thisWeek} />, '7 hari ke depan')}{chip(<CountUp to={d.st.highPriority || 0} />, 'Prioritas tinggi')}</>,
-      internal && <><Link href="/dashboard/calendar" className="btn btn-primary" style={{ minHeight: 44 }}>Buka kalender <Icon name="arrow" size={16} stroke={2.2} /></Link><Link href="/dashboard/activities" className="btn btn-ghost" style={{ minHeight: 44 }}>Activities</Link></>,
+      <>{go('/dashboard/calendar', 'Buka kalender')}{go('/dashboard/activities', 'Activities', false)}</>,
       <div className="au-heroagenda">
         {dt ? <div className="cal"><span className="m">{BLN[dt.getUTCMonth()].toUpperCase()}</span><b>{dt.getUTCDate()}</b><span className="w">{HARI[dt.getUTCDay()]}</span></div> : <div className="cal empty"><b>–</b></div>}
         <ol>{list.slice(1).map(a => <li key={a._id}><span className="d">{Number(String(a.actionDate).slice(8, 10))} {BLN[Number(String(a.actionDate).slice(5, 7)) - 1]}</span><span className="t">{a.title}</span></li>)}</ol>
@@ -121,12 +126,14 @@ function HeroBody({ kind, p, switcher }: { kind: HeroKind; p: Props; switcher: R
   }
 
   if (kind === 'enhancement') {
-    const total = d.enh.length; const by = CATS.map(c => [c, d.enh.filter((v: Any) => v.s.cat === c).length] as const)
+    const total = d.enh.length
+    const unscored = d.enh.filter((v: Any) => !(CATS as readonly string[]).includes(v.s.cat)).length
+    const by = [...CATS.map(c => [c, d.enh.filter((v: Any) => v.s.cat === c).length] as const), ...(unscored ? [['Belum dinilai', unscored] as const] : [])]
     const brd = total ? d.enh.reduce((s: number, v: Any) => s + ((v.e.stage || 1) / 7) * 100, 0) / total : 0
     return shell(
       total ? <>{hello} <em>{total} enhancement</em> di {year}{by[0][1] ? `, ${by[0][1]} Quick Win siap jalan.` : '.'}</> : <>{hello} Belum ada enhancement di {year}.</>,
       <>{by.map(([c, n]) => chip(<CountUp to={n} />, c, c))}</>,
-      <>{yearHint(total, enhHint, 'enhancement')}{internal && <Link href="/dashboard/enhancement" className="btn btn-primary" style={{ minHeight: 44 }}>Buka enhancement <Icon name="arrow" size={16} stroke={2.2} /></Link>}</>,
+      <>{yearHint(total, enhHint, 'enhancement')}{go('/dashboard/enhancement', 'Buka enhancement')}</>,
       <Ring value={brd} size={220} stroke={20} color="#8C3FD6" label={`Rata-rata tahap BRD ${P(brd)}`}><b style={{ fontSize: 46 }}>{P(brd)}</b><span>rata-rata tahap BRD</span></Ring>,
       `ENHANCEMENT · ${year}`)
   }
@@ -146,8 +153,8 @@ function HeroBody({ kind, p, switcher }: { kind: HeroKind; p: Props; switcher: R
     <>{hello} {d.inits.length
       ? (d.behind.length ? <><em>{d.behind.length} enhancement</em> butuh perhatian{d.enh.length ? `, ${d.enh.filter((v: Any) => v.s.cat === 'Quick Win').length} Quick Win siap jalan.` : '.'}</> : <>Semua enhancement <em>on track</em>.</>)
       : <>Belum ada pekerjaan tercatat di {year}.</>}</>,
-    <>{chip(<CountUp to={d.inits.length} />, 'Enhancement')}{chip(<CountUp to={d.inits.filter((v: Any) => v.i.klas === 'SI').length} />, 'SI · KPI')}{chip(<><CountUp to={d.wfoToday.length} /><small style={{ fontSize: 16, opacity: .7 }}>/{d.staff.length}</small></>, 'WFO hari ini')}</>,
-    <>{internal && <><Link href="/dashboard/enhancement?view=progress" className="btn btn-primary" style={{ minHeight: 44 }}>Lihat progress <Icon name="arrow" size={16} stroke={2.2} /></Link></>}{yearHint(d.enh.length, enhHint, 'enhancement')}</>,
+    <>{chip(<CountUp to={d.inits.length} />, 'Enhancement')}{chip(<CountUp to={d.inits.filter((v: Any) => v.i.klas === 'SI').length} />, 'SI · KPI')}{p.attOn === false ? chip(<CountUp to={d.behind.length} />, 'Perlu perhatian') : chip(<><CountUp to={d.wfoToday.length} /><small style={{ fontSize: 16, opacity: .7 }}>/{d.staff.length}</small></>, 'WFO hari ini')}</>,
+    <>{go('/dashboard/enhancement?view=progress', 'Lihat progress')}{yearHint(d.enh.length, enhHint, 'enhancement')}</>,
     <Ring value={d.port.actual} plan={d.port.spi == null ? null : d.port.plan} size={220} stroke={20} label={`Realisasi portofolio ${P(d.port.actual)} dari rencana ${P(d.port.plan)}`}><b style={{ fontSize: 46 }}>{P(d.port.actual)}</b><span>realisasi · plan {P(d.port.plan)}</span></Ring>,
     `LIVE · ${year}`)
 }

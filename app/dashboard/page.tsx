@@ -2,6 +2,8 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
+import { useGuest } from '@/lib/guestClient'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { getConfig } from '@/lib/configCache'
@@ -45,9 +47,15 @@ export default function DashboardPage() {
   const nowYear = new Date().getFullYear()
   const todayIso = format(new Date(), 'yyyy-MM-dd')
   const today = useMemo(() => todayUTC(), [])
-  const first = String(user?.name || '').split(' ')[0] || 'kamu'
+  const { access: gAccess, canOpen: gCanOpen, attendanceOn: gAtt } = useGuest()
+  const first = !internal ? gAccess.greetingName : String(user?.name || '').split(' ')[0] || 'kamu'
+  // Tamu: tab Issues & data presensi hanya bila dibuka admin (Konfigurasi → Akses tamu).
+  const issuesOn = internal || gAccess.issuesTab
+  const attOn = internal || gAtt
 
-  const [view, setView] = useState<View>('general')
+  const [view0, setView] = useState<View>('general')
+  // Tab Issues ditutup admin untuk tamu → tampil General walau tersimpan di perangkat.
+  const view: View = !issuesOn && view0 === 'issues' ? 'general' : view0
   // Fokus: default diri sendiri; bisa dipilih per nama member (filter PIC).
   const [focus, setFocus] = useState<string>('')
   const [data, setData] = useState<{ acts: Any[]; inits: Any[]; enh: Any[]; members: Any[]; att: Any[]; notes: Any[] } | null>(null)
@@ -62,6 +70,15 @@ export default function DashboardPage() {
     try { const raw = localStorage.getItem(VIEW_KEY); const s = (raw === 'mgmt' ? 'general' : raw) as View | null; if (s && ['general', 'staff', 'issues'].includes(s) && (internal || s !== 'staff')) v = s } catch {}
     setView(v)
   }, [user, internal])
+  // Tamu dialihkan dari menu yang belum dibuka (proxy menambahkan ?guest=blocked).
+  useEffect(() => {
+    if (internal || typeof window === 'undefined') return
+    const u = new URL(window.location.href)
+    if (u.searchParams.get('guest') === 'blocked') {
+      toast('Halaman itu belum dibuka untuk tamu.', { icon: '🔒', duration: 5000 })
+      u.searchParams.delete('guest'); window.history.replaceState(null, '', u.pathname + u.search)
+    }
+  }, [internal])
   const pickView = (v: View) => { setView(v); try { localStorage.setItem(VIEW_KEY, v) } catch {} }
 
   const load = useCallback(async () => {
@@ -74,12 +91,12 @@ export default function DashboardPage() {
     const [acts, inits, enh, members, notes, ...att] = await Promise.all([
       get('/api/projects', 'activities'), get('/api/initiatives?year=all', 'initiative'), get('/api/enhancements?year=all', 'enhancement'),
       get('/api/users', 'member'), internal ? get('/api/notes', 'catatan') : Promise.resolve([]),
-      ...months.map(m => get(`/api/attendance?month=${m}`, 'presensi')),
+      ...(attOn ? months.map(m => get(`/api/attendance?month=${m}`, 'presensi')) : []),
     ])
     // Transition: render widget yang berat dipecah React menjadi potongan kecil (tidak memblokir input).
     startTransition(() => { setData({ acts, inits, enh, members, notes, att: (att as Any[][]).flat() }); setFailed(Array.from(new Set(bad))) })
     getConfig(true).then(c => startTransition(() => setConfig(c))).catch(() => {})
-  }, [internal, todayIso])
+  }, [internal, todayIso, attOn])
   const ready = session !== undefined
   useEffect(() => { if (ready) load() }, [load, ready])
   // Kembali ke aplikasi (PWA dibuka lagi / tab aktif) atau ada data yang diubah → muat ulang,
@@ -144,7 +161,8 @@ export default function DashboardPage() {
 
   const views: ReadonlyArray<readonly [View, React.ReactNode]> = internal
     ? [['general', <><Icon name="dash" size={15} />General</>], ['staff', <><Icon name="me" size={15} />Fokus saya</>], ['issues', <><Icon name="bolt" size={15} />Issues</>]]
-    : [['general', <><Icon name="dash" size={15} />General</>], ['issues', <><Icon name="bolt" size={15} />Issues</>]]
+    : issuesOn ? [['general', <><Icon name="dash" size={15} />General</>], ['issues', <><Icon name="bolt" size={15} />Issues</>]]
+    : [['general', <><Icon name="dash" size={15} />General</>]]
   const dateLabel = format(new Date(), 'EEEE, d MMMM yyyy', { locale: idLocale })
 
   return (
@@ -158,11 +176,11 @@ export default function DashboardPage() {
 
       <div className="au-view au-anim">
         <PageHeader eyebrow={`${dateLabel} · ${year}`} title="Dashboard" actions={<>
-          <Seg label="Tampilan dashboard" value={view} onChange={pickView} options={views} />
+          {views.length > 1 && <Seg label="Tampilan dashboard" value={view} onChange={pickView} options={views} />}
         </>} />
         {failed.length > 0 && <div className="au-row au-wrap p-warn" role="status" style={{ borderRadius: 14, padding: 12 }}><span className="au-small" style={{ flex: 1 }}>Sebagian data gagal dimuat ({failed.join(', ')}).</span><button type="button" className="btn btn-sm" onClick={() => { ['/api/projects', '/api/initiatives?year=all', '/api/enhancements?year=all', '/api/users', '/api/notes'].forEach(u => invalidateFetch(u)); load() }}>Coba lagi</button></div>}
 
-        {!d ? <Skeleton /> : view === 'issues' ? <Issues acts={data!.acts} config={config} internal={internal} onToggleHidden={async (a, next) => {
+        {!d ? <Skeleton /> : view === 'issues' && issuesOn ? <Issues acts={data!.acts} config={config} internal={internal} allowExport={internal || gAccess.allowExport} onToggleHidden={async (a, next) => {
           setData(x => x && ({ ...x, acts: x.acts.map(y => (y._id === a._id ? { ...y, hidden: next } : y)) }))
           const r = await fetch(`/api/projects/${a._id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hidden: next }) }).catch(() => null)
           if (!r?.ok) setData(x => x && ({ ...x, acts: x.acts.map(y => (y._id === a._id ? { ...y, hidden: !next } : y)) }))
@@ -171,11 +189,11 @@ export default function DashboardPage() {
           : view === 'staff' && internal && me ? <Staff first={first} me={me} d={d} todayIso={todayIso} today={today} focus={focus} setFocus={setFocus} selfName={String(user?.name || '')} />
           : <>
             {/* Sorotan: bisa diganti (progress, presensi, agenda, enhancement, tugas saya) */}
-            <DashHero d={d} data={data!} me={me} first={first} year={year} nowYear={nowYear} todayIso={todayIso} internal={internal} isAdmin={roles.includes('admin')} setYear={setYear} onMyFocus={internal ? () => { setFocus(''); pickView('staff') } : undefined} />
+            <DashHero d={d} data={data!} me={me} first={first} year={year} nowYear={nowYear} todayIso={todayIso} internal={internal} canOpen={gCanOpen} attOn={attOn} isAdmin={roles.includes('admin')} setYear={setYear} onMyFocus={internal ? () => { setFocus(''); pickView('staff') } : undefined} />
 
             {/* Widget ala Apple: dipilih & disusun per user (galeri per menu) */}
             <WidgetBoard isAdmin={roles.includes('admin')} allowed={config ? getAllowedMenus(config.roleDefs || [], roles, true) : null}
-              ctx={{ d, data: data!, me, today, todayIso, year, nowYear, tpl, internal, config,
+              ctx={{ d, data: data!, me, today, todayIso, year, nowYear, tpl, internal, config, canOpen: gCanOpen, attOn,
                 onDetail: (title, items) => setDetail({ title, items }),
                 onFocus: internal ? (name: string) => { setFocus(name); pickView('staff') } : undefined,
                 onMyFocus: internal ? () => { setFocus(''); pickView('staff') } : undefined, onYear: setYear }} />
@@ -259,7 +277,7 @@ function Staff({ first, me, d, todayIso, today, focus, setFocus, selfName }: { f
 }
 
 /* ───────────── Issues ───────────── */
-function Issues({ acts, config, internal, onToggleHidden }: { acts: Any[]; config: Any | null; internal: boolean; onToggleHidden: (a: Any, next: boolean) => void }) {
+function Issues({ acts, config, internal, allowExport, onToggleHidden }: { acts: Any[]; config: Any | null; internal: boolean; allowExport: boolean; onToggleHidden: (a: Any, next: boolean) => void }) {
   const [status, setStatus] = useState('all'), [showHidden, setShowHidden] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const listed = acts.filter(a => a.showInList !== false)
@@ -271,7 +289,7 @@ function Issues({ acts, config, internal, onToggleHidden }: { acts: Any[]; confi
   const catColor = (k: string) => (config?.activityCategories || []).find((c: Any) => c.key === k)?.color || 'var(--accent)'
   return (
     <div className="au-col" style={{ gap: 16 }} ref={ref}>
-      <div className="au-row" style={{ justifyContent: 'flex-end' }} data-export-hide><ExportMenu getNodes={() => ref.current ? Array.from(ref.current.querySelectorAll<HTMLElement>('[data-export-card]')) : []} filename="issues-report" title="Issues — WINS" /></div>
+      {allowExport && <div className="au-row" style={{ justifyContent: 'flex-end' }} data-export-hide><ExportMenu getNodes={() => ref.current ? Array.from(ref.current.querySelectorAll<HTMLElement>('[data-export-card]')) : []} filename="issues-report" title="Issues — WINS" /></div>}
       <div className="au-grid g2" data-export-card="">
         <section className="au-card rise"><h2>Sebaran status</h2>
           <div className="au-row" style={{ alignItems: 'baseline', gap: 8 }}><b style={{ font: '700 40px/1 var(--disp)' }}>{vis.length}</b><span className="au-small au-ink2">issue tampil{hiddenN ? ` · ${hiddenN} disembunyikan` : ''}</span></div>

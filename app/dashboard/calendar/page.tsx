@@ -7,12 +7,13 @@ import { id as idLocale } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 import { Empty, Icon, PageHeader, Pill, Sheet } from '@/components/ui'
 import { useYear } from '@/lib/year'
+import { useGuest } from '@/lib/guestClient'
 
 const PRIORITY_CFG: Record<string,{label:string;tone:'bad'|'warn'|'ok'}> = {
   high:{label:'High', tone:'bad'}, medium:{label:'Medium', tone:'warn'}, low:{label:'Low', tone:'ok'},
 }
 
-function ActivityDetail({ activity, onClose, onSave }: { activity:any; onClose:()=>void; onSave:()=>void; members:any[]; config:any }) {
+function ActivityDetail({ activity, onClose, onSave, readOnly }: { activity:any; onClose:()=>void; onSave:()=>void; members:any[]; config:any; readOnly?:boolean }) {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState(activity)
   const [saving, setSaving] = useState(false)
@@ -60,11 +61,11 @@ function ActivityDetail({ activity, onClose, onSave }: { activity:any; onClose:(
         </div>
         {activity.description && <div className="au-col" style={{ gap:6 }}><span className="lbl">Narasi / progress</span><p className="au-small au-ink2" style={{ whiteSpace:'pre-wrap', lineHeight:1.6 }}>{activity.description}</p></div>}
         {activity.nextPlan && <div className="au-col" style={{ gap:6 }}><span className="lbl">Next plan</span><p className="au-small au-ink2" style={{ whiteSpace:'pre-wrap', lineHeight:1.6 }}>{activity.nextPlan}</p></div>}
-        <div className="au-row au-wrap" style={{ gap:8 }}>
+        {!readOnly && <div className="au-row au-wrap" style={{ gap:8 }}>
           <button type="button" className="btn btn-primary" onClick={()=>setEditing(true)}><Icon name="pnote" size={15} />Edit</button>
           {confirmDel ? <span className="au-row p-bad" style={{ borderRadius:12, padding:'6px 8px', gap:6 }}><span className="au-small">Hapus aktivitas?</span><button type="button" className="btn btn-sm" onClick={()=>setConfirmDel(false)}>Batal</button><button type="button" className="btn btn-danger btn-sm" disabled={saving} onClick={del}>Ya, hapus</button></span>
             : <button type="button" className="btn btn-danger" onClick={()=>setConfirmDel(true)}><Icon name="trash" size={15} />Hapus</button>}
-        </div>
+        </div>}
       </>}
     </Sheet>
   )
@@ -72,6 +73,7 @@ function ActivityDetail({ activity, onClose, onSave }: { activity:any; onClose:(
 
 export default function CalendarPage() {
   const { year } = useYear()
+  const ro = useGuest().isGuest   // tamu: lihat saja
   const [activities, setActivities] = useState<any[]>([])
   const [members, setMembers] = useState<any[]>([])
   const [config, setConfig] = useState<any>(null)
@@ -138,16 +140,16 @@ export default function CalendarPage() {
   const holidayOf = (d:Date) => holidays.has(format(d,'yyyy-MM-dd'))
   return (
     <div className="au-page">
-      {selected && <ActivityDetail activity={selected} onClose={()=>setSelected(null)} onSave={load} members={members} config={config} />}
+      {selected && <ActivityDetail activity={selected} onClose={()=>setSelected(null)} onSave={load} members={members} config={config} readOnly={ro} />}
       <div className="au-view au-anim">
-        <PageHeader eyebrow="Team · sumber: Activities" title="Calendar" actions={<>
+        <PageHeader eyebrow={ro ? 'Agenda tim · lihat saja' : 'Team · sumber: Activities'} title="Calendar" actions={<>
           <div className="au-row" style={{ gap:6 }}>
             <button type="button" onClick={()=>setCurrentMonth(subMonths(currentMonth,1))} className="btn btn-icon" aria-label="Bulan sebelumnya"><Icon name="left" size={18} /></button>
             <b style={{ minWidth:150, textAlign:'center', font:'700 17px var(--disp)' }} aria-live="polite">{format(currentMonth,'MMMM yyyy', { locale:idLocale })}</b>
             <button type="button" onClick={()=>setCurrentMonth(addMonths(currentMonth,1))} className="btn btn-icon" aria-label="Bulan berikutnya"><Icon name="right" size={18} /></button>
           </div>
           <button type="button" onClick={()=>{setCurrentMonth(new Date()); setSelectedDay(new Date())}} className="btn">Hari ini</button>
-          <a href="/dashboard/activities" className="btn btn-primary"><Icon name="plus" size={16} stroke={2.2} />Aktivitas</a>
+          {!ro && <a href="/dashboard/activities" className="btn btn-primary"><Icon name="plus" size={16} stroke={2.2} />Aktivitas</a>}
         </>} />
         <div className="au-cal-wrap">
           <section className="au-card rise" style={{ padding:14, gap:8 }}>
@@ -176,7 +178,7 @@ export default function CalendarPage() {
             <div className="au-col" style={{ gap:2 }}><span className="lbl">{selectedDayActivities.length} aktivitas</span><h2>{format(selectedDay,'EEEE, d MMMM yyyy', { locale:idLocale })}</h2></div>
             {holidayOf(selectedDay) && <span className="au-pill p-bad" style={{ alignSelf:'flex-start' }}>Hari libur</span>}
             {loading ? <><div className="au-skel" /><div className="au-skel" style={{ width:'70%' }} /></>
-              : selectedDayActivities.length === 0 ? <Empty title="Tidak ada aktivitas" text="Pilih tanggal lain atau tambahkan dari Activities." />
+              : selectedDayActivities.length === 0 ? <Empty title="Tidak ada aktivitas" text={ro ? 'Pilih tanggal lain.' : 'Pilih tanggal lain atau tambahkan dari Activities.'} />
               : <div className="au-ig">{selectedDayActivities.map(a => {
                   const pics = picArray(a.pic).length ? picArray(a.pic) : picArray(a.picName)
                   return (
