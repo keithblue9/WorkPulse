@@ -1,10 +1,12 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
+import { useGuest } from '@/lib/guestClient'
 import Link from 'next/link'
 import { cachedFetch } from '@/lib/fetchCache'
 import { Empty, Sheet } from '@/components/ui'
 
 export default function GoLiveInsights() {
+  const guest = useGuest()
   const [apps, setApps] = useState<any[]>([])
   const [entities, setEntities] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,7 +37,7 @@ export default function GoLiveInsights() {
     <section className="au-card" style={{ width: '100%' }}>
       <div className="au-row au-between au-wrap" style={{ gap: 8 }}>
         <div className="au-col"><h2>Go-live per aplikasi</h2><span className="au-xs au-muted">Ketuk aplikasi untuk detail · {total} entitas</span></div>
-        <Link href="/dashboard/golive" className="au-link">Lihat tabel</Link>
+        {guest.canOpen('/dashboard/golive') && <Link href="/dashboard/golive" className="au-link">Lihat tabel</Link>}
       </div>
       {loading ? <div className="au-grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>{[0, 1].map(k => <div key={k} className="au-tile"><div className="au-skel" style={{ width: '40%' }} /><div className="au-skel" style={{ width: 50, height: 26 }} /></div>)}</div>
         : apps.length === 0 ? <Empty title="Belum ada data go-live" />

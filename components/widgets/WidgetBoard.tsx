@@ -32,16 +32,23 @@ function useExtra(needs: Set<Need>, year: number): Extra {
   return x
 }
 
+const wantsGuestEdit = () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('widgets') === 'guest'
+
 export function WidgetBoard({ ctx, allowed, isAdmin }: { ctx: Omit<WCtx, 'extra'>; allowed: Set<string> | null; isAdmin: boolean }) {
   const internal = ctx.internal
   const avail = useMemo(() => availableWidgets(internal ? allowed : null, internal), [allowed, internal])
   const guestAvail = useMemo(() => availableWidgets(null, false), [])
   const [saved, setSaved] = useState<{ mine: Placed[] | null; guest: Placed[] | null } | null>(null)
-  const [scope, setScope] = useState<'mine' | 'guest'>('mine')
-  const [editing, setEditing] = useState(false)
+  const [scope, setScope] = useState<'mine' | 'guest'>(() => (isAdmin && wantsGuestEdit() ? 'guest' : 'mine'))
+  const [editing, setEditing] = useState(() => isAdmin && wantsGuestEdit())
   const [gallery, setGallery] = useState(false)
   const [status, setStatus] = useState<'' | 'saving' | 'saved' | 'error'>('')
 
+  // Dari Konfigurasi → Akses tamu: /dashboard?widgets=guest langsung membuka edit Tampilan tamu.
+  useEffect(() => {
+    if (!isAdmin || !wantsGuestEdit()) return
+    const u = new URL(window.location.href); u.searchParams.delete('widgets'); window.history.replaceState(null, '', u.pathname + u.search)
+  }, [isAdmin])
   useEffect(() => {
     fetch('/api/me/widgets', { cache: 'no-store' }).then(r => r.ok ? r.json() : Promise.reject()).then(j => setSaved(j.data || { mine: null, guest: null })).catch(() => setSaved({ mine: null, guest: null }))
   }, [])
@@ -86,7 +93,7 @@ export function WidgetBoard({ ctx, allowed, isAdmin }: { ctx: Omit<WCtx, 'extra'
       <div className="wg-toolbar">
         {editing ? <>
           {isAdmin && <Seg label="Susunan untuk" value={scope} onChange={setScope} options={[['mine', 'Dashboard saya'], ['guest', 'Tampilan tamu']] as const} />}
-          <span className="au-xs au-muted" aria-live="polite" style={{ marginRight: 'auto' }}>{status === 'saving' ? 'Menyimpan…' : status === 'saved' ? 'Tersimpan' : status === 'error' ? 'Gagal menyimpan' : 'Ketuk − untuk hapus, ubah ukuran, atau geser urutan'}</span>
+          <span className="au-xs au-muted" aria-live="polite" style={{ marginRight: 'auto' }}>{scope === 'guest' && !status ? 'Tampilan tamu: widget yang dipasang ikut membuka datanya untuk tamu. ' : ''}{status === 'saving' ? 'Menyimpan…' : status === 'saved' ? 'Tersimpan' : status === 'error' ? 'Gagal menyimpan' : 'Ketuk − untuk hapus, ubah ukuran, atau geser urutan'}</span>
           <button type="button" className="btn btn-sm btn-ghost" onClick={reset}>Pulihkan bawaan</button>
           <button type="button" className="btn btn-sm" onClick={() => setGallery(true)}><Icon name="plus" size={14} />Widget</button>
           <button type="button" className="btn btn-sm btn-primary" onClick={() => { setEditing(false); setScope('mine') }}>Selesai</button>
@@ -104,7 +111,7 @@ export function WidgetBoard({ ctx, allowed, isAdmin }: { ctx: Omit<WCtx, 'extra'
             const classic = def.kind === 'classic'
             const inner = classic
               ? <div className="wg-classic" data-fam={def.fam}>{renderClassic(p.id)}</div>
-              : <WidgetFrame id={p.id} size={p.size} preview={editing} href={def.id === 'myfocus' ? undefined : def.href} onOpen={def.id === 'myfocus' ? ctx.onMyFocus : undefined}>{renderWidget(p.id, p.size, full)}</WidgetFrame>
+              : <WidgetFrame id={p.id} size={p.size} preview={editing} href={def.id === 'myfocus' || (ctx.canOpen && !ctx.canOpen(def.href)) ? undefined : def.href} onOpen={def.id === 'myfocus' ? ctx.onMyFocus : undefined}>{renderWidget(p.id, p.size, full)}</WidgetFrame>
             if (!editing) return <div key={p.id} data-id={p.id} className={`wg-slot wg-${p.size} rise`} style={{ ['--d' as any]: Math.min(i, 8) }}><LazyMount eager={i < 4} minHeight={classic ? 280 : 0}>{inner}</LazyMount></div>
             return (
               <div key={p.id} data-id={p.id} className={`wg-slot wg-${p.size} jiggle${over === p.id ? ' over' : ''}`} draggable

@@ -20,7 +20,7 @@ describe('decideAccess — API', () => {
     expect(d('/api/config', 'PATCH', null, '?scope=login').kind).toBe('deny')
   })
   it('lets guests read dashboard data but not write', () => {
-    expect(d('/api/dashboard', 'GET', ['guest']).kind).toBe('next')
+    expect(d('/api/dashboard', 'GET', ['guest'])).toMatchObject({ kind: 'deny', status: 403 })   // route lama, tidak dipakai
     expect(d('/api/projects', 'GET', ['guest']).kind).toBe('next')
     expect(d('/api/projects', 'POST', ['guest'])).toMatchObject({ kind: 'deny', status: 403 })
     expect(d('/api/reimbursements', 'GET', ['guest'])).toMatchObject({ kind: 'deny', status: 403 })
@@ -52,7 +52,7 @@ describe('decideAccess — pages', () => {
   it('keeps guests on the guest pages', () => {
     expect(d('/dashboard', 'GET', ['guest']).kind).toBe('next')
     expect(d('/dashboard/links', 'GET', ['guest']).kind).toBe('next')
-    expect(d('/dashboard/members', 'GET', ['guest'])).toEqual({ kind: 'redirect', to: '/dashboard' })
+    expect(d('/dashboard/members', 'GET', ['guest'])).toEqual({ kind: 'redirect', to: '/dashboard?guest=blocked' })
   })
   it('leaves public pages alone', () => {
     expect(d('/login').kind).toBe('next')

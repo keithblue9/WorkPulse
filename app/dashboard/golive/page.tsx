@@ -3,6 +3,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 
 import toast from 'react-hot-toast'
 import { Empty, Icon, PageHeader, Seg, Sheet } from '@/components/ui'
 import { useYear } from '@/lib/year'
+import { useGuest } from '@/lib/guestClient'
 
 const GROUPS = ['Holding','SH Upstream','SH Gas','SH C&T','SH PNRE','SH R&P','SH Shipping','Others']
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
@@ -10,6 +11,8 @@ const APP_COLORS = ['#4B3BFF','#7B6BFF','#0FA898','#F2A33A','#FF5D3B','#14b8a6']
 function fmtDate(v:string){ if(!v||v==='Not Yet') return v||''; const [y,m]=v.split('-'); return m&&y? `${MONTHS[parseInt(m)-1]}-${y.slice(2)}` : v }
 
 export default function GoLivePage() {
+  // Tamu: lihat saja (semua input terkunci lewat <fieldset disabled>), export sesuai Akses tamu.
+  const guest = useGuest(); const ro = guest.isGuest; const canExport = !ro || guest.access.allowExport
   const [apps, setApps] = useState<any[]>([])
   const [entities, setEntities] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -197,15 +200,15 @@ export default function GoLivePage() {
   return (
     <div className="au-page">
       <div className="au-view au-anim">
-        <PageHeader eyebrow={`Activities · ${entities.length} entitas · ${apps.length} aplikasi`} title="Go-Live" actions={<>
-          <button type="button" onClick={()=>doExport('excel')} disabled={!!exporting||view.length===0} className="btn btn-ghost" title="Export tabel ke Excel"><Icon name="file" size={15} />{exporting==='excel'?'Menyiapkan…':'Excel'}</button>
-          <button type="button" onClick={()=>doExport('pdf')} disabled={!!exporting||view.length===0} className="btn btn-ghost" title="Export ke PDF"><Icon name="file" size={15} />{exporting==='pdf'?'Menyiapkan…':'PDF'}</button>
-          <button type="button" onClick={()=>setNewApp('')} className="btn"><Icon name="plus" size={15} />Aplikasi</button>
-          <button type="button" onClick={addEntity} className="btn btn-primary"><Icon name="plus" size={16} stroke={2.2} />Entitas</button>
+        <PageHeader eyebrow={`${ro ? 'Lihat saja' : 'Activities'} · ${entities.length} entitas · ${apps.length} aplikasi`} title="Go-Live" actions={<>
+          {canExport && <><button type="button" onClick={()=>doExport('excel')} disabled={!!exporting||view.length===0} className="btn btn-ghost" title="Export tabel ke Excel"><Icon name="file" size={15} />{exporting==='excel'?'Menyiapkan…':'Excel'}</button>
+          <button type="button" onClick={()=>doExport('pdf')} disabled={!!exporting||view.length===0} className="btn btn-ghost" title="Export ke PDF"><Icon name="file" size={15} />{exporting==='pdf'?'Menyiapkan…':'PDF'}</button></>}
+          {!ro && <><button type="button" onClick={()=>setNewApp('')} className="btn"><Icon name="plus" size={15} />Aplikasi</button>
+          <button type="button" onClick={addEntity} className="btn btn-primary"><Icon name="plus" size={16} stroke={2.2} />Entitas</button></>}
         </>} />
         <div className="au-grid au-tiles" style={{ gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))' }}>
           {summary.map((a:any)=>{ const denom=yearFilter==='all'?entities.length:yearTotal; const pct=denom>0?Math.round(a.done/denom*100):0; return (
-            <button type="button" key={a._id||a.key} className="au-tile" onClick={()=>setEditApp({...a})} title="Edit aplikasi & sub-fitur">
+            <button type="button" key={a._id||a.key} className="au-tile" onClick={ro ? undefined : ()=>setEditApp({...a})} title={ro ? undefined : 'Edit aplikasi & sub-fitur'} style={ro ? { cursor:'default' } : undefined} tabIndex={ro ? -1 : undefined}>
               <span className="au-row au-between"><span className="lbl">{a.label}</span><span className="au-xs au-muted">{pct}%</span></span>
               <b className="v" style={{ color:a.color }}>{a.done}<small style={{ fontSize:14, color:'var(--muted)', fontWeight:600 }}> / {denom}</small></b>
               <span className="au-track" style={{ height:8 }}><i className="a" style={{ width:`${pct}%`, background:a.color }} /></span>
@@ -226,6 +229,7 @@ export default function GoLivePage() {
 
         {loading?<div className="au-card"><div className="au-skel" /><div className="au-skel" style={{ width:'70%' }} /></div>:(
         <div className="au-tblw" style={{overflow:'auto',maxHeight:'calc(100dvh - 330px)', minHeight:260, scrollPaddingLeft: idLeft[frozen] ?? undefined}}>
+          <fieldset disabled={ro} className="au-ro" aria-label={ro ? 'Tabel go-live (lihat saja)' : undefined}>
           <table style={{borderCollapse:'collapse',width:'100%',minWidth:600+totalSubs*70}}>
             <thead>
               {/* Row 1: app group headers */}
@@ -238,9 +242,9 @@ export default function GoLivePage() {
                 {apps.map((a:any,ai:number)=>{
                   const subs=(a.subFeatures||[]); const cols=subs.length+1; // subs + date
                   const color=APP_COLORS[ai%6]
-                  return <th key={a._id||a.key} style={{...th,borderLeft:'1px solid var(--line2)',color:`color-mix(in srgb, ${color} 62%, var(--ink))`,cursor:'pointer'}} colSpan={cols} onClick={()=>setEditApp({...a})} title="Klik untuk edit aplikasi & sub-fitur">{a.label} <Icon name="pnote" size={11} /></th>
+                  return <th key={a._id||a.key} style={{...th,borderLeft:'1px solid var(--line2)',color:`color-mix(in srgb, ${color} 62%, var(--ink))`,cursor:ro?'default':'pointer'}} colSpan={cols} onClick={ro ? undefined : ()=>setEditApp({...a})} title={ro ? undefined : "Klik untuk edit aplikasi & sub-fitur"}>{a.label}{!ro && <> <Icon name="pnote" size={11} /></>}</th>
                 })}
-                <th style={{...th,width:30}} rowSpan={2}></th>
+                {!ro && <th style={{...th,width:30}} rowSpan={2}></th>}
               </tr>
               {/* Row 2: sub-feature headers — menempel DI BAWAH baris 1, bukan menimpanya */}
               <tr>
@@ -279,12 +283,13 @@ export default function GoLivePage() {
                       )})}
                     </Fragment>
                   )})}
-                  <td style={{...td,textAlign:'center'}}><button type="button" onClick={()=>delEntity(e)} className={`btn btn-sm${pendingDel===e._id?' btn-danger':' btn-icon'}`} aria-label={pendingDel===e._id ? `Konfirmasi hapus ${e.name||'entitas'}` : `Hapus ${e.name||'entitas'}`} style={pendingDel===e._id?undefined:{color:'var(--bad)'}}>{pendingDel===e._id ? 'Hapus?' : <Icon name="trash" size={14} />}</button></td>
+                  {!ro && <td style={{...td,textAlign:'center'}}><button type="button" onClick={()=>delEntity(e)} className={`btn btn-sm${pendingDel===e._id?' btn-danger':' btn-icon'}`} aria-label={pendingDel===e._id ? `Konfirmasi hapus ${e.name||'entitas'}` : `Hapus ${e.name||'entitas'}`} style={pendingDel===e._id?undefined:{color:'var(--bad)'}}>{pendingDel===e._id ? 'Hapus?' : <Icon name="trash" size={14} />}</button></td>}
                 </tr>
               )})}
-              {view.length===0&&<tr><td colSpan={5+totalSubs+apps.length+1}><Empty title={entities.length ? 'Tidak ada yang cocok' : 'Belum ada entitas'} text={entities.length ? 'Ubah pencarian, grup atau tahun.' : 'Tambah entitas untuk mulai mencatat go-live.'} /></td></tr>}
+              {view.length===0&&<tr><td colSpan={5+totalSubs+apps.length+(ro?0:1)}><Empty title={entities.length ? 'Tidak ada yang cocok' : 'Belum ada entitas'} text={entities.length ? 'Ubah pencarian, grup atau tahun.' : 'Tambah entitas untuk mulai mencatat go-live.'} /></td></tr>}
             </tbody>
           </table>
+          </fieldset>
         </div>
         )}
       </div>

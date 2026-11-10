@@ -18,6 +18,7 @@ import { useYear } from '@/lib/year'
 import { DAY, calc, dUTC, inYear, isoDay, ptd, statusOf, todayUTC, type Act } from '@/lib/progress'
 import { CATS, ENH_APPS, ENH_TYPES, INITIATORS, STAGES, STAGES_SHORT, TPL, brdPct, enhActs, normWeights, rankPrio, score, type Cat, type EnhItem, type EnhPhase } from '@/lib/enhancement'
 import { otherYearHint } from '@/lib/hero'
+import { useGuest } from '@/lib/guestClient'
 import { KLAS, actsFromTemplate, carriedTo, isCustom, isDone, klasOf, yearRole, type CustomAct } from '@/lib/enhancementFlow'
 
 type Enh = Record<string, any>
@@ -311,6 +312,7 @@ export default function EnhancementPage() {
   const { data: session } = useSession()
   const roles = userRolesOf(session?.user)
   const internal = isInternalUser(roles), admin = roles.includes('admin')
+  const guestAccess = useGuest().access
   const { year, years, setYear } = useYear()
   const today = useMemo(() => todayUTC(), [])
   const [all, setAll] = useState<Enh[] | null>(null)
@@ -395,9 +397,9 @@ export default function EnhancementPage() {
   }
 
   const head = (
-    <PageHeader eyebrow={`Enhancement & Progress · ${year}`} title="Enhancement" actions={<>
+    <PageHeader eyebrow={`Enhancement & Progress · ${year}${internal ? '' : ' · lihat saja'}`} title="Enhancement" actions={<>
       <span className="au-enh-seg"><Seg label="Tampilan" value={mode} onChange={m => setMode(m)} options={[['list', <><Icon name="list" size={15} />Daftar</>], ['prog', <><Icon name="prog" size={15} />Progress</>], ['matrix', <><Icon name="grid" size={15} />Matriks</>], ['road', <><Icon name="road" size={15} />Roadmap</>]] as const} /></span>
-      <ExportMenu getNodes={() => exportRef.current ? Array.from(exportRef.current.querySelectorAll<HTMLElement>('[data-export-card]')) : []} filename={`enhancement-${year}`} title="Enhancement — WINS" />
+      {(internal || guestAccess.allowExport) && <ExportMenu getNodes={() => exportRef.current ? Array.from(exportRef.current.querySelectorAll<HTMLElement>('[data-export-card]')) : []} filename={`enhancement-${year}`} title="Enhancement — WINS" />}
       {internal && own.some(v => !v.done) && <button type="button" className="btn btn-ghost" onClick={() => setSheet({ k: 'carry' })}><Icon name="arrow" size={16} stroke={2.2} />Carry Over</button>}
       {internal && <button type="button" className="btn btn-ghost" onClick={() => setSheet({ k: 'upload' })}><Icon name="up" size={16} stroke={2.2} />Upload Excel</button>}
       {internal && <button type="button" className="btn btn-primary" onClick={() => setSheet({ k: 'edit', e: null })}><Icon name="plus" size={16} stroke={2.2} />Tambah</button>}

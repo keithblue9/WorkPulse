@@ -4,6 +4,8 @@ import { ConfigModel } from '@/models/Config'
 import { DEFAULT_WIDGETS } from '@/lib/defaults'
 import { mergeConfigDefaults, loginSlice, withoutLoginBackgrounds } from '@/lib/configMerge'
 import { currentRoles } from '@/lib/session'
+import { guestConfigSlice, normalizeGuestAccess } from '@/lib/guestPolicy'
+import { clearGuestPolicyCache, guestPolicyForRequest } from '@/lib/guestServer'
 
 // GET is read-only: a missing or legacy config document is completed in memory
 // (see lib/configMerge) and never written back. Only an explicit save (PATCH) writes.
@@ -19,6 +21,9 @@ export async function GET(req: NextRequest) {
     const cfg = mergeConfigDefaults(base, DEFAULT_WIDGETS)
     const headers = { 'Cache-Control': 'no-store' }
     if (searchParams.get('scope') === 'login') return NextResponse.json({ data: loginSlice(cfg) }, { headers })
+    // Tamu: hanya potongan aman (tanpa WhatsApp/kasir/rekening/nilai anggaran), dengan menu efektif.
+    const guest = await guestPolicyForRequest()
+    if (guest) return NextResponse.json({ data: guestConfigSlice(cfg, guest.menus) }, { headers })
     if (searchParams.get('include') === 'loginBackgrounds') return NextResponse.json({ data: cfg }, { headers })
     return NextResponse.json({ data: withoutLoginBackgrounds(cfg) }, { headers })
   } catch (e:any) {
@@ -36,7 +41,9 @@ export async function PATCH(req: NextRequest) {
     if (!roles.includes('admin') && Object.keys(body || {}).some(k => k !== 'dashboardWidgets')) {
       return NextResponse.json({ error: 'Khusus admin' }, { status: 403 })
     }
+    if (body && 'guestAccess' in body) body.guestAccess = normalizeGuestAccess(body.guestAccess)
     const cfg = await ConfigModel.findOneAndUpdate({}, body, { new:true, upsert:true })
+    if (body && ('roleDefs' in body || 'guestAccess' in body || 'guestLayout' in body)) clearGuestPolicyCache()
     return NextResponse.json({ data: cfg }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (e:any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

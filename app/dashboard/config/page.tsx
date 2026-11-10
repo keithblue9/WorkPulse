@@ -7,8 +7,10 @@ import { DEFAULT_ROLES, DEFAULT_WIDGETS, DEFAULT_LINK_CATEGORIES } from '@/lib/d
 import { displayAppName } from '@/lib/appName'
 import { TPL, STAGES, normWeights } from '@/lib/enhancement'
 import { Empty, Icon, PageHeader } from '@/components/ui'
+import dynamic from 'next/dynamic'
+const GuestAccessEditor = dynamic(() => import('@/components/GuestAccessEditor'), { ssr: false })
 
-type Tab = 'branding'|'login'|'taxonomies'|'attendance'|'budget'|'roles'|'widgets'|'enhancement'|'reset'|'system'
+type Tab = 'branding'|'login'|'taxonomies'|'attendance'|'budget'|'roles'|'guest'|'widgets'|'enhancement'|'reset'|'system'
 
 const TPL_COLORS = ['var(--accent)', '#7B6BFF', 'var(--aqua)', 'var(--warn-bar)', 'var(--muted)']
 // Bobot default timeline Enhancement. Tiap enhancement memakai bobot ini kecuali diatur sendiri.
@@ -239,6 +241,7 @@ function RolesEditor({ roles, onChange }: { roles:any[]; onChange:(roles:any[])=
               {!r.builtin && <button type="button" onClick={()=>remove(i)} className={`btn btn-sm${delAsk===i?' btn-danger':' btn-icon'}`} aria-label={`Hapus role ${r.label}`}>{delAsk===i ? 'Hapus?' : <Icon name="trash" size={14} />}</button>}
             </div>
           </div>
+          {r.key === 'guest' ? <span className="au-small au-muted">Akses tamu diatur di tab <b>Akses tamu</b> — hanya halaman yang aman untuk tamu (lihat saja) yang bisa dibuka.</span> : <>
           <span className="au-xs au-muted">Menu yang bisa diakses · {(r.allowedMenus||[]).length}</span>
           <div className="au-chips wrap" role="group" aria-label={`Menu untuk ${r.label}`}>
             {MENU_KEYS.map(menu => {
@@ -249,7 +252,7 @@ function RolesEditor({ roles, onChange }: { roles:any[]; onChange:(roles:any[])=
                 </button>
               )
             })}
-          </div>
+          </div></>}
         </div>
       ))}
       {showAdd ? (
@@ -358,6 +361,7 @@ export default function ConfigPage() {
     { key:'attendance', label:'Tipe absensi', icon:'cal' },
     { key:'budget',     label:'Anggaran & transfer', icon:'budget' },
     { key:'roles',      label:'Roles & akses', icon:'shield' },
+    { key:'guest',      label:'Akses tamu', icon:'link' },
     { key:'widgets',    label:'Widget dashboard', icon:'dash' },
     { key:'enhancement', label:'Template enhancement', icon:'enh' },
     { key:'reset',      label:'Reset data', icon:'trash' },
@@ -610,6 +614,7 @@ export default function ConfigPage() {
             <RolesEditor roles={withBuiltins(config.roleDefs)} onChange={(v:any)=>setConfig((c:any)=>({...c, roleDefs:v}))} />
           </Section>
         )}
+        {tab === 'guest' && <GuestAccessEditor key={JSON.stringify(config.guestAccess||{})+JSON.stringify((config.roleDefs||[]).find((r:any)=>r.key==='guest')?.allowedMenus||[])} config={config} saving={saving} onSave={save} />}
         {tab === 'widgets' && (
           <Section title="Widget dashboard" sub="Tampilkan/sembunyikan komponen dashboard per tab. Cocok untuk fokus ke metrik yang penting saja." action={
             <button className="btn btn-sm btn-primary" onClick={()=>save({ dashboardWidgets: (config.dashboardWidgets && config.dashboardWidgets.length) ? config.dashboardWidgets : DEFAULT_WIDGETS, linkCategories: (config.linkCategories && config.linkCategories.length) ? config.linkCategories : DEFAULT_LINK_CATEGORIES })}>Simpan</button>

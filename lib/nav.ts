@@ -1,3 +1,5 @@
+import { guestCanOpenPage } from './guestPolicy'
+
 // Menu structure (as-is + Enhancement) and permission rules shared by the sidebar,
 // the phone tab bar, the Menu page and the command palette.
 export type NavItem = { href: string; label: string; icon: string; permKey: string; perms?: string[]; internal?: boolean; isNew?: boolean }
@@ -66,7 +68,9 @@ export function visibleNav(allowed: Set<string>, roles: string[]): NavGroup[] {
   const internal = isInternalUser(roles)
   return NAV_GROUPS.map(g => ({
     ...g,
-    items: g.items.filter(i => i.internal ? internal : (i.perms ? i.perms.some(p => allowed.has(p)) : allowed.has(i.permKey))),
+    // Tamu: hanya halaman yang benar-benar bisa dibuka tamu (sama dengan aturan proxy) — tidak ada menu yang memantul.
+    items: g.items.filter(i => !internal ? guestCanOpenPage(i.href, allowed)
+      : i.internal ? true : (i.perms ? i.perms.some(p => allowed.has(p)) : allowed.has(i.permKey))),
   })).filter(g => g.items.length)
 }
 
