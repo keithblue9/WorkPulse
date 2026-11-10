@@ -3,6 +3,8 @@ import { connectDB } from '@/lib/db'
 import { ProjectModel } from '@/models/Project'
 import { addedPics } from '@/lib/changeLog'
 import { currentActor, notifyNewPics, recordAudit } from '@/lib/notifyServer'
+import { guestPolicyForRequest } from '@/lib/guestServer'
+import { sanitizeActivityForGuest } from '@/lib/guestPolicy'
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,8 +15,11 @@ export async function GET(req: NextRequest) {
     const query: any = {}
     if (pic) query.$or = [{ pic }, { members: pic }]
     if (status) query.status = status
+    const guest = await guestPolicyForRequest()
+    if (guest) query.hidden = { $ne: true }   // aktivitas yang disembunyikan admin tidak pernah dikirim ke tamu
     const projects = await ProjectModel.find(query).sort({ priority: 1, createdAt: -1 }).lean()
-    return NextResponse.json({ data: projects })
+    const data = guest ? projects.map((a: any) => sanitizeActivityForGuest(a, guest.access)) : projects
+    return NextResponse.json({ data })
   } catch { return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
 }
 

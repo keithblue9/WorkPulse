@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { invalidateConfig } from '@/lib/configCache'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
@@ -67,6 +68,7 @@ export default function LoginPage() {
     if (!selectedUser) { toast.error('Pilih nama dulu'); return }
     if (pinStr.length !== 6) { toast.error('PIN harus 6 digit'); return }
     setLoading(true)
+    invalidateConfig()   // jangan bawa config sesi sebelumnya (mis. internal → tamu di tab yang sama)
     const res = await signIn('credentials', { email: selectedUser.email, password: pinStr, redirect: false })
     setLoading(false)
     if (res?.ok) {
@@ -79,6 +81,7 @@ export default function LoginPage() {
   }
   async function handleGuest() {
     setGuestLoading(true)
+    invalidateConfig()
     const res = await signIn('credentials', { guest: 'true', redirect: false })
     setGuestLoading(false)
     if (res?.ok) { router.push('/dashboard') }

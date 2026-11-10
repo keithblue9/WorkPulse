@@ -1,3 +1,4 @@
+import { clearGuestPolicyCache } from '@/lib/guestServer'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
@@ -40,6 +41,7 @@ export async function PUT(req: NextRequest) {
     if (body?.scope === 'guest') {
       if (!me.roles.includes('admin')) return NextResponse.json({ error: 'Khusus admin' }, { status: 403 })
       await ConfigModel.updateOne({}, { $set: set('guestLayout', 'guestHero') }, { upsert: true })
+      clearGuestPolicyCache()
     } else {
       if (me.roles.every(r => r === 'guest')) return NextResponse.json({ error: 'Akses tamu tidak diizinkan' }, { status: 403 })
       await UserModel.updateOne({ email: me.email }, { $set: set('dashboardLayout', 'dashboardHero') })
@@ -56,6 +58,7 @@ export async function DELETE(req: NextRequest) {
     if (guest) {
       if (!me.roles.includes('admin')) return NextResponse.json({ error: 'Khusus admin' }, { status: 403 })
       await ConfigModel.updateOne({}, { $unset: { guestLayout: 1 } })
+      clearGuestPolicyCache()
     } else await UserModel.updateOne({ email: me.email }, { $unset: { dashboardLayout: 1 } })
     return NextResponse.json({ ok: true })
   } catch (e: any) { return NextResponse.json({ error: e?.message || 'Gagal' }, { status: 500 }) }

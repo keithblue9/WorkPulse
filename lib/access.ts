@@ -1,4 +1,5 @@
 // Pure access rules used by proxy.ts. Kept free of Next.js imports so they can be unit-tested.
+import { guestApiAllowed, guestCanOpenPage } from './guestPolicy'
 
 export type Decision =
   | { kind: 'next' }
@@ -10,15 +11,11 @@ const under = (path: string, base: string) => path === base || path.startsWith(b
 
 const PUBLIC_API = ['/api/auth', '/api/warmup', '/api/cron', '/api/version']
 
-// Read-only endpoints a guest (external) session needs for the guest dashboard and Link Hub.
-const GUEST_GET_API = [
-  '/api/config', '/api/dashboard', '/api/attendance', '/api/users', '/api/presence', '/api/projects', '/api/issues',
-  '/api/initiatives', '/api/enhancements', '/api/golive', '/api/cashcard/summary', '/api/budget', '/api/mandatory',
-  '/api/links', '/api/agenda', '/api/birthdays', '/api/profile', '/api/announcements', '/api/me/widgets',
-]
-const GUEST_PAGES = ['/dashboard', '/dashboard/links', '/dashboard/menu']
+/** Kebijakan tamu dari Konfigurasi (lihat lib/guestPolicy). Tanpa ini → bawaan ketat: dashboard + Link Hub. */
+export type GuestRules = { menus: ReadonlySet<string>; issuesTab: boolean }
+const STRICT_GUEST: GuestRules = { menus: new Set(['dashboard', 'links']), issuesTab: true }
 
-export function decideAccess(input: { pathname: string; method: string; roles: string[] | null; search?: string }): Decision {
+export function decideAccess(input: { pathname: string; method: string; roles: string[] | null; search?: string; guest?: GuestRules }): Decision {
   const { pathname, roles } = input
   const method = (input.method || 'GET').toUpperCase()
   const signedIn = Array.isArray(roles)
@@ -32,10 +29,9 @@ export function decideAccess(input: { pathname: string; method: string; roles: s
     if (pathname === '/api/users' && method === 'GET' && /(^|[?&])scope=login(&|$)/.test(input.search || '')) return { kind: 'next' }
     if (!signedIn) return { kind: 'deny', status: 401, message: 'Silakan login dulu' }
     if (isGuest) {
-      const ok = (method === 'GET' && GUEST_GET_API.some(p => under(pathname, p)))
-        || (method === 'POST' && pathname === '/api/presence')
-        || (method === 'PATCH' && /^\/api\/links\/[^/]+$/.test(pathname))
-      return ok ? { kind: 'next' } : { kind: 'deny', status: 403, message: 'Akses tamu tidak diizinkan' }
+      const g = input.guest || STRICT_GUEST
+      return guestApiAllowed(pathname, method, g.menus, { issuesTab: g.issuesTab })
+        ? { kind: 'next' } : { kind: 'deny', status: 403, message: 'Akses tamu tidak diizinkan' }
     }
     if (under(pathname, '/api/admin') && !has('admin')) return { kind: 'deny', status: 403, message: 'Khusus admin' }
     if (under(pathname, '/api/users') && (method === 'POST' || method === 'DELETE') && !has('admin', 'manager')) {
@@ -46,7 +42,7 @@ export function decideAccess(input: { pathname: string; method: string; roles: s
 
   if (under(pathname, '/dashboard')) {
     if (!signedIn) return { kind: 'redirect', to: '/login?callbackUrl=' + encodeURIComponent(pathname) }
-    if (isGuest && !GUEST_PAGES.includes(pathname)) return { kind: 'redirect', to: '/dashboard' }
+    if (isGuest && !guestCanOpenPage(pathname, (input.guest || STRICT_GUEST).menus)) return { kind: 'redirect', to: '/dashboard?guest=blocked' }
     return { kind: 'next' }
   }
   return { kind: 'next' }

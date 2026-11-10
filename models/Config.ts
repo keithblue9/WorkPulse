@@ -191,6 +191,14 @@ const ConfigSchema = new Schema({
   // Susunan widget dashboard untuk tamu/eksternal (diatur admin)
   guestLayout: { type: [{ _id:false, id:String, size:String }], default: undefined },
   guestHero: String,
+  // Akses tamu (lihat lib/guestPolicy): tab Issues, export, sembunyikan link & PIC, sapaan.
+  guestAccess: {
+    issuesTab: { type:Boolean, default:true },
+    allowExport: { type:Boolean, default:false },
+    hideLinks: { type:Boolean, default:true },
+    showPic: { type:Boolean, default:true },
+    greetingName: { type:String, default:'Guest' },
+  },
   lastWeeklyDigest: { type:String, default:'' },
   lastStaleReimburse: { type:String, default:'' },
   // Guard ringkasan to-do pagi (tugas yang di-assign, sampai due date) — 1x per tanggal
