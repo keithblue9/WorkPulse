@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { PresenceModel } from '@/models/Presence'
 
-const ONLINE_WINDOW_MS = 90 * 1000 // considered "online" if seen within last 90s
+const ONLINE_WINDOW_MS = 150 * 1000 // "online" bila terlihat dalam 150 dtk terakhir (heartbeat klien tiap 60 dtk)
 
 export async function POST(req: NextRequest) {
   try {

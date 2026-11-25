@@ -68,9 +68,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
               navigator.serviceWorker.register('/sw.js?v=${process.env.NEXT_PUBLIC_BUILD_ID || ''}').then(function(reg){
-                // Cek update tiap kali tab difokuskan + tiap 60 detik
+                // Cek update tiap kali tab difokuskan + tiap 15 menit selama tab terlihat (dulu tiap 60 detik, termasuk tab tersembunyi).
+                // Versi baru juga dideteksi VersionWatch (/api/version) tiap 5 menit.
                 try { reg.update(); } catch(e){}
-                setInterval(function(){ try { reg.update(); } catch(e){} }, 60000);
+                setInterval(function(){ if (!document.hidden) { try { reg.update(); } catch(e){} } }, 900000);
                 document.addEventListener('visibilitychange', function(){ if (!document.hidden) { try { reg.update(); } catch(e){} } });
               }).catch(function(){});
               // Begitu SW baru ambil alih, reload sekali biar dapet versi terbaru.

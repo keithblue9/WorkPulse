@@ -8,6 +8,8 @@
 // - In-flight dedupe: request identik yang jalan bersamaan share 1 promise.
 // - Cache TTL pendek: hasil dipakai ulang sebentar (default 30 dtk).
 
+import { invalidateConfig } from '@/lib/configCache'
+
 type Entry = { at: number; data: any }
 
 const cache = new Map<string, Entry>()
@@ -43,6 +45,14 @@ export function invalidateFetch(prefix?: string) {
   for (const k of Array.from(cache.keys())) if (k.startsWith(prefix)) cache.delete(k)
 }
 
+// POST latar belakang (heartbeat presence, cek pengingat, push) BUKAN perubahan data pengguna.
+// Dulu ikut dihitung → tiap 45 dtk cache dibuang & dashboard memuat ulang SEMUA API
+// (notes + config ≈ 600 KB per putaran) sehingga biaya Vercel membengkak.
+const BACKGROUND_API = /\/api\/(auth|presence|push|quicknotes\/check-reminders|version|warmup)(\/|\?|$)/
+export function isBackgroundRequest(url: string): boolean {
+  return BACKGROUND_API.test(url)
+}
+
 // Setiap simpan/ubah/hapus yang berhasil ke /api/* membuang cache, supaya dashboard, badge menu
 // dan widget langsung memakai data terbaru (sebelumnya bisa tertahan sampai 30 detik).
 // Dipasang sekali di Providers. Hanya memantau; respons tidak diubah.
@@ -56,8 +66,9 @@ export function watchMutations() {
     try {
       const method = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-      if (method !== 'GET' && method !== 'HEAD' && res.ok && /\/api\//.test(url) && !/\/api\/auth\//.test(url)) {
+      if (method !== 'GET' && method !== 'HEAD' && res.ok && /\/api\//.test(url) && !isBackgroundRequest(url)) {
         cache.clear()
+        if (/\/api\/config(\/|\?|$)/.test(url)) invalidateConfig()   // config disimpan → buang cache sessionStorage-nya juga
         window.dispatchEvent(new CustomEvent('wins:data-changed', { detail: { url, method } }))
       }
     } catch {}

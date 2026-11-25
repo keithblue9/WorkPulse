@@ -48,7 +48,7 @@ export default function VersionWatch() {
     document.addEventListener('visibilitychange', onVis)
     window.addEventListener('focus', onVis)
     window.addEventListener('pageshow', onVis)
-    const id = setInterval(() => check(), 5 * 60 * 1000)
+    const id = setInterval(() => { if (!document.hidden) check() }, 5 * 60 * 1000)   // tab tersembunyi tidak perlu; saat terlihat lagi onVis yang mengecek
     return () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis); window.removeEventListener('pageshow', onVis); clearInterval(id) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { check() }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps

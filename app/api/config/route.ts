@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { ConfigModel } from '@/models/Config'
 import { DEFAULT_WIDGETS } from '@/lib/defaults'
-import { mergeConfigDefaults, loginSlice, withoutLoginBackgrounds } from '@/lib/configMerge'
+import { mergeConfigDefaults, loginSlice, withoutLoginBackgrounds, configSizeReport } from '@/lib/configMerge'
+import { jsonRevalidate } from '@/lib/httpCache'
 import { currentRoles } from '@/lib/session'
 import { guestConfigSlice, normalizeGuestAccess } from '@/lib/guestPolicy'
 import { clearGuestPolicyCache, guestPolicyForRequest } from '@/lib/guestServer'
@@ -12,6 +13,19 @@ import { clearGuestPolicyCache, guestPolicyForRequest } from '@/lib/guestServer'
 // ?scope=login        → public slice for the login page (allowed without a session, see lib/access)
 // ?include=loginBackgrounds → full config incl. login images (Configuration page)
 // default              → full config without the heavy login images
+// Respons memakai ETag + `private, no-cache` (lib/httpCache): browser menyimpan salinan tapi selalu validasi ulang,
+// jadi perubahan dari admin langsung terlihat sementara config yang tidak berubah dibalas 304 (tanpa badan).
+// Dulu `no-store` → config penuh terkirim ulang setiap kali.
+let lastHeavyLog = 0
+function reply(req: NextRequest, data: unknown) {
+  // Penanda ukuran: kalau config > 64 KB, catat field terbesar (maks 1x/menit per instance) supaya sumbernya mudah dilacak di Vercel Logs.
+  if (Date.now() - lastHeavyLog > 60_000) {
+    const r = configSizeReport(data)
+    if (r.total > 64_000) { lastHeavyLog = Date.now(); console.warn('[config] payload besar', r.total, 'bytes; field terbesar:', JSON.stringify(r.top)) }
+  }
+  return jsonRevalidate(req, { data })
+}
+
 export async function GET(req: NextRequest) {
   try {
     await connectDB()
@@ -19,13 +33,12 @@ export async function GET(req: NextRequest) {
     const doc = await ConfigModel.findOne({}).lean() as any
     const base = doc || (new ConfigModel({}) as any).toObject()
     const cfg = mergeConfigDefaults(base, DEFAULT_WIDGETS)
-    const headers = { 'Cache-Control': 'no-store' }
-    if (searchParams.get('scope') === 'login') return NextResponse.json({ data: loginSlice(cfg) }, { headers })
+    if (searchParams.get('scope') === 'login') return reply(req, loginSlice(cfg))
     // Tamu: hanya potongan aman (tanpa WhatsApp/kasir/rekening/nilai anggaran), dengan menu efektif.
     const guest = await guestPolicyForRequest()
-    if (guest) return NextResponse.json({ data: guestConfigSlice(cfg, guest.menus) }, { headers })
-    if (searchParams.get('include') === 'loginBackgrounds') return NextResponse.json({ data: cfg }, { headers })
-    return NextResponse.json({ data: withoutLoginBackgrounds(cfg) }, { headers })
+    if (guest) return reply(req, guestConfigSlice(cfg, guest.menus))
+    if (searchParams.get('include') === 'loginBackgrounds') return reply(req, cfg)
+    return reply(req, withoutLoginBackgrounds(cfg))
   } catch (e:any) {
     console.error('GET /api/config error', e)
     return NextResponse.json({ error: e.message }, { status: 500 })

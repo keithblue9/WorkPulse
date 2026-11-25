@@ -1,5 +1,6 @@
 'use client'
 import { Portal } from '@/components/ui/Portal'
+import { getConfig } from '@/lib/configCache'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
@@ -137,7 +138,7 @@ export default function AppPopups() {
   const [config, setConfig] = useState<any>(null)
   useEffect(() => {
     if (!session) return
-    fetch('/api/config').then(r=>r.json()).then(d => setConfig(d.data)).catch(()=>{})
+    getConfig().then(d => setConfig(d)).catch(()=>{})
   }, [session])
 
   if (!session?.user) return null

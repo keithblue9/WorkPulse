@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { cachedFetch } from '@/lib/fetchCache'
+import { getConfig } from '@/lib/configCache'
 import { useYear } from '@/lib/year'
 import { Ring } from '@/components/ui'
 
@@ -61,7 +62,7 @@ export default function BudgetInsights({ section }: { section?: 'yield' | 'realp
       try {
         const [b, c] = await Promise.all([
           cachedFetch('/api/budget?all=1').catch(() => ({ data: [] })),
-          cachedFetch('/api/config').catch(() => ({ data: {} })),
+          getConfig().then(data => ({ data })).catch(() => ({ data: {} as any })),
         ])
         setRows(b.data || [])
         const cats = c.data?.budgetCategories || []

@@ -97,3 +97,9 @@ export function withoutLoginBackgrounds(cfg: any): any {
   const { loginBackgrounds, ...rest } = cfg || {}
   return { ...rest, loginBackgroundCount: Array.isArray(loginBackgrounds) ? loginBackgrounds.length : 0 }
 }
+
+/** Ukuran JSON per field teratas — untuk menemukan field config yang membengkak (mis. gambar base64). */
+export function configSizeReport(cfg: any, top = 5): { total: number; top: { key: string; bytes: number }[] } {
+  const rows = Object.entries(cfg || {}).map(([key, v]) => ({ key, bytes: JSON.stringify(v ?? null)?.length ?? 0 }))
+  return { total: rows.reduce((n, r) => n + r.bytes, 0), top: rows.sort((a, b) => b.bytes - a.bytes).slice(0, top) }
+}

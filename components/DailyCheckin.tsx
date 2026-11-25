@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { getConfig } from '@/lib/configCache'
 import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 
@@ -37,7 +38,7 @@ export default function DailyCheckin() {
         const att = await fetch(`/api/attendance?userId=${pr.data._id}&month=${month}`).then(r => r.json())
         const done = (att?.data || []).some((a: any) => a.date === localToday())
         if (done) { try { localStorage.setItem(key, '1') } catch {}; return }
-        const cfg = await fetch('/api/config').then(r => r.json())
+        const cfg = { data: await getConfig() }   // cache bersama (5 mnt), bukan fetch mentah
         if (cancelled) return
         setProfile(pr.data)
         setTypes((cfg.data?.attendanceTypes || []).filter((t: any) => t.active))

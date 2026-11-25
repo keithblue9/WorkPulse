@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db'
 import { NotesModel } from '@/models/Notes'
+import { restoreImages } from '@/lib/notesImages'
 export async function GET(req: NextRequest, ctx:{params:Promise<{id:string}>}) {
   try { await connectDB(); const { id } = await ctx.params; const item = await NotesModel.findById(id).lean(); return NextResponse.json({ data:item }) }
   catch (e:any) { return NextResponse.json({ error:e.message }, { status:500 }) }
 }
 export async function PATCH(req: NextRequest, ctx:{params:Promise<{id:string}>}) {
-  try { await connectDB(); const { id } = await ctx.params; const body = await req.json(); const item = await NotesModel.findByIdAndUpdate(id, body, { new:true }); return NextResponse.json({ data:item }) }
+  try {
+    await connectDB(); const { id } = await ctx.params; const body = await req.json()
+    // Klien menerima gambar sebagai alamat /api/notes/<id>/image/<n>; kembalikan ke gambar aslinya sebelum disimpan
+    // (kalau tidak, gambar tersimpan sebagai rujukan ke dirinya sendiri dan hilang).
+    if (body && Array.isArray(body.images)) {
+      const cur: any = await NotesModel.findById(id).select('images').lean()
+      body.images = restoreImages(body.images, id, cur?.images)
+    }
+    const item = await NotesModel.findByIdAndUpdate(id, body, { new:true }); return NextResponse.json({ data:item })
+  }
   catch (e:any) { return NextResponse.json({ error:e.message }, { status:500 }) }
 }
 export async function DELETE(req: NextRequest, ctx:{params:Promise<{id:string}>}) {
