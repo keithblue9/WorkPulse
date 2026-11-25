@@ -38,11 +38,13 @@ export default function OnlinePresence() {
   useEffect(() => {
     if (!me) return
     let alive = true
-    const beat = () => { fetch('/api/presence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(me) }).catch(() => {}) }
-    const poll = () => { fetch('/api/presence').then(r => r.json()).then(d => { if (alive && d.data) setOnline(d.data) }).catch(() => {}) }
+    // Tab yang tersembunyi tidak mengirim apa pun (hemat request); begitu terlihat lagi, onVis langsung beat+poll.
+    const beat = () => { if (document.hidden) return; fetch('/api/presence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(me) }).catch(() => {}) }
+    const poll = () => { if (document.hidden) return; fetch('/api/presence').then(r => r.json()).then(d => { if (alive && d.data) setOnline(d.data) }).catch(() => {}) }
     beat(); poll()
-    const beatId = setInterval(beat, 45000)
-    const pollId = setInterval(poll, 30000)
+    // 60 dtk (dulu 45 & 30 dtk). Jendela "online" di server 150 dtk > 2× interval, jadi tidak berkedip offline.
+    const beatId = setInterval(beat, 60000)
+    const pollId = setInterval(poll, 60000)
     const onVis = () => { if (document.visibilityState === 'visible') { beat(); poll() } }
     document.addEventListener('visibilitychange', onVis)
     return () => { alive = false; clearInterval(beatId); clearInterval(pollId); document.removeEventListener('visibilitychange', onVis) }

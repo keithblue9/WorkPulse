@@ -8,6 +8,7 @@ import { Empty, Icon, PageHeader, Sheet, Portal } from '@/components/ui'
 import { useYear } from '@/lib/year'
 import { matches, notesForYear, sortNotes } from '@/lib/notesView'
 import { monthGroups, catCounts } from '@/lib/notesFeed'
+import { uploadNoteImage } from '@/lib/noteImageUpload'
 
 type Note = Record<string, any>
 type Cat = { key: string; label: string; color?: string }
@@ -62,9 +63,8 @@ function NoteSheet({ editing, defaultCat, cats, members, onClose, onSaved }: { e
       const blob = item.getAsFile()
       if (!blob) continue
       if (blob.size > 3 * 1024 * 1024) { toast.error('Gambar maksimal 3 MB'); continue }
-      const reader = new FileReader()
-      reader.onload = ev => { setForm(f => ({ ...f, images: [...f.images, ev.target?.result as string] })); toast.success('Gambar ditempel') }
-      reader.readAsDataURL(blob)
+      // Diunggah ke Vercel Blob (catatan hanya menyimpan URL-nya); kalau gagal, jatuh ke base64 seperti dulu.
+      uploadNoteImage(blob).then(r => { setForm(f => ({ ...f, images: [...f.images, r.url] })); toast.success('Gambar ditempel') }).catch(() => toast.error('Gagal menempel gambar'))
     }
   }
   function bullet(prefix: string) {

@@ -90,12 +90,12 @@ export default function DashboardPage() {
     const get = (url: string, label: string) => cachedFetch(url).then(r => r?.data ?? []).catch(() => { bad.push(label); return [] })
     const [acts, inits, enh, members, notes, ...att] = await Promise.all([
       get('/api/projects', 'activities'), get('/api/initiatives?year=all', 'initiative'), get('/api/enhancements?year=all', 'enhancement'),
-      get('/api/users', 'member'), internal ? get('/api/notes', 'catatan') : Promise.resolve([]),
+      get('/api/users', 'member'), internal ? get('/api/notes?pinned=1', 'catatan') : Promise.resolve([]),   // widget hanya butuh catatan yang disematkan
       ...(attOn ? months.map(m => get(`/api/attendance?month=${m}`, 'presensi')) : []),
     ])
     // Transition: render widget yang berat dipecah React menjadi potongan kecil (tidak memblokir input).
     startTransition(() => { setData({ acts, inits, enh, members, notes, att: (att as Any[][]).flat() }); setFailed(Array.from(new Set(bad))) })
-    getConfig(true).then(c => startTransition(() => setConfig(c))).catch(() => {})
+    getConfig().then(c => startTransition(() => setConfig(c))).catch(() => {})   // pakai cache 5 mnt; PATCH config membuangnya (lib/fetchCache)
   }, [internal, todayIso, attOn])
   const ready = session !== undefined
   useEffect(() => { if (ready) load() }, [load, ready])
@@ -104,7 +104,8 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!ready) return
     let last = Date.now()
-    const refresh = () => { if (Date.now() - last < 2000) return; last = Date.now(); load() }
+    // Tab di latar belakang tidak perlu memuat ulang; saat kembali terlihat, onVis di bawah yang menyegarkan.
+    const refresh = () => { if (document.visibilityState !== 'visible') return; if (Date.now() - last < 2000) return; last = Date.now(); load() }
     const onVis = () => { if (document.visibilityState === 'visible' && Date.now() - last > 30_000) refresh() }
     document.addEventListener('visibilitychange', onVis)
     window.addEventListener('wins:data-changed', refresh)
